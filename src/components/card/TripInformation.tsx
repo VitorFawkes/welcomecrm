@@ -3,7 +3,7 @@ import { MapPin, Calendar, DollarSign, Tag, TrendingUp } from 'lucide-react'
 import type { Database, TripsProdutoData } from '../../database.types'
 import { supabase } from '../../lib/supabase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import PessoasField from '../pipeline/fields/PessoasField'
+// import PessoasField from '../pipeline/fields/PessoasField'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -11,15 +11,11 @@ interface TripInformationProps {
     card: Card
 }
 
-interface TravelersSummary {
-    total: number
-    adults: number
-    children: number
-}
+
 
 export default function TripInformation({ card }: TripInformationProps) {
     const productData = (card.produto_data as TripsProdutoData) || {}
-    const [summary, setSummary] = useState<TravelersSummary | null>(null)
+
     const [editingField, setEditingField] = useState<string | null>(null)
     const [editedData, setEditedData] = useState<TripsProdutoData>(productData)
     const queryClient = useQueryClient()
@@ -27,8 +23,7 @@ export default function TripInformation({ card }: TripInformationProps) {
     useEffect(() => {
         const fetchSummary = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('view_cards_contatos_summary')
+                const { data, error } = await (supabase.from('view_cards_contatos_summary') as any)
                     .select('total_viajantes, total_adultos, total_criancas')
                     .eq('card_id', card.id)
                     .single()
@@ -36,11 +31,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                 if (error && error.code !== 'PGRST116') throw error
 
                 if (data) {
-                    setSummary({
-                        total: data.total_viajantes || 0,
-                        adults: data.total_adultos || 0,
-                        children: data.total_criancas || 0
-                    })
+
                 }
             } catch (error) {
                 console.error('Error fetching travelers summary:', error)
@@ -57,8 +48,7 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     const updateCardMutation = useMutation({
         mutationFn: async (newData: TripsProdutoData) => {
-            const { error } = await supabase
-                .from('cards')
+            const { error } = await (supabase.from('cards') as any)
                 .update({ produto_data: newData })
                 .eq('id', card.id!)
 
@@ -95,9 +85,7 @@ export default function TripInformation({ card }: TripInformationProps) {
         }).format(value)
     }
 
-    const displayAdults = summary?.total ? summary.adults : (productData.pessoas?.adultos || 0)
-    const displayChildren = summary?.total ? summary.children : (productData.pessoas?.criancas || 0)
-    const displayTotal = summary?.total ? summary.total : (displayAdults + displayChildren)
+
 
     return (
         <div className="rounded-lg border bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm">
@@ -175,7 +163,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 value={editedData.epoca_viagem?.inicio || ''}
                                 onChange={(e) => setEditedData({
                                     ...editedData,
-                                    epoca_viagem: { ...editedData.epoca_viagem, inicio: e.target.value, fim: editedData.epoca_viagem?.fim || '' }
+                                    epoca_viagem: { ...editedData.epoca_viagem, inicio: e.target.value, fim: editedData.epoca_viagem?.fim || '', flexivel: editedData.epoca_viagem?.flexivel || false }
                                 })}
                                 onBlur={handleFieldSave}
                                 autoFocus
@@ -186,7 +174,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 value={editedData.epoca_viagem?.fim || ''}
                                 onChange={(e) => setEditedData({
                                     ...editedData,
-                                    epoca_viagem: { ...editedData.epoca_viagem, inicio: editedData.epoca_viagem?.inicio || '', fim: e.target.value }
+                                    epoca_viagem: { ...editedData.epoca_viagem, inicio: editedData.epoca_viagem?.inicio || '', fim: e.target.value, flexivel: editedData.epoca_viagem?.flexivel || false }
                                 })}
                                 onBlur={handleFieldSave}
                                 className="w-full text-xs border-gray-300 rounded-md"
@@ -223,7 +211,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 value={editedData.orcamento?.total || ''}
                                 onChange={(e) => setEditedData({
                                     ...editedData,
-                                    orcamento: { ...editedData.orcamento, total: parseFloat(e.target.value) || 0 }
+                                    orcamento: { ...editedData.orcamento, total: parseFloat(e.target.value) || 0, por_pessoa: editedData.orcamento?.por_pessoa || 0 }
                                 })}
                                 onBlur={handleFieldSave}
                                 autoFocus

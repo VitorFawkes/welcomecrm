@@ -41,13 +41,12 @@ export default function PipelineSettings() {
     const { data: settings, isLoading } = useQuery({
         queryKey: ['pipeline-settings'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('pipeline_card_settings')
+            const { data, error } = await (supabase.from('pipeline_card_settings') as any)
                 .select('*')
                 .is('usuario_id', null) // Fetch global defaults for now
 
             if (error) throw error
-            return data
+            return data as any[]
         }
     })
 
@@ -102,8 +101,7 @@ export default function PipelineSettings() {
     const saveMutation = useMutation({
         mutationFn: async (newConfig: any) => {
             // Upsert based on fase and usuario_id (null for global)
-            const { error } = await supabase
-                .from('pipeline_card_settings')
+            const { error } = await (supabase.from('pipeline_card_settings') as any)
                 .upsert({
                     fase: activePhase,
                     campos_visiveis: newConfig.campos_visiveis,

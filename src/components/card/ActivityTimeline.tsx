@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckSquare, MessageCircle, Phone, Mail, Send, AlertCircle, Clock, Filter } from 'lucide-react'
+import { CheckSquare, MessageCircle, Send, AlertCircle, Clock, Filter } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 interface ActivityTimelineProps {
@@ -27,8 +27,7 @@ export default function ActivityTimeline({ cardId }: ActivityTimelineProps) {
     const { data: tasks } = useQuery({
         queryKey: ['timeline-tasks', cardId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('tarefas')
+            const { data, error } = await (supabase.from('tarefas') as any)
                 .select('*, profiles:responsavel_id(nome)')
                 .eq('card_id', cardId)
                 .order('data_vencimento', { ascending: false })
@@ -42,8 +41,7 @@ export default function ActivityTimeline({ cardId }: ActivityTimelineProps) {
     const { data: notes } = useQuery({
         queryKey: ['timeline-notes', cardId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('notas')
+            const { data, error } = await (supabase.from('notas') as any)
                 .select('*, profiles:autor_id(nome)')
                 .eq('card_id', cardId)
                 .order('created_at', { ascending: false })
@@ -57,8 +55,7 @@ export default function ActivityTimeline({ cardId }: ActivityTimelineProps) {
     const { data: activities } = useQuery({
         queryKey: ['timeline-activities', cardId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('atividades')
+            const { data, error } = await (supabase.from('atividades') as any)
                 .select('*, profiles:responsavel_id(nome)')
                 .eq('card_id', cardId)
                 .order('created_at', { ascending: false })
@@ -71,7 +68,7 @@ export default function ActivityTimeline({ cardId }: ActivityTimelineProps) {
 
     // Combine and sort timeline
     const timelineItems: Activity[] = [
-        ...(tasks?.map(t => ({
+        ...(tasks?.map((t: any) => ({
             id: t.id,
             type: 'task' as const,
             title: t.titulo,
@@ -82,14 +79,14 @@ export default function ActivityTimeline({ cardId }: ActivityTimelineProps) {
             overdue: !t.concluida && new Date(t.data_vencimento) < new Date(),
             priority: t.prioridade
         })) || []),
-        ...(notes?.map(n => ({
+        ...(notes?.map((n: any) => ({
             id: n.id,
             type: 'note' as const,
-            title: n.texto,
+            title: n.conteudo,
             timestamp: n.created_at || '',
             author: (n.profiles as any)?.nome
         })) || []),
-        ...(activities?.map(a => ({
+        ...(activities?.map((a: any) => ({
             id: a.id,
             type: 'activity' as const,
             title: a.titulo,
@@ -172,7 +169,7 @@ export default function ActivityTimeline({ cardId }: ActivityTimelineProps) {
                                                 {item.title}
                                             </p>
                                             {item.description && (
-                                                <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.description}</p>
                                             )}
                                             <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
                                                 <span>{item.author}</span>

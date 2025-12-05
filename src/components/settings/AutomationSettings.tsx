@@ -1,12 +1,13 @@
+
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Plus, Trash2, Clock, CheckSquare, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
-import type { Database } from '../../database.types'
+import { Plus, Trash2, Clock, CheckSquare, ChevronDown, ChevronRight } from 'lucide-react'
 
-type Stage = Database['public']['Tables']['pipeline_stages']['Row']
-type AutomationRule = Database['public']['Tables']['automation_rules']['Row']
-type StageObligation = Database['public']['Tables']['stage_obligations']['Row']
+
+// type Stage = Database['public']['Tables']['pipeline_stages']['Row']
+// type AutomationRule = Database['public']['Tables']['automation_rules']['Row']
+// type StageObligation = Database['public']['Tables']['stage_obligations']['Row']
 
 export default function AutomationSettings() {
     const queryClient = useQueryClient()
@@ -18,12 +19,11 @@ export default function AutomationSettings() {
     const { data: stages, isLoading: loadingStages } = useQuery({
         queryKey: ['pipeline-stages'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('pipeline_stages')
+            const { data, error } = await (supabase.from('pipeline_stages') as any)
                 .select('*')
                 .order('ordem')
             if (error) throw error
-            return data
+            return data as any[]
         }
     })
 
@@ -31,12 +31,11 @@ export default function AutomationSettings() {
     const { data: rules, isLoading: loadingRules } = useQuery({
         queryKey: ['automation-rules'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('automation_rules')
+            const { data, error } = await (supabase.from('automation_rules') as any)
                 .select('*')
                 .eq('active', true)
             if (error) throw error
-            return data
+            return data as any[]
         }
     })
 
@@ -44,19 +43,18 @@ export default function AutomationSettings() {
     const { data: obligations, isLoading: loadingObligations } = useQuery({
         queryKey: ['stage-obligations'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('stage_obligations')
+            const { data, error } = await (supabase.from('stage_obligations') as any)
                 .select('*')
                 .eq('active', true)
             if (error) throw error
-            return data
+            return data as any[]
         }
     })
 
     // Mutations
     const createRuleMutation = useMutation({
         mutationFn: async (newRule: any) => {
-            const { error } = await supabase.from('automation_rules').insert(newRule)
+            const { error } = await (supabase.from('automation_rules') as any).insert(newRule)
             if (error) throw error
         },
         onSuccess: () => {
@@ -67,7 +65,7 @@ export default function AutomationSettings() {
 
     const deleteRuleMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('automation_rules').delete().eq('id', id)
+            const { error } = await (supabase.from('automation_rules') as any).delete().eq('id', id)
             if (error) throw error
         },
         onSuccess: () => {
@@ -77,7 +75,7 @@ export default function AutomationSettings() {
 
     const createObligationMutation = useMutation({
         mutationFn: async (newOb: any) => {
-            const { error } = await supabase.from('stage_obligations').insert(newOb)
+            const { error } = await (supabase.from('stage_obligations') as any).insert(newOb)
             if (error) throw error
         },
         onSuccess: () => {
@@ -88,7 +86,7 @@ export default function AutomationSettings() {
 
     const deleteObligationMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('stage_obligations').delete().eq('id', id)
+            const { error } = await (supabase.from('stage_obligations') as any).delete().eq('id', id)
             if (error) throw error
         },
         onSuccess: () => {
@@ -152,7 +150,7 @@ export default function AutomationSettings() {
                                                 <div key={rule.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 text-sm">
                                                     <div className="flex items-center gap-3">
                                                         <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">
-                                                            {rule.delay_minutes === 0 ? 'Imediato' : `+${rule.delay_minutes} min`}
+                                                            {rule.delay_minutes === 0 ? 'Imediato' : `+ ${rule.delay_minutes} min`}
                                                         </span>
                                                         <span className="font-medium text-gray-900">{rule.task_title}</span>
                                                         <span className="text-gray-500 text-xs">({rule.task_type})</span>
@@ -174,7 +172,7 @@ export default function AutomationSettings() {
                                                     stageId={stage.id}
                                                     pipelineId={stage.pipeline_id}
                                                     onCancel={() => setIsAddingRule(null)}
-                                                    onSubmit={(data) => createRuleMutation.mutate(data)}
+                                                    onSubmit={(data: any) => createRuleMutation.mutate(data)}
                                                 />
                                             )}
                                         </div>
@@ -223,7 +221,7 @@ export default function AutomationSettings() {
                                                     stageId={stage.id}
                                                     pipelineId={stage.pipeline_id}
                                                     onCancel={() => setIsAddingObligation(null)}
-                                                    onSubmit={(data) => createObligationMutation.mutate(data)}
+                                                    onSubmit={(data: any) => createObligationMutation.mutate(data)}
                                                 />
                                             )}
                                         </div>

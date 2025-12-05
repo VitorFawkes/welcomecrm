@@ -19,8 +19,7 @@ export default function ObservacoesLivres({ card }: ObservacoesLivresProps) {
 
     const updateObsMutation = useMutation({
         mutationFn: async (newObs: string) => {
-            const { error } = await supabase
-                .from('cards')
+            const { error } = await (supabase.from('cards') as any)
                 .update({
                     produto_data: {
                         ...productData,

@@ -34,8 +34,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded }: Con
         queryFn: async () => {
             if (!debouncedSearch) return []
 
-            const { data, error } = await supabase
-                .from('contatos')
+            const { data, error } = await (supabase.from('contatos') as any)
                 .select('*')
                 .ilike('nome', `%${debouncedSearch}%`)
                 .limit(5)
@@ -49,8 +48,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded }: Con
     // Create contact mutation
     const createContactMutation = useMutation({
         mutationFn: async () => {
-            const { data, error } = await supabase
-                .from('contatos')
+            const { data, error } = await (supabase.from('contatos') as any)
                 .insert(newContact)
                 .select()
                 .single()
@@ -60,8 +58,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded }: Con
         },
         onSuccess: async (createdContact) => {
             // Add the newly created contact as a traveler
-            const { data: existing } = await supabase
-                .from('cards_contatos')
+            const { data: existing } = await (supabase.from('cards_contatos') as any)
                 .select('ordem')
                 .eq('card_id', cardId)
                 .order('ordem', { ascending: false })
@@ -69,8 +66,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded }: Con
 
             const nextOrder = (existing?.[0]?.ordem || 0) + 1
 
-            await supabase
-                .from('cards_contatos')
+            await (supabase.from('cards_contatos') as any)
                 .insert({
                     card_id: cardId,
                     contato_id: createdContact.id,
@@ -88,8 +84,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded }: Con
     const addContactMutation = useMutation({
         mutationFn: async (contactId: string) => {
             // Get current max order
-            const { data: existing } = await supabase
-                .from('cards_contatos')
+            const { data: existing } = await (supabase.from('cards_contatos') as any)
                 .select('ordem')
                 .eq('card_id', cardId)
                 .order('ordem', { ascending: false })
@@ -97,8 +92,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded }: Con
 
             const nextOrder = (existing?.[0]?.ordem || 0) + 1
 
-            const { error } = await supabase
-                .from('cards_contatos')
+            const { error } = await (supabase.from('cards_contatos') as any)
                 .insert({
                     card_id: cardId,
                     contato_id: contactId,

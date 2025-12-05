@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckSquare, Plus, Calendar, Trash2, Check, Clock, AlertCircle } from 'lucide-react'
+import { CheckSquare, Plus, Calendar, Trash2, Check, AlertCircle } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 interface CardTasksProps {
@@ -34,8 +34,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const { data: tasks, isLoading } = useQuery({
         queryKey: ['tasks', cardId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('tarefas')
+            const { data, error } = await (supabase.from('tarefas') as any)
                 .select('*')
                 .eq('card_id', cardId)
                 .order('concluida', { ascending: true })
@@ -51,8 +50,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
             if (!user) throw new Error('Usuário não autenticado')
 
             const dataVencimento = `${newTask.data_vencimento}T${newTask.hora_vencimento}:00`
-            const { error } = await supabase
-                .from('tarefas')
+            const { error } = await (supabase.from('tarefas') as any)
                 .insert({
                     card_id: cardId,
                     titulo: newTask.titulo,
@@ -80,8 +78,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
     const toggleTaskMutation = useMutation({
         mutationFn: async ({ id, concluida }: { id: string, concluida: boolean }) => {
-            const { error } = await supabase
-                .from('tarefas')
+            const { error } = await (supabase.from('tarefas') as any)
                 .update({
                     concluida,
                     concluida_em: concluida ? new Date().toISOString() : null
@@ -97,8 +94,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
     const deleteTaskMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
-                .from('tarefas')
+            const { error } = await (supabase.from('tarefas') as any)
                 .delete()
                 .eq('id', id)
             if (error) throw error

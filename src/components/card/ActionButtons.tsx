@@ -21,8 +21,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
 
     const logActivityMutation = useMutation({
         mutationFn: async (activity: { tipo: string; descricao: string; metadata?: any }) => {
-            const { error } = await supabase
-                .from('activities')
+            const { error } = await (supabase.from('activities') as any)
                 .insert({
                     card_id: card.id,
                     tipo: activity.tipo,
@@ -40,7 +39,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
 
     const handleWhatsAppClick = () => {
         // Get primary contact's WhatsApp
-        const whatsappNumber = card.pessoa_principal_id // Would need to fetch from contato
+        // const whatsappNumber = card.pessoa_principal_id // TODO: Get from settings or profilencipal_id // Would need to fetch from contato
         const message = encodeURIComponent(`Olá! Sobre sua viagem: ${card.titulo}`)
 
         logActivityMutation.mutate({

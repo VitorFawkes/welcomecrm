@@ -53,7 +53,7 @@ export default function CardSidebar({ card }: CardSidebarProps) {
         'Outro': 'bg-gray-100 text-gray-700 border-gray-200'
     }
 
-    const productData = card.produto_data as any
+    // const productData = card.produto_data as any
 
     return (
         <div className="space-y-4">

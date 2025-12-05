@@ -2,7 +2,7 @@
 import DynamicFieldRenderer from './DynamicFieldRenderer'
 import type { Database } from '../../database.types'
 
-type Card = Database['public']['Views']['view_cards_detalhes']['Row']
+type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
 interface CardOverviewProps {
     card: Card

@@ -13,8 +13,7 @@ export default function OwnerHistoryModal({ cardId, isOpen, onClose }: OwnerHist
     const { data: history, isLoading } = useQuery({
         queryKey: ['owner-history', cardId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('card_owner_history')
+            const { data, error } = await (supabase.from('card_owner_history') as any)
                 .select(`
                     *,
                     owner:profiles!owner_id(nome, email),
@@ -56,7 +55,7 @@ export default function OwnerHistoryModal({ cardId, isOpen, onClose }: OwnerHist
                         <div className="text-center py-8 text-gray-500">Carregando...</div>
                     ) : history && history.length > 0 ? (
                         <div className="space-y-4">
-                            {history.map((entry, idx) => {
+                            {history.map((entry: any, idx: number) => {
                                 const owner = entry.owner as any
                                 const transferredBy = entry.transferred_by_user as any
                                 const isActive = !entry.ended_at

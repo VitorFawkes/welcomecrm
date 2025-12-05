@@ -9,6 +9,51 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      activities: {
+        Row: {
+          id: string
+          card_id: string
+          tipo: string
+          descricao: string
+          metadata: Json | null
+          created_by: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          card_id: string
+          tipo: string
+          descricao: string
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          card_id?: string
+          tipo?: string
+          descricao?: string
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       arquivos: {
         Row: {
           caminho_arquivo: string
@@ -525,6 +570,10 @@ export type Database = {
           nome: string
           observacoes: string | null
           telefone: string | null
+          data_nascimento: string | null
+          cpf: string | null
+          passaporte: string | null
+          responsavel_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -537,6 +586,9 @@ export type Database = {
           nome: string
           observacoes?: string | null
           telefone?: string | null
+          data_nascimento?: string | null
+          cpf?: string | null
+          passaporte?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -549,6 +601,9 @@ export type Database = {
           nome?: string
           observacoes?: string | null
           telefone?: string | null
+          data_nascimento?: string | null
+          cpf?: string | null
+          passaporte?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -989,32 +1044,44 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          pipeline_id: string
+          fase: string
+          campos_visiveis: Json
+          ordem_campos: Json
+          campos_kanban: Json | null
+          ordem_kanban: Json | null
+          usuario_id: string | null
           updated_at: string | null
-          visible_fields: Json
         }
         Insert: {
           created_at?: string | null
           id?: string
-          pipeline_id: string
+          fase: string
+          campos_visiveis?: Json
+          ordem_campos?: Json
+          campos_kanban?: Json | null
+          ordem_kanban?: Json | null
+          usuario_id?: string | null
           updated_at?: string | null
-          visible_fields?: Json
         }
         Update: {
           created_at?: string | null
           id?: string
-          pipeline_id?: string
+          fase?: string
+          campos_visiveis?: Json
+          ordem_campos?: Json
+          campos_kanban?: Json | null
+          ordem_kanban?: Json | null
+          usuario_id?: string | null
           updated_at?: string | null
-          visible_fields?: Json
         }
         Relationships: [
           {
-            foreignKeyName: "pipeline_card_settings_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: true
-            referencedRelation: "pipelines"
+            foreignKeyName: "pipeline_card_settings_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       pipeline_config: {
@@ -1314,46 +1381,27 @@ export type Database = {
     Views: {
       view_cards_acoes: {
         Row: {
-          cliente_recorrente: boolean | null
-          codigo_cliente_erp: string | null
-          codigo_projeto_erp: string | null
-          concierge_owner_id: string | null
-          condicoes_pagamento: string | null
-          created_at: string | null
-          created_by: string | null
-          data_pronto_erp: string | null
-          data_viagem_inicio: string | null
-          dono_atual_id: string | null
-          estado_operacional: string | null
-          forma_pagamento: string | null
-          id: string | null
-          moeda: string | null
-          motivo_perda_id: string | null
-          pessoa_principal_id: string | null
-          pipeline_id: string | null
-          pipeline_stage_id: string | null
-          pos_owner_id: string | null
+          id: string
+          titulo: string
+          pipeline_id: string
+          pipeline_stage_id: string
           prioridade: string | null
-          produto: Database["public"]["Enums"]["app_product"] | null
-          produto_data: Json | null
+          data_viagem_inicio: string | null
+          valor_estimado: number | null
+          produto: Database["public"]["Enums"]["app_product"]
+          created_at: string | null
+          updated_at: string | null
+          dono_atual_id: string | null
+          sdr_owner_id: string | null
+          concierge_owner_id: string | null
+          vendas_owner_id: string | null
+          pos_owner_id: string | null
+          cliente_recorrente: boolean | null
           pronto_para_contrato: boolean | null
           pronto_para_erp: boolean | null
-          sdr_owner_id: string | null
-          status_comercial: string | null
-          taxa_alterado_por: string | null
-          taxa_ativa: boolean | null
-          taxa_codigo_transacao: string | null
-          taxa_data_status: string | null
-          taxa_meio_pagamento: string | null
           taxa_status: string | null
           taxa_valor: number | null
-          titulo: string | null
-          updated_at: string | null
-          updated_by: string | null
-          valor_estimado: number | null
-          valor_final: number | null
-          vendas_owner_id: string | null
-          // Manually adding missing columns from view definition
+          produto_data: Json | null
           fase: string | null
           etapa_nome: string | null
           etapa_ordem: number | null
@@ -1372,6 +1420,17 @@ export type Database = {
           urgencia_tempo_etapa: number | null
           destinos: string | null
           orcamento: string | null
+          pessoa_principal_id: string | null
+          status_comercial: string | null
+          sdr_nome: string | null
+          concierge_nome: string | null
+          vendas_nome: string | null
+          pos_nome: string | null
+          moeda: string | null
+          valor_final: number | null
+          condicoes_pagamento: string | null
+          forma_pagamento: string | null
+          estado_operacional: string | null
         }
         Relationships: [
           {
@@ -1401,8 +1460,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
-          },
+          }
         ]
+      }
+      view_dashboard_funil: {
+        Row: {
+          stage_id: string
+          stage_name: string
+          count: number
+          total_value: number
+          pipeline_id: string
+        }
+      }
+      view_cards_contatos_summary: {
+        Row: {
+          card_id: string
+          total_viajantes: number
+          total_adultos: number
+          total_criancas: number
+        }
+      }
+      cards_historico: {
+        Row: {
+          id: string
+          card_id: string
+          fase_anterior: string | null
+          fase_nova: string | null
+          created_at: string | null
+          created_by: string | null
+        }
       }
     }
     Functions: {
@@ -1432,19 +1518,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      mover_card: {
+        Args: {
+          p_card_id: string
+          p_nova_etapa_id: string
+          p_motivo_perda_id?: string
+        }
+        Returns: void
+      }
     }
     Enums: {
       app_product: "TRIPS" | "WEDDING" | "CORP"
-      app_role:
-      | "admin"
-      | "gestor"
-      | "sdr"
-      | "vendas"
-      | "pos_venda"
-      | "concierge"
-      | "financeiro"
+      app_role: "admin" | "gestor" | "sdr" | "vendas" | "pos_venda" | "concierge" | "financeiro"
       tipo_pessoa_enum: "adulto" | "crianca"
-      tipo_viajante_enum: "titular" | "acompanhante"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1452,6 +1538,37 @@ export type Database = {
   }
 }
 
+export type Contato = Database['public']['Tables']['contatos']['Row'] & {
+  tipo_pessoa?: 'adulto' | 'crianca'
+}
+
+export type TripsProdutoData = {
+  taxa_planejamento?: {
+    ativa: boolean
+    status: 'pendente' | 'paga' | 'cortesia' | 'nao_aplicavel' | 'nao_ativa'
+    valor: number
+    data_status?: string
+    autorizada_por?: string
+    data_envio?: string
+    data_pagamento?: string
+  }
+  motivo?: string
+  destinos?: string[]
+  epoca_viagem?: {
+    inicio: string
+    fim: string
+    flexivel: boolean
+  }
+  orcamento?: {
+    total: number
+    por_pessoa: number
+  }
+  pessoas?: {
+    adultos: number
+    criancas: number
+    idades_criancas: number[]
+  }
+}
 type PublicSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<

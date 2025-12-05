@@ -42,15 +42,14 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         queryKey: ['pipeline-settings', card.fase],
         queryFn: async () => {
             if (!card.fase) return null
-            const { data, error } = await supabase
-                .from('pipeline_card_settings')
+            const { data, error } = await (supabase.from('pipeline_card_settings') as any)
                 .select('campos_kanban, ordem_kanban')
                 .eq('fase', card.fase)
                 .is('usuario_id', null)
                 .single()
 
             if (error) return null
-            return data
+            return data as any
         },
         enabled: !!card.fase
     })

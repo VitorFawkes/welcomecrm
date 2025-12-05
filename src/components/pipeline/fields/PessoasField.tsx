@@ -26,16 +26,15 @@ export default function PessoasField({
 }: BaseFieldProps) {
     const pessoasValue = (value as Pessoas | null | undefined) || { adultos: 2 }
     const [contacts, setContacts] = useState<Contato[]>([])
-    const [loading, setLoading] = useState(false)
+
     const [showSelector, setShowSelector] = useState(false)
     const [removingId, setRemovingId] = useState<string | null>(null)
 
     const fetchContacts = async () => {
         if (!cardId) return
-        setLoading(true)
+
         try {
-            const { data, error } = await supabase
-                .from('cards_contatos')
+            const { data, error } = await (supabase.from('cards_contatos') as any)
                 .select(`
                     contato:contatos (*)
                 `)
@@ -44,7 +43,7 @@ export default function PessoasField({
 
             if (error) throw error
 
-            const mappedContacts = data?.map(item => item.contato).filter(Boolean) as Contato[] || []
+            const mappedContacts = data?.map((item: any) => item.contato).filter(Boolean) as Contato[] || []
             setContacts(mappedContacts)
 
             // Sync summary if we have contacts and we are in edit mode (onChange present)
@@ -66,7 +65,7 @@ export default function PessoasField({
         } catch (error) {
             console.error('Error fetching contacts:', error)
         } finally {
-            setLoading(false)
+
         }
     }
 

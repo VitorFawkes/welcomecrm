@@ -15,14 +15,13 @@ export default function TaxaPlanejamentoCard({ card }: TaxaPlanejamentoCardProps
     const queryClient = useQueryClient()
     const [isEditing, setIsEditing] = useState(false)
     const productData = (card.produto_data as TripsProdutoData) || {}
-    const taxa = productData.taxa_planejamento || {}
+    const taxa = productData.taxa_planejamento || {} as any
 
     const [editedTaxa, setEditedTaxa] = useState(taxa)
 
     const updateTaxaMutation = useMutation({
         mutationFn: async (newTaxaData: typeof taxa) => {
-            const { error } = await supabase
-                .from('cards')
+            const { error } = await (supabase.from('cards') as any)
                 .update({
                     produto_data: {
                         ...productData,

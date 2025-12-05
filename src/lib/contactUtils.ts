@@ -1,4 +1,8 @@
-import type { Contato } from '../database.types'
+import type { Database } from '../database.types'
+
+type Contato = Database['public']['Tables']['contatos']['Row'] & {
+    tipo_pessoa?: 'adulto' | 'crianca'
+}
 
 export function calculateAge(birthDate: string | null | undefined): number | null {
     if (!birthDate) return null

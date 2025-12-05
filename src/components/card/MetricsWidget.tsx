@@ -36,8 +36,7 @@ export default function MetricsWidget({ card }: MetricsWidgetProps) {
     const { data: users } = useQuery({
         queryKey: ['users'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('profiles')
+            const { data, error } = await (supabase.from('profiles') as any)
                 .select('id, nome')
                 .order('nome')
 
@@ -50,8 +49,7 @@ export default function MetricsWidget({ card }: MetricsWidgetProps) {
     // Mutation to change owner
     const changeOwnerMutation = useMutation({
         mutationFn: async (newOwnerId: string) => {
-            const { error } = await supabase
-                .from('cards')
+            const { error } = await (supabase.from('cards') as any)
                 .update({ dono_atual_id: newOwnerId })
                 .eq('id', card.id)
 

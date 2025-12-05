@@ -5,7 +5,7 @@ interface AIChatProps {
     cardId: string
 }
 
-export default function AIChat({ cardId }: AIChatProps) {
+export default function AIChat({ }: AIChatProps) {
     const [message, setMessage] = useState('')
     const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([])
 

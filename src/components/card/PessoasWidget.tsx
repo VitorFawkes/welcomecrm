@@ -47,8 +47,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
     const { data: travelers } = useQuery({
         queryKey: ['card-contacts', card.id],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('cards_contatos')
+            const { data, error } = await (supabase.from('cards_contatos') as any)
                 .select(`
                     contato:contatos (*)
                 `)
@@ -63,8 +62,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
                     if (!contato) return null
 
                     // Check history
-                    const { count } = await supabase
-                        .from('cards_contatos')
+                    const { count } = await (supabase.from('cards_contatos') as any)
                         .select('*', { count: 'exact', head: true })
                         .eq('contato_id', contato.id)
                         .neq('card_id', card.id)
@@ -98,8 +96,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
 
             if (isContactTraveler) {
                 // Remove from travelers
-                const { error } = await supabase
-                    .from('cards_contatos')
+                const { error } = await (supabase.from('cards_contatos') as any)
                     .delete()
                     .eq('card_id', card.id)
                     .eq('contato_id', contact.id)
@@ -107,8 +104,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
                 if (error) throw error
             } else {
                 // Add to travelers
-                const { error } = await supabase
-                    .from('cards_contatos')
+                const { error } = await (supabase.from('cards_contatos') as any)
                     .insert({
                         card_id: card.id,
                         contato_id: contact.id,
@@ -186,9 +182,9 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
                                         Ligar
                                     </a>
                                 )}
-                                {contact.whatsapp && (
+                                {contact.telefone && (
                                     <a
-                                        href={`https://wa.me/${contact.whatsapp.replace(/\D/g, '')}`}
+                                        href={`https://wa.me/${contact.telefone.replace(/\D/g, '')}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"

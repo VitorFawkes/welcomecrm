@@ -49,15 +49,13 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
     const { data: stages } = useQuery({
         queryKey: ['stages', productFilter],
         queryFn: async () => {
-            let query = supabase
-                .from('pipeline_stages')
+            let query = (supabase.from('pipeline_stages') as any)
                 .select('*')
                 .order('ordem')
 
             // Filtrar stages pelo pipeline do produto
             if (productFilter !== 'ALL') {
-                const { data: pipeline } = await supabase
-                    .from('pipelines')
+                const { data: pipeline } = await (supabase.from('pipelines') as any)
                     .select('id')
                     .eq('produto', productFilter)
                     .single()
@@ -69,15 +67,14 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
 
             const { data, error } = await query
             if (error) throw error
-            return data
+            return data as any[]
         }
     })
 
     const { data: cards } = useQuery({
         queryKey: ['cards', productFilter],
         queryFn: async () => {
-            let query = supabase
-                .from('view_cards_acoes')
+            let query = (supabase.from('view_cards_acoes') as any)
                 .select('*')
 
             if (productFilter !== 'ALL') {
@@ -86,13 +83,13 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
 
             const { data, error } = await query
             if (error) throw error
-            return data
+            return data as Card[]
         }
     })
 
     const moveCardMutation = useMutation({
         mutationFn: async ({ cardId, stageId }: { cardId: string, stageId: string }) => {
-            const { error } = await supabase.rpc('mover_card', {
+            const { error } = await (supabase.rpc as any)('mover_card', {
                 p_card_id: cardId,
                 p_nova_etapa_id: stageId,
                 p_motivo_perda_id: undefined

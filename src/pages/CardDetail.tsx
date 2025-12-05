@@ -52,7 +52,7 @@ export default function CardDetail() {
                     <StageRequirements card={card} />
 
                     {/* Tasks (Priority #1) */}
-                    <CardTasks cardId={card.id} />
+                    <CardTasks cardId={card.id!} />
 
                     {/* Notes & Observations */}
                     <ObservacoesEstruturadas card={card} />

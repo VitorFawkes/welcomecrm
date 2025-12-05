@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react'
-import { Users, User, Loader2 } from 'lucide-react'
+import { Users, Loader2 } from 'lucide-react'
 import type { Database, TripsProdutoData, Contato } from '../../database.types'
 import { supabase } from '../../lib/supabase'
 import { calculateAge } from '../../lib/contactUtils'
@@ -25,20 +26,19 @@ export default function CardTravelers({ card }: CardTravelersProps) {
     useEffect(() => {
         const fetchContacts = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('cards_contatos')
+                const { data, error } = await (supabase.from('cards_contatos') as any)
                     .select(`
-                        id,
-                        tipo_viajante,
-                        contato:contatos (*)
-                    `)
+id,
+    tipo_viajante,
+    contato: contatos(*)
+        `)
                     .eq('card_id', card.id)
                     .order('ordem')
 
                 if (error) throw error
 
                 // Cast to correct type since Supabase returns array of objects
-                const mapped = (data || []).map(item => ({
+                const mapped = (data || []).map((item: any) => ({
                     id: item.id,
                     tipo_viajante: item.tipo_viajante,
                     contato: item.contato as unknown as Contato

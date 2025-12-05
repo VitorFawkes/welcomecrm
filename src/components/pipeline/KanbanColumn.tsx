@@ -34,8 +34,8 @@ export default function KanbanColumn({ stage, cards }: KanbanColumnProps) {
         'Outro': 'bg-gray-100 text-gray-700 border-gray-200'
     }
 
-    const phaseColor = phaseColors[stage.fase] || phaseColors['Outro']
-    const phaseBadgeColor = phaseBadgeColors[stage.fase] || phaseBadgeColors['Outro']
+    const phaseColor = phaseColors[(stage.fase || 'Outro') as keyof typeof phaseColors] || phaseColors['Outro']
+    const phaseBadgeColor = phaseBadgeColors[(stage.fase || 'Outro') as keyof typeof phaseBadgeColors] || phaseBadgeColors['Outro']
 
     return (
         <div className={cn(

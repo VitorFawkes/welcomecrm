@@ -1,0 +1,128 @@
+
+> welcome-crm@0.0.0 build
+> tsc -b && vite build
+
+src/components/card/ActionButtons.tsx(25,23): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(relation: "cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"): PostgrestQueryBuilder<...>', gave the following error.
+    Argument of type '"activities"' is not assignable to parameter of type '"cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"'.
+  Overload 2 of 2, '(relation: "view_cards_acoes"): PostgrestQueryBuilder<{ PostgrestVersion: "12"; }, { Tables: { arquivos: { Row: { caminho_arquivo: string; card_id: string; created_at: string | null; created_by: string | null; ... 4 more ...; tamanho_bytes: number | null; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 25 more ...; task_queue: { ...; }; }; Views: { ...; }; Functions: { ...; }; Enums: { ...; }; CompositeTypes: {}; }, { ...; }, "view_cards_acoes", [...]>', gave the following error.
+    Argument of type '"activities"' is not assignable to parameter of type '"view_cards_acoes"'.
+src/components/card/ActionButtons.tsx(43,15): error TS6133: 'whatsappNumber' is declared but its value is never read.
+src/components/card/ActivityFeed.tsx(12,46): error TS2339: Property 'activities' does not exist on type '{ arquivos: { Row: { caminho_arquivo: string; card_id: string; created_at: string | null; created_by: string | null; id: string; mime_type: string | null; nome_original: string; pessoa_id: string | null; tamanho_bytes: number | null; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 25 more ...; ta...'.
+src/components/card/ActivityFeed.tsx(55,23): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(relation: "cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"): PostgrestQueryBuilder<...>', gave the following error.
+    Argument of type '"activities"' is not assignable to parameter of type '"cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"'.
+  Overload 2 of 2, '(relation: "view_cards_acoes"): PostgrestQueryBuilder<{ PostgrestVersion: "12"; }, { Tables: { arquivos: { Row: { caminho_arquivo: string; card_id: string; created_at: string | null; created_by: string | null; ... 4 more ...; tamanho_bytes: number | null; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 25 more ...; task_queue: { ...; }; }; Views: { ...; }; Functions: { ...; }; Enums: { ...; }; CompositeTypes: {}; }, { ...; }, "view_cards_acoes", [...]>', gave the following error.
+    Argument of type '"activities"' is not assignable to parameter of type '"view_cards_acoes"'.
+src/components/card/ActivityTimeline.tsx(4,38): error TS6133: 'Phone' is declared but its value is never read.
+src/components/card/ActivityTimeline.tsx(4,45): error TS6133: 'Mail' is declared but its value is never read.
+src/components/card/ActivityTimeline.tsx(73,11): error TS2322: Type '({ id: string; type: "task"; title: string; description: string | null; timestamp: string; author: any; completed: boolean | null; overdue: boolean; priority: string | null; } | { id: string; type: "note"; title: any; timestamp: string; author: any; } | { ...; })[]' is not assignable to type 'Activity[]'.
+  Type '{ id: string; type: "task"; title: string; description: string | null; timestamp: string; author: any; completed: boolean | null; overdue: boolean; priority: string | null; } | { id: string; type: "note"; title: any; timestamp: string; author: any; } | { ...; }' is not assignable to type 'Activity'.
+    Type '{ id: string; type: "task"; title: string; description: string | null; timestamp: string; author: any; completed: boolean | null; overdue: boolean; priority: string | null; }' is not assignable to type 'Activity'.
+      Types of property 'description' are incompatible.
+        Type 'string | null' is not assignable to type 'string | undefined'.
+          Type 'null' is not assignable to type 'string | undefined'.
+src/components/card/ActivityTimeline.tsx(88,22): error TS2339: Property 'texto' does not exist on type '{ card_id: string; conteudo: string; created_at: string | null; created_by: string | null; id: string; updated_at: string | null; profiles: SelectQueryError<"could not find the relation between notas and autor_id">; }'.
+src/components/card/AIChat.tsx(8,32): error TS6133: 'cardId' is declared but its value is never read.
+src/components/card/CardOverview.tsx(5,41): error TS2339: Property 'view_cards_detalhes' does not exist on type '{ view_cards_acoes: { Row: { cliente_recorrente: boolean | null; codigo_cliente_erp: string | null; codigo_projeto_erp: string | null; concierge_owner_id: string | null; condicoes_pagamento: string | null; ... 51 more ...; orcamento: string | null; }; Relationships: [...]; }; }'.
+src/components/card/CardSidebar.tsx(38,28): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/CardSidebar.tsx(56,11): error TS6133: 'productData' is declared but its value is never read.
+src/components/card/CardStatusWidget.tsx(24,28): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/CardTasks.tsx(4,54): error TS6133: 'Clock' is declared but its value is never read.
+src/components/card/CardTravelers.tsx(2,17): error TS6133: 'User' is declared but its value is never read.
+src/components/card/CardTravelers.tsx(3,25): error TS2305: Module '"../../database.types"' has no exported member 'TripsProdutoData'.
+src/components/card/CardTravelers.tsx(3,43): error TS2305: Module '"../../database.types"' has no exported member 'Contato'.
+src/components/card/CardTravelers.tsx(35,36): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/CardTravelers.tsx(42,30): error TS2339: Property 'id' does not exist on type 'SelectQueryError<"column 'id' does not exist on 'cards_contatos'.">'.
+src/components/card/CardTravelers.tsx(43,41): error TS2339: Property 'tipo_viajante' does not exist on type 'SelectQueryError<"column 'id' does not exist on 'cards_contatos'.">'.
+src/components/card/CardTravelers.tsx(44,35): error TS2339: Property 'contato' does not exist on type 'SelectQueryError<"column 'id' does not exist on 'cards_contatos'.">'.
+src/components/card/CardTravelers.tsx(145,59): error TS7006: Parameter 'idade' implicitly has an 'any' type.
+src/components/card/CardTravelers.tsx(145,66): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+src/components/card/ContactForm.tsx(3,15): error TS2305: Module '"../../database.types"' has no exported member 'Contato'.
+src/components/card/ContactForm.tsx(28,25): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/components/card/ContactSelector.tsx(70,47): error TS2339: Property 'ordem' does not exist on type 'SelectQueryError<"column 'ordem' does not exist on 'cards_contatos'.">'.
+src/components/card/ContactSelector.tsx(98,47): error TS2339: Property 'ordem' does not exist on type 'SelectQueryError<"column 'ordem' does not exist on 'cards_contatos'.">'.
+src/components/card/DynamicFieldRenderer.tsx(7,41): error TS2339: Property 'view_cards_detalhes' does not exist on type '{ view_cards_acoes: { Row: { cliente_recorrente: boolean | null; codigo_cliente_erp: string | null; codigo_projeto_erp: string | null; concierge_owner_id: string | null; condicoes_pagamento: string | null; ... 51 more ...; orcamento: string | null; }; Relationships: [...]; }; }'.
+src/components/card/DynamicFieldRenderer.tsx(66,30): error TS6133: 'fieldName' is declared but its value is never read.
+src/components/card/MetricsWidget.tsx(56,27): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/ObservacoesEstruturadas.tsx(35,27): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/ObservacoesLivres.tsx(30,27): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/OwnerHistoryModal.tsx(62,57): error TS2339: Property 'ended_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(63,56): error TS2339: Property 'ended_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(64,66): error TS2339: Property 'ended_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(64,103): error TS2339: Property 'started_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(65,89): error TS2339: Property 'started_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(88,79): error TS2339: Property 'fase' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(90,68): error TS2339: Property 'fase' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(102,81): error TS2339: Property 'started_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(109,64): error TS2339: Property 'ended_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(113,85): error TS2339: Property 'ended_at' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(123,60): error TS2339: Property 'transfer_reason' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/OwnerHistoryModal.tsx(125,76): error TS2339: Property 'transfer_reason' does not exist on type '{ card_id: string; id: string; new_owner_id: string | null; old_owner_id: string | null; role_type: string; transferred_at: string | null; transferred_by: string | null; owner: SelectQueryError<"could not find the relation between card_owner_history and profiles">; transferred_by_user: SelectQueryError<...>; }'.
+src/components/card/PessoasWidget.tsx(55,32): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/PessoasWidget.tsx(70,41): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/PessoasWidget.tsx(189,42): error TS2339: Property 'whatsapp' does not exist on type '{ cargo: string | null; created_at: string | null; created_by: string | null; email: string | null; empresa: string | null; id: string; nome: string; observacoes: string | null; telefone: string | null; updated_at: string | null; }'.
+src/components/card/PessoasWidget.tsx(191,72): error TS2339: Property 'whatsapp' does not exist on type '{ cargo: string | null; created_at: string | null; created_by: string | null; email: string | null; empresa: string | null; id: string; nome: string; observacoes: string | null; telefone: string | null; updated_at: string | null; }'.
+src/components/card/StageRequirements.tsx(42,32): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/StageRequirements.tsx(61,36): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/StageRequirements.tsx(69,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: { card_id: string; completed?: boolean | null | undefined; completed_at?: string | null | undefined; completed_by?: string | null | undefined; id?: string | undefined; obligation_id: string; }, options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
+    Type 'string | null' is not assignable to type 'string'.
+      Type 'null' is not assignable to type 'string'.
+  Overload 2 of 2, '(values: { card_id: string; completed?: boolean | null | undefined; completed_at?: string | null | undefined; completed_by?: string | null | undefined; id?: string | undefined; obligation_id: string; }[], options?: { ...; } | undefined): PostgrestFilterBuilder<...>', gave the following error.
+    Object literal may only specify known properties, and 'card_id' does not exist in type '{ card_id: string; completed?: boolean | null | undefined; completed_at?: string | null | undefined; completed_by?: string | null | undefined; id?: string | undefined; obligation_id: string; }[]'.
+src/components/card/TaxaPlanejamentoCard.tsx(6,25): error TS2305: Module '"../../database.types"' has no exported member 'TripsProdutoData'.
+src/components/card/TaxaPlanejamentoCard.tsx(32,27): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/components/card/TripInformation.tsx(3,25): error TS2305: Module '"../../database.types"' has no exported member 'TripsProdutoData'.
+src/components/card/TripInformation.tsx(6,1): error TS6133: 'PessoasField' is declared but its value is never read.
+src/components/card/TripInformation.tsx(31,27): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(relation: "cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"): PostgrestQueryBuilder<...>', gave the following error.
+    Argument of type '"view_cards_contatos_summary"' is not assignable to parameter of type '"cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"'.
+  Overload 2 of 2, '(relation: "view_cards_acoes"): PostgrestQueryBuilder<{ PostgrestVersion: "12"; }, { Tables: { arquivos: { Row: { caminho_arquivo: string; card_id: string; created_at: string | null; created_by: string | null; ... 4 more ...; tamanho_bytes: number | null; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 25 more ...; task_queue: { ...; }; }; Views: { ...; }; Functions: { ...; }; Enums: { ...; }; CompositeTypes: {}; }, { ...; }, "view_cards_acoes", [...]>', gave the following error.
+    Argument of type '"view_cards_contatos_summary"' is not assignable to parameter of type '"view_cards_acoes"'.
+src/components/card/TripInformation.tsx(33,36): error TS2345: Argument of type 'string | null' is not assignable to parameter of type '{}'.
+  Type 'null' is not assignable to type '{}'.
+src/components/card/TripInformation.tsx(40,37): error TS2339: Property 'total_viajantes' does not exist on type 'SelectQueryError<"column 'total_viajantes' does not exist on 'cards'."> | SelectQueryError<"column 'total_viajantes' does not exist on 'pipelines'."> | ... 24 more ... | SelectQueryError<...>'.
+  Property 'total_viajantes' does not exist on type 'SelectQueryError<"column 'total_viajantes' does not exist on 'cards'.">'.
+src/components/card/TripInformation.tsx(41,38): error TS2339: Property 'total_adultos' does not exist on type 'SelectQueryError<"column 'total_viajantes' does not exist on 'cards'."> | SelectQueryError<"column 'total_viajantes' does not exist on 'pipelines'."> | ... 24 more ... | SelectQueryError<...>'.
+  Property 'total_adultos' does not exist on type 'SelectQueryError<"column 'total_viajantes' does not exist on 'cards'.">'.
+src/components/card/TripInformation.tsx(42,40): error TS2339: Property 'total_criancas' does not exist on type 'SelectQueryError<"column 'total_viajantes' does not exist on 'cards'."> | SelectQueryError<"column 'total_viajantes' does not exist on 'pipelines'."> | ... 24 more ... | SelectQueryError<...>'.
+  Property 'total_criancas' does not exist on type 'SelectQueryError<"column 'total_viajantes' does not exist on 'cards'.">'.
+src/components/card/TripInformation.tsx(100,11): error TS6133: 'displayTotal' is declared but its value is never read.
+src/components/dashboard/FunnelChart.tsx(17,23): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(relation: "cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"): PostgrestQueryBuilder<...>', gave the following error.
+    Argument of type '"view_dashboard_funil"' is not assignable to parameter of type '"cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"'.
+  Overload 2 of 2, '(relation: "view_cards_acoes"): PostgrestQueryBuilder<{ PostgrestVersion: "12"; }, { Tables: { arquivos: { Row: { caminho_arquivo: string; card_id: string; created_at: string | null; created_by: string | null; ... 4 more ...; tamanho_bytes: number | null; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 25 more ...; task_queue: { ...; }; }; Views: { ...; }; Functions: { ...; }; Enums: { ...; }; CompositeTypes: {}; }, { ...; }, "view_cards_acoes", [...]>', gave the following error.
+    Argument of type '"view_dashboard_funil"' is not assignable to parameter of type '"view_cards_acoes"'.
+src/components/dashboard/RecentActivity.tsx(21,23): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(relation: "cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"): PostgrestQueryBuilder<...>', gave the following error.
+    Argument of type '"cards_historico"' is not assignable to parameter of type '"cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"'.
+  Overload 2 of 2, '(relation: "view_cards_acoes"): PostgrestQueryBuilder<{ PostgrestVersion: "12"; }, { Tables: { arquivos: { Row: { caminho_arquivo: string; card_id: string; created_at: string | null; created_by: string | null; ... 4 more ...; tamanho_bytes: number | null; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 25 more ...; task_queue: { ...; }; }; Views: { ...; }; Functions: { ...; }; Enums: { ...; }; CompositeTypes: {}; }, { ...; }, "view_cards_acoes", [...]>', gave the following error.
+    Argument of type '"cards_historico"' is not assignable to parameter of type '"view_cards_acoes"'.
+src/components/dashboard/StatsCards.tsx(17,23): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(relation: "cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"): PostgrestQueryBuilder<...>', gave the following error.
+    Argument of type '"view_dashboard_funil"' is not assignable to parameter of type '"cards" | "pipelines" | "pipeline_stages" | "stage_obligations" | "motivos_perda" | "pessoas" | "contatos" | "automation_rules" | "arquivos" | "atividades" | "audit_logs" | ... 15 more ... | "task_queue"'.
+  Overload 2 of 2, '(relation: "view_cards_acoes"): PostgrestQueryBuilder<{ PostgrestVersion: "12"; }, { Tables: { arquivos: { Row: { caminho_arquivo: string; card_id: string; created_at: string | null; created_by: string | null; ... 4 more ...; tamanho_bytes: number | null; }; Insert: { ...; }; Update: { ...; }; Relationships: [...]; }; ... 25 more ...; task_queue: { ...; }; }; Views: { ...; }; Functions: { ...; }; Enums: { ...; }; CompositeTypes: {}; }, { ...; }, "view_cards_acoes", [...]>', gave the following error.
+    Argument of type '"view_dashboard_funil"' is not assignable to parameter of type '"view_cards_acoes"'.
+src/components/pipeline/fields/PessoasField.tsx(6,15): error TS2305: Module '"../../../database.types"' has no exported member 'Contato'.
+src/components/pipeline/fields/PessoasField.tsx(29,12): error TS6133: 'loading' is declared but its value is never read.
+src/components/pipeline/KanbanBoard.tsx(95,50): error TS2345: Argument of type '"mover_card"' is not assignable to parameter of type '"is_admin" | "is_card_owner" | "is_financeiro" | "is_gestor" | "is_operational" | "process_task_queue"'.
+src/components/pipeline/KanbanColumn.tsx(37,36): error TS2538: Type 'null' cannot be used as an index type.
+src/components/pipeline/KanbanColumn.tsx(38,46): error TS2538: Type 'null' cannot be used as an index type.
+src/components/settings/AutomationSettings.tsx(4,44): error TS6133: 'AlertCircle' is declared but its value is never read.
+src/components/settings/AutomationSettings.tsx(7,6): error TS6196: 'Stage' is declared but never used.
+src/components/settings/AutomationSettings.tsx(8,6): error TS6196: 'AutomationRule' is declared but never used.
+src/components/settings/AutomationSettings.tsx(9,6): error TS6196: 'StageObligation' is declared but never used.
+src/components/settings/AutomationSettings.tsx(177,64): error TS7006: Parameter 'data' implicitly has an 'any' type.
+src/components/settings/AutomationSettings.tsx(226,64): error TS7006: Parameter 'data' implicitly has an 'any' type.

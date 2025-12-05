@@ -38,8 +38,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
     const fetchPotentialGuardians = async () => {
         setLoading(true)
         try {
-            const { data } = await supabase
-                .from('contatos')
+            const { data } = await (supabase.from('contatos') as any)
                 .select('*')
                 .eq('tipo_pessoa', 'adulto')
                 .order('nome')
@@ -72,8 +71,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
 
             let result
             if (contact?.id) {
-                const { data, error } = await supabase
-                    .from('contatos')
+                const { data, error } = await (supabase.from('contatos') as any)
                     .update(dataToSave)
                     .eq('id', contact.id)
                     .select()
@@ -82,8 +80,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
                 if (error) throw error
                 result = data
             } else {
-                const { data, error } = await supabase
-                    .from('contatos')
+                const { data, error } = await (supabase.from('contatos') as any)
                     .insert(dataToSave)
                     .select()
                     .single()

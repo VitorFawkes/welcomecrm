@@ -26,8 +26,7 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
         setLoading(true)
         try {
             // 1. Get definitions for this stage
-            const { data: obs, error: obsError } = await supabase
-                .from('stage_obligations')
+            const { data: obs, error: obsError } = await (supabase.from('stage_obligations') as any)
                 .select('*')
                 .eq('stage_id', card.pipeline_stage_id)
                 .eq('active', true)
@@ -36,8 +35,7 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
             setObligations(obs || [])
 
             // 2. Get status for this card
-            const { data: status, error: statusError } = await supabase
-                .from('card_obligations')
+            const { data: status, error: statusError } = await (supabase.from('card_obligations') as any)
                 .select('*')
                 .eq('card_id', card.id)
 
@@ -55,16 +53,14 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
         try {
             if (currentStatus) {
                 // Uncheck
-                await supabase
-                    .from('card_obligations')
+                await (supabase.from('card_obligations') as any)
                     .delete()
                     .eq('card_id', card.id)
                     .eq('obligation_id', obligationId)
             } else {
                 // Check
                 const { data: { user } } = await supabase.auth.getUser()
-                await supabase
-                    .from('card_obligations')
+                await (supabase.from('card_obligations') as any)
                     .insert({
                         card_id: card.id,
                         obligation_id: obligationId,

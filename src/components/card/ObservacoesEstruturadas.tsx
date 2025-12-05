@@ -24,8 +24,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
 
     const updateObsMutation = useMutation({
         mutationFn: async (newObs: typeof observacoes) => {
-            const { error } = await supabase
-                .from('cards')
+            const { error } = await (supabase.from('cards') as any)
                 .update({
                     produto_data: {
                         ...productData,

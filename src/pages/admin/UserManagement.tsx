@@ -47,7 +47,7 @@ export default function UserManagement() {
         queryFn: async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return null;
-            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            const { data } = await (supabase.from('profiles') as any).select('*').eq('id', user.id).single();
             return data;
         }
     });
@@ -56,13 +56,12 @@ export default function UserManagement() {
     const { data: profiles, isLoading } = useQuery({
         queryKey: ['profiles'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('profiles')
+            const { data, error } = await (supabase.from('profiles') as any)
                 .select('*')
                 .order('nome');
 
             if (error) throw error;
-            return data;
+            return data as Profile[] | null;
         },
         enabled: !!currentUser && currentUser.role === 'admin' // Only fetch if admin
     });
@@ -70,8 +69,7 @@ export default function UserManagement() {
     // Update Mutation
     const updateProfileMutation = useMutation({
         mutationFn: async ({ id, updates }: { id: string; updates: Partial<Profile> }) => {
-            const { error } = await supabase
-                .from('profiles')
+            const { error } = await (supabase.from('profiles') as any)
                 .update(updates)
                 .eq('id', id);
 
@@ -85,7 +83,7 @@ export default function UserManagement() {
                 type: 'success'
             });
         },
-        onError: (error) => {
+        onError: () => {
             toast({
                 title: 'Erro ao atualizar',
                 description: 'Não foi possível salvar as alterações.',

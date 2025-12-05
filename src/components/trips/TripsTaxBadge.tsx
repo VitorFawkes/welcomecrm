@@ -1,6 +1,14 @@
-import { Badge } from '../ui/badge'
+import { Badge } from '../ui/Badge'
 import { cn } from '../../lib/utils'
-import type { TripsProdutoData } from '../../database.types'
+
+export type TripsProdutoData = {
+    taxa_planejamento?: {
+        ativa: boolean
+        status: 'pendente' | 'paga' | 'cortesia' | 'nao_aplicavel' | 'nao_ativa'
+        valor: number
+        data_status?: string
+    }
+}
 
 interface TripsTaxBadgeProps {
     taxaData?: TripsProdutoData['taxa_planejamento']
@@ -12,7 +20,7 @@ export default function TripsTaxBadge({ taxaData, className }: TripsTaxBadgeProp
         return null
     }
 
-    const status = taxaData.status || 'nao_ativa'
+    const status = (taxaData.status || 'nao_ativa') as keyof typeof statusConfig
 
     const statusConfig = {
         pendente: {

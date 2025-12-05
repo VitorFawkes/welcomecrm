@@ -10,8 +10,7 @@ export default function CardFiles({ cardId }: CardFilesProps) {
     const { data: files, isLoading } = useQuery({
         queryKey: ['card-files', cardId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('arquivos')
+            const { data, error } = await (supabase.from('arquivos') as any)
                 .select('*')
                 .eq('card_id', cardId)
                 .order('created_at', { ascending: false })
@@ -35,7 +34,7 @@ export default function CardFiles({ cardId }: CardFilesProps) {
 
     return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {files.map((file) => (
+            {files.map((file: any) => (
                 <div key={file.id} className="flex items-center justify-between rounded-lg border bg-white p-3 shadow-sm">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-gray-500">

@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { getFieldRegistry } from '../../lib/fieldRegistry'
 import type { Database } from '../../database.types'
 
-type Card = Database['public']['Views']['view_cards_detalhes']['Row']
+type Card = Database['public']['Views']['view_cards_acoes']['Row']
 type Fase = 'SDR' | 'Planner' | 'Pós-venda' | 'Outro'
 
 interface DynamicFieldRendererProps {
@@ -21,14 +21,13 @@ export default function DynamicFieldRenderer({ card }: DynamicFieldRendererProps
     const [editedData, setEditedData] = useState(card.produto_data || {})
     const queryClient = useQueryClient()
 
-    const fase = (card.etapa_fase || 'Outro') as Fase
+    const fase = (card.fase || 'Outro') as Fase
 
     // Fetch field settings for this phase
     const { data: fieldSettings } = useQuery({
         queryKey: ['pipeline_card_settings', fase],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('pipeline_card_settings')
+            const { data, error } = await (supabase.from('pipeline_card_settings') as any)
                 .select('campos_visiveis, ordem_campos')
                 .eq('fase', fase)
                 .is('usuario_id', null) // Get default settings
@@ -43,8 +42,7 @@ export default function DynamicFieldRenderer({ card }: DynamicFieldRendererProps
     // Mutation to save updated produto_data
     const updateCardMutation = useMutation({
         mutationFn: async (newProdutoData: any) => {
-            const { error } = await supabase
-                .from('cards')
+            const { error } = await (supabase.from('cards') as any)
                 .update({ produto_data: newProdutoData })
                 .eq('id', card.id!)
 
@@ -63,7 +61,7 @@ export default function DynamicFieldRenderer({ card }: DynamicFieldRendererProps
         }))
     }
 
-    const handleFieldSave = (fieldName: string) => {
+    const handleFieldSave = () => {
         // Save the current edited data
         updateCardMutation.mutate(editedData)
         setEditingField(null)
@@ -120,7 +118,7 @@ export default function DynamicFieldRenderer({ card }: DynamicFieldRendererProps
                                 label={fieldConfig.label}
                                 value={currentValue}
                                 onChange={isCurrentlyEditing ? (val: any) => handleFieldChange(fieldName, val) : undefined}
-                                onSave={() => handleFieldSave(fieldName)}
+                                onSave={() => handleFieldSave()}
                                 readOnly={!isCurrentlyEditing}
                                 cardId={card.id}
                             />
