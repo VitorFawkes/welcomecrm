@@ -1,0 +1,42 @@
+import { useState } from 'react'
+import StatsCards from '../components/dashboard/StatsCards'
+import FunnelChart from '../components/dashboard/FunnelChart'
+import RecentActivity from '../components/dashboard/RecentActivity'
+import type { Database } from '../database.types'
+
+type Product = Database['public']['Enums']['app_product'] | 'ALL'
+
+export default function Dashboard() {
+    const [productFilter, setProductFilter] = useState<Product>('ALL')
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <div className="flex items-center gap-2">
+                    <label htmlFor="product-filter" className="text-sm font-medium text-gray-700">
+                        Produto:
+                    </label>
+                    <select
+                        id="product-filter"
+                        value={productFilter}
+                        onChange={(e) => setProductFilter(e.target.value as Product)}
+                        className="rounded-md border-gray-300 py-1.5 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                    >
+                        <option value="ALL">Todos</option>
+                        <option value="TRIPS">Trips</option>
+                        <option value="WEDDING">Wedding</option>
+                        <option value="CORP">Corp</option>
+                    </select>
+                </div>
+            </div>
+
+            <StatsCards productFilter={productFilter} />
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <FunnelChart productFilter={productFilter} />
+                <RecentActivity />
+            </div>
+        </div>
+    )
+}
