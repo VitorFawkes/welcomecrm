@@ -2,11 +2,13 @@ import { useState } from 'react'
 import KanbanBoard from '../components/pipeline/KanbanBoard'
 import type { Database } from '../database.types'
 import { cn } from '../lib/utils'
+import CreateCardModal from '../components/pipeline/CreateCardModal'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 
 export default function Pipeline() {
     const [productFilter, setProductFilter] = useState<Product>('ALL')
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
     return (
         <div className="flex h-full flex-col space-y-4">
@@ -42,7 +44,7 @@ export default function Pipeline() {
                     ))}
                 </div>
                 <button
-                    onClick={() => alert('Funcionalidade de criação em desenvolvimento')}
+                    onClick={() => setIsCreateModalOpen(true)}
                     className="flex items-center rounded-md bg-product-trips px-4 py-2 font-medium text-white shadow-sm transition-colors hover:bg-product-trips/90"
                 >
                     <span className="mr-2 text-lg">+</span>
@@ -53,6 +55,11 @@ export default function Pipeline() {
             <div className="flex-1 overflow-hidden">
                 <KanbanBoard productFilter={productFilter} />
             </div>
+
+            <CreateCardModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+            />
         </div>
     )
 }

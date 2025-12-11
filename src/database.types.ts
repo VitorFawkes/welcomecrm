@@ -7,35 +7,40 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "13.0.5"
+  }
   public: {
     Tables: {
       activities: {
         Row: {
-          id: string
           card_id: string
-          tipo: string
-          descricao: string
-          metadata: Json | null
-          created_by: string | null
           created_at: string | null
+          created_by: string | null
+          descricao: string
+          id: string
+          metadata: Json | null
+          tipo: string
         }
         Insert: {
-          id?: string
           card_id: string
-          tipo: string
-          descricao: string
-          metadata?: Json | null
-          created_by?: string | null
           created_at?: string | null
+          created_by?: string | null
+          descricao: string
+          id?: string
+          metadata?: Json | null
+          tipo: string
         }
         Update: {
-          id?: string
           card_id?: string
-          tipo?: string
-          descricao?: string
-          metadata?: Json | null
-          created_by?: string | null
           created_at?: string | null
+          created_by?: string | null
+          descricao?: string
+          id?: string
+          metadata?: Json | null
+          tipo?: string
         }
         Relationships: [
           {
@@ -46,12 +51,26 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "activities_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
             foreignKeyName: "activities_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       arquivos: {
@@ -103,6 +122,13 @@ export type Database = {
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "arquivos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
         ]
       }
       atividades: {
@@ -150,6 +176,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividades_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
         ]
       }
@@ -278,6 +311,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "card_obligations_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
             foreignKeyName: "card_obligations_obligation_id_fkey"
             columns: ["obligation_id"]
             isOneToOne: false
@@ -328,6 +368,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_owner_history_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
         ]
       }
@@ -491,18 +538,27 @@ export type Database = {
           card_id: string
           contato_id: string
           created_at: string | null
+          id: string
+          ordem: number
+          tipo_viajante: Database["public"]["Enums"]["tipo_viajante_enum"] | null
           tipo_vinculo: string | null
         }
         Insert: {
           card_id: string
           contato_id: string
           created_at?: string | null
+          id?: string
+          ordem?: number
+          tipo_viajante?: Database["public"]["Enums"]["tipo_viajante_enum"] | null
           tipo_vinculo?: string | null
         }
         Update: {
           card_id?: string
           contato_id?: string
           created_at?: string | null
+          id?: string
+          ordem?: number
+          tipo_viajante?: Database["public"]["Enums"]["tipo_viajante_enum"] | null
           tipo_vinculo?: string | null
         }
         Relationships: [
@@ -519,6 +575,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_contatos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
           {
             foreignKeyName: "cards_contatos_contato_id_fkey"
@@ -562,48 +625,53 @@ export type Database = {
       contatos: {
         Row: {
           cargo: string | null
+          cpf: string | null
           created_at: string | null
           created_by: string | null
+          data_nascimento: string | null
           email: string | null
           empresa: string | null
           id: string
           nome: string
           observacoes: string | null
-          telefone: string | null
-          data_nascimento: string | null
-          cpf: string | null
           passaporte: string | null
           responsavel_id: string | null
+          telefone: string | null
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
           updated_at: string | null
         }
         Insert: {
           cargo?: string | null
+          cpf?: string | null
           created_at?: string | null
           created_by?: string | null
+          data_nascimento?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
           nome: string
           observacoes?: string | null
-          telefone?: string | null
-          data_nascimento?: string | null
-          cpf?: string | null
           passaporte?: string | null
+          responsavel_id?: string | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
           updated_at?: string | null
         }
         Update: {
           cargo?: string | null
+          cpf?: string | null
           created_at?: string | null
           created_by?: string | null
+          data_nascimento?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
           nome?: string
           observacoes?: string | null
-          telefone?: string | null
-          data_nascimento?: string | null
-          cpf?: string | null
           passaporte?: string | null
+          responsavel_id?: string | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
           updated_at?: string | null
         }
         Relationships: []
@@ -656,6 +724,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
         ]
       }
@@ -770,6 +845,13 @@ export type Database = {
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dados_cadastrais_pj_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
         ]
       }
       historico_fases: {
@@ -811,6 +893,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_fases_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
           {
             foreignKeyName: "historico_fases_stage_id_fkey"
@@ -872,6 +961,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
         ]
       }
@@ -936,6 +1032,13 @@ export type Database = {
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notas_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
         ]
       }
       participacoes: {
@@ -980,6 +1083,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participacoes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
         ]
       }
@@ -1042,37 +1152,37 @@ export type Database = {
       }
       pipeline_card_settings: {
         Row: {
-          created_at: string | null
-          id: string
-          fase: string
-          campos_visiveis: Json
-          ordem_campos: Json
           campos_kanban: Json | null
+          campos_visiveis: Json
+          created_at: string | null
+          fase: string
+          id: string
+          ordem_campos: Json
           ordem_kanban: Json | null
-          usuario_id: string | null
           updated_at: string | null
+          usuario_id: string | null
         }
         Insert: {
-          created_at?: string | null
-          id?: string
-          fase: string
-          campos_visiveis?: Json
-          ordem_campos?: Json
           campos_kanban?: Json | null
+          campos_visiveis?: Json
+          created_at?: string | null
+          fase: string
+          id?: string
+          ordem_campos?: Json
           ordem_kanban?: Json | null
-          usuario_id?: string | null
           updated_at?: string | null
+          usuario_id?: string | null
         }
         Update: {
-          created_at?: string | null
-          id?: string
-          fase?: string
-          campos_visiveis?: Json
-          ordem_campos?: Json
           campos_kanban?: Json | null
+          campos_visiveis?: Json
+          created_at?: string | null
+          fase?: string
+          id?: string
+          ordem_campos?: Json
           ordem_kanban?: Json | null
-          usuario_id?: string | null
           updated_at?: string | null
+          usuario_id?: string | null
         }
         Relationships: [
           {
@@ -1081,7 +1191,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       pipeline_config: {
@@ -1208,6 +1318,128 @@ export type Database = {
         }
         Relationships: []
       }
+      proposals: {
+        Row: {
+          card_id: string
+          content: Json | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          status: string
+          updated_at: string | null
+          valid_until: string | null
+          version: number | null
+        }
+        Insert: {
+          card_id: string
+          content?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          status?: string
+          updated_at?: string | null
+          valid_until?: string | null
+          version?: number | null
+        }
+        Update: {
+          card_id?: string
+          content?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          status?: string
+          updated_at?: string | null
+          valid_until?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+        ]
+      }
+      reunioes: {
+        Row: {
+          card_id: string
+          created_at: string | null
+          created_by: string | null
+          data_fim: string | null
+          data_inicio: string
+          id: string
+          local: string | null
+          notas: string | null
+          participantes: Json | null
+          status: string | null
+          titulo: string
+        }
+        Insert: {
+          card_id: string
+          created_at?: string | null
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio: string
+          id?: string
+          local?: string | null
+          notas?: string | null
+          participantes?: Json | null
+          status?: string | null
+          titulo: string
+        }
+        Update: {
+          card_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          id?: string
+          local?: string | null
+          notas?: string | null
+          participantes?: Json | null
+          status?: string | null
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reunioes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reunioes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+        ]
+      }
       stage_obligations: {
         Row: {
           active: boolean | null
@@ -1302,7 +1534,7 @@ export type Database = {
           responsavel_id?: string | null
           status?: string | null
           tipo?: string | null
-          titulo?: string
+          titulo: string
           updated_at?: string | null
         }
         Relationships: [
@@ -1319,6 +1551,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
         ]
       }
@@ -1369,6 +1608,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
             foreignKeyName: "task_queue_rule_id_fkey"
             columns: ["rule_id"]
             isOneToOne: false
@@ -1381,56 +1627,56 @@ export type Database = {
     Views: {
       view_cards_acoes: {
         Row: {
-          id: string
-          titulo: string
-          pipeline_id: string
-          pipeline_stage_id: string
-          prioridade: string | null
-          data_viagem_inicio: string | null
-          valor_estimado: number | null
-          produto: Database["public"]["Enums"]["app_product"]
-          created_at: string | null
-          updated_at: string | null
-          dono_atual_id: string | null
-          sdr_owner_id: string | null
-          concierge_owner_id: string | null
-          vendas_owner_id: string | null
-          pos_owner_id: string | null
           cliente_recorrente: boolean | null
-          pronto_para_contrato: boolean | null
-          pronto_para_erp: boolean | null
-          taxa_status: string | null
-          taxa_valor: number | null
-          produto_data: Json | null
-          fase: string | null
+          concierge_nome: string | null
+          concierge_owner_id: string | null
+          condicoes_pagamento: string | null
+          created_at: string | null
+          destinos: string | null
+          dias_ate_viagem: number | null
+          dono_atual_email: string | null
+          dono_atual_id: string | null
+          dono_atual_nome: string | null
+          estado_operacional: string | null
           etapa_nome: string | null
           etapa_ordem: number | null
-          pipeline_nome: string | null
-          pessoa_nome: string | null
-          dono_atual_nome: string | null
-          dono_atual_email: string | null
-          proxima_tarefa: Json | null
-          tarefas_pendentes: number | null
-          ultima_interacao: Json | null
-          tempo_sem_contato: number | null
-          status_taxa: string | null
-          dias_ate_viagem: number | null
-          urgencia_viagem: number | null
-          tempo_etapa_dias: number | null
-          urgencia_tempo_etapa: number | null
-          destinos: string | null
-          orcamento: string | null
-          pessoa_principal_id: string | null
-          status_comercial: string | null
-          sdr_nome: string | null
-          concierge_nome: string | null
-          vendas_nome: string | null
-          pos_nome: string | null
-          moeda: string | null
-          valor_final: number | null
-          condicoes_pagamento: string | null
+          fase: string | null
           forma_pagamento: string | null
-          estado_operacional: string | null
+          id: string
+          moeda: string | null
+          orcamento: string | null
+          pessoa_nome: string | null
+          pessoa_principal_id: string | null
+          pipeline_id: string
+          pipeline_nome: string | null
+          pipeline_stage_id: string
+          pos_nome: string | null
+          pos_owner_id: string | null
+          prioridade: string | null
+          produto: Database["public"]["Enums"]["app_product"]
+          produto_data: Json | null
+          pronto_para_contrato: boolean | null
+          pronto_para_erp: boolean | null
+          proxima_tarefa: Json | null
+          sdr_nome: string | null
+          sdr_owner_id: string | null
+          status_comercial: string | null
+          status_taxa: string | null
+          tarefas_pendentes: number | null
+          taxa_status: string | null
+          taxa_valor: number | null
+          tempo_etapa_dias: number | null
+          tempo_sem_contato: number | null
+          titulo: string
+          ultima_interacao: Json | null
+          updated_at: string | null
+          urgencia_tempo_etapa: number | null
+          urgencia_viagem: number | null
+          valor_estimado: number | null
+          valor_final: number | null
+          vendas_nome: string | null
+          vendas_owner_id: string | null
+          data_viagem_inicio: string | null
         }
         Relationships: [
           {
@@ -1460,25 +1706,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipelines"
             referencedColumns: ["id"]
-          }
+          },
         ]
-      }
-      view_dashboard_funil: {
-        Row: {
-          stage_id: string
-          stage_name: string
-          count: number
-          total_value: number
-          pipeline_id: string
-        }
       }
       view_cards_contatos_summary: {
         Row: {
-          card_id: string
-          total_viajantes: number
-          total_adultos: number
-          total_criancas: number
+          card_id: string | null
+          total_adultos: number | null
+          total_criancas: number | null
+          total_viajantes: number | null
         }
+        Relationships: []
+      }
+      view_dashboard_funil: {
+        Row: {
+          count: number | null
+          pipeline_id: string | null
+          stage_id: string | null
+          stage_name: string | null
+          total_value: number | null
+        }
+        Relationships: []
       }
       cards_historico: {
         Row: {
@@ -1514,23 +1762,24 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
-      process_task_queue: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       mover_card: {
         Args: {
           p_card_id: string
           p_nova_etapa_id: string
           p_motivo_perda_id?: string
         }
-        Returns: void
+        Returns: undefined
+      }
+      process_task_queue: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {
       app_product: "TRIPS" | "WEDDING" | "CORP"
       app_role: "admin" | "gestor" | "sdr" | "vendas" | "pos_venda" | "concierge" | "financeiro"
       tipo_pessoa_enum: "adulto" | "crianca"
+      tipo_viajante_enum: "titular" | "acompanhante"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1569,99 +1818,3 @@ export type TripsProdutoData = {
     idades_criancas: number[]
   }
 }
-type PublicSchema = Database[Extract<keyof Database, "public">]
-
-export type Tables<
-  PublicTableNameOrOptions extends
-  | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-    Database[PublicTableNameOrOptions["schema"]]["Views"])
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-    Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-    PublicSchema["Views"])
-  ? (PublicSchema["Tables"] &
-    PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
-
-export type TablesInsert<
-  PublicTableNameOrOptions extends
-  | keyof PublicSchema["Tables"]
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
-
-export type TablesUpdate<
-  PublicTableNameOrOptions extends
-  | keyof PublicSchema["Tables"]
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
-
-export type Enums<
-  PublicEnumNameOrOptions extends
-  | keyof PublicSchema["Enums"]
-  | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-  ? PublicSchema["Enums"][PublicEnumNameOrOptions]
-  : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-  | keyof PublicSchema["CompositeTypes"]
-  | { schema: keyof Database },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
-  }
-  ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-  ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never

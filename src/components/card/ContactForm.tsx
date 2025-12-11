@@ -98,6 +98,8 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
         }
     }
 
+    const isChild = formData.tipo_pessoa === 'crianca'
+
     return (
         <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-gray-50">
             <div className="flex justify-between items-center mb-4">
@@ -147,7 +149,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
                     </select>
                 </div>
 
-                {formData.tipo_pessoa === 'crianca' && (
+                {isChild && (
                     <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700">Responsável</label>
                         <select
@@ -164,45 +166,50 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
                     </div>
                 )}
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    <input
-                        type="email"
-                        value={formData.email || ''}
-                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                    />
-                </div>
+                {/* Only show these fields for Adults */}
+                {!isChild && (
+                    <>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                            <input
+                                type="email"
+                                value={formData.email || ''}
+                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                            />
+                        </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Telefone</label>
-                    <input
-                        type="tel"
-                        value={formData.telefone || ''}
-                        onChange={e => setFormData({ ...formData, telefone: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                    />
-                </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Telefone</label>
+                            <input
+                                type="tel"
+                                value={formData.telefone || ''}
+                                onChange={e => setFormData({ ...formData, telefone: e.target.value })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                            />
+                        </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">CPF</label>
-                    <input
-                        type="text"
-                        value={formData.cpf || ''}
-                        onChange={e => setFormData({ ...formData, cpf: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                    />
-                </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">CPF</label>
+                            <input
+                                type="text"
+                                value={formData.cpf || ''}
+                                onChange={e => setFormData({ ...formData, cpf: e.target.value })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                            />
+                        </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Passaporte</label>
-                    <input
-                        type="text"
-                        value={formData.passaporte || ''}
-                        onChange={e => setFormData({ ...formData, passaporte: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                    />
-                </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Passaporte</label>
+                            <input
+                                type="text"
+                                value={formData.passaporte || ''}
+                                onChange={e => setFormData({ ...formData, passaporte: e.target.value })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                            />
+                        </div>
+                    </>
+                )}
 
                 <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700">Observações</label>

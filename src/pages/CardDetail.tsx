@@ -38,20 +38,20 @@ export default function CardDetail() {
     if (!card) return <div className="p-8 text-center">Card não encontrado</div>
 
     return (
-        <div className="flex flex-col h-screen bg-gray-50">
+        <div className="h-full bg-gray-50 flex flex-col overflow-hidden">
             {/* Sticky Header */}
             <div className="sticky top-0 z-10 bg-white shadow-md">
                 <CardHeader card={card} />
             </div>
 
             {/* 2-Column Layout: Work Area + Context/Accountability */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 p-6 overflow-hidden">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 p-6">
                 {/* CENTER COLUMN - Work Area (What to do) */}
-                <div className="overflow-y-auto space-y-4 pr-2 scroll-smooth" style={{ scrollbarGutter: 'stable' }}>
+                <div className="min-h-0 overflow-y-auto space-y-4 pr-2 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
                     {/* Stage Requirements (Checklist) */}
                     <StageRequirements card={card} />
 
-                    {/* Tasks (Priority #1) */}
+                    {/* Tasks & Meetings (Unified) */}
                     <CardTasks cardId={card.id!} />
 
                     {/* Notes & Observations */}
@@ -65,7 +65,7 @@ export default function CardDetail() {
                 </div>
 
                 {/* SIDEBAR - Context & Accountability */}
-                <div className="overflow-y-auto space-y-4 scroll-smooth" style={{ scrollbarGutter: 'stable' }}>
+                <div className="min-h-0 overflow-y-auto space-y-4 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
                     {/* 1. Metrics + Owner (Accountability First) */}
                     <MetricsWidget card={card} />
 

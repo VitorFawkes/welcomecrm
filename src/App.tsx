@@ -8,6 +8,7 @@ import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
 import PipelineSettings from './components/settings/PipelineSettings'
 import UserManagement from './pages/admin/UserManagement'
+import ActivitiesPage from './pages/ActivitiesPage'
 import { ToastProvider } from './contexts/ToastContext'
 
 const queryClient = new QueryClient()
@@ -31,6 +32,7 @@ function App() {
                 <Route path="/cards" element={<div className="p-8">Cards List (Placeholder)</div>} />
                 <Route path="/people" element={<div className="p-8">People (Placeholder)</div>} />
                 <Route path="/tasks" element={<div className="p-8">Tasks (Placeholder)</div>} />
+                <Route path="/activities" element={<ActivitiesPage />} />
                 <Route path="/settings/pipeline" element={<PipelineSettings />} />
                 <Route path="/admin/users" element={<UserManagement />} />
                 <Route path="/settings" element={<div className="p-8">Settings (Placeholder)</div>} />

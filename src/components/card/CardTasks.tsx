@@ -1,257 +1,568 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckSquare, Plus, Calendar, Trash2, Check, AlertCircle } from 'lucide-react'
+import { CheckSquare, Plus, Calendar, Trash2, Check, Clock, MapPin, Phone, Mail, MessageSquare } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useAuth } from '../../contexts/AuthContext'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
+import { Button } from '../ui/Button'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 interface CardTasksProps {
     cardId: string
 }
 
-interface Task {
+type TaskType = 'tarefa' | 'reuniao' | 'ligacao' | 'email' | 'mensagem' | 'outro'
+
+interface BaseTask {
     id: string
     titulo: string
+    created_at: string
+    type_origin: 'tarefa' | 'reuniao'
+}
+
+interface Tarefa extends BaseTask {
+    type_origin: 'tarefa'
     data_vencimento: string
     concluida: boolean
     prioridade: 'baixa' | 'media' | 'alta'
     tipo: string
+    descricao?: string
+    concluida_em?: string | null
 }
 
-import { useAuth } from '../../contexts/AuthContext'
+interface Reuniao extends BaseTask {
+    type_origin: 'reuniao'
+    data_inicio: string
+    data_fim: string | null
+    local: string | null
+    notas: string | null
+    status: 'agendada' | 'realizada' | 'cancelada' | 'adiada'
+}
+
+type UnifiedItem = Tarefa | Reuniao
 
 export default function CardTasks({ cardId }: CardTasksProps) {
     const { user } = useAuth()
     const queryClient = useQueryClient()
-    const [isAdding, setIsAdding] = useState(false)
-    const [newTask, setNewTask] = useState({
-        titulo: '',
-        data_vencimento: new Date().toISOString().split('T')[0],
-        hora_vencimento: '12:00',
-        prioridade: 'media' as const,
-        tipo: 'outro'
-    })
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [editingItem, setEditingItem] = useState<UnifiedItem | null>(null)
+    const [selectedType, setSelectedType] = useState<TaskType>('tarefa')
 
-    const { data: tasks, isLoading } = useQuery({
+    // Form States
+    const [title, setTitle] = useState('')
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+    const [time, setTime] = useState('12:00')
+    const [endTime, setEndTime] = useState('13:00')
+    const [priority, setPriority] = useState<'baixa' | 'media' | 'alta'>('media')
+    const [location, setLocation] = useState('')
+    const [notes, setNotes] = useState('')
+    const [status, setStatus] = useState<string>('agendada')
+
+    // Fetch Tasks
+    const { data: tasks = [] } = useQuery({
         queryKey: ['tasks', cardId],
         queryFn: async () => {
             const { data, error } = await (supabase.from('tarefas') as any)
                 .select('*')
                 .eq('card_id', cardId)
-                .order('concluida', { ascending: true })
-                .order('data_vencimento', { ascending: true })
-
             if (error) throw error
-            return data as Task[]
+            return (data || []).map((t: any) => ({ ...t, type_origin: 'tarefa' })) as Tarefa[]
         }
     })
 
-    const addTaskMutation = useMutation({
+    // Fetch Meetings
+    const { data: meetings = [] } = useQuery({
+        queryKey: ['meetings', cardId],
+        queryFn: async () => {
+            const { data, error } = await (supabase.from('reunioes') as any)
+                .select('*')
+                .eq('card_id', cardId)
+            if (error) throw error
+            return (data || []).map((m: any) => ({ ...m, type_origin: 'reuniao' })) as Reuniao[]
+        }
+    })
+
+    // Merge and Sort
+    const allItems: UnifiedItem[] = [...tasks, ...meetings].sort((a, b) => {
+        const dateA = a.type_origin === 'tarefa' ? (a as Tarefa).data_vencimento : (a as Reuniao).data_inicio
+        const dateB = b.type_origin === 'tarefa' ? (b as Tarefa).data_vencimento : (b as Reuniao).data_inicio
+        return new Date(dateA).getTime() - new Date(dateB).getTime()
+    })
+
+    const pendingItems = allItems.filter(item => {
+        if (item.type_origin === 'tarefa') return !(item as Tarefa).concluida
+        if (item.type_origin === 'reuniao') return (item as Reuniao).status === 'agendada' || (item as Reuniao).status === 'adiada'
+        return true
+    })
+
+    const completedItems = allItems.filter(item => {
+        if (item.type_origin === 'tarefa') return (item as Tarefa).concluida
+        if (item.type_origin === 'reuniao') return (item as Reuniao).status === 'realizada' || (item as Reuniao).status === 'cancelada'
+        return false
+    })
+
+    // Mutations
+    const saveMutation = useMutation({
         mutationFn: async () => {
             if (!user) throw new Error('Usuário não autenticado')
+            const dateTime = `${date}T${time}:00`
 
-            const dataVencimento = `${newTask.data_vencimento}T${newTask.hora_vencimento}:00`
-            const { error } = await (supabase.from('tarefas') as any)
-                .insert({
+            if (selectedType === 'reuniao') {
+                const endDateTime = `${date}T${endTime}:00`
+                const payload = {
                     card_id: cardId,
-                    titulo: newTask.titulo,
-                    data_vencimento: dataVencimento,
-                    prioridade: newTask.prioridade,
-                    tipo: newTask.tipo,
-                    concluida: false,
+                    titulo: title,
+                    data_inicio: dateTime,
+                    data_fim: endDateTime,
+                    local: location,
+                    notas: notes,
+                    status: status,
+                    created_by: editingItem ? undefined : user.id // Only set created_by on insert
+                }
+
+                if (editingItem) {
+                    const { error } = await (supabase.from('reunioes') as any)
+                        .update(payload)
+                        .eq('id', editingItem.id)
+                    if (error) throw error
+                } else {
+                    const { error } = await (supabase.from('reunioes') as any)
+                        .insert(payload)
+                    if (error) throw error
+                }
+            } else {
+                const payload = {
+                    card_id: cardId,
+                    titulo: title,
+                    data_vencimento: dateTime,
+                    prioridade: priority,
+                    tipo: selectedType,
+                    descricao: notes,
+                    created_by: editingItem ? undefined : user.id,
                     responsavel_id: user.id
-                })
-            if (error) throw error
+                }
+
+                if (editingItem) {
+                    const { error } = await (supabase.from('tarefas') as any)
+                        .update(payload)
+                        .eq('id', editingItem.id)
+                    if (error) throw error
+                } else {
+                    const { error } = await (supabase.from('tarefas') as any)
+                        .insert({ ...payload, concluida: false })
+                    if (error) throw error
+                }
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
-            queryClient.invalidateQueries({ queryKey: ['cards'] }) // Refresh kanban indicators
-            setIsAdding(false)
-            setNewTask({
-                titulo: '',
-                data_vencimento: new Date().toISOString().split('T')[0],
-                hora_vencimento: '12:00',
-                prioridade: 'media',
-                tipo: 'outro'
-            })
+            queryClient.invalidateQueries({ queryKey: ['meetings', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['cards'] }) // Update card list counters if any
+            closeModal()
         }
     })
 
     const toggleTaskMutation = useMutation({
         mutationFn: async ({ id, concluida }: { id: string, concluida: boolean }) => {
             const { error } = await (supabase.from('tarefas') as any)
-                .update({
-                    concluida,
-                    concluida_em: concluida ? new Date().toISOString() : null
-                })
+                .update({ concluida, concluida_em: concluida ? new Date().toISOString() : null })
                 .eq('id', id)
             if (error) throw error
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
-            queryClient.invalidateQueries({ queryKey: ['cards'] })
         }
     })
 
-    const deleteTaskMutation = useMutation({
-        mutationFn: async (id: string) => {
-            const { error } = await (supabase.from('tarefas') as any)
-                .delete()
-                .eq('id', id)
+    const deleteItemMutation = useMutation({
+        mutationFn: async ({ id, type }: { id: string, type: 'tarefa' | 'reuniao' }) => {
+            const table = type === 'tarefa' ? 'tarefas' : 'reunioes'
+            const { error } = await (supabase.from(table) as any).delete().eq('id', id)
             if (error) throw error
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
-            queryClient.invalidateQueries({ queryKey: ['cards'] })
+            queryClient.invalidateQueries({ queryKey: ['meetings', cardId] })
         }
     })
 
-    const pendingTasks = tasks?.filter(t => !t.concluida) || []
-    const completedTasks = tasks?.filter(t => t.concluida) || []
+    const openModal = (item?: UnifiedItem) => {
+        if (item) {
+            setEditingItem(item)
+            setTitle(item.titulo)
+            if (item.type_origin === 'reuniao') {
+                const m = item as Reuniao
+                setSelectedType('reuniao')
+                setDate(m.data_inicio.split('T')[0])
+                setTime(m.data_inicio.split('T')[1].substring(0, 5))
+                setEndTime(m.data_fim ? m.data_fim.split('T')[1].substring(0, 5) : '13:00')
+                setLocation(m.local || '')
+                setNotes(m.notas || '')
+                setStatus(m.status || 'agendada')
+            } else {
+                const t = item as Tarefa
+                setSelectedType(t.tipo as TaskType || 'tarefa')
+                setDate(t.data_vencimento.split('T')[0])
+                setTime(t.data_vencimento.split('T')[1].substring(0, 5))
+                setPriority(t.prioridade)
+                setNotes(t.descricao || '')
+            }
+        } else {
+            setEditingItem(null)
+            resetForm()
+        }
+        setIsModalOpen(true)
+    }
+
+    const closeModal = () => {
+        setIsModalOpen(false)
+        setEditingItem(null)
+        resetForm()
+    }
+
+    const resetForm = () => {
+        setTitle('')
+        setDate(new Date().toISOString().split('T')[0])
+        setTime('12:00')
+        setEndTime('13:00')
+        setPriority('media')
+        setLocation('')
+        setNotes('')
+        setStatus('agendada')
+        setSelectedType('tarefa')
+    }
+
+    const getTypeIcon = (type: string) => {
+        switch (type) {
+            case 'reuniao': return <Calendar className="h-4 w-4 text-purple-600" />
+            case 'ligacao': return <Phone className="h-4 w-4 text-green-600" />
+            case 'email': return <Mail className="h-4 w-4 text-blue-600" />
+            case 'mensagem': return <MessageSquare className="h-4 w-4 text-indigo-600" />
+            default: return <CheckSquare className="h-4 w-4 text-gray-500" />
+        }
+    }
 
     return (
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900">Tarefas</h3>
-                <button
-                    onClick={() => setIsAdding(true)}
-                    className="flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                <h3 className="text-sm font-semibold text-gray-900">Tarefas e Compromissos</h3>
+                <Button
+                    onClick={() => openModal()}
+                    size="sm"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
                 >
                     <Plus className="h-4 w-4" />
-                    Nova Tarefa
-                </button>
+                    Novo
+                </Button>
             </div>
 
-            {isAdding && (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 mb-4">
-                    <input
-                        type="text"
-                        placeholder="O que precisa ser feito?"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                        value={newTask.titulo}
-                        onChange={e => setNewTask({ ...newTask, titulo: e.target.value })}
-                        autoFocus
-                    />
-                    <div className="flex gap-3">
-                        <input
-                            type="date"
-                            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                            value={newTask.data_vencimento}
-                            onChange={e => setNewTask({ ...newTask, data_vencimento: e.target.value })}
-                        />
-                        <input
-                            type="time"
-                            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                            value={newTask.hora_vencimento}
-                            onChange={e => setNewTask({ ...newTask, hora_vencimento: e.target.value })}
-                        />
-                        <select
-                            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                            value={newTask.prioridade}
-                            onChange={e => setNewTask({ ...newTask, prioridade: e.target.value as any })}
-                        >
-                            <option value="baixa">Baixa</option>
-                            <option value="media">Média</option>
-                            <option value="alta">Alta</option>
-                        </select>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <button
-                            onClick={() => setIsAdding(false)}
-                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={() => addTaskMutation.mutate()}
-                            disabled={!newTask.titulo}
-                            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            Adicionar
-                        </button>
-                    </div>
-                </div>
-            )}
+            <div className="space-y-6">
+                {/* Pending / Upcoming */}
+                {pendingItems.length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">Próximos</h4>
+                        {pendingItems.map(item => {
+                            const isMeeting = item.type_origin === 'reuniao'
+                            const dateStr = isMeeting ? (item as Reuniao).data_inicio : (item as Tarefa).data_vencimento
+                            const isLate = new Date(dateStr) < new Date()
 
-            <div className="space-y-4">
-                {isLoading ? (
-                    <div className="text-center py-8 text-gray-500">Carregando tarefas...</div>
-                ) : tasks?.length === 0 && !isAdding ? (
-                    <div className="text-center py-8">
-                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-                            <CheckSquare className="h-6 w-6 text-gray-400" />
-                        </div>
-                        <h4 className="mt-2 text-sm font-medium text-gray-900">Nenhuma tarefa</h4>
-                        <p className="mt-1 text-xs text-gray-500">Comece adicionando tarefas para este card.</p>
-                    </div>
-                ) : (
-                    <>
-                        {pendingTasks.length > 0 && (
-                            <div className="space-y-2">
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pendentes</h4>
-                                {pendingTasks.map(task => {
-                                    const isLate = new Date(task.data_vencimento) < new Date()
-                                    return (
-                                        <div key={task.id} className="group flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 hover:shadow-sm transition-shadow">
-                                            <button
-                                                onClick={() => toggleTaskMutation.mutate({ id: task.id, concluida: true })}
-                                                className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border border-gray-300 text-blue-600 focus:ring-blue-500 hover:border-blue-500 flex items-center justify-center"
-                                            >
-                                            </button>
-                                            <div className="flex-1 min-w-0">
-                                                <p className={cn("text-sm font-medium text-gray-900", isLate && "text-red-600")}>
-                                                    {task.titulo}
-                                                </p>
-                                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                                                    <div className={cn("flex items-center gap-1", isLate && "text-red-600 font-medium")}>
-                                                        {isLate ? <AlertCircle className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
-                                                        {new Date(task.data_vencimento).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                    {task.prioridade === 'alta' && (
-                                                        <span className="text-red-600 font-medium">Alta Prioridade</span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => deleteTaskMutation.mutate(task.id)}
-                                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-
-                        {completedTasks.length > 0 && (
-                            <div className="space-y-2">
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Concluídas</h4>
-                                {completedTasks.map(task => (
-                                    <div key={task.id} className="group flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 opacity-75">
+                            return (
+                                <div key={item.id} className={cn(
+                                    "group flex items-start gap-3 rounded-lg border p-3 hover:shadow-md transition-all cursor-pointer",
+                                    isMeeting ? "bg-white border-purple-100 hover:border-purple-200" : "bg-white border-gray-200 hover:border-indigo-200"
+                                )} onClick={() => openModal(item)}>
+                                    {!isMeeting ? (
                                         <button
-                                            onClick={() => toggleTaskMutation.mutate({ id: task.id, concluida: false })}
-                                            className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border border-gray-300 bg-blue-50 text-blue-600 focus:ring-blue-500 flex items-center justify-center"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                toggleTaskMutation.mutate({ id: item.id, concluida: true })
+                                            }}
+                                            className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border border-gray-300 text-indigo-600 focus:ring-indigo-500 hover:border-indigo-500 flex items-center justify-center hover:bg-indigo-50 transition-colors"
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center w-10 h-10 bg-purple-50 rounded-lg text-purple-700 shrink-0 border border-purple-100">
+                                            <span className="text-[10px] font-bold uppercase">{format(new Date(dateStr), 'MMM', { locale: ptBR })}</span>
+                                            <span className="text-sm font-bold">{new Date(dateStr).getDate()}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            {isMeeting ? null : getTypeIcon((item as Tarefa).tipo || 'tarefa')}
+                                            <p className={cn("text-sm font-medium text-gray-900", isLate && !isMeeting && "text-red-600")}>
+                                                {item.titulo}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                                            <div className={cn("flex items-center gap-1.5", isLate && !isMeeting && "text-red-600 font-medium")}>
+                                                <Clock className="h-3.5 w-3.5" />
+                                                {format(new Date(dateStr), "HH:mm")}
+                                                {!isMeeting && ` • ${format(new Date(dateStr), "dd/MM")}`}
+                                                {isMeeting && (item as Reuniao).data_fim && ` - ${format(new Date((item as Reuniao).data_fim!), "HH:mm")}`}
+                                            </div>
+
+                                            {isMeeting && (item as Reuniao).local && (
+                                                <div className="flex items-center gap-1.5 truncate max-w-[150px]">
+                                                    <MapPin className="h-3.5 w-3.5" />
+                                                    {(item as Reuniao).local}
+                                                </div>
+                                            )}
+
+                                            {!isMeeting && (item as Tarefa).prioridade === 'alta' && (
+                                                <span className="px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-[10px] font-medium border border-red-100">
+                                                    Alta Prioridade
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+
+                {/* Completed / Past */}
+                {completedItems.length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">Concluídos / Passados</h4>
+                        {completedItems.map(item => {
+                            const isMeeting = item.type_origin === 'reuniao'
+                            const dateStr = isMeeting ? (item as Reuniao).data_inicio : (item as Tarefa).data_vencimento
+
+                            return (
+                                <div key={item.id} className="group flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50/50 p-3 opacity-70 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => openModal(item)}>
+                                    {!isMeeting ? (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                toggleTaskMutation.mutate({ id: item.id, concluida: false })
+                                            }}
+                                            className="mt-0.5 h-5 w-5 flex-shrink-0 rounded border border-gray-300 bg-indigo-50 text-indigo-600 focus:ring-indigo-500 flex items-center justify-center"
                                         >
                                             <Check className="h-3.5 w-3.5" />
                                         </button>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-500 line-through">
-                                                {task.titulo}
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center w-10 h-10 bg-gray-100 rounded-lg text-gray-500 shrink-0 grayscale border border-gray-200">
+                                            <span className="text-[10px] font-bold uppercase">{format(new Date(dateStr), 'MMM', { locale: ptBR })}</span>
+                                            <span className="text-sm font-bold">{new Date(dateStr).getDate()}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            {isMeeting ? null : getTypeIcon((item as Tarefa).tipo || 'tarefa')}
+                                            <p className="text-sm font-medium text-gray-500 line-through decoration-gray-400">
+                                                {item.titulo}
                                             </p>
                                         </div>
-                                        <button
-                                            onClick={() => deleteTaskMutation.mutate(task.id)}
-                                            className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
+                                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                                            <span>{format(new Date(dateStr), "dd 'de' MMMM", { locale: ptBR })}</span>
+                                            {isMeeting && (
+                                                <span className={cn(
+                                                    "px-1.5 py-0.5 rounded text-[10px] font-medium border",
+                                                    (item as Reuniao).status === 'realizada' ? "bg-green-50 text-green-700 border-green-100" : "bg-red-50 text-red-700 border-red-100"
+                                                )}>
+                                                    {(item as Reuniao).status}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            deleteItemMutation.mutate({ id: item.id, type: item.type_origin })
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+
+                {allItems.length === 0 && (
+                    <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50/50">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm mb-3">
+                            <CheckSquare className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <h4 className="text-sm font-medium text-gray-900">Nenhuma atividade</h4>
+                        <p className="mt-1 text-xs text-gray-500">Crie tarefas ou agende reuniões para começar.</p>
+                        <Button
+                            onClick={() => openModal()}
+                            variant="outline"
+                            size="sm"
+                            className="mt-4"
+                        >
+                            Criar Atividade
+                        </Button>
+                    </div>
+                )}
+            </div>
+
+            {/* Create/Edit Modal */}
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="sm:max-w-[500px] w-full">
+                    <DialogHeader>
+                        <DialogTitle>{editingItem ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        {/* Type Selector */}
+                        {!editingItem && (
+                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full">
+                                {(['tarefa', 'reuniao', 'ligacao', 'email', 'mensagem', 'outro'] as TaskType[]).map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => setSelectedType(type)}
+                                        className={cn(
+                                            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap",
+                                            selectedType === type
+                                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200"
+                                                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                        )}
+                                    >
+                                        {getTypeIcon(type)}
+                                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                                    </button>
                                 ))}
                             </div>
                         )}
-                    </>
-                )}
-            </div>
+
+                        <div className="space-y-4 w-full">
+                            <div>
+                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Título</label>
+                                <input
+                                    type="text"
+                                    placeholder={selectedType === 'reuniao' ? "Ex: Reunião de Apresentação" : "Ex: Enviar proposta"}
+                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                    value={title}
+                                    onChange={e => setTitle(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">Data</label>
+                                    <input
+                                        type="date"
+                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                        value={date}
+                                        onChange={e => setDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Início</label>
+                                        <input
+                                            type="time"
+                                            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                            value={time}
+                                            onChange={e => setTime(e.target.value)}
+                                        />
+                                    </div>
+                                    {selectedType === 'reuniao' && (
+                                        <div>
+                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Fim</label>
+                                            <input
+                                                type="time"
+                                                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                value={endTime}
+                                                onChange={e => setEndTime(e.target.value)}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {selectedType === 'reuniao' ? (
+                                <>
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Local / Link</label>
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Google Meet, Zoom, Escritório..."
+                                                className="w-full pl-9 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                value={location}
+                                                onChange={e => setLocation(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {editingItem && (
+                                        <div>
+                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</label>
+                                            <select
+                                                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                value={status}
+                                                onChange={e => setStatus(e.target.value)}
+                                            >
+                                                <option value="agendada">Agendada</option>
+                                                <option value="realizada">Realizada</option>
+                                                <option value="cancelada">Cancelada</option>
+                                                <option value="adiada">Adiada</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div>
+                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">Prioridade</label>
+                                    <select
+                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                        value={priority}
+                                        onChange={e => setPriority(e.target.value as any)}
+                                    >
+                                        <option value="baixa">Baixa</option>
+                                        <option value="media">Média</option>
+                                        <option value="alta">Alta</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">
+                                    {selectedType === 'reuniao' ? "Pauta / Notas" : "Descrição"}
+                                </label>
+                                <textarea
+                                    placeholder="Adicione detalhes..."
+                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 min-h-[100px]"
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={closeModal}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={() => saveMutation.mutate()}
+                            disabled={!title || saveMutation.isPending}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            {saveMutation.isPending ? (
+                                <>
+                                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                                    Salvando...
+                                </>
+                            ) : (
+                                'Salvar'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

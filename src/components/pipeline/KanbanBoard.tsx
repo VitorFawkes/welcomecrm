@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
+import StageChangeModal from './StageChangeModal'
 import type { Database } from '../../database.types'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
@@ -141,6 +142,9 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
         }
     })
 
+    const [stageChangeModalOpen, setStageChangeModalOpen] = useState(false)
+    const [pendingMove, setPendingMove] = useState<{ cardId: string, stageId: string, currentOwnerId: string, sdrName?: string, targetStageName: string } | null>(null)
+
     const handleDragStart = (event: DragStartEvent) => {
         if (event.active.data.current) {
             setActiveCard(event.active.data.current as Card)
@@ -154,13 +158,65 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
             const cardId = active.id as string
             const stageId = over.id as string
             const currentStageId = active.data.current?.pipeline_stage_id
+            const currentFase = active.data.current?.fase
+            const targetStage = stages?.find(s => s.id === stageId)
+            const targetFase = targetStage?.fase
 
             if (stageId !== currentStageId) {
+                // Check if moving from SDR to non-SDR
+                if (currentFase === 'SDR' && targetFase && targetFase !== 'SDR') {
+                    // Trigger modal
+                    setPendingMove({
+                        cardId,
+                        stageId,
+                        currentOwnerId: active.data.current?.dono_atual_id,
+                        sdrName: active.data.current?.sdr_owner_id ? 'SDR Atual' : undefined, // Ideally fetch name, but ID is what we have on card usually. 
+                        // Actually card view has names? No, usually IDs. 
+                        // But we can just say "o SDR atual" or try to find the name if we had the list of users.
+                        // For now, let's just pass the ID or a generic string if we don't have the map.
+                        // UserSelector has the list but it's internal.
+                        // Let's just pass undefined for name and let modal handle generic text or we could fetch it.
+                        targetStageName: targetStage?.nome || 'Nova Etapa'
+                    })
+                    setStageChangeModalOpen(true)
+                    return
+                }
+
                 moveCardMutation.mutate({ cardId, stageId })
             }
         }
 
         setActiveCard(null)
+    }
+
+    const handleConfirmStageChange = (newOwnerId: string) => {
+        if (pendingMove) {
+            // Update owner first or together?
+            // We need to update owner AND move stage.
+            // moveCardMutation only moves stage.
+            // We need a new mutation or call update owner then move.
+
+            // Let's call update owner first
+            const updateOwner = async () => {
+                const { error } = await (supabase.from('cards') as any)
+                    .update({ dono_atual_id: newOwnerId })
+                    .eq('id', pendingMove.cardId)
+
+                if (error) {
+                    console.error('Error updating owner:', error)
+                    alert('Erro ao atualizar responsável.')
+                    return
+                }
+
+                // Then move
+                moveCardMutation.mutate({ cardId: pendingMove.cardId, stageId: pendingMove.stageId })
+                setStageChangeModalOpen(false)
+                setPendingMove(null)
+                setActiveCard(null)
+            }
+
+            updateOwner()
+        }
     }
 
     if (!stages || !cards) return <div className="h-full w-full animate-pulse bg-gray-100 rounded-lg"></div>
@@ -188,6 +244,21 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
                     </div>
                 ) : null}
             </DragOverlay>
+
+            {pendingMove && (
+                <StageChangeModal
+                    isOpen={stageChangeModalOpen}
+                    onClose={() => {
+                        setStageChangeModalOpen(false)
+                        setPendingMove(null)
+                        setActiveCard(null)
+                    }}
+                    onConfirm={handleConfirmStageChange}
+                    currentOwnerId={pendingMove.currentOwnerId}
+                    sdrName={pendingMove.sdrName}
+                    targetStageName={pendingMove.targetStageName}
+                />
+            )}
         </DndContext>
     )
 }

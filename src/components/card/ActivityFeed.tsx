@@ -1,65 +1,165 @@
-import { Pencil, Plus, UserPlus, FileText, X, Check, TrendingUp, UserCheck, ArrowRightLeft, Mail, MessageSquare } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { Pencil, Plus, UserPlus, UserMinus, FileText, X, Check, TrendingUp, UserCheck, ArrowRightLeft, Mail, MessageSquare, Calendar, RotateCcw, FileEdit, MapPin, DollarSign, Upload, Trash2, FileSignature, CheckCircle, XCircle, Archive } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Database } from '../../database.types'
 
 interface ActivityFeedProps {
-    cardId: string
+    cardId?: string
 }
 
 type Activity = Database['public']['Tables']['activities']['Row'] & {
-    created_by_profile?: {
+    created_by_user?: {
         nome: string | null
+        email: string | null
+    }
+    card?: {
+        titulo: string | null
     }
 }
 
 const activityIcons = {
+    // Card
+    'card_created': Plus,
+    'card_archived': Archive,
+    // Tasks
     'task_created': FileText,
     'task_completed': Check,
+    'task_reopened': RotateCcw,
+    'task_updated': Pencil,
+    'task_deleted': Trash2,
     'task_cancelled': X,
+    // Status & Ownership
     'status_changed': TrendingUp,
     'owner_changed': UserCheck,
     'stage_changed': ArrowRightLeft,
+    // Travelers
     'traveler_added': UserPlus,
+    'traveler_removed': UserMinus,
+    'traveler_changed': UserCheck,
+    'traveler_updated': UserCheck,
+    // Communication
     'email_sent': Mail,
     'whatsapp_sent': MessageSquare,
+    'message_sent': MessageSquare,
+    // Notes
     'note_added': Pencil,
+    'note_created': Pencil,
+    'note_updated': Pencil,
+    'note_deleted': Trash2,
+    // Files
+    'file_uploaded': Upload,
+    'file_deleted': Trash2,
+    // Proposals
+    'proposal_created': FileText,
+    'proposal_updated': FileEdit,
+    // Contracts
+    'contract_created': FileSignature,
+    'contract_updated': FileSignature,
+    'contract_signed': FileSignature,
+    // Meetings
+    'meeting_created': Calendar,
+    'meeting_updated': Calendar,
+    'meeting_deleted': Trash2,
+    // Requirements
+    'requirement_completed': CheckCircle,
+    'requirement_uncompleted': XCircle,
+    // Values & Data
+    'value_changed': DollarSign,
+    'destination_changed': MapPin,
+    'budget_changed': DollarSign,
+    'period_changed': Calendar,
+    // Generic
     'created': Plus,
     'updated': Pencil,
     'default': FileText
 }
 
 const activityColors = {
+    // Card
+    'card_created': 'text-green-600 bg-green-50',
+    'card_archived': 'text-gray-600 bg-gray-50',
+    // Tasks
     'task_created': 'text-blue-600 bg-blue-50',
     'task_completed': 'text-green-600 bg-green-50',
+    'task_reopened': 'text-orange-600 bg-orange-50',
+    'task_updated': 'text-blue-600 bg-blue-50',
+    'task_deleted': 'text-red-600 bg-red-50',
     'task_cancelled': 'text-red-600 bg-red-50',
+    // Status & Ownership
     'status_changed': 'text-purple-600 bg-purple-50',
     'owner_changed': 'text-indigo-600 bg-indigo-50',
     'stage_changed': 'text-cyan-600 bg-cyan-50',
+    // Travelers
     'traveler_added': 'text-purple-600 bg-purple-50',
+    'traveler_removed': 'text-red-600 bg-red-50',
+    'traveler_changed': 'text-violet-600 bg-violet-50',
+    'traveler_updated': 'text-violet-600 bg-violet-50',
+    // Communication
     'email_sent': 'text-blue-600 bg-blue-50',
     'whatsapp_sent': 'text-green-600 bg-green-50',
+    'message_sent': 'text-blue-600 bg-blue-50',
+    // Notes
     'note_added': 'text-gray-600 bg-gray-50',
+    'note_created': 'text-gray-600 bg-gray-50',
+    'note_updated': 'text-gray-600 bg-gray-50',
+    'note_deleted': 'text-red-600 bg-red-50',
+    // Files
+    'file_uploaded': 'text-teal-600 bg-teal-50',
+    'file_deleted': 'text-red-600 bg-red-50',
+    // Proposals
+    'proposal_created': 'text-pink-600 bg-pink-50',
+    'proposal_updated': 'text-pink-600 bg-pink-50',
+    // Contracts
+    'contract_created': 'text-amber-600 bg-amber-50',
+    'contract_updated': 'text-amber-600 bg-amber-50',
+    'contract_signed': 'text-green-600 bg-green-50',
+    // Meetings
+    'meeting_created': 'text-yellow-600 bg-yellow-50',
+    'meeting_updated': 'text-yellow-600 bg-yellow-50',
+    'meeting_deleted': 'text-red-600 bg-red-50',
+    // Requirements
+    'requirement_completed': 'text-green-600 bg-green-50',
+    'requirement_uncompleted': 'text-orange-600 bg-orange-50',
+    // Values & Data
+    'value_changed': 'text-green-600 bg-green-50',
+    'destination_changed': 'text-blue-600 bg-blue-50',
+    'budget_changed': 'text-emerald-600 bg-emerald-50',
+    'period_changed': 'text-orange-600 bg-orange-50',
+    // Generic
     'created': 'text-green-600 bg-green-50',
     'updated': 'text-blue-600 bg-blue-50',
     'default': 'text-gray-600 bg-gray-50'
 }
 
 export default function ActivityFeed({ cardId }: ActivityFeedProps) {
+    const queryClient = useQueryClient()
     const { data: activities, isLoading } = useQuery({
-        queryKey: ['activity-feed', cardId],
+        queryKey: ['activity-feed', cardId || 'global'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('activities')
                 .select(`
                     *,
-                    created_by_profile:created_by(nome)
+                    created_by_user:profiles (
+                        nome,
+                        email
+                    ),
+                    card:cards (
+                        titulo
+                    )
                 `)
-                .eq('card_id', cardId)
                 .order('created_at', { ascending: false })
-                .limit(20)
+                .limit(100)
+
+            if (cardId) {
+                query = query.eq('card_id', cardId)
+            }
+
+            const { data, error } = await query
 
             if (error) {
                 console.error('Error fetching activities:', error)
@@ -67,9 +167,39 @@ export default function ActivityFeed({ cardId }: ActivityFeedProps) {
             }
 
             return data as Activity[]
-        },
-        enabled: !!cardId
+        }
     })
+
+    useEffect(() => {
+        const channel = supabase
+            .channel(`activity-feed-${cardId || 'global'}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'activities'
+                },
+                (payload) => {
+                    console.log('Activity received:', payload)
+                    if (cardId) {
+                        if (payload.new.card_id === cardId) {
+                            queryClient.invalidateQueries({ queryKey: ['activity-feed', cardId] })
+                        }
+                    } else {
+                        // Global feed: update on any activity
+                        queryClient.invalidateQueries({ queryKey: ['activity-feed', 'global'] })
+                    }
+                }
+            )
+            .subscribe((status) => {
+                console.log('ActivityFeed subscription status:', status, cardId || 'global')
+            })
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [cardId, queryClient])
 
     if (isLoading) {
         return (
@@ -82,14 +212,14 @@ export default function ActivityFeed({ cardId }: ActivityFeedProps) {
 
     return (
         <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Atividades Recentes</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Atividades</h3>
 
             {activities && activities.length > 0 ? (
                 <div className="space-y-3">
                     {activities.map((activity) => {
                         const Icon = activityIcons[activity.tipo as keyof typeof activityIcons] || activityIcons.default
                         const colorClass = activityColors[activity.tipo as keyof typeof activityColors] || activityColors.default
-                        const userName = activity.created_by_profile?.nome || 'Sistema'
+                        const userName = activity.created_by_user?.nome || activity.created_by_user?.email || 'Sistema'
 
                         return (
                             <div key={activity.id} className="flex gap-2 text-xs">
@@ -100,10 +230,22 @@ export default function ActivityFeed({ cardId }: ActivityFeedProps) {
 
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
+                                    {!cardId && activity.card?.titulo && (
+                                        <Link to={`/pipeline/cards/${activity.card_id}`} className="text-xs text-indigo-600 mb-0.5 font-medium hover:underline block">
+                                            {activity.card.titulo}
+                                        </Link>
+                                    )}
                                     <p className="text-gray-900">{activity.descricao}</p>
-                                    <p className="text-gray-500 mt-0.5">
-                                        por {userName} • {formatDistanceToNow(new Date(activity.created_at!), { addSuffix: true, locale: ptBR })}
-                                    </p>
+                                    <div className="flex flex-col mt-0.5">
+                                        <span className="text-gray-500">
+                                            por <span className="font-medium text-gray-700">{userName}</span>
+                                        </span>
+                                        <div className="flex items-center gap-1 text-gray-400 text-[10px]">
+                                            <span>{formatDistanceToNow(new Date(activity.created_at!), { addSuffix: true, locale: ptBR })}</span>
+                                            <span>•</span>
+                                            <span>{format(new Date(activity.created_at!), "HH:mm '•' dd/MM")}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )

@@ -3,6 +3,7 @@ import { Mail, X, Send } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../../database.types'
+import ProposalBuilderModal from './ProposalBuilderModal'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -13,6 +14,7 @@ interface ActionButtonsProps {
 export default function ActionButtons({ card }: ActionButtonsProps) {
     const queryClient = useQueryClient()
     const [showEmailModal, setShowEmailModal] = useState(false)
+    const [showProposalModal, setShowProposalModal] = useState(false)
     const [emailData, setEmailData] = useState({
         to: '',
         subject: '',
@@ -63,17 +65,6 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         setEmailData({ to: '', subject: '', body: '' })
     }
 
-    const handleContractGenerate = () => {
-        logActivityMutation.mutate({
-            tipo: 'contract_generated',
-            descricao: 'Contrato gerado',
-            metadata: { card_id: card.id }
-        })
-
-        // Placeholder for contract generation
-        alert('Funcionalidade de gerar contrato será implementada em breve!')
-    }
-
     return (
         <>
             <div className="flex gap-2">
@@ -98,14 +89,14 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                 </button>
 
                 <button
-                    onClick={handleContractGenerate}
+                    onClick={() => setShowProposalModal(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm font-medium"
-                    title="Gerar Contrato"
+                    title="Gerar Proposta"
                 >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Contrato
+                    Proposta
                 </button>
             </div>
 
@@ -177,6 +168,12 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                     </div>
                 </div>
             )}
+
+            <ProposalBuilderModal
+                cardId={card.id}
+                isOpen={showProposalModal}
+                onClose={() => setShowProposalModal(false)}
+            />
         </>
     )
 }

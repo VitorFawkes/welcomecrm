@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { MessageSquare, Mail, Calendar, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { MessageSquare, Mail, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import AIChat from './AIChat'
 
@@ -12,7 +12,7 @@ interface ConversationHistoryProps {
 type Tab = 'whatsapp' | 'email' | 'meetings' | 'ai'
 
 export default function ConversationHistory({ cardId }: ConversationHistoryProps) {
-    const [isExpanded, setIsExpanded] = useState(false)
+    const [isExpanded, setIsExpanded] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>('whatsapp')
 
     // Fetch WhatsApp conversations
@@ -137,23 +137,7 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
                                 </span>
                             )}
                         </button>
-                        <button
-                            onClick={() => setActiveTab('meetings')}
-                            className={cn(
-                                "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                                activeTab === 'meetings'
-                                    ? "border-purple-500 text-purple-700 bg-white"
-                                    : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                            )}
-                        >
-                            <Calendar className="h-4 w-4" />
-                            Reuniões
-                            {meetingsData && meetingsData.length > 0 && (
-                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
-                                    {meetingsData.length}
-                                </span>
-                            )}
-                        </button>
+
                         <button
                             onClick={() => setActiveTab('ai')}
                             className={cn(
@@ -169,7 +153,7 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
                     </div>
 
                     {/* Content Area */}
-                    <div className="p-4 max-h-96 overflow-y-auto">
+                    <div className="p-4">
                         {activeTab === 'ai' ? (
                             <AIChat cardId={cardId} />
                         ) : (

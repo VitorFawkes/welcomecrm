@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 interface Activity {
@@ -11,6 +11,10 @@ interface Activity {
     card?: {
         titulo: string
     }
+    created_by_user?: {
+        full_name: string | null
+        email: string | null
+    }
 }
 
 export default function RecentActivity() {
@@ -18,7 +22,7 @@ export default function RecentActivity() {
         queryKey: ['recent-activity'],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('cards_historico')
+                .from('activities')
                 .select(`
                     id,
                     tipo,
@@ -26,6 +30,10 @@ export default function RecentActivity() {
                     created_at,
                     card:cards (
                         titulo
+                    ),
+                    created_by_user:profiles (
+                        full_name,
+                        email
                     )
                 `)
                 .order('created_at', { ascending: false })
@@ -51,21 +59,28 @@ export default function RecentActivity() {
                                 ) : null}
                                 <div className="relative flex space-x-3">
                                     <div>
-                                        <span className="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-8 ring-white">
-                                            <div className="h-2.5 w-2.5 rounded-full bg-white" />
+                                        <span className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center ring-8 ring-white text-indigo-600 font-bold text-xs">
+                                            {(activity.created_by_user?.full_name || activity.created_by_user?.email || '?').charAt(0).toUpperCase()}
                                         </span>
                                     </div>
                                     <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
                                         <div>
                                             <p className="text-sm text-gray-500">
-                                                <span className="font-medium text-gray-900">{activity.tipo}</span>
+                                                <span className="font-medium text-gray-900">
+                                                    {activity.created_by_user?.full_name || activity.created_by_user?.email || 'Sistema'}
+                                                </span>
+                                                {' '}
+                                                {activity.tipo.replace('_', ' ')}
                                                 {' em '}
                                                 <span className="font-medium text-gray-900">{activity.card?.titulo || 'Sem título'}</span>
                                             </p>
                                             <p className="text-sm text-gray-500">{activity.descricao}</p>
                                         </div>
-                                        <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                                            {activity.created_at && formatDistanceToNow(new Date(activity.created_at), { locale: ptBR, addSuffix: true })}
+                                        <div className="whitespace-nowrap text-right text-sm text-gray-500 flex flex-col items-end">
+                                            <span>{activity.created_at && formatDistanceToNow(new Date(activity.created_at), { locale: ptBR, addSuffix: true })}</span>
+                                            <span className="text-xs text-gray-400">
+                                                {activity.created_at && format(new Date(activity.created_at), "HH:mm '•' dd/MM")}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
