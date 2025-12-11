@@ -9,7 +9,7 @@ import { Button } from '../ui/Button'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import UserSelector from './UserSelector'
-import MultiUserSelector from './MultiUserSelector'
+import ParticipantSelector, { type Participant } from './ParticipantSelector'
 
 interface CardTasksProps {
     cardId: string
@@ -66,7 +66,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const [notes, setNotes] = useState('')
     const [status, setStatus] = useState<string>('agendada')
     const [responsavelId, setResponsavelId] = useState<string | null>(null)
-    const [participantes, setParticipantes] = useState<string[]>([])
+    const [participantes, setParticipantes] = useState<Participant[]>([])
 
     // Fetch Tasks
     const { data: tasks = [] } = useQuery({
@@ -423,7 +423,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
             {/* Create/Edit Modal */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-2xl w-full block overflow-hidden p-0">
+                <DialogContent className="sm:max-w-4xl w-full block overflow-hidden p-0">
                     <div className="p-6 space-y-6">
                         <DialogHeader>
                             <DialogTitle className="text-xl">{editingItem ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
@@ -555,9 +555,9 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
                                     {selectedType === 'reuniao' && (
                                         <div>
-                                            <MultiUserSelector
-                                                label="Participantes Internos"
-                                                selectedUserIds={participantes}
+                                            <ParticipantSelector
+                                                label="Participantes (Internos e Convidados)"
+                                                value={participantes}
                                                 onChange={setParticipantes}
                                             />
                                         </div>
