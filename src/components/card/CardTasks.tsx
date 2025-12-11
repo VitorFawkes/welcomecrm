@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../ui/Button'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import UserSelector from './UserSelector'
+import MultiUserSelector from './MultiUserSelector'
 
 interface CardTasksProps {
     cardId: string
@@ -20,6 +22,7 @@ interface BaseTask {
     titulo: string
     created_at: string
     type_origin: 'tarefa' | 'reuniao'
+    created_by: string | null
 }
 
 interface Tarefa extends BaseTask {
@@ -30,6 +33,7 @@ interface Tarefa extends BaseTask {
     tipo: string
     descricao?: string
     concluida_em?: string | null
+    responsavel_id?: string | null
 }
 
 interface Reuniao extends BaseTask {
@@ -39,6 +43,8 @@ interface Reuniao extends BaseTask {
     local: string | null
     notas: string | null
     status: 'agendada' | 'realizada' | 'cancelada' | 'adiada'
+    responsavel_id?: string | null
+    participantes?: any // JSONB
 }
 
 type UnifiedItem = Tarefa | Reuniao
@@ -59,6 +65,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const [location, setLocation] = useState('')
     const [notes, setNotes] = useState('')
     const [status, setStatus] = useState<string>('agendada')
+    const [responsavelId, setResponsavelId] = useState<string | null>(null)
+    const [participantes, setParticipantes] = useState<string[]>([])
 
     // Fetch Tasks
     const { data: tasks = [] } = useQuery({
@@ -119,7 +127,9 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     local: location,
                     notas: notes,
                     status: status,
-                    created_by: editingItem ? undefined : user.id // Only set created_by on insert
+                    created_by: editingItem ? undefined : user.id,
+                    responsavel_id: responsavelId || user.id,
+                    participantes: participantes
                 }
 
                 if (editingItem) {
@@ -141,7 +151,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     tipo: selectedType,
                     descricao: notes,
                     created_by: editingItem ? undefined : user.id,
-                    responsavel_id: user.id
+                    responsavel_id: responsavelId || user.id
                 }
 
                 if (editingItem) {
@@ -159,7 +169,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
             queryClient.invalidateQueries({ queryKey: ['meetings', cardId] })
-            queryClient.invalidateQueries({ queryKey: ['cards'] }) // Update card list counters if any
+            queryClient.invalidateQueries({ queryKey: ['cards'] })
             closeModal()
         }
     })
@@ -201,6 +211,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 setLocation(m.local || '')
                 setNotes(m.notas || '')
                 setStatus(m.status || 'agendada')
+                setResponsavelId(m.responsavel_id || m.created_by || null)
+                setParticipantes(Array.isArray(m.participantes) ? m.participantes : [])
             } else {
                 const t = item as Tarefa
                 setSelectedType(t.tipo as TaskType || 'tarefa')
@@ -208,6 +220,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 setTime(t.data_vencimento.split('T')[1].substring(0, 5))
                 setPriority(t.prioridade)
                 setNotes(t.descricao || '')
+                setResponsavelId(t.responsavel_id || t.created_by || null)
+                setParticipantes([])
             }
         } else {
             setEditingItem(null)
@@ -232,6 +246,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         setNotes('')
         setStatus('agendada')
         setSelectedType('tarefa')
+        setResponsavelId(user?.id || null)
+        setParticipantes([])
     }
 
     const getTypeIcon = (type: string) => {
@@ -407,13 +423,13 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
             {/* Create/Edit Modal */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-[500px] w-full block overflow-hidden p-0">
-                    <div className="p-6 space-y-4">
+                <DialogContent className="sm:max-w-2xl w-full block overflow-hidden p-0">
+                    <div className="p-6 space-y-6">
                         <DialogHeader>
-                            <DialogTitle>{editingItem ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
+                            <DialogTitle className="text-xl">{editingItem ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
                         </DialogHeader>
 
-                        <div className="space-y-4 w-full min-w-0">
+                        <div className="space-y-6 w-full min-w-0">
                             {/* Type Selector */}
                             {!editingItem && (
                                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
@@ -422,9 +438,9 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                             key={type}
                                             onClick={() => setSelectedType(type)}
                                             className={cn(
-                                                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0",
+                                                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all whitespace-nowrap flex-shrink-0",
                                                 selectedType === type
-                                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200"
+                                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200 shadow-sm"
                                                     : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                                             )}
                                         >
@@ -435,32 +451,33 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                 </div>
                             )}
 
-                            <div className="space-y-4 w-full">
-                                <div>
-                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">Título</label>
-                                    <input
-                                        type="text"
-                                        placeholder={selectedType === 'reuniao' ? "Ex: Reunião de Apresentação" : "Ex: Enviar proposta"}
-                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 box-border"
-                                        value={title}
-                                        onChange={e => setTitle(e.target.value)}
-                                        autoFocus
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Left Column: Core Info */}
+                                <div className="space-y-4">
                                     <div>
-                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Data</label>
+                                        <label className="text-sm font-medium text-gray-700 mb-1.5 block">Título</label>
                                         <input
-                                            type="date"
+                                            type="text"
+                                            placeholder={selectedType === 'reuniao' ? "Ex: Reunião de Apresentação" : "Ex: Enviar proposta"}
                                             className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                            value={date}
-                                            onChange={e => setDate(e.target.value)}
+                                            value={title}
+                                            onChange={e => setTitle(e.target.value)}
+                                            autoFocus
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
+
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Início</label>
+                                            <label className="text-sm font-medium text-gray-700 mb-1.5 block">Data</label>
+                                            <input
+                                                type="date"
+                                                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                value={date}
+                                                onChange={e => setDate(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-gray-700 mb-1.5 block">Início</label>
                                             <input
                                                 type="time"
                                                 className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
@@ -468,9 +485,12 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 onChange={e => setTime(e.target.value)}
                                             />
                                         </div>
-                                        {selectedType === 'reuniao' && (
+                                    </div>
+
+                                    {selectedType === 'reuniao' && (
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Fim</label>
+                                                <label className="text-sm font-medium text-gray-700 mb-1.5 block">Fim</label>
                                                 <input
                                                     type="time"
                                                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
@@ -478,29 +498,26 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                     onChange={e => setEndTime(e.target.value)}
                                                 />
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {selectedType === 'reuniao' ? (
-                                    <>
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Local / Link</label>
-                                            <div className="relative">
-                                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <div>
+                                                <label className="text-sm font-medium text-gray-700 mb-1.5 block">Local / Link</label>
                                                 <input
                                                     type="text"
-                                                    placeholder="Google Meet, Zoom, Escritório..."
-                                                    className="w-full pl-9 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                    placeholder="Link ou Endereço"
+                                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
                                                     value={location}
                                                     onChange={e => setLocation(e.target.value)}
                                                 />
                                             </div>
                                         </div>
+                                    )}
+                                </div>
 
-                                        {editingItem && (
+                                {/* Right Column: CRM Details */}
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {selectedType === 'reuniao' ? (
                                             <div>
-                                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</label>
+                                                <label className="text-sm font-medium text-gray-700 mb-1.5 block">Status</label>
                                                 <select
                                                     className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
                                                     value={status}
@@ -512,38 +529,56 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                     <option value="adiada">Adiada</option>
                                                 </select>
                                             </div>
+                                        ) : (
+                                            <div>
+                                                <label className="text-sm font-medium text-gray-700 mb-1.5 block">Prioridade</label>
+                                                <select
+                                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                    value={priority}
+                                                    onChange={e => setPriority(e.target.value as any)}
+                                                >
+                                                    <option value="baixa">Baixa</option>
+                                                    <option value="media">Média</option>
+                                                    <option value="alta">Alta</option>
+                                                </select>
+                                            </div>
                                         )}
-                                    </>
-                                ) : (
-                                    <div>
-                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Prioridade</label>
-                                        <select
-                                            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                            value={priority}
-                                            onChange={e => setPriority(e.target.value as any)}
-                                        >
-                                            <option value="baixa">Baixa</option>
-                                            <option value="media">Média</option>
-                                            <option value="alta">Alta</option>
-                                        </select>
-                                    </div>
-                                )}
 
-                                <div>
-                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">
-                                        {selectedType === 'reuniao' ? "Pauta / Notas" : "Descrição"}
-                                    </label>
-                                    <textarea
-                                        placeholder="Adicione detalhes..."
-                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 min-h-[100px]"
-                                        value={notes}
-                                        onChange={e => setNotes(e.target.value)}
-                                    />
+                                        <div>
+                                            <UserSelector
+                                                label="Responsável"
+                                                currentUserId={responsavelId}
+                                                onSelect={setResponsavelId}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {selectedType === 'reuniao' && (
+                                        <div>
+                                            <MultiUserSelector
+                                                label="Participantes Internos"
+                                                selectedUserIds={participantes}
+                                                onChange={setParticipantes}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                                    {selectedType === 'reuniao' ? "Pauta / Notas" : "Descrição"}
+                                </label>
+                                <textarea
+                                    placeholder="Adicione detalhes..."
+                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 min-h-[120px]"
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                />
                             </div>
                         </div>
 
-                        <DialogFooter>
+                        <DialogFooter className="pt-2">
                             <Button variant="outline" onClick={closeModal}>
                                 Cancelar
                             </Button>
