@@ -407,160 +407,162 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
             {/* Create/Edit Modal */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-[500px] w-full">
-                    <DialogHeader>
-                        <DialogTitle>{editingItem ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
-                    </DialogHeader>
+                <DialogContent className="sm:max-w-[500px] w-full block overflow-hidden p-0">
+                    <div className="p-6 space-y-4">
+                        <DialogHeader>
+                            <DialogTitle>{editingItem ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
+                        </DialogHeader>
 
-                    <div className="space-y-4">
-                        {/* Type Selector */}
-                        {!editingItem && (
-                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full">
-                                {(['tarefa', 'reuniao', 'ligacao', 'email', 'mensagem', 'outro'] as TaskType[]).map(type => (
-                                    <button
-                                        key={type}
-                                        onClick={() => setSelectedType(type)}
-                                        className={cn(
-                                            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap",
-                                            selectedType === type
-                                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200"
-                                                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
-                                        )}
-                                    >
-                                        {getTypeIcon(type)}
-                                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                        <div className="space-y-4 w-full min-w-0">
+                            {/* Type Selector */}
+                            {!editingItem && (
+                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full max-w-full">
+                                    {(['tarefa', 'reuniao', 'ligacao', 'email', 'mensagem', 'outro'] as TaskType[]).map(type => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setSelectedType(type)}
+                                            className={cn(
+                                                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0",
+                                                selectedType === type
+                                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200"
+                                                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                            )}
+                                        >
+                                            {getTypeIcon(type)}
+                                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
 
-                        <div className="space-y-4 w-full">
-                            <div>
-                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Título</label>
-                                <input
-                                    type="text"
-                                    placeholder={selectedType === 'reuniao' ? "Ex: Reunião de Apresentação" : "Ex: Enviar proposta"}
-                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                    value={title}
-                                    onChange={e => setTitle(e.target.value)}
-                                    autoFocus
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-4 w-full">
                                 <div>
-                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">Data</label>
+                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">Título</label>
                                     <input
-                                        type="date"
-                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                        value={date}
-                                        onChange={e => setDate(e.target.value)}
+                                        type="text"
+                                        placeholder={selectedType === 'reuniao' ? "Ex: Reunião de Apresentação" : "Ex: Enviar proposta"}
+                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 box-border"
+                                        value={title}
+                                        onChange={e => setTitle(e.target.value)}
+                                        autoFocus
                                     />
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
+
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Início</label>
+                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Data</label>
                                         <input
-                                            type="time"
+                                            type="date"
                                             className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                            value={time}
-                                            onChange={e => setTime(e.target.value)}
+                                            value={date}
+                                            onChange={e => setDate(e.target.value)}
                                         />
                                     </div>
-                                    {selectedType === 'reuniao' && (
+                                    <div className="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Fim</label>
+                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Início</label>
                                             <input
                                                 type="time"
                                                 className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                                value={endTime}
-                                                onChange={e => setEndTime(e.target.value)}
+                                                value={time}
+                                                onChange={e => setTime(e.target.value)}
                                             />
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {selectedType === 'reuniao' ? (
-                                <>
-                                    <div>
-                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Local / Link</label>
-                                        <div className="relative">
-                                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="Google Meet, Zoom, Escritório..."
-                                                className="w-full pl-9 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                                value={location}
-                                                onChange={e => setLocation(e.target.value)}
-                                            />
-                                        </div>
+                                        {selectedType === 'reuniao' && (
+                                            <div>
+                                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Fim</label>
+                                                <input
+                                                    type="time"
+                                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                    value={endTime}
+                                                    onChange={e => setEndTime(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {editingItem && (
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</label>
-                                            <select
-                                                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                                value={status}
-                                                onChange={e => setStatus(e.target.value)}
-                                            >
-                                                <option value="agendada">Agendada</option>
-                                                <option value="realizada">Realizada</option>
-                                                <option value="cancelada">Cancelada</option>
-                                                <option value="adiada">Adiada</option>
-                                            </select>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div>
-                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">Prioridade</label>
-                                    <select
-                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
-                                        value={priority}
-                                        onChange={e => setPriority(e.target.value as any)}
-                                    >
-                                        <option value="baixa">Baixa</option>
-                                        <option value="media">Média</option>
-                                        <option value="alta">Alta</option>
-                                    </select>
                                 </div>
-                            )}
 
-                            <div>
-                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">
-                                    {selectedType === 'reuniao' ? "Pauta / Notas" : "Descrição"}
-                                </label>
-                                <textarea
-                                    placeholder="Adicione detalhes..."
-                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 min-h-[100px]"
-                                    value={notes}
-                                    onChange={e => setNotes(e.target.value)}
-                                />
+                                {selectedType === 'reuniao' ? (
+                                    <>
+                                        <div>
+                                            <label className="text-xs font-medium text-gray-700 mb-1.5 block">Local / Link</label>
+                                            <div className="relative">
+                                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Google Meet, Zoom, Escritório..."
+                                                    className="w-full pl-9 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                    value={location}
+                                                    onChange={e => setLocation(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {editingItem && (
+                                            <div>
+                                                <label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</label>
+                                                <select
+                                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                                    value={status}
+                                                    onChange={e => setStatus(e.target.value)}
+                                                >
+                                                    <option value="agendada">Agendada</option>
+                                                    <option value="realizada">Realizada</option>
+                                                    <option value="cancelada">Cancelada</option>
+                                                    <option value="adiada">Adiada</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Prioridade</label>
+                                        <select
+                                            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5"
+                                            value={priority}
+                                            onChange={e => setPriority(e.target.value as any)}
+                                        >
+                                            <option value="baixa">Baixa</option>
+                                            <option value="media">Média</option>
+                                            <option value="alta">Alta</option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="text-xs font-medium text-gray-700 mb-1.5 block">
+                                        {selectedType === 'reuniao' ? "Pauta / Notas" : "Descrição"}
+                                    </label>
+                                    <textarea
+                                        placeholder="Adicione detalhes..."
+                                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 min-h-[100px]"
+                                        value={notes}
+                                        onChange={e => setNotes(e.target.value)}
+                                    />
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={closeModal}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={() => saveMutation.mutate()}
-                            disabled={!title || saveMutation.isPending}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                        >
-                            {saveMutation.isPending ? (
-                                <>
-                                    <Clock className="h-4 w-4 mr-2 animate-spin" />
-                                    Salvando...
-                                </>
-                            ) : (
-                                'Salvar'
-                            )}
-                        </Button>
-                    </DialogFooter>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={closeModal}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={() => saveMutation.mutate()}
+                                disabled={!title || saveMutation.isPending}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                                {saveMutation.isPending ? (
+                                    <>
+                                        <Clock className="h-4 w-4 mr-2 animate-spin" />
+                                        Salvando...
+                                    </>
+                                ) : (
+                                    'Salvar'
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>
