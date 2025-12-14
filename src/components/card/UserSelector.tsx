@@ -43,14 +43,14 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
     }, [])
 
     return (
-        <div className="flex items-center gap-2">
-            {label && <span className="text-xs text-gray-500">{label}:</span>}
+        <div>
+            {label && <label className="text-sm font-medium text-gray-700 mb-1.5 block">{label}</label>}
             <div className="relative">
                 <select
                     value={currentUserId || ''}
                     onChange={(e) => onSelect(e.target.value)}
                     disabled={disabled || loading}
-                    className="appearance-none bg-transparent pl-6 pr-8 py-1 text-sm font-medium text-gray-900 hover:bg-gray-50 rounded border border-transparent hover:border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    className="w-full appearance-none rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 pl-9 pr-8 cursor-pointer disabled:bg-gray-50 disabled:text-gray-500"
                 >
                     <option value="">Sem responsável</option>
                     {profiles.map((profile) => (
@@ -59,7 +59,7 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
                         </option>
                     ))}
                 </select>
-                <User className="absolute left-1 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
         </div>
     )
