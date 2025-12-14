@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckSquare, Plus, Calendar, Trash2, Check, Clock, MapPin, Phone, Mail, MessageSquare } from 'lucide-react'
+import { CheckSquare, Plus, Calendar, Trash2, Check, Clock, MapPin, Phone, Mail, MessageSquare, AlertCircle } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
@@ -34,6 +34,7 @@ interface Tarefa extends BaseTask {
     descricao?: string
     concluida_em?: string | null
     responsavel_id?: string | null
+    resultado?: string | null
 }
 
 interface Reuniao extends BaseTask {
@@ -45,6 +46,9 @@ interface Reuniao extends BaseTask {
     status: 'agendada' | 'realizada' | 'cancelada' | 'adiada'
     responsavel_id?: string | null
     participantes?: any // JSONB
+    resultado?: string | null
+    feedback?: string | null
+    motivo_cancelamento?: string | null
 }
 
 type UnifiedItem = Tarefa | Reuniao
@@ -67,6 +71,11 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const [status, setStatus] = useState<string>('agendada')
     const [responsavelId, setResponsavelId] = useState<string | null>(null)
     const [participantes, setParticipantes] = useState<Participant[]>([])
+
+    // CRM Outcome States
+    const [resultado, setResultado] = useState<string>('')
+    const [feedback, setFeedback] = useState<string>('')
+    const [motivoCancelamento, setMotivoCancelamento] = useState<string>('')
 
     // Fetch Tasks
     const { data: tasks = [] } = useQuery({
@@ -129,7 +138,10 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     status: status,
                     created_by: editingItem ? undefined : user.id,
                     responsavel_id: responsavelId || user.id,
-                    participantes: participantes
+                    participantes: participantes,
+                    resultado: status === 'realizada' ? resultado : null,
+                    feedback: status === 'realizada' ? feedback : null,
+                    motivo_cancelamento: status === 'cancelada' ? motivoCancelamento : null
                 }
 
                 if (editingItem) {
@@ -151,7 +163,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     tipo: selectedType,
                     descricao: notes,
                     created_by: editingItem ? undefined : user.id,
-                    responsavel_id: responsavelId || user.id
+                    responsavel_id: responsavelId || user.id,
+                    resultado: resultado || null
                 }
 
                 if (editingItem) {
@@ -213,6 +226,9 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 setStatus(m.status || 'agendada')
                 setResponsavelId(m.responsavel_id || m.created_by || null)
                 setParticipantes(Array.isArray(m.participantes) ? m.participantes : [])
+                setResultado(m.resultado || '')
+                setFeedback(m.feedback || '')
+                setMotivoCancelamento(m.motivo_cancelamento || '')
             } else {
                 const t = item as Tarefa
                 setSelectedType(t.tipo as TaskType || 'tarefa')
@@ -222,6 +238,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 setNotes(t.descricao || '')
                 setResponsavelId(t.responsavel_id || t.created_by || null)
                 setParticipantes([])
+                setResultado(t.resultado || '')
             }
         } else {
             setEditingItem(null)
@@ -248,6 +265,9 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         setSelectedType('tarefa')
         setResponsavelId(user?.id || null)
         setParticipantes([])
+        setResultado('')
+        setFeedback('')
+        setMotivoCancelamento('')
     }
 
     const getTypeIcon = (type: string) => {
@@ -559,6 +579,54 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 label="Participantes (Internos e Convidados)"
                                                 value={participantes}
                                                 onChange={setParticipantes}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* CRM Outcome Fields */}
+                                    {selectedType === 'reuniao' && status === 'realizada' && (
+                                        <div className="bg-green-50 p-3 rounded-lg border border-green-100 space-y-3">
+                                            <h4 className="text-xs font-semibold text-green-800 flex items-center gap-1.5">
+                                                <CheckSquare className="h-3.5 w-3.5" />
+                                                Conclusão da Reunião
+                                            </h4>
+                                            <div>
+                                                <label className="text-xs font-medium text-green-700 mb-1 block">Resultado</label>
+                                                <select
+                                                    className="w-full rounded border-green-200 text-sm py-1.5 focus:border-green-500 focus:ring-green-500"
+                                                    value={resultado}
+                                                    onChange={e => setResultado(e.target.value)}
+                                                >
+                                                    <option value="">Selecione...</option>
+                                                    <option value="sucesso">Sucesso / Avançou</option>
+                                                    <option value="sem_interesse">Sem Interesse</option>
+                                                    <option value="no_show">Cliente não compareceu (No Show)</option>
+                                                    <option value="remarcada">Precisa Remarcar</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-medium text-green-700 mb-1 block">Feedback / Resumo</label>
+                                                <textarea
+                                                    className="w-full rounded border-green-200 text-sm py-1.5 focus:border-green-500 focus:ring-green-500 min-h-[60px]"
+                                                    placeholder="Resumo do que foi conversado..."
+                                                    value={feedback}
+                                                    onChange={e => setFeedback(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedType === 'reuniao' && status === 'cancelada' && (
+                                        <div className="bg-red-50 p-3 rounded-lg border border-red-100 space-y-3">
+                                            <h4 className="text-xs font-semibold text-red-800 flex items-center gap-1.5">
+                                                <AlertCircle className="h-3.5 w-3.5" />
+                                                Motivo do Cancelamento
+                                            </h4>
+                                            <textarea
+                                                className="w-full rounded border-red-200 text-sm py-1.5 focus:border-red-500 focus:ring-red-500 min-h-[60px]"
+                                                placeholder="Por que foi cancelada?"
+                                                value={motivoCancelamento}
+                                                onChange={e => setMotivoCancelamento(e.target.value)}
                                             />
                                         </div>
                                     )}
