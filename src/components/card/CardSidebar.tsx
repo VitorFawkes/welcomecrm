@@ -35,7 +35,7 @@ export default function CardSidebar({ card }: CardSidebarProps) {
                 .from('cards')
                 .select('id, titulo, created_at, status_comercial')
                 .eq('pessoa_principal_id', card.pessoa_principal_id)
-                .neq('id', card.id) // Exclude current card
+                .neq('id', card.id!) // Exclude current card
                 .eq('produto', 'TRIPS')
                 .order('created_at', { ascending: false })
                 .limit(5)
@@ -125,7 +125,7 @@ export default function CardSidebar({ card }: CardSidebarProps) {
             {card.produto === 'TRIPS' && <TaxaPlanejamentoCard card={card} />}
 
             {/* Travelers */}
-            {card.produto === 'TRIPS' && <CardTravelers card={card} />}
+            {card.produto === 'TRIPS' && <CardTravelers card={card as any} />}
 
             {/* Contact Info */}
             <div className="rounded-lg border bg-white p-4 shadow-sm">

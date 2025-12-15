@@ -40,7 +40,7 @@ export default function ParticipantSelector({ value, onChange, label, disabled =
                     .order('nome')
 
                 if (error) throw error
-                setProfiles(data || [])
+                setProfiles((data || []) as Profile[])
             } catch (error) {
                 console.error('Error fetching profiles:', error)
             }

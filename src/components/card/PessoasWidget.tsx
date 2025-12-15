@@ -200,7 +200,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
 
                             <div className="space-y-2 mb-4">
                                 <CardTravelers
-                                    card={card}
+                                    card={card as any}
                                     embedded={true}
                                 // Removed onTravelerClick as TravelHistoryModal is no longer used for individual travelers
                                 />

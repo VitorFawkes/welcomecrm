@@ -13,12 +13,7 @@ interface KanbanCardProps {
     card: Card
 }
 
-// Mock SLA Config (In minutes) - Should come from DB 'slas' table
-const SLA_CONFIG: Record<string, number> = {
-    'Novo Lead': 120, // 2 hours
-    'Qualificação': 1440, // 24 hours
-    'Negociação': 2880, // 48 hours
-}
+
 
 export default function KanbanCard({ card }: KanbanCardProps) {
     const navigate = useNavigate()
@@ -252,16 +247,11 @@ export default function KanbanCard({ card }: KanbanCardProps) {
 
             {/* SLA Badge */}
             {(() => {
-                if (!card.tempo_etapa_dias || !card.etapa_nome) return null;
-                const minutesInStage = card.tempo_etapa_dias * 24 * 60;
-                const limit = SLA_CONFIG[card.etapa_nome] || 2880; // Default 48h
-                const isBreached = minutesInStage > limit;
-
-                if (isBreached) {
+                if (card.urgencia_tempo_etapa === 1) {
                     return (
                         <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-100">
                             <Clock className="h-3 w-3" />
-                            <span>ATRASADO ({Math.floor(card.tempo_etapa_dias)}d)</span>
+                            <span>ATRASADO ({Math.floor(card.tempo_etapa_dias || 0)}d)</span>
                         </div>
                     );
                 }

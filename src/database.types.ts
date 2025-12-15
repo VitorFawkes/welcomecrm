@@ -65,6 +65,13 @@ export type Database = {
             referencedColumns: ["card_id"]
           },
           {
+            foreignKeyName: "activities_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "activities_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -129,6 +136,20 @@ export type Database = {
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
           },
+          {
+            foreignKeyName: "arquivos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arquivos_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       atividades: {
@@ -136,31 +157,34 @@ export type Database = {
           card_id: string
           created_at: string | null
           created_by: string | null
-          data_ocorrencia: string
+          data_ocorrencia: string | null
           descricao: string | null
           id: string
+          pessoa_id: string | null
           tipo: string
-          titulo: string
+          titulo: string | null
         }
         Insert: {
           card_id: string
           created_at?: string | null
           created_by?: string | null
-          data_ocorrencia?: string
+          data_ocorrencia?: string | null
           descricao?: string | null
           id?: string
+          pessoa_id?: string | null
           tipo: string
-          titulo: string
+          titulo?: string | null
         }
         Update: {
           card_id?: string
           created_at?: string | null
           created_by?: string | null
-          data_ocorrencia?: string
+          data_ocorrencia?: string | null
           descricao?: string | null
           id?: string
+          pessoa_id?: string | null
           tipo?: string
-          titulo?: string
+          titulo?: string | null
         }
         Relationships: [
           {
@@ -183,6 +207,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "atividades_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividades_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -223,52 +261,37 @@ export type Database = {
         Row: {
           active: boolean | null
           created_at: string | null
-          delay_minutes: number
+          delay_minutes: number | null
           id: string
           pipeline_id: string
           stage_id: string
-          task_priority: string
+          task_priority: string | null
           task_title: string
           task_type: string
         }
         Insert: {
           active?: boolean | null
           created_at?: string | null
-          delay_minutes?: number
+          delay_minutes?: number | null
           id?: string
           pipeline_id: string
           stage_id: string
-          task_priority?: string
+          task_priority?: string | null
           task_title: string
           task_type: string
         }
         Update: {
           active?: boolean | null
           created_at?: string | null
-          delay_minutes?: number
+          delay_minutes?: number | null
           id?: string
           pipeline_id?: string
           stage_id?: string
-          task_priority?: string
+          task_priority?: string | null
           task_title?: string
           task_type?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "automation_rules_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "pipelines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "automation_rules_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "pipeline_stages"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       card_obligations: {
         Row: {
@@ -318,6 +341,13 @@ export type Database = {
             referencedColumns: ["card_id"]
           },
           {
+            foreignKeyName: "card_obligations_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "card_obligations_obligation_id_fkey"
             columns: ["obligation_id"]
             isOneToOne: false
@@ -329,29 +359,35 @@ export type Database = {
       card_owner_history: {
         Row: {
           card_id: string
+          created_at: string | null
+          ended_at: string | null
+          fase: string
           id: string
-          new_owner_id: string | null
-          old_owner_id: string | null
-          role_type: string
-          transferred_at: string | null
+          owner_id: string
+          started_at: string
+          transfer_reason: string | null
           transferred_by: string | null
         }
         Insert: {
           card_id: string
+          created_at?: string | null
+          ended_at?: string | null
+          fase: string
           id?: string
-          new_owner_id?: string | null
-          old_owner_id?: string | null
-          role_type: string
-          transferred_at?: string | null
+          owner_id: string
+          started_at?: string
+          transfer_reason?: string | null
           transferred_by?: string | null
         }
         Update: {
           card_id?: string
+          created_at?: string | null
+          ended_at?: string | null
+          fase?: string
           id?: string
-          new_owner_id?: string | null
-          old_owner_id?: string | null
-          role_type?: string
-          transferred_at?: string | null
+          owner_id?: string
+          started_at?: string
+          transfer_reason?: string | null
           transferred_by?: string | null
         }
         Relationships: [
@@ -376,10 +412,32 @@ export type Database = {
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
           },
+          {
+            foreignKeyName: "card_owner_history_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_owner_history_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_owner_history_transferred_by_fkey"
+            columns: ["transferred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cards: {
         Row: {
+          campaign_id: string | null
           cliente_recorrente: boolean | null
           codigo_cliente_erp: string | null
           codigo_projeto_erp: string | null
@@ -391,13 +449,16 @@ export type Database = {
           data_viagem_inicio: string | null
           dono_atual_id: string | null
           estado_operacional: string | null
+          external_id: string | null
+          external_source: string | null
           forma_pagamento: string | null
           id: string
           moeda: string | null
           motivo_perda_id: string | null
+          origem: string | null
           pessoa_principal_id: string | null
           pipeline_id: string
-          pipeline_stage_id: string
+          pipeline_stage_id: string | null
           pos_owner_id: string | null
           prioridade: string | null
           produto: Database["public"]["Enums"]["app_product"]
@@ -421,6 +482,7 @@ export type Database = {
           vendas_owner_id: string | null
         }
         Insert: {
+          campaign_id?: string | null
           cliente_recorrente?: boolean | null
           codigo_cliente_erp?: string | null
           codigo_projeto_erp?: string | null
@@ -432,13 +494,16 @@ export type Database = {
           data_viagem_inicio?: string | null
           dono_atual_id?: string | null
           estado_operacional?: string | null
+          external_id?: string | null
+          external_source?: string | null
           forma_pagamento?: string | null
           id?: string
           moeda?: string | null
           motivo_perda_id?: string | null
+          origem?: string | null
           pessoa_principal_id?: string | null
           pipeline_id: string
-          pipeline_stage_id: string
+          pipeline_stage_id?: string | null
           pos_owner_id?: string | null
           prioridade?: string | null
           produto: Database["public"]["Enums"]["app_product"]
@@ -462,6 +527,7 @@ export type Database = {
           vendas_owner_id?: string | null
         }
         Update: {
+          campaign_id?: string | null
           cliente_recorrente?: boolean | null
           codigo_cliente_erp?: string | null
           codigo_projeto_erp?: string | null
@@ -473,13 +539,16 @@ export type Database = {
           data_viagem_inicio?: string | null
           dono_atual_id?: string | null
           estado_operacional?: string | null
+          external_id?: string | null
+          external_source?: string | null
           forma_pagamento?: string | null
           id?: string
           moeda?: string | null
           motivo_perda_id?: string | null
+          origem?: string | null
           pessoa_principal_id?: string | null
           pipeline_id?: string
-          pipeline_stage_id?: string
+          pipeline_stage_id?: string | null
           pos_owner_id?: string | null
           prioridade?: string | null
           produto?: Database["public"]["Enums"]["app_product"]
@@ -537,28 +606,28 @@ export type Database = {
         Row: {
           card_id: string
           contato_id: string
-          created_at: string | null
+          created_at: string
           id: string
           ordem: number
-          tipo_viajante: Database["public"]["Enums"]["tipo_viajante_enum"] | null
+          tipo_viajante: Database["public"]["Enums"]["tipo_viajante_enum"]
           tipo_vinculo: string | null
         }
         Insert: {
           card_id: string
           contato_id: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           ordem?: number
-          tipo_viajante?: Database["public"]["Enums"]["tipo_viajante_enum"] | null
+          tipo_viajante?: Database["public"]["Enums"]["tipo_viajante_enum"]
           tipo_vinculo?: string | null
         }
         Update: {
           card_id?: string
           contato_id?: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           ordem?: number
-          tipo_viajante?: Database["public"]["Enums"]["tipo_viajante_enum"] | null
+          tipo_viajante?: Database["public"]["Enums"]["tipo_viajante_enum"]
           tipo_vinculo?: string | null
         }
         Relationships: [
@@ -582,6 +651,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "cards_contatos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "cards_contatos_contato_id_fkey"
@@ -594,121 +670,138 @@ export type Database = {
       }
       configuracao_taxa_trips: {
         Row: {
-          active: boolean | null
-          created_at: string | null
-          currency: string
-          description: string | null
+          ativo_global: boolean | null
           id: string
+          texto_explicativo: string | null
           updated_at: string | null
-          value: number
+          updated_by: string | null
+          valor_padrao: number | null
         }
         Insert: {
-          active?: boolean | null
-          created_at?: string | null
-          currency?: string
-          description?: string | null
+          ativo_global?: boolean | null
           id?: string
+          texto_explicativo?: string | null
           updated_at?: string | null
-          value: number
+          updated_by?: string | null
+          valor_padrao?: number | null
         }
         Update: {
-          active?: boolean | null
-          created_at?: string | null
-          currency?: string
-          description?: string | null
+          ativo_global?: boolean | null
           id?: string
+          texto_explicativo?: string | null
           updated_at?: string | null
-          value?: number
+          updated_by?: string | null
+          valor_padrao?: number | null
         }
         Relationships: []
       }
       contatos: {
         Row: {
-          cargo: string | null
           cpf: string | null
-          created_at: string | null
-          created_by: string | null
+          created_at: string
           data_nascimento: string | null
           email: string | null
-          empresa: string | null
+          endereco: Json | null
           id: string
           nome: string
           observacoes: string | null
           passaporte: string | null
           responsavel_id: string | null
           telefone: string | null
-          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
-          updated_at: string | null
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"]
+          updated_at: string
         }
         Insert: {
-          cargo?: string | null
           cpf?: string | null
-          created_at?: string | null
-          created_by?: string | null
+          created_at?: string
           data_nascimento?: string | null
           email?: string | null
-          empresa?: string | null
+          endereco?: Json | null
           id?: string
           nome: string
           observacoes?: string | null
           passaporte?: string | null
           responsavel_id?: string | null
           telefone?: string | null
-          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
-          updated_at?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
+          updated_at?: string
         }
         Update: {
-          cargo?: string | null
           cpf?: string | null
-          created_at?: string | null
-          created_by?: string | null
+          created_at?: string
           data_nascimento?: string | null
           email?: string | null
-          empresa?: string | null
+          endereco?: Json | null
           id?: string
           nome?: string
           observacoes?: string | null
           passaporte?: string | null
           responsavel_id?: string | null
           telefone?: string | null
-          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
-          updated_at?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contatos_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contratos: {
         Row: {
-          arquivo_url: string | null
           card_id: string
           created_at: string | null
-          created_by: string | null
           data_assinatura: string | null
+          data_criacao: string | null
+          data_envio: string | null
           id: string
+          moeda: string | null
+          nome_contrato: string
+          observacoes: string | null
+          plataforma: string | null
+          responsavel_id: string | null
           status: string | null
-          tipo: string
-          valor_total: number | null
+          tipo: Database["public"]["Enums"]["app_product"]
+          updated_at: string | null
+          valor: number | null
         }
         Insert: {
-          arquivo_url?: string | null
           card_id: string
           created_at?: string | null
-          created_by?: string | null
           data_assinatura?: string | null
+          data_criacao?: string | null
+          data_envio?: string | null
           id?: string
+          moeda?: string | null
+          nome_contrato: string
+          observacoes?: string | null
+          plataforma?: string | null
+          responsavel_id?: string | null
           status?: string | null
-          tipo: string
-          valor_total?: number | null
+          tipo: Database["public"]["Enums"]["app_product"]
+          updated_at?: string | null
+          valor?: number | null
         }
         Update: {
-          arquivo_url?: string | null
           card_id?: string
           created_at?: string | null
-          created_by?: string | null
           data_assinatura?: string | null
+          data_criacao?: string | null
+          data_envio?: string | null
           id?: string
+          moeda?: string | null
+          nome_contrato?: string
+          observacoes?: string | null
+          plataforma?: string | null
+          responsavel_id?: string | null
           status?: string | null
-          tipo?: string
-          valor_total?: number | null
+          tipo?: Database["public"]["Enums"]["app_product"]
+          updated_at?: string | null
+          valor?: number | null
         }
         Relationships: [
           {
@@ -732,44 +825,51 @@ export type Database = {
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
           },
+          {
+            foreignKeyName: "contratos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       dados_cadastrais_pf: {
         Row: {
-          card_id: string | null
           cpf: string | null
           created_at: string | null
+          dados_bancarios: string | null
           data_nascimento: string | null
           email_cobranca: string | null
           endereco_completo: string | null
           id: string
-          pessoa_id: string | null
+          pessoa_id: string
           rg: string | null
           telefone_cobranca: string | null
           updated_at: string | null
         }
         Insert: {
-          card_id?: string | null
           cpf?: string | null
           created_at?: string | null
+          dados_bancarios?: string | null
           data_nascimento?: string | null
           email_cobranca?: string | null
           endereco_completo?: string | null
           id?: string
-          pessoa_id?: string | null
+          pessoa_id: string
           rg?: string | null
           telefone_cobranca?: string | null
           updated_at?: string | null
         }
         Update: {
-          card_id?: string | null
           cpf?: string | null
           created_at?: string | null
+          dados_bancarios?: string | null
           data_nascimento?: string | null
           email_cobranca?: string | null
           endereco_completo?: string | null
           id?: string
-          pessoa_id?: string | null
+          pessoa_id?: string
           rg?: string | null
           telefone_cobranca?: string | null
           updated_at?: string | null
@@ -778,7 +878,7 @@ export type Database = {
           {
             foreignKeyName: "dados_cadastrais_pf_pessoa_id_fkey"
             columns: ["pessoa_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "pessoas"
             referencedColumns: ["id"]
           },
@@ -786,13 +886,12 @@ export type Database = {
       }
       dados_cadastrais_pj: {
         Row: {
-          card_id: string | null
+          card_id: string
           cnpj: string | null
           contato_financeiro_email: string | null
           contato_financeiro_nome: string | null
           contato_financeiro_telefone: string | null
           created_at: string | null
-          dados_bancarios: string | null
           endereco_cobranca: string | null
           id: string
           inscricao_estadual: string | null
@@ -801,13 +900,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          card_id?: string | null
+          card_id: string
           cnpj?: string | null
           contato_financeiro_email?: string | null
           contato_financeiro_nome?: string | null
           contato_financeiro_telefone?: string | null
           created_at?: string | null
-          dados_bancarios?: string | null
           endereco_cobranca?: string | null
           id?: string
           inscricao_estadual?: string | null
@@ -816,13 +914,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          card_id?: string | null
+          card_id?: string
           cnpj?: string | null
           contato_financeiro_email?: string | null
           contato_financeiro_nome?: string | null
           contato_financeiro_telefone?: string | null
           created_at?: string | null
-          dados_bancarios?: string | null
           endereco_cobranca?: string | null
           id?: string
           inscricao_estadual?: string | null
@@ -834,50 +931,60 @@ export type Database = {
           {
             foreignKeyName: "dados_cadastrais_pj_card_id_fkey"
             columns: ["card_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "cards"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "dados_cadastrais_pj_card_id_fkey"
             columns: ["card_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "view_cards_acoes"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "dados_cadastrais_pj_card_id_fkey"
             columns: ["card_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "dados_cadastrais_pj_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: true
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
           },
         ]
       }
       historico_fases: {
         Row: {
-          card_id: string | null
-          data_entrada: string | null
-          data_saida: string | null
-          duracao_horas: number | null
+          card_id: string
+          data_mudanca: string | null
+          etapa_anterior_id: string | null
+          etapa_nova_id: string
           id: string
-          stage_id: string | null
+          mudado_por: string | null
+          tempo_na_etapa_anterior: unknown
         }
         Insert: {
-          card_id?: string | null
-          data_entrada?: string | null
-          data_saida?: string | null
-          duracao_horas?: number | null
+          card_id: string
+          data_mudanca?: string | null
+          etapa_anterior_id?: string | null
+          etapa_nova_id: string
           id?: string
-          stage_id?: string | null
+          mudado_por?: string | null
+          tempo_na_etapa_anterior?: unknown
         }
         Update: {
-          card_id?: string | null
-          data_entrada?: string | null
-          data_saida?: string | null
-          duracao_horas?: number | null
+          card_id?: string
+          data_mudanca?: string | null
+          etapa_anterior_id?: string | null
+          etapa_nova_id?: string
           id?: string
-          stage_id?: string | null
+          mudado_por?: string | null
+          tempo_na_etapa_anterior?: unknown
         }
         Relationships: [
           {
@@ -902,8 +1009,22 @@ export type Database = {
             referencedColumns: ["card_id"]
           },
           {
-            foreignKeyName: "historico_fases_stage_id_fkey"
-            columns: ["stage_id"]
+            foreignKeyName: "historico_fases_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_fases_etapa_anterior_id_fkey"
+            columns: ["etapa_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_fases_etapa_nova_id_fkey"
+            columns: ["etapa_nova_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
@@ -912,40 +1033,43 @@ export type Database = {
       }
       mensagens: {
         Row: {
-          anexos: Json | null
+          assunto: string | null
           canal: string
           card_id: string
-          conteudo: string
+          conteudo: string | null
           created_at: string | null
-          created_by: string | null
-          data_envio: string | null
-          direcao: string
+          data_hora: string | null
           id: string
-          lida: boolean | null
+          lado: string
+          metadados: Json | null
+          pessoa_id: string | null
+          remetente_interno_id: string | null
         }
         Insert: {
-          anexos?: Json | null
+          assunto?: string | null
           canal: string
           card_id: string
-          conteudo: string
+          conteudo?: string | null
           created_at?: string | null
-          created_by?: string | null
-          data_envio?: string | null
-          direcao: string
+          data_hora?: string | null
           id?: string
-          lida?: boolean | null
+          lado: string
+          metadados?: Json | null
+          pessoa_id?: string | null
+          remetente_interno_id?: string | null
         }
         Update: {
-          anexos?: Json | null
+          assunto?: string | null
           canal?: string
           card_id?: string
-          conteudo?: string
+          conteudo?: string | null
           created_at?: string | null
-          created_by?: string | null
-          data_envio?: string | null
-          direcao?: string
+          data_hora?: string | null
           id?: string
-          lida?: boolean | null
+          lado?: string
+          metadados?: Json | null
+          pessoa_id?: string | null
+          remetente_interno_id?: string | null
         }
         Relationships: [
           {
@@ -969,24 +1093,35 @@ export type Database = {
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
           },
+          {
+            foreignKeyName: "mensagens_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       motivos_perda: {
         Row: {
-          active: boolean | null
-          created_at: string | null
+          ativo: boolean | null
           id: string
           nome: string
         }
         Insert: {
-          active?: boolean | null
-          created_at?: string | null
+          ativo?: boolean | null
           id?: string
           nome: string
         }
         Update: {
-          active?: boolean | null
-          created_at?: string | null
+          ativo?: boolean | null
           id?: string
           nome?: string
         }
@@ -994,30 +1129,40 @@ export type Database = {
       }
       notas: {
         Row: {
+          autor_id: string
           card_id: string
-          conteudo: string
           created_at: string | null
-          created_by: string | null
           id: string
+          pinned: boolean | null
+          texto: string
           updated_at: string | null
         }
         Insert: {
+          autor_id: string
           card_id: string
-          conteudo: string
           created_at?: string | null
-          created_by?: string | null
           id?: string
+          pinned?: boolean | null
+          texto: string
           updated_at?: string | null
         }
         Update: {
+          autor_id?: string
           card_id?: string
-          conteudo?: string
           created_at?: string | null
-          created_by?: string | null
           id?: string
+          pinned?: boolean | null
+          texto?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "notas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notas_card_id_fkey"
             columns: ["card_id"]
@@ -1038,36 +1183,40 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "notas_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
           },
         ]
       }
       participacoes: {
         Row: {
-          card_id: string | null
-          comissao_percentual: number | null
-          comissao_valor: number | null
+          card_id: string
           created_at: string | null
-          funcao: string
           id: string
-          usuario_id: string | null
+          observacoes: string | null
+          papel: string
+          pessoa_id: string
         }
         Insert: {
-          card_id?: string | null
-          comissao_percentual?: number | null
-          comissao_valor?: number | null
+          card_id: string
           created_at?: string | null
-          funcao: string
           id?: string
-          usuario_id?: string | null
+          observacoes?: string | null
+          papel: string
+          pessoa_id: string
         }
         Update: {
-          card_id?: string | null
-          comissao_percentual?: number | null
-          comissao_valor?: number | null
+          card_id?: string
           created_at?: string | null
-          funcao?: string
           id?: string
-          usuario_id?: string | null
+          observacoes?: string | null
+          papel?: string
+          pessoa_id?: string
         }
         Relationships: [
           {
@@ -1091,96 +1240,107 @@ export type Database = {
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
           },
+          {
+            foreignKeyName: "participacoes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participacoes_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pessoas: {
         Row: {
+          cidade: string | null
           cpf: string | null
           created_at: string | null
           created_by: string | null
           data_nascimento: string | null
           email: string | null
+          estado: string | null
           id: string
           nome: string
-          observacoes: string | null
-          passaporte: string | null
-          passaporte_validade: string | null
-          rg: string | null
+          origem: string | null
+          pais: string | null
+          status_relacionamento: string | null
           telefone: string | null
-          tipo: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
           updated_at: string | null
-          visto_americano: boolean | null
-          visto_americano_validade: string | null
+          updated_by: string | null
         }
         Insert: {
+          cidade?: string | null
           cpf?: string | null
           created_at?: string | null
           created_by?: string | null
           data_nascimento?: string | null
           email?: string | null
+          estado?: string | null
           id?: string
           nome: string
-          observacoes?: string | null
-          passaporte?: string | null
-          passaporte_validade?: string | null
-          rg?: string | null
+          origem?: string | null
+          pais?: string | null
+          status_relacionamento?: string | null
           telefone?: string | null
-          tipo?: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
           updated_at?: string | null
-          visto_americano?: boolean | null
-          visto_americano_validade?: string | null
+          updated_by?: string | null
         }
         Update: {
+          cidade?: string | null
           cpf?: string | null
           created_at?: string | null
           created_by?: string | null
           data_nascimento?: string | null
           email?: string | null
+          estado?: string | null
           id?: string
           nome?: string
-          observacoes?: string | null
-          passaporte?: string | null
-          passaporte_validade?: string | null
-          rg?: string | null
+          origem?: string | null
+          pais?: string | null
+          status_relacionamento?: string | null
           telefone?: string | null
-          tipo?: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
           updated_at?: string | null
-          visto_americano?: boolean | null
-          visto_americano_validade?: string | null
+          updated_by?: string | null
         }
         Relationships: []
       }
       pipeline_card_settings: {
         Row: {
-          campos_kanban: Json | null
-          campos_visiveis: Json
+          campos_kanban: Json
+          campos_visiveis: Json | null
           created_at: string | null
           fase: string
           id: string
-          ordem_campos: Json
-          ordem_kanban: Json | null
+          ordem_campos: Json | null
+          ordem_kanban: Json
           updated_at: string | null
           usuario_id: string | null
         }
         Insert: {
-          campos_kanban?: Json | null
-          campos_visiveis?: Json
+          campos_kanban?: Json
+          campos_visiveis?: Json | null
           created_at?: string | null
           fase: string
           id?: string
-          ordem_campos?: Json
-          ordem_kanban?: Json | null
+          ordem_campos?: Json | null
+          ordem_kanban?: Json
           updated_at?: string | null
           usuario_id?: string | null
         }
         Update: {
-          campos_kanban?: Json | null
-          campos_visiveis?: Json
+          campos_kanban?: Json
+          campos_visiveis?: Json | null
           created_at?: string | null
           fase?: string
           id?: string
-          ordem_campos?: Json
-          ordem_kanban?: Json | null
+          ordem_campos?: Json | null
+          ordem_kanban?: Json
           updated_at?: string | null
           usuario_id?: string | null
         }
@@ -1189,67 +1349,105 @@ export type Database = {
             foreignKeyName: "pipeline_card_settings_usuario_id_fkey"
             columns: ["usuario_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
       pipeline_config: {
         Row: {
-          config: Json
+          actions: Json | null
+          ativo: boolean | null
+          conditions: Json | null
+          config_type: string
           created_at: string | null
+          from_stage_id: string | null
           id: string
           pipeline_id: string
+          to_stage_id: string | null
           updated_at: string | null
         }
         Insert: {
-          config?: Json
+          actions?: Json | null
+          ativo?: boolean | null
+          conditions?: Json | null
+          config_type: string
           created_at?: string | null
+          from_stage_id?: string | null
           id?: string
           pipeline_id: string
+          to_stage_id?: string | null
           updated_at?: string | null
         }
         Update: {
-          config?: Json
+          actions?: Json | null
+          ativo?: boolean | null
+          conditions?: Json | null
+          config_type?: string
           created_at?: string | null
+          from_stage_id?: string | null
           id?: string
           pipeline_id?: string
+          to_stage_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "pipeline_config_from_stage_id_fkey"
+            columns: ["from_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pipeline_config_pipeline_id_fkey"
             columns: ["pipeline_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_config_to_stage_id_fkey"
+            columns: ["to_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
         ]
       }
       pipeline_stages: {
         Row: {
-          cor: string | null
+          ativo: boolean | null
+          description: string | null
           fase: string | null
           id: string
           nome: string
           ordem: number
           pipeline_id: string
+          sla_hours: number | null
+          tipo_responsavel: Database["public"]["Enums"]["app_role"]
         }
         Insert: {
-          cor?: string | null
+          ativo?: boolean | null
+          description?: string | null
           fase?: string | null
           id?: string
           nome: string
           ordem: number
           pipeline_id: string
+          sla_hours?: number | null
+          tipo_responsavel: Database["public"]["Enums"]["app_role"]
         }
         Update: {
-          cor?: string | null
+          ativo?: boolean | null
+          description?: string | null
           fase?: string | null
           id?: string
           nome?: string
           ordem?: number
           pipeline_id?: string
+          sla_hours?: number | null
+          tipo_responsavel?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: [
           {
@@ -1263,25 +1461,31 @@ export type Database = {
       }
       pipelines: {
         Row: {
-          active: boolean | null
+          ativo: boolean | null
           created_at: string | null
+          descricao: string | null
           id: string
           nome: string
           produto: Database["public"]["Enums"]["app_product"]
+          updated_at: string | null
         }
         Insert: {
-          active?: boolean | null
+          ativo?: boolean | null
           created_at?: string | null
+          descricao?: string | null
           id?: string
           nome: string
           produto: Database["public"]["Enums"]["app_product"]
+          updated_at?: string | null
         }
         Update: {
-          active?: boolean | null
+          ativo?: boolean | null
           created_at?: string | null
+          descricao?: string | null
           id?: string
           nome?: string
           produto?: Database["public"]["Enums"]["app_product"]
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1374,6 +1578,13 @@ export type Database = {
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
           },
+          {
+            foreignKeyName: "proposals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       reunioes: {
@@ -1383,10 +1594,14 @@ export type Database = {
           created_by: string | null
           data_fim: string | null
           data_inicio: string
+          feedback: string | null
           id: string
           local: string | null
+          motivo_cancelamento: string | null
           notas: string | null
           participantes: Json | null
+          responsavel_id: string | null
+          resultado: string | null
           status: string | null
           titulo: string
         }
@@ -1396,10 +1611,14 @@ export type Database = {
           created_by?: string | null
           data_fim?: string | null
           data_inicio: string
+          feedback?: string | null
           id?: string
           local?: string | null
+          motivo_cancelamento?: string | null
           notas?: string | null
           participantes?: Json | null
+          responsavel_id?: string | null
+          resultado?: string | null
           status?: string | null
           titulo: string
         }
@@ -1409,10 +1628,14 @@ export type Database = {
           created_by?: string | null
           data_fim?: string | null
           data_inicio?: string
+          feedback?: string | null
           id?: string
           local?: string | null
+          motivo_cancelamento?: string | null
           notas?: string | null
           participantes?: Json | null
+          responsavel_id?: string | null
+          resultado?: string | null
           status?: string | null
           titulo?: string
         }
@@ -1437,6 +1660,51 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "reunioes_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stage_fields_settings: {
+        Row: {
+          created_at: string | null
+          field_key: string
+          id: string
+          label: string
+          required: boolean | null
+          stage_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          field_key: string
+          id?: string
+          label: string
+          required?: boolean | null
+          stage_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          field_key?: string
+          id?: string
+          label?: string
+          required?: boolean | null
+          stage_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_fields_settings_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1471,71 +1739,62 @@ export type Database = {
           title?: string
           type?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "stage_obligations_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "pipelines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stage_obligations_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "pipeline_stages"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       tarefas: {
         Row: {
           card_id: string
           concluida: boolean | null
           concluida_em: string | null
+          concluido_por: string | null
           created_at: string | null
           created_by: string | null
-          data_vencimento: string
+          data_conclusao: string | null
+          data_vencimento: string | null
           descricao: string | null
           id: string
           prioridade: string | null
-          responsavel_id: string | null
+          responsavel_id: string
+          resultado: string | null
           status: string | null
           tipo: string | null
           titulo: string
-          updated_at: string | null
         }
         Insert: {
           card_id: string
           concluida?: boolean | null
           concluida_em?: string | null
+          concluido_por?: string | null
           created_at?: string | null
           created_by?: string | null
-          data_vencimento: string
+          data_conclusao?: string | null
+          data_vencimento?: string | null
           descricao?: string | null
           id?: string
           prioridade?: string | null
-          responsavel_id?: string | null
+          responsavel_id: string
+          resultado?: string | null
           status?: string | null
           tipo?: string | null
           titulo: string
-          updated_at?: string | null
         }
         Update: {
           card_id?: string
           concluida?: boolean | null
           concluida_em?: string | null
+          concluido_por?: string | null
           created_at?: string | null
           created_by?: string | null
-          data_vencimento?: string
+          data_conclusao?: string | null
+          data_vencimento?: string | null
           descricao?: string | null
           id?: string
           prioridade?: string | null
-          responsavel_id?: string | null
+          responsavel_id?: string
+          resultado?: string | null
           status?: string | null
           tipo?: string | null
-          titulo: string
-          updated_at?: string | null
+          titulo?: string
         }
         Relationships: [
           {
@@ -1559,37 +1818,41 @@ export type Database = {
             referencedRelation: "view_cards_contatos_summary"
             referencedColumns: ["card_id"]
           },
+          {
+            foreignKeyName: "tarefas_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       task_queue: {
         Row: {
           card_id: string
           created_at: string | null
-          error_log: string | null
+          error_message: string | null
           id: string
           processed: boolean | null
-          processed_at: string | null
-          rule_id: string
+          rule_id: string | null
           scheduled_for: string
         }
         Insert: {
           card_id: string
           created_at?: string | null
-          error_log?: string | null
+          error_message?: string | null
           id?: string
           processed?: boolean | null
-          processed_at?: string | null
-          rule_id: string
+          rule_id?: string | null
           scheduled_for: string
         }
         Update: {
           card_id?: string
           created_at?: string | null
-          error_log?: string | null
+          error_message?: string | null
           id?: string
           processed?: boolean | null
-          processed_at?: string | null
-          rule_id?: string
+          rule_id?: string | null
           scheduled_for?: string
         }
         Relationships: [
@@ -1615,6 +1878,13 @@ export type Database = {
             referencedColumns: ["card_id"]
           },
           {
+            foreignKeyName: "task_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_detalhes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_queue_rule_id_fkey"
             columns: ["rule_id"]
             isOneToOne: false
@@ -1627,12 +1897,13 @@ export type Database = {
     Views: {
       view_cards_acoes: {
         Row: {
+          campaign_id: string | null
           cliente_recorrente: boolean | null
-          concierge_nome: string | null
           concierge_owner_id: string | null
           condicoes_pagamento: string | null
           created_at: string | null
-          destinos: string | null
+          data_viagem_inicio: string | null
+          destinos: Json | null
           dias_ate_viagem: number | null
           dono_atual_email: string | null
           dono_atual_id: string | null
@@ -1640,34 +1911,33 @@ export type Database = {
           estado_operacional: string | null
           etapa_nome: string | null
           etapa_ordem: number | null
+          external_id: string | null
           fase: string | null
           forma_pagamento: string | null
-          id: string
+          id: string | null
           moeda: string | null
-          orcamento: string | null
+          orcamento: Json | null
+          origem: string | null
           pessoa_nome: string | null
           pessoa_principal_id: string | null
-          pipeline_id: string
+          pipeline_id: string | null
           pipeline_nome: string | null
-          pipeline_stage_id: string
-          pos_nome: string | null
+          pipeline_stage_id: string | null
           pos_owner_id: string | null
           prioridade: string | null
-          produto: Database["public"]["Enums"]["app_product"]
+          produto: Database["public"]["Enums"]["app_product"] | null
           produto_data: Json | null
-          pronto_para_contrato: boolean | null
-          pronto_para_erp: boolean | null
           proxima_tarefa: Json | null
           sdr_nome: string | null
+          sdr_owner_email: string | null
           sdr_owner_id: string | null
+          sdr_owner_nome: string | null
           status_comercial: string | null
           status_taxa: string | null
           tarefas_pendentes: number | null
-          taxa_status: string | null
-          taxa_valor: number | null
           tempo_etapa_dias: number | null
           tempo_sem_contato: number | null
-          titulo: string
+          titulo: string | null
           ultima_interacao: Json | null
           updated_at: string | null
           urgencia_tempo_etapa: number | null
@@ -1676,7 +1946,93 @@ export type Database = {
           valor_final: number | null
           vendas_nome: string | null
           vendas_owner_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_etapa_funil_id_fkey"
+            columns: ["pipeline_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_pessoa_principal_id_fkey"
+            columns: ["pessoa_principal_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_cards_contatos_summary: {
+        Row: {
+          card_id: string | null
+          contatos: Json | null
+          total_adultos: number | null
+          total_criancas: number | null
+          total_viajantes: number | null
+        }
+        Relationships: []
+      }
+      view_cards_detalhes: {
+        Row: {
+          cliente_recorrente: boolean | null
+          codigo_cliente_erp: string | null
+          codigo_projeto_erp: string | null
+          concierge_owner_id: string | null
+          condicoes_pagamento: string | null
+          created_at: string | null
+          created_by: string | null
+          data_pronto_erp: string | null
           data_viagem_inicio: string | null
+          dono_atual_email: string | null
+          dono_atual_id: string | null
+          dono_atual_nome: string | null
+          estado_operacional: string | null
+          etapa_fase: string | null
+          etapa_nome: string | null
+          etapa_ordem: number | null
+          forma_pagamento: string | null
+          id: string | null
+          moeda: string | null
+          motivo_perda_id: string | null
+          motivo_perda_nome: string | null
+          pessoa_email: string | null
+          pessoa_nome: string | null
+          pessoa_principal_id: string | null
+          pipeline_id: string | null
+          pipeline_nome: string | null
+          pipeline_stage_id: string | null
+          pos_owner_id: string | null
+          prioridade: string | null
+          produto: Database["public"]["Enums"]["app_product"] | null
+          produto_data: Json | null
+          pronto_para_contrato: boolean | null
+          pronto_para_erp: boolean | null
+          sdr_nome: string | null
+          sdr_owner_id: string | null
+          status_comercial: string | null
+          taxa_alterado_por: string | null
+          taxa_ativa: boolean | null
+          taxa_codigo_transacao: string | null
+          taxa_data_status: string | null
+          taxa_meio_pagamento: string | null
+          taxa_status: string | null
+          taxa_valor: number | null
+          titulo: string | null
+          updated_at: string | null
+          updated_by: string | null
+          valor_estimado: number | null
+          valor_final: number | null
+          vendas_nome: string | null
+          vendas_owner_id: string | null
         }
         Relationships: [
           {
@@ -1709,75 +2065,80 @@ export type Database = {
           },
         ]
       }
-      view_cards_contatos_summary: {
-        Row: {
-          card_id: string | null
-          total_adultos: number | null
-          total_criancas: number | null
-          total_viajantes: number | null
-        }
-        Relationships: []
-      }
       view_dashboard_funil: {
         Row: {
-          count: number | null
-          pipeline_id: string | null
-          stage_id: string | null
-          stage_name: string | null
-          total_value: number | null
+          etapa_nome: string | null
+          etapa_ordem: number | null
+          produto: Database["public"]["Enums"]["app_product"] | null
+          total_cards: number | null
+          total_valor_estimado: number | null
+          total_valor_final: number | null
         }
         Relationships: []
-      }
-      cards_historico: {
-        Row: {
-          id: string
-          card_id: string
-          fase_anterior: string | null
-          fase_nova: string | null
-          created_at: string | null
-          created_by: string | null
-        }
       }
     }
     Functions: {
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
+      get_travel_history:
+        | {
+            Args: { contact_id_param: string }
+            Returns: {
+              card_id: string
+              companions: string[]
+              data_viagem: string
+              moeda: string
+              role: string
+              status: string
+              titulo: string
+              valor: number
+            }[]
+          }
+        | {
+            Args: { contact_ids: string[] }
+            Returns: {
+              card_id: string
+              companions: string[]
+              data_viagem: string
+              moeda: string
+              relevant_contacts: string[]
+              role: string
+              status: string
+              titulo: string
+              valor: number
+            }[]
+          }
+      get_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
       }
-      is_card_owner: {
-        Args: {
-          p_card_id: string
-        }
-        Returns: boolean
-      }
-      is_financeiro: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_gestor: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_operational: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_admin: { Args: never; Returns: boolean }
+      is_card_owner: { Args: { p_card_id: string }; Returns: boolean }
+      is_gestor: { Args: never; Returns: boolean }
+      is_operational: { Args: never; Returns: boolean }
+      is_privileged_user: { Args: never; Returns: boolean }
       mover_card: {
         Args: {
           p_card_id: string
-          p_nova_etapa_id: string
           p_motivo_perda_id?: string
+          p_nova_etapa_id: string
         }
         Returns: undefined
       }
-      process_task_queue: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
+      pode_avancar_etapa: {
+        Args: { p_card_id: string; p_nova_etapa_id: string }
+        Returns: boolean
       }
+      process_task_queue: { Args: never; Returns: number }
     }
     Enums: {
       app_product: "TRIPS" | "WEDDING" | "CORP"
-      app_role: "admin" | "gestor" | "sdr" | "vendas" | "pos_venda" | "concierge" | "financeiro"
+      app_role:
+        | "admin"
+        | "gestor"
+        | "sdr"
+        | "vendas"
+        | "pos_venda"
+        | "concierge"
+        | "financeiro"
       tipo_pessoa_enum: "adulto" | "crianca"
       tipo_viajante_enum: "titular" | "acompanhante"
     }
@@ -1786,6 +2147,142 @@ export type Database = {
     }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_product: ["TRIPS", "WEDDING", "CORP"],
+      app_role: [
+        "admin",
+        "gestor",
+        "sdr",
+        "vendas",
+        "pos_venda",
+        "concierge",
+        "financeiro",
+      ],
+      tipo_pessoa_enum: ["adulto", "crianca"],
+      tipo_viajante_enum: ["titular", "acompanhante"],
+    },
+  },
+} as const
 
 export type Contato = Database['public']['Tables']['contatos']['Row'] & {
   tipo_pessoa?: 'adulto' | 'crianca'

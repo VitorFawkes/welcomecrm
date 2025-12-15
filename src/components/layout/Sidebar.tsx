@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Kanban, Users, CheckSquare, Settings, List, Activity } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, CheckSquare, Settings, List, Activity, Shield } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const navigation = [
@@ -10,6 +10,7 @@ const navigation = [
     { name: 'Tarefas', href: '/tarefas', icon: CheckSquare },
     { name: 'Atividades', href: '/activities', icon: Activity },
     { name: 'Configurações', href: '/settings/pipeline', icon: Settings },
+    { name: 'Usuários', href: '/admin/users', icon: Shield },
 ]
 
 export default function Sidebar() {

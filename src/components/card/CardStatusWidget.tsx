@@ -21,7 +21,7 @@ export default function CardStatusWidget({ card }: CardStatusWidgetProps) {
                 .from('cards')
                 .select('id, titulo, created_at, status_comercial')
                 .eq('pessoa_principal_id', card.pessoa_principal_id)
-                .neq('id', card.id) // Exclude current card
+                .neq('id', card.id!) // Exclude current card
                 .eq('produto', 'TRIPS')
                 .order('created_at', { ascending: false })
                 .limit(5)

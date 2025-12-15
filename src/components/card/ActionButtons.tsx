@@ -170,7 +170,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
             )}
 
             <ProposalBuilderModal
-                cardId={card.id}
+                cardId={card.id!}
                 isOpen={showProposalModal}
                 onClose={() => setShowProposalModal(false)}
             />

@@ -15,6 +15,8 @@ import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import StageChangeModal from './StageChangeModal'
+import QualityGateModal from './QualityGateModal'
+import { useQualityGate } from '../../hooks/useQualityGate'
 import type { Database } from '../../database.types'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
@@ -27,6 +29,7 @@ interface KanbanBoardProps {
 export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
     const queryClient = useQueryClient()
     const [activeCard, setActiveCard] = useState<Card | null>(null)
+    const { validateMove } = useQualityGate()
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -143,7 +146,16 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
     })
 
     const [stageChangeModalOpen, setStageChangeModalOpen] = useState(false)
-    const [pendingMove, setPendingMove] = useState<{ cardId: string, stageId: string, currentOwnerId: string, sdrName?: string, targetStageName: string } | null>(null)
+    const [qualityGateModalOpen, setQualityGateModalOpen] = useState(false)
+
+    const [pendingMove, setPendingMove] = useState<{
+        cardId: string,
+        stageId: string,
+        currentOwnerId?: string,
+        sdrName?: string,
+        targetStageName: string,
+        missingFields?: { key: string, label: string }[]
+    } | null>(null)
 
     const handleDragStart = (event: DragStartEvent) => {
         if (event.active.data.current) {
@@ -161,24 +173,34 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
             const currentFase = active.data.current?.fase
             const targetStage = stages?.find(s => s.id === stageId)
             const targetFase = targetStage?.fase
+            const card = active.data.current as Card
 
             if (stageId !== currentStageId) {
-                // Check if moving from SDR to non-SDR
+                // 1. Check Quality Gate (Mandatory Fields)
+                const validation = validateMove(card, stageId)
+                if (!validation.valid) {
+                    setPendingMove({
+                        cardId,
+                        stageId,
+                        targetStageName: targetStage?.nome || 'Nova Etapa',
+                        missingFields: validation.missingFields
+                    })
+                    setQualityGateModalOpen(true)
+                    setActiveCard(null) // Reset active card to remove drag overlay
+                    return
+                }
+
+                // 2. Check Owner Change (SDR -> Planner)
                 if (currentFase === 'SDR' && targetFase && targetFase !== 'SDR') {
-                    // Trigger modal
                     setPendingMove({
                         cardId,
                         stageId,
                         currentOwnerId: active.data.current?.dono_atual_id,
-                        sdrName: active.data.current?.sdr_owner_id ? 'SDR Atual' : undefined, // Ideally fetch name, but ID is what we have on card usually. 
-                        // Actually card view has names? No, usually IDs. 
-                        // But we can just say "o SDR atual" or try to find the name if we had the list of users.
-                        // For now, let's just pass the ID or a generic string if we don't have the map.
-                        // UserSelector has the list but it's internal.
-                        // Let's just pass undefined for name and let modal handle generic text or we could fetch it.
+                        sdrName: active.data.current?.sdr_owner_id ? 'SDR Atual' : undefined,
                         targetStageName: targetStage?.nome || 'Nova Etapa'
                     })
                     setStageChangeModalOpen(true)
+                    setActiveCard(null)
                     return
                 }
 
@@ -191,12 +213,6 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
 
     const handleConfirmStageChange = (newOwnerId: string) => {
         if (pendingMove) {
-            // Update owner first or together?
-            // We need to update owner AND move stage.
-            // moveCardMutation only moves stage.
-            // We need a new mutation or call update owner then move.
-
-            // Let's call update owner first
             const updateOwner = async () => {
                 const { error } = await (supabase.from('cards') as any)
                     .update({ dono_atual_id: newOwnerId })
@@ -208,7 +224,6 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
                     return
                 }
 
-                // Then move
                 moveCardMutation.mutate({ cardId: pendingMove.cardId, stageId: pendingMove.stageId })
                 setStageChangeModalOpen(false)
                 setPendingMove(null)
@@ -216,6 +231,28 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
             }
 
             updateOwner()
+        }
+    }
+
+    const handleConfirmQualityGate = () => {
+        if (pendingMove) {
+            // After filling fields, we still need to check if we need to change owner
+            const card = cards?.find(c => c.id === pendingMove.cardId)
+            const currentFase = card?.fase
+            const targetStage = stages?.find(s => s.id === pendingMove.stageId)
+            const targetFase = targetStage?.fase
+
+            setQualityGateModalOpen(false)
+
+            if (currentFase === 'SDR' && targetFase && targetFase !== 'SDR') {
+                // Open Owner Change Modal
+                setStageChangeModalOpen(true)
+                // pendingMove is already set with correct IDs
+            } else {
+                // Just move
+                moveCardMutation.mutate({ cardId: pendingMove.cardId, stageId: pendingMove.stageId })
+                setPendingMove(null)
+            }
         }
     }
 
@@ -246,18 +283,33 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
             </DragOverlay>
 
             {pendingMove && (
-                <StageChangeModal
-                    isOpen={stageChangeModalOpen}
-                    onClose={() => {
-                        setStageChangeModalOpen(false)
-                        setPendingMove(null)
-                        setActiveCard(null)
-                    }}
-                    onConfirm={handleConfirmStageChange}
-                    currentOwnerId={pendingMove.currentOwnerId}
-                    sdrName={pendingMove.sdrName}
-                    targetStageName={pendingMove.targetStageName}
-                />
+                <>
+                    <StageChangeModal
+                        isOpen={stageChangeModalOpen}
+                        onClose={() => {
+                            setStageChangeModalOpen(false)
+                            setPendingMove(null)
+                            setActiveCard(null)
+                        }}
+                        onConfirm={handleConfirmStageChange}
+                        currentOwnerId={pendingMove.currentOwnerId || ''}
+                        sdrName={pendingMove.sdrName}
+                        targetStageName={pendingMove.targetStageName}
+                    />
+
+                    <QualityGateModal
+                        isOpen={qualityGateModalOpen}
+                        onClose={() => {
+                            setQualityGateModalOpen(false)
+                            setPendingMove(null)
+                            setActiveCard(null)
+                        }}
+                        onConfirm={handleConfirmQualityGate}
+                        cardId={pendingMove.cardId}
+                        targetStageName={pendingMove.targetStageName}
+                        missingFields={pendingMove.missingFields || []}
+                    />
+                </>
             )}
         </DndContext>
     )
