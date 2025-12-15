@@ -7,8 +7,16 @@ import { formatDistanceToNow, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Database } from '../../database.types'
 
+interface ActivityFilters {
+    userId?: string | null
+    startDate?: string | null
+    endDate?: string | null
+    type?: string | null
+}
+
 interface ActivityFeedProps {
     cardId?: string
+    filters?: ActivityFilters
 }
 
 type Activity = Database['public']['Tables']['activities']['Row'] & {
@@ -135,10 +143,10 @@ const activityColors = {
     'default': 'text-gray-600 bg-gray-50'
 }
 
-export default function ActivityFeed({ cardId }: ActivityFeedProps) {
+export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
     const queryClient = useQueryClient()
     const { data: activities, isLoading } = useQuery({
-        queryKey: ['activity-feed', cardId || 'global'],
+        queryKey: ['activity-feed', cardId || 'global', filters],
         queryFn: async () => {
             let query = supabase
                 .from('activities')
@@ -157,6 +165,21 @@ export default function ActivityFeed({ cardId }: ActivityFeedProps) {
 
             if (cardId) {
                 query = query.eq('card_id', cardId)
+            }
+
+            // Apply filters
+            if (filters?.userId && filters.userId !== 'all') {
+                query = query.eq('created_by', filters.userId)
+            }
+            if (filters?.startDate) {
+                query = query.gte('created_at', filters.startDate)
+            }
+            if (filters?.endDate) {
+                // Add time to end date to include the whole day
+                query = query.lte('created_at', `${filters.endDate}T23:59:59`)
+            }
+            if (filters?.type && filters.type !== 'all') {
+                query = query.eq('tipo', filters.type)
             }
 
             const { data, error } = await query
