@@ -8,6 +8,7 @@ import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
 import PipelineSettings from './components/settings/PipelineSettings'
 import UserManagement from './pages/admin/UserManagement'
+import CRMHealth from './pages/admin/CRMHealth'
 import ActivitiesPage from './pages/ActivitiesPage'
 import { ToastProvider } from './contexts/ToastContext'
 
@@ -35,6 +36,7 @@ function App() {
                 <Route path="/activities" element={<ActivitiesPage />} />
                 <Route path="/settings/pipeline" element={<PipelineSettings />} />
                 <Route path="/admin/users" element={<UserManagement />} />
+                <Route path="/admin/health" element={<CRMHealth />} />
                 <Route path="/settings" element={<div className="p-8">Settings (Placeholder)</div>} />
               </Route>
             </Routes>

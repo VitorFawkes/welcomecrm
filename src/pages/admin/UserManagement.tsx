@@ -6,21 +6,13 @@ import {
     Users,
     Search,
     Shield,
-    CheckCircle,
-    XCircle,
     MoreVertical
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../contexts/ToastContext';
-
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type AppRole = Database['public']['Enums']['app_role'];
@@ -210,7 +202,7 @@ export default function UserManagement() {
                             ))
                         ) : filteredProfiles?.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                                     Nenhum usuário encontrado.
                                 </td>
                             </tr>
@@ -239,34 +231,43 @@ export default function UserManagement() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <Button
-                                            variant={profile.active ? "outline" : "destructive"}
-                                            size="sm"
-                                            onClick={() => handleToggleActive(profile.id, profile.active ?? true)}
-                                            className={cn(
-                                                "flex items-center gap-1 h-7 text-xs",
-                                                profile.active
-                                                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
-                                                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:text-red-800"
-                                            )}
-                                        >
-                                            {profile.active ? (
-                                                <>
-                                                    <CheckCircle className="w-3 h-3 mr-1" /> Ativo
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <XCircle className="w-3 h-3 mr-1" /> Inativo
-                                                </>
-                                            )}
-                                        </Button>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={profile.is_admin || false}
+                                                onChange={(e) => updateProfileMutation.mutate({
+                                                    id: profile.id,
+                                                    updates: { is_admin: e.target.checked }
+                                                })}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                            <span className="ml-3 text-sm font-medium text-gray-700">
+                                                {profile.is_admin ? 'Sim' : 'Não'}
+                                            </span>
+                                        </label>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${profile.active
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-red-100 text-red-800'
+                                            }`}>
+                                            {profile.active ? 'Ativo' : 'Inativo'}
+                                        </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {/* Placeholder for Last Login - Supabase Auth tracks this but it's not in public.profiles by default unless synced */}
                                         -
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        {/* Future actions: Edit Details, Reset Password (Admin) */}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleToggleActive(profile.id, profile.active ?? true)}
+                                            className={profile.active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
+                                        >
+                                            {profile.active ? 'Desativar' : 'Ativar'}
+                                        </Button>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
                                             <MoreVertical className="w-4 h-4" />
                                         </Button>
@@ -280,3 +281,4 @@ export default function UserManagement() {
         </div>
     );
 }
+

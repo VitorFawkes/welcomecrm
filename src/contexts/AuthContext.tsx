@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (error) {
                 console.error('Erro ao buscar profile:', error)
             } else {
-                setProfile(data)
+                setProfile(data as Profile)
             }
         } catch (error) {
             console.error('Erro inesperado ao buscar profile:', error)

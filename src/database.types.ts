@@ -1495,6 +1495,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          is_admin: boolean | null
           nome: string | null
           produtos: Database["public"]["Enums"]["app_product"][] | null
           role: Database["public"]["Enums"]["app_role"] | null
@@ -1505,6 +1506,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id: string
+          is_admin?: boolean | null
           nome?: string | null
           produtos?: Database["public"]["Enums"]["app_product"][] | null
           role?: Database["public"]["Enums"]["app_role"] | null
@@ -1515,6 +1517,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          is_admin?: boolean | null
           nome?: string | null
           produtos?: Database["public"]["Enums"]["app_product"][] | null
           role?: Database["public"]["Enums"]["app_role"] | null
@@ -1740,6 +1743,48 @@ export type Database = {
           type?: string
         }
         Relationships: []
+      }
+      stage_transitions: {
+        Row: {
+          allowed: boolean | null
+          created_at: string | null
+          id: string
+          source_stage_id: string | null
+          target_stage_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          allowed?: boolean | null
+          created_at?: string | null
+          id?: string
+          source_stage_id?: string | null
+          target_stage_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          allowed?: boolean | null
+          created_at?: string | null
+          id?: string
+          source_stage_id?: string | null
+          target_stage_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_transitions_source_stage_id_fkey"
+            columns: ["source_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_transitions_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tarefas: {
         Row: {
@@ -2128,6 +2173,10 @@ export type Database = {
         Returns: boolean
       }
       process_task_queue: { Args: never; Returns: number }
+      validate_transition: {
+        Args: { p_card_id: string; p_target_stage_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_product: "TRIPS" | "WEDDING" | "CORP"

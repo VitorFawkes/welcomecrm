@@ -4,9 +4,10 @@ import { supabase } from '../../lib/supabase'
 import { Save, Loader2, LayoutTemplate, List, Check, Zap, Clock, AlertCircle, Shield } from 'lucide-react'
 import AutomationSettings from './AutomationSettings'
 import type { Database } from '../../database.types'
+import StageTransitionsSettings from './StageTransitionsSettings'
 
 type PipelinePhase = 'SDR' | 'Planner' | 'Pós-venda'
-type SettingsTab = 'fields' | 'stages' | 'automation'
+type SettingsTab = 'fields' | 'stages' | 'automation' | 'transitions'
 
 interface FieldConfig {
     id: string
@@ -439,6 +440,11 @@ export default function PipelineSettings() {
                     ))}
                 </div>
             )}
+
+            {activeTab === 'transitions' && (
+                <StageTransitionsSettings stages={localStages} />
+            )}
         </div>
     )
 }
+
