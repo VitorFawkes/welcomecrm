@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Mail, X, Send } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../../database.types'
 import ProposalBuilderModal from './ProposalBuilderModal'
@@ -39,19 +39,40 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         }
     })
 
+    // Fetch primary contact details
+    const { data: contact } = useQuery({
+        queryKey: ['contact', card.pessoa_principal_id],
+        queryFn: async () => {
+            if (!card.pessoa_principal_id) return null
+            const { data, error } = await supabase
+                .from('contatos')
+                .select('email, telefone')
+                .eq('id', card.pessoa_principal_id)
+                .single()
+
+            if (error) throw error
+            return data
+        },
+        enabled: !!card.pessoa_principal_id
+    })
+
     const handleWhatsAppClick = () => {
-        // Get primary contact's WhatsApp
-        // const whatsappNumber = card.pessoa_principal_id // TODO: Get from settings or profilencipal_id // Would need to fetch from contato
+        if (!contact?.telefone) {
+            alert('Este contato não possui telefone cadastrado.')
+            return
+        }
+
+        // Remove non-numeric characters
+        const cleanNumber = contact.telefone.replace(/\D/g, '')
         const message = encodeURIComponent(`Olá! Sobre sua viagem: ${card.titulo}`)
 
         logActivityMutation.mutate({
             tipo: 'whatsapp_sent',
             descricao: 'WhatsApp enviado para o cliente',
-            metadata: { contact_id: card.pessoa_principal_id }
+            metadata: { contact_id: card.pessoa_principal_id, phone: cleanNumber }
         })
 
-        // Open WhatsApp (placeholder - needs actual phone number)
-        window.open(`https://wa.me/?text=${message}`, '_blank')
+        window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank')
     }
 
     const handleEmailSend = () => {
@@ -63,6 +84,14 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
 
         setShowEmailModal(false)
         setEmailData({ to: '', subject: '', body: '' })
+    }
+
+    // Pre-fill email when opening modal
+    const openEmailModal = () => {
+        if (contact?.email) {
+            setEmailData(prev => ({ ...prev, to: contact.email || '' }))
+        }
+        setShowEmailModal(true)
     }
 
     return (
@@ -80,7 +109,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                 </button>
 
                 <button
-                    onClick={() => setShowEmailModal(true)}
+                    onClick={openEmailModal}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
                     title="Enviar Email"
                 >

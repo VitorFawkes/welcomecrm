@@ -11,7 +11,7 @@ interface Profile {
 
 interface UserSelectorProps {
     currentUserId: string | null
-    onSelect: (userId: string) => void
+    onSelect: (userId: string | null) => void
     label?: string
     disabled?: boolean
 }
@@ -48,7 +48,7 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
             <div className="relative">
                 <select
                     value={currentUserId || ''}
-                    onChange={(e) => onSelect(e.target.value)}
+                    onChange={(e) => onSelect(e.target.value || null)}
                     disabled={disabled || loading}
                     className="w-full appearance-none rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2.5 pl-9 pr-8 cursor-pointer disabled:bg-gray-50 disabled:text-gray-500"
                 >

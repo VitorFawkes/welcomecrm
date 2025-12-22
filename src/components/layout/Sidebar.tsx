@@ -4,13 +4,14 @@ import { cn } from '../../lib/utils'
 
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Pipeline', href: '/pipeline', icon: Kanban },
-    { name: 'Cards', href: '/cards', icon: List },
+    { name: 'Funil', href: '/pipeline', icon: Kanban },
+    { name: 'Viagens', href: '/cards', icon: List },
     { name: 'Pessoas', href: '/pessoas', icon: Users },
     { name: 'Tarefas', href: '/tarefas', icon: CheckSquare },
     { name: 'Atividades', href: '/activities', icon: Activity },
     { name: 'Configurações', href: '/settings/pipeline', icon: Settings },
     { name: 'Usuários', href: '/admin/users', icon: Shield },
+    { name: 'Governança', href: '/admin/stages', icon: Settings },
     { name: 'Saúde do CRM', href: '/admin/health', icon: Activity },
 ]
 

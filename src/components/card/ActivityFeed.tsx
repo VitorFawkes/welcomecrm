@@ -27,6 +27,7 @@ type Activity = Database['public']['Tables']['activities']['Row'] & {
     card?: {
         titulo: string | null
     }
+    party_type?: 'client' | 'supplier' | null
 }
 
 const activityIcons = {
@@ -258,7 +259,14 @@ export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
                                             {activity.card.titulo}
                                         </Link>
                                     )}
-                                    <p className="text-gray-900">{activity.descricao}</p>
+                                    <div className="flex items-center gap-1.5">
+                                        <p className="text-gray-900">{activity.descricao}</p>
+                                        {activity.party_type === 'supplier' && (
+                                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded">
+                                                Fornecedor
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex flex-col mt-0.5">
                                         <span className="text-gray-500">
                                             por <span className="font-medium text-gray-700">{userName}</span>

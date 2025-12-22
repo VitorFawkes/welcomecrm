@@ -21,7 +21,7 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('atividades')
-                .select('*, profiles:responsavel_id(nome)')
+                .select('*, profiles:created_by(nome)')
                 .eq('card_id', cardId)
                 .eq('tipo', 'whatsapp')
                 .order('created_at', { ascending: false })
@@ -38,7 +38,7 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('atividades')
-                .select('*, profiles:responsavel_id(nome)')
+                .select('*, profiles:created_by(nome)')
                 .eq('card_id', cardId)
                 .eq('tipo', 'email')
                 .order('created_at', { ascending: false })
@@ -55,7 +55,7 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('atividades')
-                .select('*, profiles:responsavel_id(nome)')
+                .select('*, profiles:created_by(nome)')
                 .eq('card_id', cardId)
                 .eq('tipo', 'reuniao')
                 .order('created_at', { ascending: false })

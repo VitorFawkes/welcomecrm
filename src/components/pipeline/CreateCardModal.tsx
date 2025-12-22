@@ -196,26 +196,27 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                 <ContactSelector
                     cardId="" // Empty string or null? Need to update ContactSelector to handle this
                     onClose={() => setShowContactSelector(false)}
-                    onContactAdded={(contactId) => {
-                        // We need the contact name too. 
-                        // ContactSelector currently only returns ID.
-                        // We might need to fetch it or update ContactSelector to return the full object.
-                        // For now, let's fetch it here or just show "Carregando..."
-                        // Better: Update ContactSelector to return the contact object.
-                        // Or just fetch it quickly.
-
-                        // Let's fetch it for now to be safe
-                        supabase.from('contatos').select('nome').eq('id', contactId!).single().then(({ data }) => {
-                            if (data) {
-                                const contactData = data as { nome: string }
-                                setFormData({
-                                    ...formData,
-                                    pessoa_principal_id: contactId!,
-                                    pessoa_principal_nome: contactData.nome
-                                })
-                                setShowContactSelector(false)
-                            }
-                        })
+                    onContactAdded={(contactId, contact) => {
+                        if (contactId && contact) {
+                            setFormData({
+                                ...formData,
+                                pessoa_principal_id: contactId,
+                                pessoa_principal_nome: contact.nome
+                            })
+                            setShowContactSelector(false)
+                        } else if (contactId) {
+                            // Fallback if contact object is missing (shouldn't happen with updated ContactSelector)
+                            supabase.from('contatos').select('nome').eq('id', contactId).single().then(({ data }) => {
+                                if (data) {
+                                    setFormData({
+                                        ...formData,
+                                        pessoa_principal_id: contactId,
+                                        pessoa_principal_nome: data.nome
+                                    })
+                                    setShowContactSelector(false)
+                                }
+                            })
+                        }
                     }}
                 />
             )}

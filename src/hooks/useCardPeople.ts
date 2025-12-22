@@ -1,0 +1,192 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../lib/supabase'
+import type { Database } from '../database.types'
+
+type Contact = Database['public']['Tables']['contatos']['Row']
+
+export interface CardPerson extends Contact {
+    role: 'primary' | 'traveler'
+}
+
+export function useCardPeople(cardId: string | undefined) {
+    const queryClient = useQueryClient()
+
+    // Unified Query: Fetches both Primary and Travelers
+    const { data: people, isLoading } = useQuery({
+        queryKey: ['card-people', cardId],
+        queryFn: async () => {
+            if (!cardId) return []
+
+            // 1. Fetch Card (for Primary)
+            const { data: card, error: cardError } = await supabase
+                .from('cards')
+                .select(`
+                    pessoa_principal_id,
+                    contato:contatos!cards_pessoa_principal_id_fkey (*)
+                `)
+                .eq('id', cardId)
+                .single()
+
+            if (cardError) throw cardError
+
+            // 2. Fetch Travelers
+            const { data: travelersData, error: travelersError } = await supabase
+                .from('cards_contatos')
+                .select(`
+                    contato:contatos (*)
+                `)
+                .eq('card_id', cardId)
+                .order('ordem')
+
+            if (travelersError) throw travelersError
+
+            const result: CardPerson[] = []
+
+            // Add Primary
+            if (card.contato) {
+                result.push({
+                    ...(card.contato as any), // Type assertion needed due to complex join types
+                    role: 'primary'
+                })
+            }
+
+            // Add Travelers
+            const travelers = (travelersData || [])
+                .map((item: any) => item.contato)
+                .filter((c): c is Contact => !!c)
+                .map(c => ({ ...c, role: 'traveler' } as CardPerson))
+
+            result.push(...travelers)
+
+            return result
+        },
+        enabled: !!cardId
+    })
+
+    // --- Mutations ---
+
+    // Promote to Primary (Atomic)
+    const promoteToPrimaryMutation = useMutation({
+        mutationFn: async (contactId: string) => {
+            if (!cardId) throw new Error('Card ID required')
+
+            const { error } = await supabase
+                .rpc('set_card_primary_contact', {
+                    p_card_id: cardId,
+                    p_contact_id: contactId
+                })
+
+            if (error) throw error
+        },
+        onMutate: async (contactId) => {
+            await queryClient.cancelQueries({ queryKey: ['card-people', cardId] })
+            const previousPeople = queryClient.getQueryData<CardPerson[]>(['card-people', cardId])
+
+            queryClient.setQueryData(['card-people', cardId], (old: CardPerson[] | undefined) => {
+                if (!old) return []
+
+                // Find the person being promoted
+                const promotedPerson = old.find(p => p.id === contactId)
+                if (!promotedPerson) return old // Should not happen
+
+                // Filter out the promoted person from their old position
+                const others = old.filter(p => p.id !== contactId)
+
+                // If there was an existing primary, they are effectively removed from the list (unless we demote them)
+                // In this "Swap" logic, the old primary disappears from the list entirely unless they were also a traveler (impossible state)
+                // To be robust: remove any existing primary from the list
+                const othersWithoutOldPrimary = others.filter(p => p.role !== 'primary')
+
+                // Return new list: New Primary + Others (who are all travelers now)
+                return [
+                    { ...promotedPerson, role: 'primary' } as CardPerson,
+                    ...othersWithoutOldPrimary
+                ]
+            })
+
+            return { previousPeople }
+        },
+        onError: (_, __, context) => {
+            if (context?.previousPeople) {
+                queryClient.setQueryData(['card-people', cardId], context.previousPeople)
+            }
+            alert('Erro ao definir contato principal')
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-people', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['card', cardId] }) // Keep legacy sync
+        }
+    })
+
+    // Remove Person (Generic)
+    const removePersonMutation = useMutation({
+        mutationFn: async (person: CardPerson) => {
+            if (!cardId) throw new Error('Card ID required')
+
+            if (person.role === 'primary') {
+                const { error } = await supabase
+                    .from('cards')
+                    .update({ pessoa_principal_id: null })
+                    .eq('id', cardId)
+                if (error) throw error
+            } else {
+                const { error } = await supabase
+                    .from('cards_contatos')
+                    .delete()
+                    .eq('card_id', cardId)
+                    .eq('contato_id', person.id)
+                if (error) throw error
+            }
+        },
+        onMutate: async (person) => {
+            await queryClient.cancelQueries({ queryKey: ['card-people', cardId] })
+            const previousPeople = queryClient.getQueryData(['card-people', cardId])
+
+            queryClient.setQueryData(['card-people', cardId], (old: CardPerson[] | undefined) => {
+                return old?.filter(p => p.id !== person.id) || []
+            })
+
+            return { previousPeople }
+        },
+        onError: (_, __, context) => {
+            if (context?.previousPeople) {
+                queryClient.setQueryData(['card-people', cardId], context.previousPeople)
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-people', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['card', cardId] })
+        }
+    })
+
+    // Add Person (as Traveler)
+    const addPersonMutation = useMutation({
+        mutationFn: async (contact: { id: string, nome: string }) => {
+            if (!cardId) throw new Error('Card ID required')
+
+            const { error } = await supabase
+                .from('cards_contatos')
+                .insert({
+                    card_id: cardId,
+                    contato_id: contact.id,
+                    ordem: 99 // Append to end
+                })
+
+            if (error) throw error
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-people', cardId] })
+        }
+    })
+
+    return {
+        people,
+        primary: people?.find(p => p.role === 'primary') || null,
+        travelers: people?.filter(p => p.role === 'traveler') || [],
+        isLoading,
+        promoteToPrimary: promoteToPrimaryMutation.mutate,
+        removePerson: removePersonMutation.mutate,
+        addPerson: addPersonMutation.mutate,
+        isUpdating: promoteToPrimaryMutation.isPending || removePersonMutation.isPending || addPersonMutation.isPending
+    }
+}

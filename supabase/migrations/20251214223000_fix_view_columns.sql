@@ -1,3 +1,6 @@
+DROP VIEW IF EXISTS view_dashboard_funil;
+DROP VIEW IF EXISTS view_cards_acoes CASCADE;
+
 CREATE OR REPLACE VIEW view_cards_acoes AS
 SELECT 
     c.id,

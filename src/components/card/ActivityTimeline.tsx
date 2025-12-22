@@ -56,7 +56,7 @@ export default function ActivityTimeline({ cardId }: ActivityTimelineProps) {
         queryKey: ['timeline-activities', cardId],
         queryFn: async () => {
             const { data, error } = await (supabase.from('atividades') as any)
-                .select('*, profiles:responsavel_id(nome)')
+                .select('*, profiles:created_by(nome)')
                 .eq('card_id', cardId)
                 .order('created_at', { ascending: false })
                 .limit(20)

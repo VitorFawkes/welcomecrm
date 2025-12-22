@@ -1,4 +1,3 @@
-// import { Calendar, CreditCard, DollarSign, Globe, MapPin } from 'lucide-react'
 import DynamicFieldRenderer from './DynamicFieldRenderer'
 import type { Database } from '../../database.types'
 
@@ -50,6 +49,27 @@ export default function CardOverview({ card }: CardOverviewProps) {
                         <div>
                             <dt className="text-sm font-medium text-gray-500">Estado Operacional</dt>
                             <dd className="mt-1 text-sm text-gray-900 capitalize">{card.estado_operacional?.replace('_', ' ')}</dd>
+                        </div>
+                        <div className="sm:col-span-2 border-t pt-4 mt-2">
+                            <dt className="text-sm font-semibold text-indigo-600 mb-2">Período da Viagem</dt>
+                            <div className="flex gap-4">
+                                <div>
+                                    <span className="text-xs text-gray-500">Início:</span>
+                                    <dd className="text-sm text-gray-900">
+                                        {card.data_viagem_inicio
+                                            ? new Date(card.data_viagem_inicio).toLocaleDateString('pt-BR')
+                                            : '-'}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-gray-500">Fim:</span>
+                                    <dd className="text-sm text-gray-900">
+                                        {(card as any).data_viagem_fim
+                                            ? new Date((card as any).data_viagem_fim).toLocaleDateString('pt-BR')
+                                            : '-'}
+                                    </dd>
+                                </div>
+                            </div>
                         </div>
                         <div>
                             <dt className="text-sm font-medium text-gray-500">Criado em</dt>

@@ -2,6 +2,7 @@ import { Calendar, DollarSign, Phone, Mail, MessageSquare, TrendingUp, Clock, Hi
 import { cn } from '../../lib/utils'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useCardPeople } from '../../hooks/useCardPeople'
 import type { Database } from '../../database.types'
 import TaxaPlanejamentoCard from './TaxaPlanejamentoCard'
 import CardTravelers from './CardTravelers'
@@ -24,6 +25,10 @@ export default function CardSidebar({ card }: CardSidebarProps) {
         const diff = new Date(card.data_viagem_inicio).getTime() - new Date().getTime()
         return Math.floor(diff / (1000 * 60 * 60 * 24))
     }
+
+    // Use unified hook for consistent display
+    const { primary } = useCardPeople(card.id || undefined)
+    const displayNome = primary?.nome || ''
 
     // Fetch client history count
     const { data: clientHistory } = useQuery({
@@ -133,10 +138,10 @@ export default function CardSidebar({ card }: CardSidebarProps) {
                 <div className="space-y-3">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-bold">
-                            {card.pessoa_nome?.charAt(0) || 'L'}
+                            {displayNome.charAt(0) || ''}
                         </div>
                         <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">{card.pessoa_nome || 'Lead'}</p>
+                            <p className="text-sm font-medium text-gray-900">{displayNome}</p>
                             <p className="text-xs text-gray-500">Cliente Principal</p>
                         </div>
                     </div>

@@ -59,6 +59,9 @@ export default function StageChangeModal({
                             currentUserId={selectedOwnerId}
                             onSelect={setSelectedOwnerId}
                         />
+                        <p className="text-xs text-gray-500">
+                            Se desejar manter o dono atual, apenas confirme abaixo.
+                        </p>
                     </div>
                 </div>
 
@@ -68,10 +71,10 @@ export default function StageChangeModal({
                     </Button>
                     <Button
                         onClick={handleConfirm}
-                        disabled={!selectedOwnerId || selectedOwnerId === currentOwnerId}
+                        disabled={!selectedOwnerId}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
-                        Confirmar e Mover
+                        {selectedOwnerId === currentOwnerId ? 'Manter Dono e Mover' : 'Confirmar e Mover'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

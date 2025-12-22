@@ -22,6 +22,8 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
     const [editedObs, setEditedObs] = useState(observacoes)
     const [lastSavedObs, setLastSavedObs] = useState(observacoes)
 
+    const [isDirty, setIsDirty] = useState(false)
+
     // Sync state when card changes
     useEffect(() => {
         const obs = (card.produto_data as any)?.observacoes_criticas || {
@@ -31,6 +33,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
         }
         setEditedObs(obs)
         setLastSavedObs(obs)
+        setIsDirty(false)
     }, [card.produto_data])
 
     const updateObsMutation = useMutation({
@@ -48,15 +51,19 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
         onSuccess: (_, newObs) => {
             queryClient.invalidateQueries({ queryKey: ['card', card.id!] })
             setLastSavedObs(newObs)
+            setIsDirty(false)
         }
     })
 
     const handleSave = useCallback(() => {
-        // Only save if changed
-        if (JSON.stringify(editedObs) !== JSON.stringify(lastSavedObs)) {
-            updateObsMutation.mutate(editedObs)
-        }
-    }, [editedObs, lastSavedObs, updateObsMutation])
+        updateObsMutation.mutate(editedObs)
+    }, [editedObs, updateObsMutation])
+
+    const handleChange = (field: keyof typeof observacoes, value: string) => {
+        const newObs = { ...editedObs, [field]: value }
+        setEditedObs(newObs)
+        setIsDirty(JSON.stringify(newObs) !== JSON.stringify(lastSavedObs))
+    }
 
     // Handle Enter to save (Shift+Enter for new line)
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -67,7 +74,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
     }
 
     return (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-red-100 rounded-lg">
@@ -80,6 +87,14 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Salvando...
                     </div>
+                ) : isDirty ? (
+                    <button
+                        onClick={handleSave}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
+                    >
+                        <Check className="h-3 w-3" />
+                        Salvar Alterações
+                    </button>
                 ) : updateObsMutation.isSuccess ? (
                     <div className="flex items-center gap-1.5 text-xs text-green-600">
                         <Check className="h-3 w-3" />
@@ -96,8 +111,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                     </label>
                     <textarea
                         value={editedObs.o_que_e_importante || ''}
-                        onChange={(e) => setEditedObs({ ...editedObs, o_que_e_importante: e.target.value })}
-                        onBlur={handleSave}
+                        onChange={(e) => handleChange('o_que_e_importante', e.target.value)}
                         className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-red-50/30 focus:bg-white"
                         rows={2}
                         placeholder="Ex: Aniversário de casamento, primeira viagem internacional..."
@@ -111,8 +125,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                     </label>
                     <textarea
                         value={editedObs.o_que_nao_pode_dar_errado || ''}
-                        onChange={(e) => setEditedObs({ ...editedObs, o_que_nao_pode_dar_errado: e.target.value })}
-                        onBlur={handleSave}
+                        onChange={(e) => handleChange('o_que_nao_pode_dar_errado', e.target.value)}
                         className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-orange-50/30 focus:bg-white"
                         rows={2}
                         placeholder="Ex: Não pode ter atraso de voo, hotel deve ter acessibilidade..."
@@ -126,8 +139,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                     </label>
                     <textarea
                         value={editedObs.sensibilidades || ''}
-                        onChange={(e) => setEditedObs({ ...editedObs, sensibilidades: e.target.value })}
-                        onBlur={handleSave}
+                        onChange={(e) => handleChange('sensibilidades', e.target.value)}
                         className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-yellow-50/30 focus:bg-white"
                         rows={2}
                         placeholder="Ex: Medo de avião, não gosta de calor, vegetariano..."

@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS public.stage_transitions (
 );
 
 ALTER TABLE public.stage_transitions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow admin to manage transitions" ON public.stage_transitions;
 CREATE POLICY "Allow admin to manage transitions" ON public.stage_transitions FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "Allow read access to everyone" ON public.stage_transitions;
 CREATE POLICY "Allow read access to everyone" ON public.stage_transitions FOR SELECT USING (true);
 
 -- 2. Audit Logs
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 );
 
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow admin to view logs" ON public.audit_logs;
 CREATE POLICY "Allow admin to view logs" ON public.audit_logs FOR SELECT USING (public.is_admin());
 
 -- 3. Validation Function (Transitions)

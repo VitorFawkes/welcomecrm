@@ -9,7 +9,7 @@ import { Button } from '../ui/Button'
 interface ContactSelectorProps {
     cardId: string
     onClose: () => void
-    onContactAdded: (contactId?: string) => void
+    onContactAdded: (contactId?: string, contact?: { nome: string }) => void
     addToCard?: boolean
 }
 
@@ -100,7 +100,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                     }
                 }
 
-                onContactAdded(createdContact.id)
+                onContactAdded(createdContact.id, createdContact)
                 onClose() // Close modal on success
             } catch (err: any) {
                 console.error('Error linking contact:', err)
@@ -151,8 +151,14 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
             }
             return contactId
         },
-        onSuccess: (contactId) => {
-            onContactAdded(contactId)
+        onSuccess: (contactId, _variables) => {
+            // We need the contact name for the callback. 
+            // Since we don't have it in the mutation result (it just returns ID), 
+            // we rely on the fact that we selected it from the list.
+            // But wait, the mutationFn argument is just the ID.
+            // We need to find the contact in the 'contacts' list to get the name.
+            const contact = contacts?.find(c => c.id === contactId)
+            onContactAdded(contactId, contact)
             onClose()
         },
         onError: (err: any) => {
@@ -194,7 +200,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                 <input
                                     type="text"
                                     placeholder="Buscar por nome..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     autoFocus

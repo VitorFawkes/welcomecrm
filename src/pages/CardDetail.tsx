@@ -35,7 +35,7 @@ export default function CardDetail() {
     })
 
     if (isLoading) return <div className="p-8 text-center">Carregando...</div>
-    if (!card) return <div className="p-8 text-center">Card não encontrado</div>
+    if (!card) return <div className="p-8 text-center">Viagem não encontrada</div>
 
     return (
         <div className="h-full bg-gray-50 flex flex-col overflow-hidden">

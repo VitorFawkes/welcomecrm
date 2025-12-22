@@ -14,8 +14,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
-import StageChangeModal from './StageChangeModal'
-import QualityGateModal from './QualityGateModal'
+import StageChangeModal from '../card/StageChangeModal'
+import QualityGateModal from '../card/QualityGateModal'
 import { useQualityGate } from '../../hooks/useQualityGate'
 import type { Database } from '../../database.types'
 
@@ -96,7 +96,7 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
             const { error } = await (supabase.rpc as any)('mover_card', {
                 p_card_id: cardId,
                 p_nova_etapa_id: stageId,
-                p_motivo_perda_id: undefined
+                p_motivo_perda_id: null
             })
             if (error) throw error
         },
@@ -201,6 +201,13 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
                     })
                     setStageChangeModalOpen(true)
                     setActiveCard(null)
+                    return
+                }
+
+                // Validate UUIDs
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+                if (!uuidRegex.test(cardId) || !uuidRegex.test(stageId)) {
+                    console.error('Invalid UUIDs for move:', { cardId, stageId })
                     return
                 }
 

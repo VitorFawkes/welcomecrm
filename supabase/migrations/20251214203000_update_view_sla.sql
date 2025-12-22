@@ -1,3 +1,6 @@
+DROP VIEW IF EXISTS view_dashboard_funil;
+DROP VIEW IF EXISTS view_cards_acoes CASCADE;
+
 CREATE OR REPLACE VIEW view_cards_acoes AS
 SELECT 
     c.id,
@@ -7,7 +10,7 @@ SELECT
     c.pipeline_stage_id,
     c.pessoa_principal_id,
     c.valor_estimado,
-    c.valor_final, -- Added missing field from types if it exists in table, wait, the view def didn't have it? Let me check the view def again.
+    -- c.valor_final removed (duplicate)
     -- The view def returned by pg_get_viewdef didn't show valor_final, but database.types.ts showed it. 
     -- Ah, database.types.ts showed it in the TABLE definition, but for the VIEW it showed... let me check step 1266.
     -- Step 1266 showed valor_final in the view row type.
