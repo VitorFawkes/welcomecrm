@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Calendar, DollarSign, TrendingUp, History, Edit2, Check, X, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
 import OwnerHistoryModal from './OwnerHistoryModal'
 import ActionButtons from './ActionButtons'
+import { Button } from '../ui/Button'
 import UserSelector from './UserSelector'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useQualityGate } from '../../hooks/useQualityGate'
 import QualityGateModal from './QualityGateModal'
 import StageChangeModal from './StageChangeModal'
+import { useStageRequirements } from '../../hooks/useStageRequirements'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -40,9 +42,91 @@ export default function CardHeader({ card }: CardHeaderProps) {
         sdrName?: string
     } | null>(null)
 
+    const { missingBlocking } = useStageRequirements(card)
+
     useEffect(() => {
         setEditedTitle(card.titulo || '')
     }, [card.titulo])
+
+    // Fetch active change requests
+    const { data: hasActiveChange } = useQuery({
+        queryKey: ['tasks', card.id, 'active-change'],
+        queryFn: async () => {
+            if (!card.id) return false
+            const { data } = await supabase
+                .from('tarefas')
+                .select('id')
+                .eq('card_id', card.id)
+                .eq('tipo', 'solicitacao_mudanca')
+                .eq('concluida', false)
+                .maybeSingle()
+            return !!data
+        },
+        enabled: !!card.id
+    })
+
+    // Determine Operational Badge
+    const getOperationalBadge = () => {
+        // 1. High Priority: Active Change Request
+        if (hasActiveChange) {
+            return (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-medium">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Mudança ativa
+                </div>
+            )
+        }
+
+        // 2. Task Status Logic
+        if (card.proxima_tarefa) {
+            const task = card.proxima_tarefa as any
+            if (task.data_vencimento) {
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                const taskDate = new Date(task.data_vencimento)
+                taskDate.setHours(0, 0, 0, 0)
+
+                const diffDays = Math.floor((taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+                // Overdue
+                if (diffDays < 0) {
+                    const daysLate = Math.abs(diffDays)
+                    return (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                            <Clock className="h-3.5 w-3.5" />
+                            Atrasada há {daysLate} dia{daysLate > 1 ? 's' : ''}
+                        </div>
+                    )
+                }
+
+                // Today
+                if (diffDays === 0) {
+                    return (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs font-medium">
+                            <Clock className="h-3.5 w-3.5" />
+                            Para hoje
+                        </div>
+                    )
+                }
+
+                // Future
+                return (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium">
+                        <Calendar className="h-3.5 w-3.5" />
+                        Para daqui a {diffDays} dia{diffDays > 1 ? 's' : ''}
+                    </div>
+                )
+            }
+        }
+
+        // 3. Warning: No Next Task
+        return (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Sem próxima tarefa
+            </div>
+        )
+    }
 
     // Fetch pipeline stages
     const { data: stages } = useQuery({
@@ -83,6 +167,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
             if (error) throw error
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
             queryClient.invalidateQueries({ queryKey: ['card', card.id] })
             queryClient.invalidateQueries({ queryKey: ['cards'] })
             queryClient.invalidateQueries({ queryKey: ['activity-feed', card.id] })
@@ -101,6 +186,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
             if (error) throw error
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
             queryClient.invalidateQueries({ queryKey: ['card', card.id] })
             queryClient.invalidateQueries({ queryKey: ['cards'] })
             queryClient.invalidateQueries({ queryKey: ['activity-feed', card.id] })
@@ -116,6 +202,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
             if (error) throw error
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
             queryClient.invalidateQueries({ queryKey: ['card', card.id] })
             queryClient.invalidateQueries({ queryKey: ['cards'] })
             queryClient.invalidateQueries({ queryKey: ['activity-feed', card.id] })
@@ -142,7 +229,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
             setPendingStageChange({
                 stageId,
                 targetStageName: stageName,
-                currentOwnerId: card.dono_atual_id,
+                currentOwnerId: card.dono_atual_id || undefined,
                 sdrName: card.sdr_owner_id ? 'SDR Atual' : undefined
             })
             setStageChangeModalOpen(true)
@@ -213,6 +300,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     return (
         <>
+
             <div className="flex flex-col bg-white border-b border-gray-200 shadow-sm">
                 {/* Top Bar: Breadcrumbs & Stage */}
                 <div className="px-6 py-2 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100">
@@ -221,14 +309,24 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             <ArrowLeft className="h-4 w-4" /> Voltar
                         </button>
                         <span className="text-gray-300">/</span>
-                        <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium text-xs uppercase tracking-wide">
+                        <button
+                            onClick={() => navigate('/pipeline')}
+                            className="px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium text-xs uppercase tracking-wide transition-colors"
+                        >
                             {card.produto}
-                        </span>
+                        </button>
                     </div>
 
-                    {/* Stage Selector */}
-                    <div className="relative z-20">
-                        <div className="flex items-center gap-2">
+                    {/* Stage Selector & Time in Stage */}
+                    <div className="relative z-20 flex items-center gap-3">
+                        {card.tempo_etapa_dias !== null && card.tempo_etapa_dias !== undefined && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 text-xs font-medium text-gray-500" title="Tempo nesta etapa">
+                                <History className="h-3 w-3" />
+                                {card.tempo_etapa_dias}d
+                            </div>
+                        )}
+
+                        <div className="relative">
                             <button
                                 onClick={() => setShowStageDropdown(!showStageDropdown)}
                                 className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm font-medium transition-all border border-gray-200 hover:border-gray-300"
@@ -243,46 +341,40 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 <ChevronDown className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
                             </button>
 
-                            {card.tempo_etapa_dias !== null && card.tempo_etapa_dias !== undefined && (
-                                <span className="text-xs text-gray-400">
-                                    {card.tempo_etapa_dias}d nesta etapa
-                                </span>
+                            {showStageDropdown && stages && (
+                                <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="max-h-[300px] overflow-y-auto">
+                                        {stages.map((stage) => (
+                                            <button
+                                                key={stage.id}
+                                                onClick={() => handleStageSelect(stage.id, stage.nome, stage.fase)}
+                                                className={cn(
+                                                    "w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 transition-colors",
+                                                    card.pipeline_stage_id === stage.id && "bg-indigo-50 text-indigo-700 font-medium"
+                                                )}
+                                            >
+                                                <span className={cn(
+                                                    "w-2.5 h-2.5 rounded-full shrink-0",
+                                                    stage.fase === 'SDR' ? 'bg-blue-500' :
+                                                        stage.fase === 'Planner' ? 'bg-purple-500' :
+                                                            stage.fase === 'Pós-venda' ? 'bg-green-500' : 'bg-gray-500'
+                                                )} />
+                                                <span className="truncate">{stage.nome}</span>
+                                                {card.pipeline_stage_id === stage.id && (
+                                                    <Check className="h-4 w-4 ml-auto shrink-0" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
-
-                        {showStageDropdown && stages && (
-                            <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                                <div className="max-h-[300px] overflow-y-auto">
-                                    {stages.map((stage) => (
-                                        <button
-                                            key={stage.id}
-                                            onClick={() => handleStageSelect(stage.id, stage.nome, stage.fase)}
-                                            className={cn(
-                                                "w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 transition-colors",
-                                                card.pipeline_stage_id === stage.id && "bg-indigo-50 text-indigo-700 font-medium"
-                                            )}
-                                        >
-                                            <span className={cn(
-                                                "w-2.5 h-2.5 rounded-full shrink-0",
-                                                stage.fase === 'SDR' ? 'bg-blue-500' :
-                                                    stage.fase === 'Planner' ? 'bg-purple-500' :
-                                                        stage.fase === 'Pós-venda' ? 'bg-green-500' : 'bg-gray-500'
-                                            )} />
-                                            <span className="truncate">{stage.nome}</span>
-                                            {card.pipeline_stage_id === stage.id && (
-                                                <Check className="h-4 w-4 ml-auto shrink-0" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
                 {/* Main Content: Title & Actions */}
                 <div className="px-6 py-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                    <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex-1 min-w-0 space-y-3">
                         <div className="flex items-start gap-3">
                             {isEditingTitle ? (
                                 <div className="flex items-center gap-2 flex-1 max-w-2xl">
@@ -326,106 +418,103 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        {/* Metadata Row: Badges | Value | Trip Date */}
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
                             <span className={cn(
                                 "px-2.5 py-0.5 rounded-full font-semibold text-xs uppercase tracking-wide",
                                 phaseColors[card.fase as keyof typeof phaseColors] || phaseColors['Outro']
                             )}>
                                 {card.fase}
                             </span>
-                            <span className="px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-600 border border-gray-200 text-xs font-medium uppercase tracking-wide">
-                                {card.etapa_nome || stages?.find(s => s.id === card.pipeline_stage_id)?.nome || 'Sem Etapa'}
-                            </span>
+
+                            {/* Operational Badge */}
+                            {getOperationalBadge()}
+
                             <span className={cn(
                                 "px-2.5 py-0.5 rounded-md border text-xs font-medium uppercase tracking-wide",
                                 statusColors[card.status_comercial?.toLowerCase() as keyof typeof statusColors] || statusColors['aberto']
                             )}>
                                 {card.status_comercial?.replace('_', ' ')}
                             </span>
+
+                            {/* Divider */}
+                            <div className="h-4 w-px bg-gray-300 mx-1" />
+
+                            {/* Value */}
+                            {(card.valor_estimado || card.valor_final) && (
+                                <div className="flex items-center gap-1.5 text-gray-600 font-medium">
+                                    <DollarSign className="h-3.5 w-3.5 text-gray-400" />
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                        (card.status_comercial === 'ganho' || card.status_comercial === 'perdido')
+                                            ? (card.valor_final || card.valor_estimado || 0)
+                                            : (card.valor_estimado || 0)
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Trip Date */}
+                            {card.data_viagem_inicio && (
+                                <>
+                                    <div className="h-4 w-px bg-gray-300 mx-1" />
+                                    <div className="flex items-center gap-1.5 text-gray-600 font-medium">
+                                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                                        {new Intl.NumberFormat('pt-BR').format(new Date(card.data_viagem_inicio).getDate())} de {new Date(card.data_viagem_inicio).toLocaleString('pt-BR', { month: 'short' })}
+                                        <span className="text-gray-400 ml-0.5">'{new Date(card.data_viagem_inicio).getFullYear().toString().slice(2)}</span>
+                                    </div>
+                                    {/* Days until trip */}
+                                    {(() => {
+                                        const daysToTrip = Math.floor((new Date(card.data_viagem_inicio).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                                        if (daysToTrip >= 0) {
+                                            return (
+                                                <div className={cn(
+                                                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                                                    daysToTrip < 14 ? "bg-red-50 text-red-700 border border-red-200" :
+                                                        daysToTrip < 30 ? "bg-orange-50 text-orange-700 border border-orange-200" :
+                                                            "bg-blue-50 text-blue-700 border border-blue-200"
+                                                )}>
+                                                    ✈️ {daysToTrip}d
+                                                </div>
+                                            )
+                                        }
+                                        return null
+                                    })()}
+                                </>
+                            )}
                         </div>
                     </div>
 
-                    <div className="shrink-0">
-                        <ActionButtons card={card} />
-                    </div>
-                </div>
-
-                {/* Meta Bar: Details Grid */}
-                <div className="px-6 py-3 bg-gray-50/80 border-t border-gray-100 grid grid-cols-1 md:grid-cols-12 gap-6 items-center text-sm">
-                    {/* People Section */}
-                    <div className="md:col-span-5 flex items-center gap-6">
-                        <div className="flex items-center gap-3 min-w-[180px]">
-                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider w-10">Dono</span>
-                            <div className="flex-1 flex items-center gap-2">
+                    {/* Right Side: Owners & Actions */}
+                    <div className="shrink-0 flex items-center gap-4">
+                        {/* Owner Selectors - Horizontal Layout */}
+                        <div className="flex items-center gap-4 pr-4 border-r border-gray-200">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Dono</span>
                                 <UserSelector
                                     currentUserId={card.dono_atual_id}
                                     onSelect={handleOwnerSelect}
                                 />
-                                <button
-                                    onClick={() => setShowOwnerHistory(true)}
-                                    className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-                                    title="Histórico"
-                                >
-                                    <History className="h-3.5 w-3.5 text-gray-400" />
-                                </button>
                             </div>
-                        </div>
-
-                        <div className="w-px h-8 bg-gray-200 hidden md:block" />
-
-                        <div className="flex items-center gap-3 min-w-[180px]">
-                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider w-8">SDR</span>
-                            <div className="flex-1 flex items-center gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SDR</span>
                                 <UserSelector
                                     currentUserId={card.sdr_owner_id}
                                     onSelect={handleSdrSelect}
                                 />
-                                {card.fase === 'SDR' && (
-                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 whitespace-nowrap" title="Sincronizado com Dono">
-                                        AUTO
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Data Section */}
-                    <div className="md:col-span-7 flex items-center justify-start md:justify-end gap-6 md:gap-8 text-gray-600">
-                        <div className="flex items-center gap-2">
-                            <DollarSign className="h-4 w-4 text-gray-400" />
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-medium text-gray-400 uppercase leading-none">Valor</span>
-                                <span className="font-semibold text-gray-900">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_final || card.valor_estimado || 0)}
-                                </span>
                             </div>
                         </div>
 
-                        {card.data_viagem_inicio && (
-                            <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-medium text-gray-400 uppercase leading-none">Viagem</span>
-                                    <span className="font-medium text-gray-900">
-                                        {new Intl.NumberFormat('pt-BR').format(new Date(card.data_viagem_inicio).getDate())} de {new Date(card.data_viagem_inicio).toLocaleString('pt-BR', { month: 'short' })}
-                                        <span className="text-gray-400 ml-1">'{new Date(card.data_viagem_inicio).getFullYear().toString().slice(2)}</span>
-                                    </span>
-                                </div>
-                            </div>
+                        {missingBlocking.length > 0 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setQualityGateModalOpen(true)}
+                                className="gap-2 text-red-600 border-red-200 bg-red-50"
+                            >
+                                <AlertCircle className="h-4 w-4" />
+                                {missingBlocking.length} Pendências
+                            </Button>
                         )}
-
-                        {card.tarefas_pendentes ? (
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg border border-orange-100">
-                                <TrendingUp className="h-4 w-4" />
-                                <span className="font-semibold text-sm">{card.tarefas_pendentes}</span>
-                                <span className="text-xs opacity-80">pendências</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg border border-green-100 opacity-60">
-                                <Check className="h-4 w-4" />
-                                <span className="text-xs font-medium">Tudo em dia</span>
-                            </div>
-                        )}
+                        <ActionButtons card={card} />
                     </div>
                 </div>
             </div>
@@ -442,6 +531,24 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 cardId={card.id!}
                 isOpen={showOwnerHistory}
                 onClose={() => setShowOwnerHistory(false)}
+            />
+
+            <QualityGateModal
+                isOpen={qualityGateModalOpen}
+                onClose={() => setQualityGateModalOpen(false)}
+                missingFields={pendingStageChange?.missingFields || []}
+                onConfirm={handleConfirmQualityGate}
+                targetStageName={pendingStageChange?.targetStageName || ''}
+                cardId={card.id!}
+            />
+
+            <StageChangeModal
+                isOpen={stageChangeModalOpen}
+                onClose={() => setStageChangeModalOpen(false)}
+                onConfirm={handleConfirmStageChange}
+                targetStageName={pendingStageChange?.targetStageName || ''}
+                currentOwnerId={pendingStageChange?.currentOwnerId || null}
+                sdrName={pendingStageChange?.sdrName}
             />
         </>
     )

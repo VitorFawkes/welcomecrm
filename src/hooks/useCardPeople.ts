@@ -155,6 +155,7 @@ export function useCardPeople(cardId: string | undefined) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['card-people', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['card-contacts', cardId] }) // Sync with CardTravelers
             queryClient.invalidateQueries({ queryKey: ['card', cardId] })
         }
     })
@@ -163,6 +164,13 @@ export function useCardPeople(cardId: string | undefined) {
     const addPersonMutation = useMutation({
         mutationFn: async (contact: { id: string, nome: string }) => {
             if (!cardId) throw new Error('Card ID required')
+
+            // Forensic Fix: Check if already exists to avoid 409 conflict
+            const isAlreadyLinked = people?.some(p => p.id === contact.id)
+            if (isAlreadyLinked) {
+                console.warn(`[DEBUG] Contact ${contact.nome} (${contact.id}) is already linked to card ${cardId}. Skipping insert.`);
+                return
+            }
 
             const { error } = await supabase
                 .from('cards_contatos')
@@ -176,6 +184,7 @@ export function useCardPeople(cardId: string | undefined) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['card-people', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['card-contacts', cardId] }) // Sync with CardTravelers
         }
     })
 

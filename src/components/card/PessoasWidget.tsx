@@ -146,7 +146,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
                 <ContactSelector
                     cardId={card.id!}
                     onClose={() => setSelectorMode('none')}
-                    addToCard={selectorMode === 'add_traveler'} // Only add to card_contatos if explicitly adding a traveler
+                    addToCard={false} // Only add to card_contatos if explicitly adding a traveler
                     onContactAdded={(contactId, contact) => {
                         if (selectorMode === 'set_primary' && contactId) {
                             handleSetPrimaryContact(contactId)

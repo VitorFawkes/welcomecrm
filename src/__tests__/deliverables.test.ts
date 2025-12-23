@@ -95,7 +95,7 @@ describe('ActivityFeed Party Type', () => {
 
     it('should not show badge for client (default)', () => {
         const activity = { party_type: 'client' as const }
-        const showBadge = activity.party_type === 'supplier'
+        const showBadge = (activity.party_type as string) === 'supplier'
         expect(showBadge).toBe(false)
     })
 

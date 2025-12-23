@@ -1,13 +1,11 @@
 import { useState } from 'react'
-import { Users, Loader2, Edit2, Trash2, History as HistoryIcon, ChevronDown, ChevronUp, MapPin, UserPlus } from 'lucide-react'
+import { Users, Loader2, Edit2, Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
 import type { Contato } from '../../database.types'
 import { supabase } from '../../lib/supabase'
 import { calculateAge } from '../../lib/contactUtils'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 
 interface CardTravelersProps {
     card: {
@@ -29,30 +27,6 @@ function TravelerRow({
     onEdit: (contact: Contato) => void
     onDelete: () => void
 }) {
-    const [isExpanded, setIsExpanded] = useState(false)
-
-    // Fetch travel history count and data
-    const { data: history } = useQuery({
-        queryKey: ['travel-history', contact.id],
-        queryFn: async () => {
-            const { data, error } = await (supabase.rpc as any)('get_travel_history', {
-                contact_id: contact.id
-            })
-            if (error) throw error
-            return data
-        },
-        enabled: !!contact.id
-    })
-
-    const historyCount = history?.length || 0
-
-    const formatCurrency = (value: number, currency: string) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: currency || 'BRL'
-        }).format(value)
-    }
-
     return (
         <div className="border border-transparent hover:border-gray-100 rounded-md transition-all">
             <div className="group flex items-start gap-3 p-2 rounded-md hover:bg-gray-50 transition-colors">
@@ -76,22 +50,6 @@ function TravelerRow({
                     </div>
                 </div>
 
-                {/* History Badge / Toggle */}
-                <button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-colors ${historyCount > 0
-                        ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                        : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-                        }`}
-                    title={historyCount > 0 ? "Ver histórico de viagens" : "Sem histórico de viagens"}
-                >
-                    <HistoryIcon className="h-3 w-3" />
-                    {historyCount > 0 ? `${historyCount} viagens` : 'Novo'}
-                    {historyCount > 0 && (
-                        isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-                    )}
-                </button>
-
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                     <button
                         onClick={() => onEdit(contact)}
@@ -109,53 +67,6 @@ function TravelerRow({
                     </button>
                 </div>
             </div>
-
-            {/* Expanded History Details */}
-            {isExpanded && history && history.length > 0 && (
-                <div className="ml-11 mr-2 mb-2 p-3 bg-gray-50 rounded-md border border-gray-100 text-sm animate-in slide-in-from-top-2 duration-200">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Histórico de Viagens</h4>
-                    <div className="space-y-3">
-                        {history.map((trip: any) => (
-                            <div key={trip.card_id} className="pb-3 border-b border-gray-200 last:border-0 last:pb-0">
-                                <div className="flex items-start gap-3">
-                                    <div className="mt-0.5">
-                                        <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-medium text-gray-900">{trip.titulo}</p>
-                                            {trip.valor && (
-                                                <span className="text-xs font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                    {formatCurrency(trip.valor, trip.moeda)}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${trip.fase === 'Ganho' ? 'bg-green-100 text-green-700' :
-                                                trip.fase === 'Perdido' ? 'bg-red-100 text-red-700' :
-                                                    'bg-gray-100 text-gray-700'
-                                                }`}>
-                                                {trip.status || 'Em andamento'}
-                                            </span>
-                                            {trip.data_viagem && (
-                                                <span>• {format(new Date(trip.data_viagem), "d 'de' MMM, yyyy", { locale: ptBR })}</span>
-                                            )}
-                                        </div>
-
-                                        {trip.companions && trip.companions.length > 0 && (
-                                            <div className="mt-2 flex items-start gap-1.5 text-xs text-gray-500">
-                                                <UserPlus className="h-3 w-3 mt-0.5 text-gray-400" />
-                                                <span>Com: {trip.companions.join(', ')}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

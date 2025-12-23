@@ -9,7 +9,6 @@ import ObservacoesEstruturadas from '../components/card/ObservacoesEstruturadas'
 import ObservacoesLivres from '../components/card/ObservacoesLivres'
 import ConversationHistory from '../components/card/ConversationHistory'
 import PessoasWidget from '../components/card/PessoasWidget'
-import MetricsWidget from '../components/card/MetricsWidget'
 import TaxaPlanejamentoCard from '../components/card/TaxaPlanejamentoCard'
 import ActivityFeed from '../components/card/ActivityFeed'
 
@@ -21,7 +20,7 @@ export default function CardDetail() {
     const { id } = useParams<{ id: string }>()
 
     const { data: card, isLoading } = useQuery({
-        queryKey: ['card', id],
+        queryKey: ['card-detail', id],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('view_cards_acoes')
@@ -31,7 +30,8 @@ export default function CardDetail() {
             if (error) throw error
             return data as Card
         },
-        enabled: !!id
+        enabled: !!id,
+        staleTime: 1000 * 30, // 30 seconds to avoid immediate refetch flickers
     })
 
     if (isLoading) return <div className="p-8 text-center">Carregando...</div>
@@ -66,10 +66,7 @@ export default function CardDetail() {
 
                 {/* SIDEBAR - Context & Accountability */}
                 <div className="min-h-0 overflow-y-auto space-y-4 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
-                    {/* 1. Metrics + Owner (Accountability First) */}
-                    <MetricsWidget card={card} />
-
-                    {/* 2. Pessoas (Contact + Travelers) */}
+                    {/* 1. Pessoas (Contact + Travelers) */}
                     <PessoasWidget card={card} />
 
                     {/* 3. Trip Details */}

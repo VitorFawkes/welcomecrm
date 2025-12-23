@@ -1995,6 +1995,7 @@ export type Database = {
           sdr_owner_nome: string | null
           status_comercial: string | null
           status_taxa: string | null
+          tarefas_atrasadas: number | null
           tarefas_pendentes: number | null
           tempo_etapa_dias: number | null
           tempo_sem_contato: number | null

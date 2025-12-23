@@ -20,10 +20,10 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
         queryKey: ['conversations-whatsapp', cardId],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('atividades')
+                .from('activities')
                 .select('*, profiles:created_by(nome)')
                 .eq('card_id', cardId)
-                .eq('tipo', 'whatsapp')
+                .eq('tipo', 'whatsapp') // Future-proofing: currently empty
                 .order('created_at', { ascending: false })
 
             if (error) throw error
@@ -37,10 +37,10 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
         queryKey: ['conversations-email', cardId],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('atividades')
+                .from('activities')
                 .select('*, profiles:created_by(nome)')
                 .eq('card_id', cardId)
-                .eq('tipo', 'email')
+                .eq('tipo', 'email') // Future-proofing: currently empty
                 .order('created_at', { ascending: false })
 
             if (error) throw error
@@ -54,10 +54,10 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
         queryKey: ['conversations-meetings', cardId],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('atividades')
+                .from('activities')
                 .select('*, profiles:created_by(nome)')
                 .eq('card_id', cardId)
-                .eq('tipo', 'reuniao')
+                .eq('tipo', 'meeting_created') // Mapped from 'reuniao'
                 .order('created_at', { ascending: false })
 
             if (error) throw error
@@ -187,8 +187,10 @@ export default function ConversationHistory({ cardId }: ConversationHistoryProps
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <p className="text-sm font-medium text-gray-900 mb-1">{item.titulo}</p>
-                                                {item.descricao && (
+                                                <p className="text-sm font-medium text-gray-900 mb-1">
+                                                    {(item.metadata as any)?.title || item.descricao || 'Sem título'}
+                                                </p>
+                                                {item.descricao && (item.metadata as any)?.title && (
                                                     <p className="text-sm text-gray-600">{item.descricao}</p>
                                                 )}
                                             </div>

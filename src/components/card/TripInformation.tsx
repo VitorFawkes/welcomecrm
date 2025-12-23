@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Calendar, DollarSign, Tag, TrendingUp, X, Check, Edit2, History } from 'lucide-react'
+import { MapPin, Calendar, DollarSign, Tag, TrendingUp, X, Check, Edit2, History, AlertCircle } from 'lucide-react'
 import type { Database, TripsProdutoData } from '../../database.types'
 import { supabase } from '../../lib/supabase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '../../lib/utils'
+import { useStageRequirements } from '../../hooks/useStageRequirements'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -98,7 +99,9 @@ export default function TripInformation({ card }: TripInformationProps) {
     const [showBriefing, setShowBriefing] = useState(false)
     const queryClient = useQueryClient()
 
-    const displayData = showBriefing ? (card.briefing_inicial as TripsProdutoData || {}) : productData
+    const { missingBlocking, missingFuture } = useStageRequirements(card)
+
+    const displayData = showBriefing ? ((card as any).briefing_inicial as TripsProdutoData || {}) : productData
 
     // Update editedData when card changes
     useEffect(() => {
@@ -107,13 +110,22 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     const updateCardMutation = useMutation({
         mutationFn: async (newData: TripsProdutoData) => {
+            const updates: any = { produto_data: newData }
+
+            // Wave 1B: Sync Budget to Value
+            // If budget total exists, update valor_estimado
+            if (newData.orcamento?.total) {
+                updates.valor_estimado = newData.orcamento.total
+            }
+
             const { error } = await (supabase.from('cards') as any)
-                .update({ produto_data: newData })
+                .update(updates)
                 .eq('id', card.id!)
 
             if (error) throw error
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
             queryClient.invalidateQueries({ queryKey: ['card', card.id] })
             queryClient.invalidateQueries({ queryKey: ['cards'] })
             setEditingField(null)
@@ -150,6 +162,12 @@ export default function TripInformation({ card }: TripInformationProps) {
         }).format(value)
     }
 
+    const getFieldStatus = (dataKey: string) => {
+        if (missingBlocking.some(req => req.field_key === dataKey)) return 'blocking'
+        if (missingFuture.some(req => req.field_key === dataKey)) return 'attention'
+        return 'ok'
+    }
+
     // Field Card Component
     const FieldCard = ({
         icon: Icon,
@@ -157,7 +175,8 @@ export default function TripInformation({ card }: TripInformationProps) {
         label,
         value,
         subValue,
-        fieldName
+        fieldName,
+        dataKey
     }: {
         icon: any
         iconColor: string
@@ -165,31 +184,62 @@ export default function TripInformation({ card }: TripInformationProps) {
         value: string | React.ReactNode
         subValue?: string
         fieldName: string
-    }) => (
-        <div
-            className={cn(
-                "group relative p-4 bg-white rounded-xl border border-gray-300 transition-all duration-200",
-                !showBriefing && "cursor-pointer hover:border-indigo-400 hover:shadow-md"
-            )}
-            onClick={() => !showBriefing && handleFieldEdit(fieldName)}
-        >
-            {!showBriefing && (
-                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Edit2 className="h-4 w-4 text-indigo-500" />
-                </div>
-            )}
-            <div className="flex items-start gap-3">
-                <div className={`p-2 rounded-lg ${iconColor}`}>
-                    <Icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-                    <div className="text-sm font-semibold text-gray-900 truncate">{value || <span className="text-gray-400 italic font-normal">Não informado</span>}</div>
-                    {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
+        dataKey: string
+    }) => {
+        const status = getFieldStatus(dataKey)
+
+        return (
+            <div
+                className={cn(
+                    "group relative p-4 bg-white rounded-xl border transition-all duration-200",
+                    status === 'blocking' ? "border-red-300 bg-red-50/30" :
+                        status === 'attention' ? "border-orange-300 bg-orange-50/30" :
+                            "border-gray-300",
+                    !showBriefing && "cursor-pointer hover:shadow-md",
+                    !showBriefing && status === 'blocking' && "hover:border-red-400",
+                    !showBriefing && status === 'attention' && "hover:border-orange-400",
+                    !showBriefing && status === 'ok' && "hover:border-indigo-400"
+                )}
+                onClick={() => !showBriefing && handleFieldEdit(fieldName)}
+            >
+                {!showBriefing && (
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Edit2 className="h-4 w-4 text-indigo-500" />
+                    </div>
+                )}
+
+                {/* Status Indicator */}
+                {status !== 'ok' && !showBriefing && (
+                    <div className={cn(
+                        "absolute -top-2 -right-2 p-1 rounded-full shadow-sm border",
+                        status === 'blocking' ? "bg-red-100 border-red-200 text-red-600" : "bg-orange-100 border-orange-200 text-orange-600"
+                    )}>
+                        <AlertCircle className="h-3 w-3" />
+                    </div>
+                )}
+
+                <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${iconColor}`}>
+                        <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                            {label}
+                            {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold">Obrigatório</span>}
+                            {status === 'attention' && <span className="text-[10px] text-orange-600 font-bold">Futuro</span>}
+                        </p>
+                        <div className="text-sm font-semibold text-gray-900 truncate">
+                            {value || (
+                                status === 'blocking' ? <span className="text-red-500 italic font-medium">Obrigatório</span> :
+                                    <span className="text-gray-400 italic font-normal">Não informado</span>
+                            )}
+                        </div>
+                        {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
+                    </div>
                 </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     return (
         <div className={cn(
@@ -234,6 +284,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                         label="Motivo da Viagem"
                         value={displayData.motivo}
                         fieldName="motivo"
+                        dataKey="motivo"
                     />
 
                     {/* Destinos */}
@@ -243,6 +294,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                         label="Destino(s)"
                         value={displayData.destinos?.length ? displayData.destinos.join(' • ') : undefined}
                         fieldName="destinos"
+                        dataKey="destinos"
                     />
 
                     {/* Período */}
@@ -258,6 +310,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                         ) : undefined}
                         subValue={displayData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
                         fieldName="periodo"
+                        dataKey="epoca_viagem"
                     />
 
                     {/* Orçamento */}
@@ -268,6 +321,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                         value={displayData.orcamento?.total ? formatBudget(displayData.orcamento.total) : undefined}
                         subValue={displayData.orcamento?.por_pessoa ? `${formatBudget(displayData.orcamento.por_pessoa)} por pessoa` : undefined}
                         fieldName="orcamento"
+                        dataKey="orcamento"
                     />
 
                     {/* Origem do Lead */}
@@ -277,6 +331,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                         label="Origem do Lead"
                         value={(displayData as any).origem_lead}
                         fieldName="origem"
+                        dataKey="origem_lead"
                     />
                 </div>
 
