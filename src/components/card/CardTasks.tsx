@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckSquare, Plus, Calendar, Trash2, Check, Clock, MapPin, Phone, Mail, MessageSquare, AlertCircle, RefreshCw, Play } from 'lucide-react'
+import { CheckSquare, Plus, Calendar, Trash2, Check, Clock, MapPin, Phone, Mail, MessageSquare, AlertCircle, RefreshCw, Play, FileText, RotateCcw } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
@@ -15,7 +15,7 @@ interface CardTasksProps {
     cardId: string
 }
 
-type TaskType = 'tarefa' | 'reuniao' | 'ligacao' | 'email' | 'mensagem' | 'solicitacao_mudanca' | 'outro'
+type TaskType = 'follow_up' | 'reuniao' | 'ligacao' | 'proposta' | 'outro' | 'solicitacao_mudanca'
 
 interface BaseTask {
     id: string
@@ -61,7 +61,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const queryClient = useQueryClient()
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingItem, setEditingItem] = useState<UnifiedItem | null>(null)
-    const [selectedType, setSelectedType] = useState<TaskType>('tarefa')
+    const [selectedType, setSelectedType] = useState<TaskType>('follow_up')
 
     // Form States
     const [title, setTitle] = useState('')
@@ -225,10 +225,25 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 // But to keep it simple for this step, let's just save the current one.
             }
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
-            queryClient.invalidateQueries({ queryKey: ['meetings', cardId] })
-            queryClient.invalidateQueries({ queryKey: ['cards'] })
+        onSuccess: async () => {
+            // STEP 1: Cancel in-flight queries to prevent race conditions
+            // (prevents old request from overwriting cache after we refetch)
+            await queryClient.cancelQueries({ queryKey: ['card', cardId] })
+
+            // STEP 2: Invalidate all related queries in parallel for speed
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['tasks', cardId] }),
+                queryClient.invalidateQueries({ queryKey: ['meetings', cardId] }),
+                queryClient.invalidateQueries({ queryKey: ['cards'] }),
+                queryClient.invalidateQueries({ queryKey: ['card', cardId] })
+            ])
+
+            // STEP 3: Force immediate refetch of card data (only active queries)
+            // This ensures header re-renders with fresh data before modal closes
+            await queryClient.refetchQueries({
+                queryKey: ['card', cardId],
+                type: 'active'  // Only refetch if component is mounted
+            })
 
             if (nextStepType) {
                 // If next step requested, reset form but keep modal open and set defaults for new task
@@ -241,7 +256,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 setStatus('agendada')
                 setResultado('')
                 setFeedback('')
-                setSelectedType(nextStepType)
+                setSelectedType(nextStepType === 'reuniao' ? 'reuniao' : 'follow_up')
                 setNextStepType(null)
                 // Don't close modal, let user edit the new follow-up
             } else {
@@ -257,8 +272,21 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 .eq('id', id)
             if (error) throw error
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
+        onSuccess: async () => {
+            // Cancel in-flight card queries to prevent race
+            await queryClient.cancelQueries({ queryKey: ['card', cardId] })
+
+            // Parallel invalidation for speed
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['tasks', cardId] }),
+                queryClient.invalidateQueries({ queryKey: ['card', cardId] })
+            ])
+
+            // Refetch only if component is active
+            await queryClient.refetchQueries({
+                queryKey: ['card', cardId],
+                type: 'active'
+            })
         }
     })
 
@@ -271,6 +299,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
             queryClient.invalidateQueries({ queryKey: ['meetings', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['card', cardId] })
         }
     })
 
@@ -283,7 +312,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         setLocation('')
         setNotes('')
         setStatus('agendada')
-        setSelectedType('tarefa')
+        setSelectedType('follow_up')
         setResponsavelId(card?.dono_atual_id || user?.id || null)
         setSdrResponsavelId(card?.sdr_owner_id || null) // Default to Card SDR
         setParticipantes([])
@@ -294,7 +323,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         setNextStepType(null)
     }
 
-    const openModal = (item?: UnifiedItem) => {
+    const openModal = (item?: UnifiedItem, defaultType?: TaskType) => {
         if (item) {
             setEditingItem(item)
             setTitle(item.titulo)
@@ -315,7 +344,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 setMotivoCancelamento(m.motivo_cancelamento || '')
             } else {
                 const t = item as Tarefa
-                setSelectedType(t.tipo as TaskType || 'tarefa')
+                setSelectedType(t.tipo as TaskType || 'follow_up')
                 setDate(t.data_vencimento.split('T')[0])
                 setTime(t.data_vencimento.split('T')[1].substring(0, 5))
                 setPriority(t.prioridade)
@@ -328,6 +357,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         } else {
             setEditingItem(null)
             resetForm()
+            if (defaultType) setSelectedType(defaultType)
         }
         setIsModalOpen(true)
     }
@@ -344,6 +374,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
             case 'ligacao': return <Phone className="h-4 w-4 text-green-600" />
             case 'email': return <Mail className="h-4 w-4 text-blue-600" />
             case 'mensagem': return <MessageSquare className="h-4 w-4 text-indigo-600" />
+            case 'proposta': return <FileText className="h-4 w-4 text-orange-600" />
+            case 'follow_up': return <RotateCcw className="h-4 w-4 text-blue-500" />
             case 'solicitacao_mudanca': return <RefreshCw className="h-4 w-4 text-orange-600" />
             default: return <CheckSquare className="h-4 w-4 text-gray-500" />
         }
@@ -353,14 +385,16 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         <div className="rounded-xl border border-gray-300 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-gray-900">Tarefas e Compromissos</h3>
-                <Button
-                    onClick={() => openModal()}
-                    size="sm"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
-                >
-                    <Plus className="h-4 w-4" />
-                    Novo
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        onClick={() => openModal(undefined, 'follow_up')}
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Nova Tarefa
+                    </Button>
+                </div>
             </div>
 
             <div className="space-y-6">
@@ -543,12 +577,12 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                         <h4 className="text-sm font-medium text-gray-900">Nenhuma atividade</h4>
                         <p className="mt-1 text-xs text-gray-500">Crie tarefas ou agende reuniões para começar.</p>
                         <Button
-                            onClick={() => openModal()}
-                            variant="outline"
+                            onClick={() => openModal(undefined, 'follow_up')}
+                            variant="default"
                             size="sm"
-                            className="mt-4"
+                            className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white"
                         >
-                            Criar Atividade
+                            Agendar Próximo Passo
                         </Button>
                     </div>
                 )}
@@ -561,7 +595,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                         <DialogHeader className="px-6 py-4 bg-white border-b border-gray-300">
                             <div className="flex items-center justify-between">
                                 <DialogTitle className="text-xl font-semibold text-gray-900">
-                                    {editingItem ? 'Detalhes da Atividade' : 'Nova Atividade'}
+                                    {editingItem ? 'Detalhes da Tarefa' : 'Nova Tarefa'}
                                 </DialogTitle>
                                 {editingItem && (
                                     <div className="flex items-center gap-2">
@@ -584,7 +618,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                             <section className="space-y-4">
                                 {!editingItem && (
                                     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                        {(['tarefa', 'reuniao', 'ligacao', 'email', 'mensagem', 'solicitacao_mudanca', 'outro'] as TaskType[]).map(type => (
+                                        {(['follow_up', 'ligacao', 'reuniao', 'proposta', 'solicitacao_mudanca', 'outro'] as TaskType[]).map(type => (
                                             <button
                                                 key={type}
                                                 onClick={() => setSelectedType(type)}
@@ -596,7 +630,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 )}
                                             >
                                                 {getTypeIcon(type)}
-                                                {type === 'solicitacao_mudanca' ? 'Mudança' : type.charAt(0).toUpperCase() + type.slice(1)}
+                                                {type === 'solicitacao_mudanca' ? 'Mudança' : type.charAt(0).toUpperCase() + type.slice(1).replace('_', '-')}
                                             </button>
                                         ))}
                                     </div>
