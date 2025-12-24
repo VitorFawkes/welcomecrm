@@ -27,6 +27,7 @@ interface SmartTaskModalProps {
     onClose: () => void;
     cardId: string;
     initialData?: any; // For edit mode
+    mode?: 'create' | 'edit' | 'reschedule';
 }
 
 type TaskType = 'tarefa' | 'ligacao' | 'whatsapp' | 'email' | 'reuniao' | 'solicitacao_mudanca' | 'enviar_proposta';
@@ -51,7 +52,7 @@ const TEMPLATES: Record<TaskType, string> = {
     enviar_proposta: "Ex: Enviar proposta..."
 };
 
-export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTaskModalProps) {
+export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'create' }: SmartTaskModalProps) {
     // Step 1: Type Selection, Step 2: Form
     const [step, setStep] = useState<1 | 2>(1);
 
@@ -167,24 +168,24 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
     // Reset or populate form
     useEffect(() => {
         if (isOpen) {
-            if (initialData) {
-                // Edit mode
+            if (initialData || mode === 'reschedule') {
+                // Edit or Reschedule mode
                 setStep(2);
-                setTitle(initialData.titulo || '');
-                setDescription(initialData.descricao || '');
-                setType((initialData.tipo as TaskType) || 'tarefa');
-                setResponsibleId(initialData.responsavel_id || '');
-                setMetadata(initialData.metadata || {});
+                setTitle(initialData?.titulo || '');
+                setDescription(initialData?.descricao || '');
+                setType((initialData?.tipo as TaskType) || 'tarefa');
+                setResponsibleId(initialData?.responsavel_id || '');
+                setMetadata(initialData?.metadata || {});
 
                 // Meeting fields
-                setMeetingStatus(initialData.status || 'agendada');
-                setMeetingResult(initialData.resultado || '');
-                setMeetingFeedback(initialData.feedback || '');
-                setCancellationReason(initialData.motivo_cancelamento || '');
-                setOtherCategory(initialData.categoria_outro || '');
-                setExternalParticipants(initialData.participantes_externos || []);
+                setMeetingStatus(initialData?.status || 'agendada');
+                setMeetingResult(initialData?.resultado || '');
+                setMeetingFeedback(initialData?.feedback || '');
+                setCancellationReason(initialData?.motivo_cancelamento || '');
+                setOtherCategory(initialData?.categoria_outro || '');
+                setExternalParticipants(initialData?.participantes_externos || []);
 
-                if (initialData.data_vencimento) {
+                if (initialData?.data_vencimento && mode !== 'reschedule') {
                     const dt = new Date(initialData.data_vencimento);
                     setDate(formatLocalDate(dt));
                     const minutes = dt.getMinutes();
@@ -192,8 +193,18 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
                     dt.setMinutes(roundedMinutes);
                     setTime(formatLocalTime(dt));
                 } else {
-                    setDate('');
-                    setTime('');
+                    // In reschedule mode (or create with initialData?), default to today/now for the user to pick new date
+                    // Or maybe pre-fill old date to let them shift it?
+                    // Usually reschedule means "Pick a new date". Let's default to today to be easier,
+                    // or keep old date if they just want to change time?
+                    // Let's default to Today+Now for Reschedule to encourage moving it forward.
+                    const now = new Date();
+                    const minutes = now.getMinutes();
+                    const roundedMinutes = Math.ceil(minutes / 15) * 15;
+                    now.setMinutes(roundedMinutes);
+
+                    setDate(formatLocalDate(now));
+                    setTime(formatLocalTime(now));
                 }
             } else {
                 // Create mode - Reset everything
@@ -434,7 +445,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
 
             if (error) throw error;
 
-            toast.success(initialData ? "Item atualizado!" : "Item criado!");
+            if (mode === 'reschedule') {
+                toast.success("Re-agendamento confirmado!");
+            } else {
+                toast.success(initialData ? "Item atualizado!" : "Item criado!");
+            }
 
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] });
             queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] });
@@ -465,18 +480,21 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <div className="flex items-center gap-2">
-                        {step === 2 && !initialData && (
+                        {step === 2 && !initialData && mode !== 'reschedule' && (
                             <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="h-8 w-8 p-0">
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
                         )}
                         <DialogTitle>
-                            {step === 1 ? 'Novo Item' : (initialData ? 'Editar Item' : `Nova ${TASK_TYPES.find(t => t.id === type)?.label}`)}
+                            {mode === 'reschedule'
+                                ? 'Re-agendar Item'
+                                : (step === 1 ? 'Novo Item' : (initialData ? 'Editar Item' : `Nova ${TASK_TYPES.find(t => t.id === type)?.label}`))
+                            }
                         </DialogTitle>
                     </div>
                 </DialogHeader>
 
-                {step === 1 ? (
+                {step === 1 && mode !== 'reschedule' ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-4">
                         {TASK_TYPES.map((t) => {
                             const isSelected = type === t.id;
@@ -768,7 +786,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
                             <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Salvando...' : 'Salvar Item'}
+                                {isSubmitting ? 'Salvando...' : (mode === 'reschedule' ? 'Confirmar Re-agendamento' : 'Salvar Item')}
                             </Button>
                         </DialogFooter>
                     </form>
