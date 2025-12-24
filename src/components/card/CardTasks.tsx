@@ -15,6 +15,7 @@ interface CardTasksProps {
 export default function CardTasks({ cardId }: CardTasksProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingTask, setEditingTask] = useState<any>(null)
+    const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reschedule'>('create')
     const queryClient = useQueryClient()
 
     // Fetch tasks
@@ -99,12 +100,20 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
     const handleEdit = (task: any) => {
         setEditingTask(task)
+        setModalMode('edit')
+        setIsModalOpen(true)
+    }
+
+    const handleReschedule = (task: any) => {
+        setEditingTask(task)
+        setModalMode('reschedule')
         setIsModalOpen(true)
     }
 
     const handleCloseModal = () => {
         setIsModalOpen(false)
         setEditingTask(null)
+        setModalMode('create')
     }
 
     const getTypeIcon = (type: string) => {
@@ -162,7 +171,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     )}
                 </h3>
                 <button
-                    onClick={() => { setEditingTask(null); setIsModalOpen(true); }}
+                    onClick={() => { setEditingTask(null); setModalMode('create'); setIsModalOpen(true); }}
                     className="text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
                 >
                     <Plus className="w-3.5 h-3.5" />
@@ -184,7 +193,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                         <p className="text-sm font-medium text-gray-900">Tudo em dia!</p>
                         <p className="text-xs text-gray-500 mt-1">Nenhuma tarefa pendente para este card.</p>
                         <button
-                            onClick={() => { setEditingTask(null); setIsModalOpen(true); }}
+                            onClick={() => { setEditingTask(null); setModalMode('create'); setIsModalOpen(true); }}
                             className="text-xs text-indigo-600 font-medium mt-3 hover:underline"
                         >
                             Agendar próxima etapa
@@ -263,6 +272,13 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                     Editar
                                                 </DropdownMenu.Item>
                                                 <DropdownMenu.Item
+                                                    onClick={() => handleReschedule(task)}
+                                                    className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 hover:text-orange-600 rounded cursor-pointer outline-none"
+                                                >
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    Re-agendar
+                                                </DropdownMenu.Item>
+                                                <DropdownMenu.Item
                                                     onClick={() => handleToggleComplete(task)}
                                                     className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 hover:text-green-600 rounded cursor-pointer outline-none"
                                                 >
@@ -292,6 +308,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 isOpen={isModalOpen}
                 onClose={handleCloseModal}
                 initialData={editingTask}
+                mode={modalMode}
             />
         </div>
     )
