@@ -83,6 +83,36 @@ export type Database = {
           },
         ]
       }
+      activity_categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          key: string
+          label: string
+          scope: string
+          updated_at: string | null
+          visible: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key: string
+          label: string
+          scope: string
+          updated_at?: string | null
+          visible?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key?: string
+          label?: string
+          scope?: string
+          updated_at?: string | null
+          visible?: boolean | null
+        }
+        Relationships: []
+      }
       arquivos: {
         Row: {
           caminho_arquivo: string
@@ -1816,6 +1846,11 @@ export type Database = {
           status: string | null
           tipo: string | null
           titulo: string
+          feedback: string | null
+          motivo_cancelamento: string | null
+          rescheduled_to_id: string | null
+          rescheduled_from_id: string | null
+          categoria_outro: string | null
         }
         Insert: {
           card_id: string
@@ -1836,6 +1871,11 @@ export type Database = {
           status?: string | null
           tipo?: string | null
           titulo: string
+          feedback?: string | null
+          motivo_cancelamento?: string | null
+          rescheduled_to_id?: string | null
+          rescheduled_from_id?: string | null
+          categoria_outro?: string | null
         }
         Update: {
           card_id?: string
@@ -1856,6 +1896,11 @@ export type Database = {
           status?: string | null
           tipo?: string | null
           titulo?: string
+          feedback?: string | null
+          motivo_cancelamento?: string | null
+          rescheduled_to_id?: string | null
+          rescheduled_from_id?: string | null
+          categoria_outro?: string | null
         }
         Relationships: [
           {

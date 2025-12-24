@@ -20,6 +20,7 @@ import {
     ChevronDown,
     Check
 } from 'lucide-react';
+import { MultiSelectEmail } from '@/components/ui/MultiSelectEmail';
 
 interface SmartTaskModalProps {
     isOpen: boolean;
@@ -62,12 +63,31 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
 
+    // Meeting Specifics
+    const [meetingStatus, setMeetingStatus] = useState('agendada');
+    const [meetingResult, setMeetingResult] = useState('');
+    const [meetingFeedback, setMeetingFeedback] = useState('');
+    const [cancellationReason, setCancellationReason] = useState('');
+
+    // Rescheduling
+    const [rescheduleDate, setRescheduleDate] = useState('');
+    const [rescheduleTime, setRescheduleTime] = useState('');
+
+    // Change Request Specifics
+    const [otherCategory, setOtherCategory] = useState('');
+
+    // Meeting Specifics (New)
+    const [externalParticipants, setExternalParticipants] = useState<string[]>([]);
+
     // Refs for native pickers
     const dateInputRef = useRef<HTMLInputElement>(null);
+    const rescheduleDateInputRef = useRef<HTMLInputElement>(null);
 
     // Time Combobox State
     const [showTimeList, setShowTimeList] = useState(false);
     const timeListRef = useRef<HTMLDivElement>(null);
+    const [showRescheduleTimeList, setShowRescheduleTimeList] = useState(false);
+    const rescheduleTimeListRef = useRef<HTMLDivElement>(null);
 
     // Metadata Fields
     const [metadata, setMetadata] = useState<any>({});
@@ -87,6 +107,33 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
             return data;
         },
         staleTime: 1000 * 60 * 5 // 5 minutes
+    });
+
+    // Fetch Change Categories
+    const { data: changeCategories } = useQuery({
+        queryKey: ['activity-categories', 'change_request'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('activity_categories')
+                .select('key, label')
+                .eq('scope', 'change_request')
+                .eq('visible', true)
+                .order('label');
+
+            if (error) {
+                // Fallback if table doesn't exist yet or error
+                console.warn("Could not fetch categories, using defaults", error);
+                return [
+                    { key: 'voo', label: 'Voo' },
+                    { key: 'hotel', label: 'Hotel' },
+                    { key: 'datas', label: 'Datas' },
+                    { key: 'financeiro', label: 'Financeiro' },
+                    { key: 'outro', label: 'Outro' }
+                ];
+            }
+            return data;
+        },
+        staleTime: 1000 * 60 * 60 // 1 hour
     });
 
     // Generate time options (every 15 minutes)
@@ -129,12 +176,17 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
                 setResponsibleId(initialData.responsavel_id || '');
                 setMetadata(initialData.metadata || {});
 
+                // Meeting fields
+                setMeetingStatus(initialData.status || 'agendada');
+                setMeetingResult(initialData.resultado || '');
+                setMeetingFeedback(initialData.feedback || '');
+                setCancellationReason(initialData.motivo_cancelamento || '');
+                setOtherCategory(initialData.categoria_outro || '');
+                setExternalParticipants(initialData.participantes_externos || []);
+
                 if (initialData.data_vencimento) {
                     const dt = new Date(initialData.data_vencimento);
-                    // Use local time components to avoid timezone shifts
                     setDate(formatLocalDate(dt));
-
-                    // Round existing time to nearest 15 min for the select
                     const minutes = dt.getMinutes();
                     const roundedMinutes = Math.round(minutes / 15) * 15;
                     dt.setMinutes(roundedMinutes);
@@ -151,6 +203,14 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
                 setType('tarefa');
                 setMetadata({});
                 setResponsibleId('');
+                setMeetingStatus('agendada');
+                setMeetingResult('');
+                setMeetingFeedback('');
+                setCancellationReason('');
+                setOtherCategory('');
+                setExternalParticipants([]);
+                setRescheduleDate('');
+                setRescheduleTime('');
 
                 // Defaults: Today + Now (rounded to next 15 min)
                 const now = new Date();
@@ -170,17 +230,21 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
             if (timeListRef.current && !timeListRef.current.contains(event.target as Node)) {
                 setShowTimeList(false);
             }
+            if (rescheduleTimeListRef.current && !rescheduleTimeListRef.current.contains(event.target as Node)) {
+                setShowRescheduleTimeList(false);
+            }
         };
 
-        if (showTimeList) {
+        if (showTimeList || showRescheduleTimeList) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showTimeList]);
+    }, [showTimeList, showRescheduleTimeList]);
 
     const handleTypeSelect = (selectedType: TaskType) => {
         // Reset metadata when switching types to avoid stale state
         setMetadata({});
+        setOtherCategory('');
 
         // Update type
         setType(selectedType);
@@ -194,6 +258,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
 
     const updateMetadata = (key: string, value: any) => {
         setMetadata((prev: any) => ({ ...prev, [key]: value }));
+
+        // Clear other category if category changes
+        if (key === 'change_category' && value !== 'outro') {
+            setOtherCategory('');
+        }
     };
 
     const handleWrapperClick = (ref: React.RefObject<HTMLInputElement | null>) => {
@@ -207,6 +276,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
         setShowTimeList(false);
     };
 
+    const handleRescheduleTimeSelect = (timeValue: string) => {
+        setRescheduleTime(timeValue);
+        setShowRescheduleTimeList(false);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -215,7 +289,6 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
             // Combine date and time
             let finalDate = null;
             if (date && time) {
-                // Create date in local time then convert to ISO
                 finalDate = new Date(`${date}T${time}:00`).toISOString();
             } else if (date) {
                 finalDate = new Date(`${date}T09:00:00`).toISOString(); // Default to 9am
@@ -226,9 +299,6 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
 
             // Determine responsible
             let finalResponsibleId = responsibleId;
-
-            // If it's NOT a meeting, we don't show the selector, so we default to current user
-            // If it IS a meeting, the user MUST select someone (or we use what was selected)
             if (type !== 'reuniao') {
                 finalResponsibleId = user?.id || '';
             }
@@ -238,38 +308,128 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
                 throw new Error("Para reuniões, é obrigatório selecionar um responsável.");
             }
 
-            // Fallback for other types if something went wrong (shouldn't happen with user?.id)
             if (!finalResponsibleId) {
-                // If we still don't have an ID (e.g. auth error), try to use initialData or just fail
                 finalResponsibleId = initialData?.responsavel_id || user?.id;
                 if (!finalResponsibleId) throw new Error("Não foi possível identificar o responsável.");
             }
 
+            // Validations for Meeting Status
+            if (type === 'reuniao') {
+                if (meetingStatus === 'realizada' && (!meetingResult || !meetingFeedback)) {
+                    throw new Error("Para reuniões realizadas, Resultado e Feedback são obrigatórios.");
+                }
+                if (meetingStatus === 'cancelada' && !cancellationReason) {
+                    throw new Error("Para reuniões canceladas, o Motivo do Cancelamento é obrigatório.");
+                }
+                if (meetingStatus === 'reagendada' && (!rescheduleDate || !rescheduleTime)) {
+                    throw new Error("Para reagendar, é necessário informar a nova data e hora.");
+                }
+            }
+
+            // Validation for Change Request
+            if (type === 'solicitacao_mudanca') {
+                if (metadata.change_category === 'outro' && !otherCategory) {
+                    throw new Error("Por favor, especifique a categoria 'Outro'.");
+                }
+            }
+
             // Prepare payload
-            const payload = {
+            const payload: any = {
                 card_id: cardId,
                 titulo: title,
                 descricao: description,
                 tipo: type,
                 data_vencimento: finalDate,
                 responsavel_id: finalResponsibleId,
-                status: 'pendente',
-                concluida: false,
-                metadata: metadata
+                status: type === 'reuniao' ? meetingStatus : 'pendente',
+                concluida: type === 'reuniao' ? ['realizada', 'cancelada', 'nao_compareceu', 'reagendada'].includes(meetingStatus) : false,
+                metadata: metadata,
+                feedback: meetingFeedback || null,
+                motivo_cancelamento: cancellationReason || null,
+                resultado: meetingResult || null,
+                categoria_outro: otherCategory || null
             };
 
-            let error;
-            if (initialData?.id) {
-                const { error: updateError } = await supabase
-                    .from('tarefas')
-                    .update(payload)
-                    .eq('id', initialData.id);
-                error = updateError;
+            // Only add participantes_externos if it's a meeting and has values
+            if (type === 'reuniao' && externalParticipants.length > 0) {
+                payload.participantes_externos = externalParticipants;
             } else {
-                const { error: insertError } = await supabase
+                payload.participantes_externos = null; // Or empty array, but null is safer if column is nullable
+            }
+
+            // Debug Logging
+            console.log('Saving Payload:', JSON.stringify(payload, null, 2));
+
+            if (type === 'reuniao' && meetingStatus === 'realizada') {
+                payload.concluida_em = new Date().toISOString();
+            }
+
+            let error;
+            let newMeetingId = null;
+
+            // Handle Rescheduling Logic
+            if (type === 'reuniao' && meetingStatus === 'reagendada') {
+                // 1. Create NEW meeting with ORIGINAL data + NEW date
+                const newDate = new Date(`${rescheduleDate}T${rescheduleTime}:00`).toISOString();
+
+                // A NOVA reunião herda dados ORIGINAIS da tarefa antiga + nova data
+                // Isso preserva o título, descrição, participantes originais
+                const newTaskPayload = {
+                    card_id: cardId,
+                    tipo: 'reuniao',
+                    titulo: initialData?.titulo || title, // Preserva título original
+                    descricao: initialData?.descricao || description, // Preserva descrição original
+                    responsavel_id: initialData?.responsavel_id || finalResponsibleId,
+                    participantes_externos: initialData?.participantes_externos || externalParticipants,
+                    metadata: initialData?.metadata || metadata,
+                    status: 'agendada',
+                    concluida: false,
+                    data_vencimento: newDate,
+                    rescheduled_from_id: initialData?.id || null,
+                    feedback: null,
+                    motivo_cancelamento: null,
+                    resultado: null
+                };
+
+                const { data: newMeeting, error: createError } = await supabase
                     .from('tarefas')
-                    .insert([payload]);
-                error = insertError;
+                    .insert([newTaskPayload])
+                    .select('id')
+                    .single();
+
+                if (createError) throw createError;
+                newMeetingId = newMeeting.id;
+
+                // 2. Update OLD meeting - ONLY status and linking, preserve ALL original data
+                if (initialData?.id) {
+                    const oldTaskUpdatePayload = {
+                        status: 'reagendada',
+                        concluida: true,
+                        concluida_em: new Date().toISOString(),
+                        rescheduled_to_id: newMeetingId
+                        // Do NOT update title, description, date, participants, etc. to preserve history
+                    };
+
+                    const { error: updateError } = await supabase
+                        .from('tarefas')
+                        .update(oldTaskUpdatePayload)
+                        .eq('id', initialData.id);
+                    error = updateError;
+                }
+            } else {
+                // Normal Save (Create or Update)
+                if (initialData?.id) {
+                    const { error: updateError } = await supabase
+                        .from('tarefas')
+                        .update(payload)
+                        .eq('id', initialData.id);
+                    error = updateError;
+                } else {
+                    const { error: insertError } = await supabase
+                        .from('tarefas')
+                        .insert([payload]);
+                    error = insertError;
+                }
             }
 
             if (error) throw error;
@@ -281,8 +441,20 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
 
             onClose();
         } catch (error: any) {
-            console.error('Error:', error);
-            toast.error(error.message);
+            console.error('Error saving task:', error);
+            console.error('Payload:', {
+                type,
+                title,
+                description,
+                responsibleId,
+                date,
+                time,
+                meetingStatus,
+                metadata
+            });
+            // Log full error object
+            console.error('Full Error Object:', JSON.stringify(error, null, 2));
+            toast.error(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -340,153 +512,249 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label>Data</Label>
-                                <div
-                                    className="relative cursor-pointer"
-                                    onClick={() => handleWrapperClick(dateInputRef)}
-                                >
-                                    <input
-                                        ref={dateInputRef}
-                                        type="date"
-                                        value={date}
-                                        onChange={e => setDate(e.target.value)}
-                                        className="w-full h-10 px-3 py-2 rounded-md border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label>Hora</Label>
-                                <div className="relative" ref={timeListRef}>
-                                    <Input
-                                        value={time}
-                                        onChange={e => setTime(e.target.value)}
-                                        onFocus={() => setShowTimeList(true)}
-                                        placeholder="00:00"
-                                        className="font-medium"
-                                        maxLength={5}
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="absolute right-0 top-0 h-10 w-10 px-0 text-gray-400 hover:text-gray-600"
-                                        onClick={() => setShowTimeList(!showTimeList)}
+                        {/* Date/Time - Hide if Reagendada (since we show new date picker) */}
+                        {meetingStatus !== 'reagendada' && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label>Data</Label>
+                                    <div
+                                        className="relative cursor-pointer"
+                                        onClick={() => handleWrapperClick(dateInputRef)}
                                     >
-                                        <ChevronDown className="h-4 w-4" />
-                                    </Button>
+                                        <input
+                                            ref={dateInputRef}
+                                            type="date"
+                                            value={date}
+                                            onChange={e => setDate(e.target.value)}
+                                            className="w-full h-10 px-3 py-2 rounded-md border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label>Hora</Label>
+                                    <div className="relative" ref={timeListRef}>
+                                        <Input
+                                            value={time}
+                                            onChange={e => setTime(e.target.value)}
+                                            onFocus={() => setShowTimeList(true)}
+                                            placeholder="00:00"
+                                            className="font-medium"
+                                            maxLength={5}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-0 top-0 h-10 w-10 px-0 text-gray-400 hover:text-gray-600"
+                                            onClick={() => setShowTimeList(!showTimeList)}
+                                        >
+                                            <ChevronDown className="h-4 w-4" />
+                                        </Button>
 
-                                    {showTimeList && (
-                                        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100">
-                                            {timeOptions.map((option) => (
-                                                <div
-                                                    key={option.value}
-                                                    className={`
-                                                        relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors hover:bg-gray-100 hover:text-gray-900
-                                                        ${option.value === time ? "bg-blue-50 text-blue-900 font-medium" : ""}
-                                                    `}
-                                                    onClick={() => handleTimeSelect(option.value)}
-                                                >
-                                                    <span className="block truncate">{option.label}</span>
-                                                    {option.value === time && (
-                                                        <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-                                                            <Check className="h-4 w-4 text-blue-600" />
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                        {showTimeList && (
+                                            <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100">
+                                                {timeOptions.map((option) => (
+                                                    <div
+                                                        key={option.value}
+                                                        className={`
+                                                            relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors hover:bg-gray-100 hover:text-gray-900
+                                                            ${option.value === time ? "bg-blue-50 text-blue-900 font-medium" : ""}
+                                                        `}
+                                                        onClick={() => handleTimeSelect(option.value)}
+                                                    >
+                                                        <span className="block truncate">{option.label}</span>
+                                                        {option.value === time && (
+                                                            <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                                                                <Check className="h-4 w-4 text-blue-600" />
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Responsible - ONLY for Reuniao */}
                         {type === 'reuniao' && (
-                            <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
-                                <Label className="text-purple-900 font-medium">Responsável pela Reunião</Label>
-                                <Select
-                                    value={responsibleId}
-                                    onChange={setResponsibleId}
-                                    options={profileOptions}
-                                    placeholder="Selecione quem conduzirá..."
-                                />
+                            <div className="space-y-4">
+                                <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
+                                    <Label className="text-purple-900 font-medium">Responsável pela Reunião</Label>
+                                    <Select
+                                        value={responsibleId}
+                                        onChange={setResponsibleId}
+                                        options={profileOptions}
+                                        placeholder="Selecione quem conduzirá..."
+                                    />
+                                </div>
+                                <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
+                                    <Label>Participantes Externos (E-mails)</Label>
+                                    <MultiSelectEmail
+                                        value={externalParticipants}
+                                        onChange={setExternalParticipants}
+                                        placeholder="Digite o e-mail e pressione Enter..."
+                                    />
+                                </div>
                             </div>
                         )}
 
-                        {/* Type Specific Fields (Metadata) */}
+                        {/* Meeting Status & Logic */}
                         {type === 'reuniao' && (
                             <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
                                 <h4 className="font-medium text-purple-900 flex items-center gap-2">
-                                    <Users className="h-4 w-4" /> Detalhes da Reunião
+                                    <Users className="h-4 w-4" /> Status da Reunião
                                 </h4>
                                 <div className="grid gap-2">
-                                    <Label>Local / Link</Label>
-                                    <Input
-                                        value={metadata.location || ''}
-                                        onChange={e => updateMetadata('location', e.target.value)}
-                                        placeholder="Ex: Google Meet, Sala 1..."
+                                    <Label>Situação Atual</Label>
+                                    <Select
+                                        value={meetingStatus}
+                                        onChange={setMeetingStatus}
+                                        options={[
+                                            { value: 'agendada', label: 'Agendada' },
+                                            { value: 'realizada', label: 'Realizada' },
+                                            { value: 'cancelada', label: 'Cancelada' },
+                                            { value: 'reagendada', label: 'Re-Agendada' },
+                                            { value: 'nao_compareceu', label: 'Não Compareceu' }
+                                        ]}
                                     />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label>Participantes Externos (Emails)</Label>
-                                    <Input
-                                        value={metadata.participants_external || ''}
-                                        onChange={e => updateMetadata('participants_external', e.target.value)}
-                                        placeholder="email@cliente.com, ..."
-                                    />
-                                </div>
+
+                                {meetingStatus === 'realizada' && (
+                                    <div className="grid gap-3 animate-in fade-in slide-in-from-top-2">
+                                        <div className="grid gap-2">
+                                            <Label>Resumo / Ata</Label>
+                                            <Input
+                                                value={meetingResult}
+                                                onChange={e => setMeetingResult(e.target.value)}
+                                                placeholder="Resumo do que foi discutido..."
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label>Feedback</Label>
+                                            <Textarea
+                                                value={meetingFeedback}
+                                                onChange={e => setMeetingFeedback(e.target.value)}
+                                                placeholder="Detalhes do feedback..."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {meetingStatus === 'cancelada' && (
+                                    <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
+                                        <Label>Motivo do Cancelamento</Label>
+                                        <Input
+                                            value={cancellationReason}
+                                            onChange={e => setCancellationReason(e.target.value)}
+                                            placeholder="Por que foi cancelada?"
+                                        />
+                                    </div>
+                                )}
+
+                                {meetingStatus === 'reagendada' && (
+                                    <div className="space-y-3 p-3 bg-white rounded border border-purple-200 animate-in fade-in slide-in-from-top-2">
+                                        <Label className="text-purple-700 font-medium">Nova Data e Hora</Label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid gap-2">
+                                                <div
+                                                    className="relative cursor-pointer"
+                                                    onClick={() => handleWrapperClick(rescheduleDateInputRef)}
+                                                >
+                                                    <input
+                                                        ref={rescheduleDateInputRef}
+                                                        type="date"
+                                                        value={rescheduleDate}
+                                                        onChange={e => setRescheduleDate(e.target.value)}
+                                                        className="w-full h-10 px-3 py-2 rounded-md border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <div className="relative" ref={rescheduleTimeListRef}>
+                                                    <Input
+                                                        value={rescheduleTime}
+                                                        onChange={e => setRescheduleTime(e.target.value)}
+                                                        onFocus={() => setShowRescheduleTimeList(true)}
+                                                        placeholder="00:00"
+                                                        className="font-medium"
+                                                        maxLength={5}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="absolute right-0 top-0 h-10 w-10 px-0 text-gray-400 hover:text-gray-600"
+                                                        onClick={() => setShowRescheduleTimeList(!showRescheduleTimeList)}
+                                                    >
+                                                        <ChevronDown className="h-4 w-4" />
+                                                    </Button>
+
+                                                    {showRescheduleTimeList && (
+                                                        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100">
+                                                            {timeOptions.map((option) => (
+                                                                <div
+                                                                    key={option.value}
+                                                                    className={`
+                                                                        relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors hover:bg-gray-100 hover:text-gray-900
+                                                                        ${option.value === rescheduleTime ? "bg-blue-50 text-blue-900 font-medium" : ""}
+                                                                    `}
+                                                                    onClick={() => handleRescheduleTimeSelect(option.value)}
+                                                                >
+                                                                    <span className="block truncate">{option.label}</span>
+                                                                    {option.value === rescheduleTime && (
+                                                                        <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                                                                            <Check className="h-4 w-4 text-blue-600" />
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-500">
+                                            Isso criará uma nova reunião e marcará a atual como reagendada.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
+                        {/* Change Request Fields */}
                         {type === 'solicitacao_mudanca' && (
                             <div className="space-y-4 p-4 bg-orange-50 rounded-lg border border-orange-100">
                                 <h4 className="font-medium text-orange-900 flex items-center gap-2">
                                     <RefreshCw className="h-4 w-4" /> Detalhes da Mudança
                                 </h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label>Categoria</Label>
-                                        <Select
-                                            value={metadata.change_category || ''}
-                                            onChange={v => updateMetadata('change_category', v)}
-                                            options={[
-                                                { value: 'voo', label: 'Voo' },
-                                                { value: 'hotel', label: 'Hotel' },
-                                                { value: 'datas', label: 'Datas' },
-                                                { value: 'financeiro', label: 'Financeiro' },
-                                                { value: 'outro', label: 'Outro' }
-                                            ]}
-                                            placeholder="Selecione..."
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>Impacto</Label>
-                                        <Select
-                                            value={metadata.impact || ''}
-                                            onChange={v => updateMetadata('impact', v)}
-                                            options={[
-                                                { value: 'baixo', label: 'Baixo' },
-                                                { value: 'medio', label: 'Médio' },
-                                                { value: 'alto', label: 'Alto' }
-                                            ]}
-                                            placeholder="Selecione..."
-                                        />
-                                    </div>
-                                </div>
                                 <div className="grid gap-2">
-                                    <Label>O que mudou?</Label>
-                                    <Textarea
-                                        value={metadata.what_changed || ''}
-                                        onChange={e => updateMetadata('what_changed', e.target.value)}
-                                        placeholder="Descreva a mudança solicitada..."
-                                        className="bg-white"
+                                    <Label>Categoria</Label>
+                                    <Select
+                                        value={metadata.change_category || ''}
+                                        onChange={v => updateMetadata('change_category', v)}
+                                        options={changeCategories?.map((c: any) => ({ value: c.key, label: c.label })) || []}
+                                        placeholder="Selecione..."
                                     />
                                 </div>
+
+                                {metadata.change_category === 'outro' && (
+                                    <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
+                                        <Label>Qual outra categoria?</Label>
+                                        <Input
+                                            value={otherCategory}
+                                            onChange={e => setOtherCategory(e.target.value)}
+                                            placeholder="Especifique..."
+                                        />
+                                    </div>
+                                )}
+
                             </div>
                         )}
+
 
                         <div className="grid gap-2">
                             <Label>Descrição / Observações</Label>
@@ -506,6 +774,6 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData }: SmartTa
                     </form>
                 )}
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

@@ -1,4 +1,4 @@
-import { Pencil, Plus, UserPlus, UserMinus, FileText, X, Check, TrendingUp, UserCheck, ArrowRightLeft, Mail, MessageSquare, Calendar, RotateCcw, FileEdit, MapPin, DollarSign, Upload, Trash2, FileSignature, CheckCircle, XCircle, Archive } from 'lucide-react'
+import { Pencil, Plus, UserPlus, UserMinus, FileText, X, Check, TrendingUp, UserCheck, ArrowRightLeft, Mail, MessageSquare, Calendar, RotateCcw, FileEdit, MapPin, DollarSign, Upload, Trash2, FileSignature, CheckCircle, XCircle, Archive, CalendarClock } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
@@ -40,6 +40,7 @@ const activityIcons = {
     'task_reopened': RotateCcw,
     'task_updated': Pencil,
     'task_deleted': Trash2,
+    'task_rescheduled': CalendarClock,
     'task_cancelled': X,
     // Status & Ownership
     'status_changed': TrendingUp,
@@ -97,6 +98,7 @@ const activityColors = {
     'task_reopened': 'text-orange-600 bg-orange-50',
     'task_updated': 'text-blue-600 bg-blue-50',
     'task_deleted': 'text-red-600 bg-red-50',
+    'task_rescheduled': 'text-purple-600 bg-purple-50',
     'task_cancelled': 'text-red-600 bg-red-50',
     // Status & Ownership
     'status_changed': 'text-purple-600 bg-purple-50',

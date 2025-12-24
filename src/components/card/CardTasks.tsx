@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw } from 'lucide-react'
+import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { SmartTaskModal } from './SmartTaskModal'
@@ -142,6 +142,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         }
     }
 
+    const isRescheduled = (task: any) => task.status === 'reagendada'
+
     const formatTaskDate = (dateStr: string) => {
         const date = new Date(dateStr)
         if (isToday(date)) return 'Hoje'
@@ -196,11 +198,15 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                         const responsibleName = task.responsavel_id ? getResponsibleName(task.responsavel_id) : null
 
                         return (
-                            <div key={task.id} className={`p-3 hover:bg-gray-50 transition-colors group relative ${task.concluida ? 'opacity-60 bg-gray-50/50' : ''}`}>
+                            <div
+                                key={task.id}
+                                onClick={() => handleEdit(task)}
+                                className={`p-3 hover:bg-gray-50 transition-colors group relative cursor-pointer ${task.concluida ? 'opacity-60 bg-gray-50/50' : ''}`}
+                            >
                                 <div className="flex items-start gap-3">
                                     {/* Checkbox / Toggle */}
                                     <button
-                                        onClick={() => handleToggleComplete(task)}
+                                        onClick={(e) => { e.stopPropagation(); handleToggleComplete(task); }}
                                         className={`mt-0.5 flex-shrink-0 transition-colors ${task.concluida ? 'text-green-500' : 'text-gray-300 hover:text-green-500'}`}
                                     >
                                         {task.concluida ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
@@ -237,6 +243,14 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                     <span className="truncate max-w-[100px]">{responsibleName}</span>
                                                 </div>
                                             )}
+
+                                            {/* Rescheduled Badge */}
+                                            {isRescheduled(task) && (
+                                                <div className="flex items-center gap-1 text-xs text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded border border-violet-200">
+                                                    <CalendarClock className="w-3 h-3" />
+                                                    <span className="font-medium">Reagendada</span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {task.descricao && (
@@ -249,21 +263,24 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                     {/* Actions Menu */}
                                     <DropdownMenu.Root>
                                         <DropdownMenu.Trigger asChild>
-                                            <button className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
                                                 <MoreHorizontal className="w-4 h-4" />
                                             </button>
                                         </DropdownMenu.Trigger>
                                         <DropdownMenu.Portal>
                                             <DropdownMenu.Content className="min-w-[140px] bg-white rounded-lg shadow-lg border border-gray-100 p-1 z-50 animate-in fade-in zoom-in-95 duration-100" sideOffset={5}>
                                                 <DropdownMenu.Item
-                                                    onClick={() => handleEdit(task)}
+                                                    onClick={(e) => { e.stopPropagation(); handleEdit(task); }}
                                                     className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 hover:text-indigo-600 rounded cursor-pointer outline-none"
                                                 >
                                                     <Edit2 className="w-3.5 h-3.5" />
                                                     Editar
                                                 </DropdownMenu.Item>
                                                 <DropdownMenu.Item
-                                                    onClick={() => handleToggleComplete(task)}
+                                                    onClick={(e) => { e.stopPropagation(); handleToggleComplete(task); }}
                                                     className="flex items-center gap-2 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 hover:text-green-600 rounded cursor-pointer outline-none"
                                                 >
                                                     <Check className="w-3.5 h-3.5" />
@@ -271,7 +288,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 </DropdownMenu.Item>
                                                 <DropdownMenu.Separator className="h-px bg-gray-100 my-1" />
                                                 <DropdownMenu.Item
-                                                    onClick={() => handleDelete(task.id)}
+                                                    onClick={(e) => { e.stopPropagation(); handleDelete(task.id); }}
                                                     className="flex items-center gap-2 px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded cursor-pointer outline-none"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
