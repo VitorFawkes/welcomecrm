@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock } from 'lucide-react'
+import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle, Clock, UserX } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { SmartTaskModal } from './SmartTaskModal'
@@ -7,6 +7,10 @@ import { format, isToday, isPast, isTomorrow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
+import { Button } from '../ui/Button'
+import { Label } from '../ui/label'
+import { Textarea } from '../ui/textarea'
 
 interface CardTasksProps {
     cardId: string
@@ -16,6 +20,13 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingTask, setEditingTask] = useState<any>(null)
     const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reschedule'>('create')
+
+    // Outcome Modal State
+    const [outcomeModalOpen, setOutcomeModalOpen] = useState(false)
+    const [taskToComplete, setTaskToComplete] = useState<any>(null)
+    const [outcomeResult, setOutcomeResult] = useState<string>('realizada')
+    const [outcomeFeedback, setOutcomeFeedback] = useState('')
+
     const queryClient = useQueryClient()
 
     // Fetch tasks
@@ -27,11 +38,25 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 .select('*')
                 .eq('card_id', cardId)
                 .is('deleted_at', null) // Respect soft delete
-                .order('concluida', { ascending: true }) // Pending first
                 .order('data_vencimento', { ascending: true })
 
             if (error) throw error
-            return data
+
+            // Custom sort: Active first, then by Created At DESC (Newest First)
+            return data.sort((a, b) => {
+                // 1. Active vs Completed
+                const aIsActive = !a.concluida;
+                const bIsActive = !b.concluida;
+
+                if (aIsActive && !bIsActive) return -1;
+                if (!aIsActive && bIsActive) return 1;
+
+                // 2. Sort by Created At DESC
+                const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+
+                return timeB - timeA;
+            });
         },
         staleTime: 1000 * 60 // 1 minute
     })
@@ -76,6 +101,16 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
     const handleToggleComplete = (task: any) => {
         const isCompleted = !task.concluida
+
+        // Intercept Meeting Completion
+        if (task.tipo === 'reuniao' && isCompleted) {
+            setTaskToComplete(task)
+            setOutcomeResult('realizada')
+            setOutcomeFeedback('')
+            setOutcomeModalOpen(true)
+            return
+        }
+
         const updates = {
             concluida: isCompleted,
             status: isCompleted ? 'concluida' : 'pendente', // Simple mapping, can be refined for meetings/proposals
@@ -151,7 +186,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         }
     }
 
-    const isRescheduled = (task: any) => task.status === 'reagendada'
+    const isRescheduled = (task: any) => task.rescheduled_from_id !== null
 
     const formatTaskDate = (dateStr: string) => {
         const date = new Date(dateStr)
@@ -210,7 +245,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                             <div
                                 key={task.id}
                                 onClick={() => handleEdit(task)}
-                                className={`p-3 hover:bg-gray-50 transition-colors group relative cursor-pointer ${task.concluida ? 'opacity-60 bg-gray-50/50' : ''}`}
+                                className={`p-3 hover:bg-gray-50 transition-colors group relative cursor-pointer ${task.concluida ? (isRescheduled(task) ? 'opacity-75 bg-gray-50/30' : 'opacity-60 bg-gray-50/50') : ''}`}
                             >
                                 <div className="flex items-start gap-3">
                                     {/* Checkbox / Toggle */}
@@ -223,7 +258,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
-                                            <p className={`text-sm font-medium text-gray-900 truncate pr-2 ${task.concluida ? 'line-through text-gray-500' : ''}`}>
+                                            <p className={`text-sm font-medium text-gray-900 truncate pr-2 ${task.concluida && !isRescheduled(task) ? 'line-through text-gray-500' : ''}`}>
                                                 {task.titulo}
                                             </p>
                                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border flex-shrink-0 capitalize ${getTypeColor(task.tipo)} flex items-center gap-1`}>
@@ -258,6 +293,17 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 <div className="flex items-center gap-1 text-xs text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded border border-violet-200">
                                                     <CalendarClock className="w-3 h-3" />
                                                     <span className="font-medium">Reagendada</span>
+                                                </div>
+                                            )}
+
+                                            {/* Outcome Badge */}
+                                            {task.concluida && task.resultado && (
+                                                <div className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${task.resultado === 'realizada' ? 'text-green-600 bg-green-50 border-green-200' :
+                                                    task.resultado === 'cancelada' ? 'text-red-600 bg-red-50 border-red-200' :
+                                                        task.resultado === 'adiada' ? 'text-orange-600 bg-orange-50 border-orange-200' :
+                                                            'text-gray-600 bg-gray-50 border-gray-200'
+                                                    }`}>
+                                                    <span className="font-medium capitalize">{task.resultado.replace('_', ' ')}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -327,6 +373,115 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                 initialData={editingTask}
                 mode={modalMode}
             />
+
+            <Dialog open={outcomeModalOpen} onOpenChange={setOutcomeModalOpen}>
+                <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden gap-0">
+                    <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-50 bg-gray-50/30">
+                        <DialogTitle className="text-xl font-semibold text-gray-900">Como foi a reunião?</DialogTitle>
+                        <p className="text-sm text-gray-500 mt-1">Registre o resultado para manter o histórico atualizado.</p>
+                    </DialogHeader>
+
+                    <div className="p-6 space-y-6">
+                        <div className="space-y-3">
+                            <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Resultado</Label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => setOutcomeResult('realizada')}
+                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'realizada'
+                                        ? 'border-green-500 bg-green-50/50 text-green-700 shadow-sm'
+                                        : 'border-gray-100 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50/30'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-full ${outcomeResult === 'realizada' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                        <CheckCircle2 className={`w-5 h-5 ${outcomeResult === 'realizada' ? 'text-green-600' : 'text-gray-500'}`} />
+                                    </div>
+                                    <span className="font-medium text-sm">Realizada</span>
+                                    {outcomeResult === 'realizada' && (
+                                        <div className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => setOutcomeResult('cancelada')}
+                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'cancelada'
+                                        ? 'border-red-500 bg-red-50/50 text-red-700 shadow-sm'
+                                        : 'border-gray-100 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50/30'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-full ${outcomeResult === 'cancelada' ? 'bg-red-100' : 'bg-gray-100'}`}>
+                                        <XCircle className={`w-5 h-5 ${outcomeResult === 'cancelada' ? 'text-red-600' : 'text-gray-500'}`} />
+                                    </div>
+                                    <span className="font-medium text-sm">Cancelada</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setOutcomeResult('adiada')}
+                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'adiada'
+                                        ? 'border-orange-500 bg-orange-50/50 text-orange-700 shadow-sm'
+                                        : 'border-gray-100 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50/30'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-full ${outcomeResult === 'adiada' ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                                        <Clock className={`w-5 h-5 ${outcomeResult === 'adiada' ? 'text-orange-600' : 'text-gray-500'}`} />
+                                    </div>
+                                    <span className="font-medium text-sm">Adiada</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setOutcomeResult('no_show')}
+                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'no_show'
+                                        ? 'border-gray-500 bg-gray-50/50 text-gray-700 shadow-sm'
+                                        : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200 hover:bg-gray-50/30'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-full ${outcomeResult === 'no_show' ? 'bg-gray-200' : 'bg-gray-100'}`}>
+                                        <UserX className={`w-5 h-5 ${outcomeResult === 'no_show' ? 'text-gray-700' : 'text-gray-500'}`} />
+                                    </div>
+                                    <span className="font-medium text-sm">No Show</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label htmlFor="outcome-feedback" className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Feedback / Observações
+                            </Label>
+                            <Textarea
+                                id="outcome-feedback"
+                                value={outcomeFeedback}
+                                onChange={(e) => setOutcomeFeedback(e.target.value)}
+                                placeholder="Descreva os pontos principais, próximos passos ou motivos do cancelamento..."
+                                className="min-h-[100px] resize-none border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50/30"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="px-6 py-4 bg-gray-50 border-t border-gray-100 sm:justify-between items-center">
+                        <Button variant="ghost" onClick={() => setOutcomeModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (!taskToComplete) return
+                                const updates = {
+                                    concluida: true,
+                                    status: 'concluida',
+                                    concluida_em: new Date().toISOString(),
+                                    resultado: outcomeResult,
+                                    feedback: outcomeFeedback
+                                }
+                                updateTaskMutation.mutate({ id: taskToComplete.id, updates })
+                                toast.success('Reunião concluída com sucesso!')
+                                setOutcomeModalOpen(false)
+                                setTaskToComplete(null)
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 shadow-sm transition-all hover:shadow-md"
+                        >
+                            Confirmar Conclusão
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
-import type { Database } from '../../database.types'
+import type { Database, TripsProdutoData } from '../../database.types'
 import OwnerHistoryModal from './OwnerHistoryModal'
 import ActionButtons from './ActionButtons'
 import { Button } from '../ui/Button'
@@ -441,45 +441,88 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             <div className="h-4 w-px bg-gray-300 mx-1" />
 
                             {/* Value */}
-                            {(card.valor_estimado || card.valor_final) && (
-                                <div className="flex items-center gap-1.5 text-gray-600 font-medium">
-                                    <DollarSign className="h-3.5 w-3.5 text-gray-400" />
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                        (card.status_comercial === 'ganho' || card.status_comercial === 'perdido')
-                                            ? (card.valor_final || card.valor_estimado || 0)
-                                            : (card.valor_estimado || 0)
-                                    )}
-                                </div>
-                            )}
+                            {/* Value */}
+                            {(() => {
+                                if (card.produto === 'TRIPS') {
+                                    const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as TripsProdutoData
+                                    if (productData?.orcamento?.total) {
+                                        return (
+                                            <div className="flex items-center gap-1.5 text-gray-600 font-medium">
+                                                <DollarSign className="h-3.5 w-3.5 text-gray-400" />
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(productData.orcamento.total)}
+                                            </div>
+                                        )
+                                    }
+                                    return null
+                                }
+
+                                if (card.valor_estimado || card.valor_final) {
+                                    return (
+                                        <div className="flex items-center gap-1.5 text-gray-600 font-medium">
+                                            <DollarSign className="h-3.5 w-3.5 text-gray-400" />
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                                (card.status_comercial === 'ganho' || card.status_comercial === 'perdido')
+                                                    ? (card.valor_final || card.valor_estimado || 0)
+                                                    : (card.valor_estimado || 0)
+                                            )}
+                                        </div>
+                                    )
+                                }
+                                return null
+                            })()}
 
                             {/* Trip Date */}
-                            {card.data_viagem_inicio && (
-                                <>
-                                    <div className="h-4 w-px bg-gray-300 mx-1" />
-                                    <div className="flex items-center gap-1.5 text-gray-600 font-medium">
-                                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                                        {new Intl.NumberFormat('pt-BR').format(new Date(card.data_viagem_inicio).getDate())} de {new Date(card.data_viagem_inicio).toLocaleString('pt-BR', { month: 'short' })}
-                                        <span className="text-gray-400 ml-0.5">'{new Date(card.data_viagem_inicio).getFullYear().toString().slice(2)}</span>
-                                    </div>
-                                    {/* Days until trip */}
-                                    {(() => {
-                                        const daysToTrip = Math.floor((new Date(card.data_viagem_inicio).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                                        if (daysToTrip >= 0) {
-                                            return (
-                                                <div className={cn(
-                                                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                                                    daysToTrip < 14 ? "bg-red-50 text-red-700 border border-red-200" :
-                                                        daysToTrip < 30 ? "bg-orange-50 text-orange-700 border border-orange-200" :
-                                                            "bg-blue-50 text-blue-700 border border-blue-200"
-                                                )}>
-                                                    ✈️ {daysToTrip}d
-                                                </div>
-                                            )
+                            {/* Trip Date */}
+                            {(() => {
+                                let tripDate: Date | null = null
+
+                                if (card.produto === 'TRIPS') {
+                                    const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as TripsProdutoData
+
+                                    // Only show if productData has the date (to avoid random values)
+                                    if (productData?.epoca_viagem?.inicio) {
+                                        // Prefer the column if available (synced), otherwise parse JSON
+                                        if (card.data_viagem_inicio) {
+                                            tripDate = new Date(card.data_viagem_inicio)
+                                        } else {
+                                            tripDate = new Date(productData.epoca_viagem.inicio + 'T12:00:00')
                                         }
-                                        return null
-                                    })()}
-                                </>
-                            )}
+                                    }
+                                } else if (card.data_viagem_inicio) {
+                                    tripDate = new Date(card.data_viagem_inicio)
+                                }
+
+                                if (tripDate && !isNaN(tripDate.getTime())) {
+                                    return (
+                                        <>
+                                            <div className="h-4 w-px bg-gray-300 mx-1" />
+                                            <div className="flex items-center gap-1.5 text-gray-600 font-medium">
+                                                <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                                                {new Intl.NumberFormat('pt-BR').format(tripDate.getDate())} de {tripDate.toLocaleString('pt-BR', { month: 'short' })}
+                                                <span className="text-gray-400 ml-0.5">'{tripDate.getFullYear().toString().slice(2)}</span>
+                                            </div>
+                                            {/* Days until trip */}
+                                            {(() => {
+                                                const daysToTrip = Math.floor((tripDate!.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                                                if (daysToTrip >= 0) {
+                                                    return (
+                                                        <div className={cn(
+                                                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                                                            daysToTrip < 14 ? "bg-red-50 text-red-700 border border-red-200" :
+                                                                daysToTrip < 30 ? "bg-orange-50 text-orange-700 border border-orange-200" :
+                                                                    "bg-blue-50 text-blue-700 border border-blue-200"
+                                                        )}>
+                                                            ✈️ {daysToTrip}d
+                                                        </div>
+                                                    )
+                                                }
+                                                return null
+                                            })()}
+                                        </>
+                                    )
+                                }
+                                return null
+                            })()}
                         </div>
                     </div>
 

@@ -118,6 +118,19 @@ export default function TripInformation({ card }: TripInformationProps) {
                 updates.valor_estimado = newData.orcamento.total
             }
 
+            // Sync Trip Dates
+            if (newData.epoca_viagem?.inicio) {
+                updates.data_viagem_inicio = newData.epoca_viagem.inicio
+            } else {
+                updates.data_viagem_inicio = null
+            }
+
+            if (newData.epoca_viagem?.fim) {
+                updates.data_viagem_fim = newData.epoca_viagem.fim
+            } else {
+                updates.data_viagem_fim = null
+            }
+
             const { error } = await (supabase.from('cards') as any)
                 .update(updates)
                 .eq('id', card.id!)

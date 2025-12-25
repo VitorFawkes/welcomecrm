@@ -269,6 +269,14 @@ export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
                                             </span>
                                         )}
                                     </div>
+                                    {activity.tipo === 'task_rescheduled' && (activity.metadata as any)?.new_date && (
+                                        <div className="mt-1 text-xs text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-100 inline-flex items-center gap-2">
+                                            <CalendarClock className="h-3 w-3" />
+                                            <span>
+                                                Reagendada para: <span className="font-medium">{format(new Date((activity.metadata as any).new_date), "dd/MM 'às' HH:mm")}</span>
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="flex flex-col mt-0.5">
                                         <span className="text-gray-500">
                                             por <span className="font-medium text-gray-700">{userName}</span>
