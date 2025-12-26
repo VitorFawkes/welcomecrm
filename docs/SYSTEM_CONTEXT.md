@@ -23,7 +23,7 @@
 - **Central Entity:** Represents a Deal/Trip.
 - **Identity:** `id` (UUID).
 - **Status:** `status_comercial` ('aberto', 'ganho', 'perdido').
-    - **Automation:** `trigger_card_status_automation` automatically sets this based on `pipeline_stage_id`.
+    - **Automation:** `trigger_card_status_automation` automatically sets this based on `pipeline_stages.is_won` / `is_lost`.
     - **Rule:** Do NOT manually update `status_comercial` from Frontend unless overriding automation.
 - **Contacts:**
     - `pessoa_principal_id`: FK to `contatos`. The payer/negotiator.
@@ -37,6 +37,10 @@
 
 ### Pipeline (`pipeline_stages`)
 - **Structure:** `id`, `nome`, `ordem`, `fase`.
+- **Governance Flags:**
+    - `is_won`: Marks stage as "Ganho" (sets `status_comercial` = 'ganho').
+    - `is_lost`: Marks stage as "Perdido" (sets `status_comercial` = 'perdido').
+    - `target_role`: Enforces owner role (e.g., 'vendas', 'concierge') upon entry.
 - **Phases:** 'SDR', 'Planner', 'Pós-venda'.
 - **Quality Gates:** `pode_avancar_etapa` (DB Function) checks if a card can move.
     - **Rule:** Moving to > "Qualificado pelo SDR" requires `taxa_status` to be 'paga' or 'cortesia' (if product is TRIPS).
@@ -66,3 +70,29 @@
 ## 6. Known "Gotchas"
 - **Ghost Contacts:** `view_cards_acoes` has `pessoa_nome`. Always prefer this over fetching `contatos` again to avoid sync issues.
 - **Optimistic Updates:** Frontend must update Cache immediately for good UX, but must handle Rollback on error. `useCardContacts` implements this correctly.
+
+## 7. Recent Architecture Updates (Dec 2025)
+
+### Task Management (`tarefas`)
+- **Single Source of Truth:** The `tarefas` table is the only source for "Next Steps".
+- **View Logic:** `view_cards_acoes` aggregates the *next pending task* for each card.
+    - **Logic:** `ORDER BY data_vencimento ASC, created_at DESC`.
+    - **Fix:** We recently fixed a bug where "No next step" appeared incorrectly. The view now robustly handles this.
+- **Rescheduling:**
+    - **Pattern:** When rescheduling, we do NOT just update the date.
+    - **Flow:** 1. Mark old task as `completed` (outcome: 'rescheduled'). 2. Create NEW task with new date. 3. Log `task_rescheduled` activity.
+
+### Activity Logging (`log_tarefa_activity`)
+- **Comprehensive Logging:** We moved from ad-hoc logging to a centralized Trigger-based approach.
+- **Trigger:** `log_tarefa_activity` captures INSERT/UPDATE on `tarefas` and automatically inserts into `atividades`.
+- **Rule:** Do NOT manually insert into `atividades` from the Frontend for task-related actions. Let the DB trigger handle it.
+
+### Header Logic
+- **Dense & Honest:** The Card Header must show real data only.
+    - **Budget/Dates:** If null, show nothing. Do not show placeholders.
+    - **Next Step:** Derived strictly from `view_cards_acoes`.
+
+### Pipeline Governance 2.0
+- **Data-Driven Rules:** Moved from hardcoded stage names/IDs to database columns (`is_won`, `is_lost`, `target_role`).
+- **Owner Handoff:** `KanbanBoard` checks `target_role` on drag-end. If set, it triggers `StageChangeModal` to enforce role compliance (e.g., SDR -> Planner).
+- **Automation:** `trigger_card_status_automation` now uses `is_won`/`is_lost` flags instead of string matching.

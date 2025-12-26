@@ -11,27 +11,48 @@ export function useStageRequirements(card: Card) {
             if (!card.pipeline_stage_id) return []
 
             // Fetch ALL required fields for this pipeline
+            // We need to join stage_field_config with pipeline_stages to get the order
+            // And filter by the pipeline of the current card (via stage)
+
+            // First get the pipeline_id of the current card's stage
+            const { data: currentStageData, error: stageError } = await supabase
+                .from('pipeline_stages')
+                .select('pipeline_id, ordem')
+                .eq('id', card.pipeline_stage_id)
+                .single()
+
+            if (stageError) throw stageError
+            const pipelineId = currentStageData.pipeline_id
+            const currentOrder = currentStageData.ordem
+
+            // Now fetch all stage configs for this pipeline where required is true
             const { data, error } = await supabase
-                .from('stage_fields_settings')
-                .select('*, pipeline_stages!inner(ordem, fase)')
+                .from('stage_field_config')
+                .select(`
+                    *,
+                    pipeline_stages!inner (
+                        id,
+                        ordem,
+                        fase,
+                        pipeline_id
+                    ),
+                    system_fields (
+                        label,
+                        type
+                    )
+                `)
                 .eq('required', true)
+                .eq('pipeline_stages.pipeline_id', pipelineId)
                 .order('pipeline_stages(ordem)', { ascending: true })
 
             if (error) throw error
 
-            // Fetch current stage order
-            const { data: currentStage } = await supabase
-                .from('pipeline_stages')
-                .select('ordem')
-                .eq('id', card.pipeline_stage_id)
-                .single()
-
-            const currentOrder = currentStage?.ordem || 0
-
-            return (data || []).map((req: any) => ({
-                ...req,
-                isBlocking: req.pipeline_stages.ordem === currentOrder,
-                isFuture: req.pipeline_stages.ordem > currentOrder
+            return (data || []).map((config: any) => ({
+                field_key: config.field_key,
+                label: config.system_fields?.label || config.field_key,
+                stage_id: config.stage_id,
+                isBlocking: config.pipeline_stages.ordem === currentOrder,
+                isFuture: config.pipeline_stages.ordem > currentOrder
             })).filter((req: any) => req.isBlocking || req.isFuture)
         },
         enabled: !!card.pipeline_stage_id,

@@ -49,25 +49,22 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         enabled: !!card.fase
     })
 
+    // Fetch system fields for dynamic rendering
+    const { data: systemFields } = useQuery({
+        queryKey: ['system-fields'],
+        queryFn: async () => {
+            const { data, error } = await (supabase.from('system_fields') as any)
+                .select('*')
+                .eq('active', true)
+            if (error) throw error
+            return data as any[]
+        },
+        staleTime: 1000 * 60 * 5 // 5 minutes
+    })
+
     const renderDynamicField = (fieldId: string) => {
-        // Handle top-level fields first
+        // 1. Handle Special/Complex Fields (Legacy Custom UI)
         switch (fieldId) {
-            case 'data_viagem_inicio':
-                if (!card.data_viagem_inicio) return null
-                return (
-                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span>{new Date(card.data_viagem_inicio).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                )
-            case 'valor_estimado':
-                if (!card.valor_estimado) return null
-                return (
-                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_estimado)}</span>
-                    </div>
-                )
             case 'prioridade':
                 if (!card.prioridade) return null
                 const priorityColors: Record<string, string> = {
@@ -85,20 +82,6 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${priorityColors[card.prioridade] || 'text-gray-500'}`}>
                             {priorityLabels[card.prioridade] || card.prioridade}
                         </span>
-                    </div>
-                )
-            case 'created_at':
-                if (!card.created_at) return null
-                return (
-                    <div key={fieldId} className="text-[10px] text-gray-400 mt-1">
-                        Criado em {new Date(card.created_at).toLocaleDateString('pt-BR')}
-                    </div>
-                )
-            case 'updated_at':
-                if (!card.updated_at) return null
-                return (
-                    <div key={fieldId} className="text-[10px] text-gray-400 mt-1">
-                        Atualizado em {new Date(card.updated_at).toLocaleDateString('pt-BR')}
                     </div>
                 )
             case 'proxima_tarefa':
@@ -137,55 +120,9 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
-        }
-
-        // Handle product_data fields
-        const data = card.produto_data as any
-        if (!data) return null
-
-        switch (fieldId) {
-            case 'destinos':
-                if (!data.destinos?.length) return null
-                return (
-                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <MapPin className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span className="truncate block flex-1">{data.destinos.join(', ')}</span>
-                    </div>
-                )
-            case 'epoca_viagem':
-                if (!data.epoca_viagem?.inicio) return null
-                return (
-                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span className="truncate block flex-1">
-                            {new Date(data.epoca_viagem.inicio).toLocaleDateString('pt-BR')}
-                            {data.epoca_viagem.fim && ` - ${new Date(data.epoca_viagem.fim).toLocaleDateString('pt-BR')}`}
-                        </span>
-                    </div>
-                )
-            case 'pessoas':
-                if (!data.pessoas) return null
-                return (
-                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <Users className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span className="truncate block flex-1">
-                            {data.pessoas.adultos} Adt
-                            {data.pessoas.criancas ? `, ${data.pessoas.criancas} Criança(s)` : ''}
-                        </span>
-                    </div>
-                )
-            case 'orcamento':
-                if (!data.orcamento?.total) return null
-                return (
-                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span className="truncate block flex-1">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.orcamento.total)}
-                        </span>
-                    </div>
-                )
             case 'taxa_planejamento':
-                if (!data.taxa_planejamento?.status) return null
+                const data = card.produto_data as any
+                if (!data?.taxa_planejamento?.status) return null
                 const statusColors: Record<string, string> = {
                     pendente: 'text-yellow-600 bg-yellow-50',
                     paga: 'text-green-600 bg-green-50',
@@ -208,8 +145,95 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
-            default:
-                return null
+            case 'pessoas':
+                const pData = card.produto_data as any
+                if (!pData?.pessoas) return null
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <Users className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                        <span className="truncate block flex-1">
+                            {pData.pessoas.adultos} Adt
+                            {pData.pessoas.criancas ? `, ${pData.pessoas.criancas} Criança(s)` : ''}
+                        </span>
+                    </div>
+                )
+        }
+
+        // 2. Generic Dynamic Rendering (The "Ferrari Engine")
+        const fieldDef = systemFields?.find(f => f.key === fieldId)
+        if (!fieldDef) return null
+
+        // Resolve value (check root, then produto_data)
+        let value = (card as any)[fieldId]
+        if (value === undefined || value === null) {
+            const produtoData = card.produto_data as any
+            value = produtoData?.[fieldId]
+        }
+
+        // Handle nested objects (like epoca_viagem or orcamento) if they match the key
+        // This is a compatibility layer for existing complex objects stored in JSON
+        if (fieldId === 'epoca_viagem' && value?.inicio) {
+            return (
+                <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                    <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                    <span className="truncate block flex-1">
+                        {new Date(value.inicio).toLocaleDateString('pt-BR')}
+                        {value.fim && ` - ${new Date(value.fim).toLocaleDateString('pt-BR')}`}
+                    </span>
+                </div>
+            )
+        }
+        if (fieldId === 'orcamento' && value?.total) {
+            return (
+                <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                    <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                    <span className="truncate block flex-1">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value.total)}
+                    </span>
+                </div>
+            )
+        }
+        if (fieldId === 'destinos' && Array.isArray(value)) {
+            return (
+                <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                    <MapPin className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                    <span className="truncate block flex-1">{value.join(', ')}</span>
+                </div>
+            )
+        }
+
+        if (value === undefined || value === null || value === '') return null
+
+        // Generic Renderers based on Type
+        switch (fieldDef.type) {
+            case 'currency':
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                        <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value))}</span>
+                    </div>
+                )
+            case 'date':
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                        <span>{new Date(value).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                )
+            case 'multiselect':
+                const vals = Array.isArray(value) ? value : [value]
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <CheckSquare className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                        <span className="truncate block flex-1">{vals.join(', ')}</span>
+                    </div>
+                )
+            default: // text, select, etc
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <span className="truncate block flex-1">{String(value)}</span>
+                    </div>
+                )
         }
     }
 

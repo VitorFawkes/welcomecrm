@@ -6,9 +6,9 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
-import PipelineSettings from './components/settings/PipelineSettings'
+
+import PipelineStudio from './pages/admin/PipelineStudio'
 import UserManagement from './pages/admin/UserManagement'
-import StageGovernance from './pages/admin/StageGovernance'
 import CRMHealth from './pages/admin/CRMHealth'
 import CategoryManagement from './pages/admin/CategoryManagement'
 import ActivitiesPage from './pages/ActivitiesPage'
@@ -36,9 +36,9 @@ function App() {
                 <Route path="/people" element={<div className="p-8">People (Placeholder)</div>} />
                 <Route path="/tasks" element={<div className="p-8">Tasks (Placeholder)</div>} />
                 <Route path="/activities" element={<ActivitiesPage />} />
-                <Route path="/settings/pipeline" element={<PipelineSettings />} />
+                <Route path="/settings/pipeline" element={<PipelineStudio />} />
                 <Route path="/admin/users" element={<UserManagement />} />
-                <Route path="/admin/stages" element={<StageGovernance />} />
+
                 <Route path="/admin/categories" element={<CategoryManagement />} />
                 <Route path="/admin/health" element={<CRMHealth />} />
                 <Route path="/settings" element={<div className="p-8">Settings (Placeholder)</div>} />

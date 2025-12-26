@@ -11,7 +11,7 @@ const navigation = [
     { name: 'Atividades', href: '/activities', icon: Activity },
     { name: 'Configurações', href: '/settings/pipeline', icon: Settings },
     { name: 'Usuários', href: '/admin/users', icon: Shield },
-    { name: 'Governança', href: '/admin/stages', icon: Settings },
+
     { name: 'Saúde do CRM', href: '/admin/health', icon: Activity },
 ]
 

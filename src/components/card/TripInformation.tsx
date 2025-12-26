@@ -1,12 +1,32 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Calendar, DollarSign, Tag, TrendingUp, X, Check, Edit2, History, AlertCircle } from 'lucide-react'
-import type { Database, TripsProdutoData } from '../../database.types'
+import { MapPin, Calendar, DollarSign, Tag, TrendingUp, X, Check, Edit2, History, AlertCircle, FileText, Globe, CreditCard, AlertTriangle, Eraser } from 'lucide-react'
+import type { Database } from '../../database.types'
 import { supabase } from '../../lib/supabase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '../../lib/utils'
 import { useStageRequirements } from '../../hooks/useStageRequirements'
+import { useFieldConfig } from '../../hooks/useFieldConfig'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+interface TripsProdutoData {
+    orcamento?: {
+        total?: number
+        por_pessoa?: number
+    }
+    epoca_viagem?: {
+        inicio?: string
+        fim?: string
+        flexivel?: boolean
+    }
+    destinos?: string[]
+    origem?: string
+    origem_lead?: string
+    motivo?: string
+    [key: string]: any
+}
+
+type Card = Database['public']['Views']['view_cards_acoes']['Row'] & {
+    briefing_inicial?: TripsProdutoData | null
+}
 
 interface TripInformationProps {
     card: Card
@@ -19,9 +39,10 @@ interface EditModalProps {
     title: string
     children: React.ReactNode
     isSaving?: boolean
+    isCorrection?: boolean
 }
 
-function EditModal({ isOpen, onClose, onSave, title, children, isSaving }: EditModalProps) {
+function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorrection }: EditModalProps) {
     if (!isOpen) return null
 
     // Handle Enter key to save
@@ -42,17 +63,41 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving }: EditM
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onKeyDown={handleKeyDown}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className={cn(
+                "relative rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden transition-all",
+                isCorrection ? "bg-[#fffbf0] border-2 border-amber-200" : "bg-white"
+            )}>
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b bg-gradient-to-r from-indigo-50 to-white">
-                    <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+                <div className={cn(
+                    "flex items-center justify-between px-5 py-4 border-b",
+                    isCorrection ? "bg-amber-100/50" : "bg-gradient-to-r from-indigo-50 to-white"
+                )}>
+                    <div className="flex items-center gap-2">
+                        {isCorrection && <AlertTriangle className="h-5 w-5 text-amber-600" />}
+                        <h3 className={cn("text-lg font-semibold", isCorrection ? "text-amber-900" : "text-gray-900")}>
+                            {title}
+                        </h3>
+                    </div>
                     <button
                         onClick={onClose}
-                        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                        className="p-1 rounded-full hover:bg-black/5 transition-colors"
                     >
                         <X className="h-5 w-5 text-gray-500" />
                     </button>
                 </div>
+
+                {/* Warning for Correction Mode */}
+                {isCorrection && (
+                    <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex gap-3">
+                        <div className="mt-0.5">
+                            <History className="h-4 w-4 text-amber-600" />
+                        </div>
+                        <div className="text-xs text-amber-800">
+                            <span className="font-bold block mb-0.5">Modo de Correção Histórica</span>
+                            Você está alterando o registro original do pedido. Use apenas para corrigir erros de digitação ou informações que foram registradas erradas no passado.
+                        </div>
+                    </div>
+                )}
 
                 {/* Content */}
                 <div className="p-5">
@@ -60,7 +105,7 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving }: EditM
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-5 py-4 border-t bg-gray-50">
+                <div className={cn("flex items-center justify-end gap-3 px-5 py-4 border-t", isCorrection ? "bg-amber-50/50" : "bg-gray-50")}>
                     <button
                         onClick={onClose}
                         className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -70,7 +115,10 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving }: EditM
                     <button
                         onClick={onSave}
                         disabled={isSaving}
-                        className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className={cn(
+                            "px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2",
+                            isCorrection ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                        )}
                     >
                         {isSaving ? (
                             <>
@@ -79,8 +127,8 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving }: EditM
                             </>
                         ) : (
                             <>
-                                <Check className="h-4 w-4" />
-                                Salvar
+                                {isCorrection ? <Eraser className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                                {isCorrection ? "Corrigir Registro" : "Salvar"}
                             </>
                         )}
                     </button>
@@ -92,6 +140,7 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving }: EditM
 
 export default function TripInformation({ card }: TripInformationProps) {
     const productData = (card.produto_data as TripsProdutoData) || {}
+    const briefingData = (card.briefing_inicial as TripsProdutoData) || {}
 
     const [editingField, setEditingField] = useState<string | null>(null)
     const [editedData, setEditedData] = useState<TripsProdutoData>(productData)
@@ -101,34 +150,42 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     const { missingBlocking, missingFuture } = useStageRequirements(card)
 
-    const displayData = showBriefing ? ((card as any).briefing_inicial as TripsProdutoData || {}) : productData
+    const displayData = showBriefing ? briefingData : productData
 
-    // Update editedData when card changes
+    const { getVisibleFields } = useFieldConfig()
+    // Get fields for 'trip_info' section (or 'details' if legacy)
+    // We might want to show multiple sections here? For now let's assume 'trip_info' covers it.
+    // Actually, the previous code fetched ALL active system fields. 
+    // But TripInformation is semantically about the trip.
+    // Let's get 'trip_info' section fields.
+    const visibleFields = card.pipeline_stage_id ? getVisibleFields(card.pipeline_stage_id, 'trip_info') : []
+
+    // Update editedData when card or mode changes
     useEffect(() => {
-        setEditedData((card.produto_data as TripsProdutoData) || {})
-    }, [card.produto_data])
+        setEditedData(showBriefing ? briefingData : productData)
+    }, [card.produto_data, card.briefing_inicial, showBriefing])
 
     const updateCardMutation = useMutation({
-        mutationFn: async (newData: TripsProdutoData) => {
-            const updates: any = { produto_data: newData }
+        mutationFn: async ({ newData, target }: { newData: TripsProdutoData, target: 'produto_data' | 'briefing_inicial' }) => {
+            const updates: any = { [target]: newData }
 
-            // Wave 1B: Sync Budget to Value
-            // If budget total exists, update valor_estimado
-            if (newData.orcamento?.total) {
-                updates.valor_estimado = newData.orcamento.total
-            }
-
-            // Sync Trip Dates
-            if (newData.epoca_viagem?.inicio) {
-                updates.data_viagem_inicio = newData.epoca_viagem.inicio
-            } else {
-                updates.data_viagem_inicio = null
-            }
-
-            if (newData.epoca_viagem?.fim) {
-                updates.data_viagem_fim = newData.epoca_viagem.fim
-            } else {
-                updates.data_viagem_fim = null
+            // Only sync legacy columns if we are updating the CURRENT product data
+            if (target === 'produto_data') {
+                // Wave 1B: Sync Budget to Value
+                if (newData.orcamento?.total) {
+                    updates.valor_estimado = newData.orcamento.total
+                }
+                // Sync Trip Dates
+                if (newData.epoca_viagem?.inicio) {
+                    updates.data_viagem_inicio = newData.epoca_viagem.inicio
+                } else {
+                    updates.data_viagem_inicio = null
+                }
+                if (newData.epoca_viagem?.fim) {
+                    updates.data_viagem_fim = newData.epoca_viagem.fim
+                } else {
+                    updates.data_viagem_fim = null
+                }
             }
 
             const { error } = await (supabase.from('cards') as any)
@@ -146,7 +203,10 @@ export default function TripInformation({ card }: TripInformationProps) {
     })
 
     const handleFieldSave = () => {
-        updateCardMutation.mutate(editedData)
+        updateCardMutation.mutate({
+            newData: editedData,
+            target: showBriefing ? 'briefing_inicial' : 'produto_data'
+        })
     }
 
     const handleFieldEdit = (fieldName: string) => {
@@ -154,7 +214,7 @@ export default function TripInformation({ card }: TripInformationProps) {
     }
 
     const handleCloseModal = () => {
-        setEditedData((card.produto_data as TripsProdutoData) || {})
+        setEditedData(showBriefing ? briefingData : productData)
         setEditingField(null)
         setDestinosInput('')
     }
@@ -176,6 +236,9 @@ export default function TripInformation({ card }: TripInformationProps) {
     }
 
     const getFieldStatus = (dataKey: string) => {
+        // Briefing mode doesn't show validation errors (it's history)
+        if (showBriefing) return 'ok'
+
         if (missingBlocking.some(req => req.field_key === dataKey)) return 'blocking'
         if (missingFuture.some(req => req.field_key === dataKey)) return 'attention'
         return 'ok'
@@ -204,24 +267,39 @@ export default function TripInformation({ card }: TripInformationProps) {
         return (
             <div
                 className={cn(
-                    "group relative p-4 bg-white rounded-xl border transition-all duration-200",
-                    status === 'blocking' ? "border-red-300 bg-red-50/30" :
-                        status === 'attention' ? "border-orange-300 bg-orange-50/30" :
-                            "border-gray-300",
-                    !showBriefing && "cursor-pointer hover:shadow-md",
-                    !showBriefing && status === 'blocking' && "hover:border-red-400",
-                    !showBriefing && status === 'attention' && "hover:border-orange-400",
-                    !showBriefing && status === 'ok' && "hover:border-indigo-400"
+                    "group relative p-4 rounded-xl border transition-all duration-200",
+                    // Visual Styles based on Mode
+                    showBriefing
+                        ? "bg-[#fdfbf7] border-amber-200/50 border-dashed hover:border-amber-300 hover:bg-[#fffdf9] cursor-pointer"
+                        : cn(
+                            "bg-white",
+                            status === 'blocking' ? "border-red-300 bg-red-50/30" :
+                                status === 'attention' ? "border-orange-300 bg-orange-50/30" :
+                                    "border-gray-300",
+                            "hover:shadow-md cursor-pointer",
+                            status === 'blocking' && "hover:border-red-400",
+                            status === 'attention' && "hover:border-orange-400",
+                            status === 'ok' && "hover:border-indigo-400"
+                        )
                 )}
-                onClick={() => !showBriefing && handleFieldEdit(fieldName)}
+                onClick={() => handleFieldEdit(fieldName)}
             >
-                {!showBriefing && (
-                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Edit/Correction Icon */}
+                <div className={cn(
+                    "absolute top-3 right-3 transition-opacity",
+                    showBriefing ? "opacity-0 group-hover:opacity-100" : "opacity-0 group-hover:opacity-100"
+                )}>
+                    {showBriefing ? (
+                        <div className="flex items-center gap-1 text-amber-600 bg-amber-100 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                            <Eraser className="h-3 w-3" />
+                            Corrigir
+                        </div>
+                    ) : (
                         <Edit2 className="h-4 w-4 text-indigo-500" />
-                    </div>
-                )}
+                    )}
+                </div>
 
-                {/* Status Indicator */}
+                {/* Status Indicator (Only in Normal Mode) */}
                 {status !== 'ok' && !showBriefing && (
                     <div className={cn(
                         "absolute -top-2 -right-2 p-1 rounded-full shadow-sm border",
@@ -232,19 +310,28 @@ export default function TripInformation({ card }: TripInformationProps) {
                 )}
 
                 <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${iconColor}`}>
+                    <div className={cn(
+                        "p-2 rounded-lg transition-colors",
+                        showBriefing ? "bg-gray-100 text-gray-400 grayscale" : iconColor
+                    )}>
                         <Icon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                        <p className={cn(
+                            "text-xs font-medium uppercase tracking-wide mb-1 flex items-center gap-2",
+                            showBriefing ? "text-gray-400 font-mono" : "text-gray-500"
+                        )}>
                             {label}
-                            {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold">Obrigatório</span>}
-                            {status === 'attention' && <span className="text-[10px] text-orange-600 font-bold">Futuro</span>}
+                            {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold font-sans">Obrigatório</span>}
+                            {status === 'attention' && <span className="text-[10px] text-orange-600 font-bold font-sans">Futuro</span>}
                         </p>
-                        <div className="text-sm font-semibold text-gray-900 truncate">
+                        <div className={cn(
+                            "text-sm truncate",
+                            showBriefing ? "font-mono text-gray-700 font-medium" : "font-semibold text-gray-900"
+                        )}>
                             {value || (
-                                status === 'blocking' ? <span className="text-red-500 italic font-medium">Obrigatório</span> :
-                                    <span className="text-gray-400 italic font-normal">Não informado</span>
+                                status === 'blocking' ? <span className="text-red-500 italic font-medium font-sans">Obrigatório</span> :
+                                    <span className="text-gray-400 italic font-normal font-sans">Não informado</span>
                             )}
                         </div>
                         {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
@@ -254,31 +341,209 @@ export default function TripInformation({ card }: TripInformationProps) {
         )
     }
 
+    // Generic Render Function
+    const renderField = (field: any) => {
+        // Handle Legacy/Complex Fields
+        if (field.key === 'epoca_viagem') {
+            return (
+                <FieldCard
+                    key={field.key}
+                    icon={Calendar}
+                    iconColor="bg-orange-100 text-orange-600"
+                    label={field.label}
+                    value={displayData.epoca_viagem?.inicio ? (
+                        <>
+                            {formatDate(displayData.epoca_viagem.inicio)}
+                            {displayData.epoca_viagem.fim && ` até ${formatDate(displayData.epoca_viagem.fim)}`}
+                        </>
+                    ) : undefined}
+                    subValue={displayData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
+                    fieldName="periodo" // Maps to legacy modal
+                    dataKey="epoca_viagem"
+                />
+            )
+        }
+
+        if (field.key === 'orcamento') {
+            return (
+                <FieldCard
+                    key={field.key}
+                    icon={DollarSign}
+                    iconColor="bg-green-100 text-green-600"
+                    label={field.label}
+                    value={displayData.orcamento?.total ? formatBudget(displayData.orcamento.total) : undefined}
+                    subValue={displayData.orcamento?.por_pessoa ? `${formatBudget(displayData.orcamento.por_pessoa)} por pessoa` : undefined}
+                    fieldName="orcamento" // Maps to legacy modal
+                    dataKey="orcamento"
+                />
+            )
+        }
+
+        if (field.key === 'destinos') {
+            return (
+                <FieldCard
+                    key={field.key}
+                    icon={MapPin}
+                    iconColor="bg-blue-100 text-blue-600"
+                    label={field.label}
+                    value={displayData.destinos?.length ? displayData.destinos.join(' • ') : undefined}
+                    fieldName="destinos" // Maps to legacy modal
+                    dataKey="destinos"
+                />
+            )
+        }
+
+        if (field.key === 'origem' || field.key === 'origem_lead') {
+            const val = (displayData as any).origem_lead || (displayData as any).origem
+            return (
+                <FieldCard
+                    key={field.key}
+                    icon={TrendingUp}
+                    iconColor="bg-cyan-100 text-cyan-600"
+                    label={field.label}
+                    value={val}
+                    fieldName="origem" // Maps to legacy modal
+                    dataKey="origem_lead"
+                />
+            )
+        }
+
+        if (field.key === 'motivo') {
+            return (
+                <FieldCard
+                    key={field.key}
+                    icon={Tag}
+                    iconColor="bg-purple-100 text-purple-600"
+                    label={field.label}
+                    value={displayData.motivo}
+                    fieldName="motivo" // Maps to legacy modal
+                    dataKey="motivo"
+                />
+            )
+        }
+
+        // Generic Field Rendering
+        let Icon = FileText
+        let iconColor = "bg-gray-100 text-gray-600"
+
+        if (field.type === 'date') {
+            Icon = Calendar
+            iconColor = "bg-pink-100 text-pink-600"
+        } else if (field.type === 'currency') {
+            Icon = CreditCard
+            iconColor = "bg-emerald-100 text-emerald-600"
+        } else if (field.type === 'select' || field.type === 'multiselect') {
+            Icon = Globe
+            iconColor = "bg-indigo-100 text-indigo-600"
+        }
+
+        let value = (displayData as any)[field.key]
+        if (field.type === 'date' && value) {
+            value = formatDate(value)
+        } else if (field.type === 'currency' && value) {
+            value = formatBudget(value)
+        }
+
+        return (
+            <FieldCard
+                key={field.key}
+                icon={Icon}
+                iconColor={iconColor}
+                label={field.label}
+                value={value}
+                fieldName={field.key} // Maps to generic modal
+                dataKey={field.key}
+            />
+        )
+    }
+
+    // Generic Input Renderer
+    const renderGenericInput = (field: any) => {
+        const value = (editedData as any)[field.key] || ''
+
+        if (field.type === 'text') {
+            return (
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => setEditedData({ ...editedData, [field.key]: e.target.value })}
+                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    autoFocus
+                />
+            )
+        }
+
+        if (field.type === 'number' || field.type === 'currency') {
+            return (
+                <input
+                    type="number"
+                    value={value}
+                    onChange={(e) => setEditedData({ ...editedData, [field.key]: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    autoFocus
+                />
+            )
+        }
+
+        if (field.type === 'date') {
+            return (
+                <input
+                    type="date"
+                    value={value}
+                    onChange={(e) => setEditedData({ ...editedData, [field.key]: e.target.value })}
+                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    autoFocus
+                />
+            )
+        }
+
+        if (field.type === 'select') {
+            return (
+                <select
+                    value={value}
+                    onChange={(e) => setEditedData({ ...editedData, [field.key]: e.target.value })}
+                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    autoFocus
+                >
+                    <option value="">Selecione...</option>
+                    {field.options?.map((opt: string) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                </select>
+            )
+        }
+
+        return (
+            <p className="text-red-500">Tipo de campo não suportado: {field.type}</p>
+        )
+    }
+
+
     return (
         <div className={cn(
-            "rounded-xl border shadow-sm transition-colors duration-300",
+            "rounded-xl border shadow-sm transition-all duration-500",
             showBriefing
-                ? "border-amber-200 bg-amber-50"
+                ? "border-amber-200 bg-[#fdfbf7] shadow-inner" // Blueprint Theme
                 : "border-gray-300 bg-gradient-to-br from-white via-gray-50/50 to-indigo-50/30"
         )}>
             <div className="mb-4 p-5 pb-0 flex items-center justify-between">
                 <div>
-                    <h3 className={cn("text-base font-semibold flex items-center gap-2", showBriefing ? "text-amber-900" : "text-gray-900")}>
-                        <div className={cn("p-1.5 rounded-lg", showBriefing ? "bg-amber-100" : "bg-indigo-100")}>
+                    <h3 className={cn("text-base font-semibold flex items-center gap-2", showBriefing ? "text-amber-900 font-mono tracking-tight" : "text-gray-900")}>
+                        <div className={cn("p-1.5 rounded-lg transition-colors", showBriefing ? "bg-amber-100" : "bg-indigo-100")}>
                             {showBriefing ? <History className="h-4 w-4 text-amber-600" /> : <Tag className="h-4 w-4 text-indigo-600" />}
                         </div>
-                        {showBriefing ? "Briefing Inicial (Snapshot)" : "Informações da Viagem"}
+                        {showBriefing ? "BRIEFING_INICIAL.json" : "Informações da Viagem"}
                     </h3>
-                    <p className={cn("text-xs mt-1 ml-8", showBriefing ? "text-amber-700 font-medium" : "text-gray-500")}>
-                        {showBriefing ? "Visualizando o desejo original do cliente (Imutável)" : "Clique em um campo para editar"}
+                    <p className={cn("text-xs mt-1 ml-8 transition-colors", showBriefing ? "text-amber-700 font-medium font-mono" : "text-gray-500")}>
+                        {showBriefing ? "Registro imutável do pedido original (Snapshot)" : "Clique em um campo para editar"}
                     </p>
                 </div>
                 <button
                     onClick={() => setShowBriefing(!showBriefing)}
                     className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border shadow-sm",
                         showBriefing
-                            ? "bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                            ? "bg-white text-amber-900 border-amber-200 hover:bg-amber-50 ring-2 ring-amber-100"
                             : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                     )}
                 >
@@ -290,62 +555,7 @@ export default function TripInformation({ card }: TripInformationProps) {
             <div className="p-5 pt-0">
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Motivo */}
-                    <FieldCard
-                        icon={Tag}
-                        iconColor="bg-purple-100 text-purple-600"
-                        label="Motivo da Viagem"
-                        value={displayData.motivo}
-                        fieldName="motivo"
-                        dataKey="motivo"
-                    />
-
-                    {/* Destinos */}
-                    <FieldCard
-                        icon={MapPin}
-                        iconColor="bg-blue-100 text-blue-600"
-                        label="Destino(s)"
-                        value={displayData.destinos?.length ? displayData.destinos.join(' • ') : undefined}
-                        fieldName="destinos"
-                        dataKey="destinos"
-                    />
-
-                    {/* Período */}
-                    <FieldCard
-                        icon={Calendar}
-                        iconColor="bg-orange-100 text-orange-600"
-                        label="Período da Viagem"
-                        value={displayData.epoca_viagem?.inicio ? (
-                            <>
-                                {formatDate(displayData.epoca_viagem.inicio)}
-                                {displayData.epoca_viagem.fim && ` até ${formatDate(displayData.epoca_viagem.fim)}`}
-                            </>
-                        ) : undefined}
-                        subValue={displayData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
-                        fieldName="periodo"
-                        dataKey="epoca_viagem"
-                    />
-
-                    {/* Orçamento */}
-                    <FieldCard
-                        icon={DollarSign}
-                        iconColor="bg-green-100 text-green-600"
-                        label="Orçamento"
-                        value={displayData.orcamento?.total ? formatBudget(displayData.orcamento.total) : undefined}
-                        subValue={displayData.orcamento?.por_pessoa ? `${formatBudget(displayData.orcamento.por_pessoa)} por pessoa` : undefined}
-                        fieldName="orcamento"
-                        dataKey="orcamento"
-                    />
-
-                    {/* Origem do Lead */}
-                    <FieldCard
-                        icon={TrendingUp}
-                        iconColor="bg-cyan-100 text-cyan-600"
-                        label="Origem do Lead"
-                        value={(displayData as any).origem_lead}
-                        fieldName="origem"
-                        dataKey="origem_lead"
-                    />
+                    {visibleFields.map(field => renderField(field))}
                 </div>
 
                 {/* Cliente Recorrente */}
@@ -367,6 +577,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                     onSave={handleFieldSave}
                     title="Motivo da Viagem"
                     isSaving={updateCardMutation.isPending}
+                    isCorrection={showBriefing}
                 >
                     <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">
@@ -390,6 +601,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                     onSave={handleFieldSave}
                     title="Destino(s)"
                     isSaving={updateCardMutation.isPending}
+                    isCorrection={showBriefing}
                 >
                     <div className="space-y-3">
                         <label className="block text-sm font-medium text-gray-700">
@@ -454,8 +666,6 @@ export default function TripInformation({ card }: TripInformationProps) {
                             />
                         </div>
                         <p className="text-xs text-gray-500">💡 Digite e pressione Enter ou Vírgula para adicionar</p>
-                        {/* Preview tags */}
-
                     </div>
                 </EditModal>
 
@@ -466,6 +676,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                     onSave={handleFieldSave}
                     title="Período da Viagem"
                     isSaving={updateCardMutation.isPending}
+                    isCorrection={showBriefing}
                 >
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -475,7 +686,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 </label>
                                 <input
                                     type="date"
-                                    value={editedData.epoca_viagem?.inicio || ''}
+                                    value={editedData.epoca_viagem?.inicio ? editedData.epoca_viagem.inicio.substring(0, 10) : ''}
                                     onChange={(e) => setEditedData({
                                         ...editedData,
                                         epoca_viagem: {
@@ -494,7 +705,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 </label>
                                 <input
                                     type="date"
-                                    value={editedData.epoca_viagem?.fim || ''}
+                                    value={editedData.epoca_viagem?.fim ? editedData.epoca_viagem.fim.substring(0, 10) : ''}
                                     onChange={(e) => setEditedData({
                                         ...editedData,
                                         epoca_viagem: {
@@ -538,6 +749,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                     onSave={handleFieldSave}
                     title="Orçamento"
                     isSaving={updateCardMutation.isPending}
+                    isCorrection={showBriefing}
                 >
                     <div className="space-y-4">
                         <div>
@@ -594,6 +806,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                     onSave={handleFieldSave}
                     title="Origem do Lead"
                     isSaving={updateCardMutation.isPending}
+                    isCorrection={showBriefing}
                 >
                     <div className="space-y-3">
                         <label className="block text-sm font-medium text-gray-700">
@@ -621,6 +834,25 @@ export default function TripInformation({ card }: TripInformationProps) {
                         </div>
                     </div>
                 </EditModal>
+
+                {/* Generic Modal for New Fields */}
+                {editingField && !['motivo', 'destinos', 'periodo', 'orcamento', 'origem'].includes(editingField) && (
+                    <EditModal
+                        isOpen={true}
+                        onClose={handleCloseModal}
+                        onSave={handleFieldSave}
+                        title={visibleFields.find(f => f.key === editingField)?.label || 'Editar Campo'}
+                        isSaving={updateCardMutation.isPending}
+                        isCorrection={showBriefing}
+                    >
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {visibleFields.find(f => f.key === editingField)?.label}
+                            </label>
+                            {renderGenericInput(visibleFields.find(f => f.key === editingField))}
+                        </div>
+                    </EditModal>
+                )}
             </div>
         </div>
     )

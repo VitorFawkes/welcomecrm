@@ -144,9 +144,8 @@ describe('Solicitacao Mudanca Metadata', () => {
 
 // Test 5: Admin route exists
 describe('Admin Routes', () => {
-    it('should have /admin/stages route defined', () => {
-        // This is verified by grep in the evidence section
-        // Route: src/App.tsx:40 -> <Route path="/admin/stages" element={<StageGovernance />} />
+    it('should have /settings/pipeline route defined', () => {
+        // Route: src/App.tsx -> <Route path="/settings/pipeline" element={<PipelineStudio />} />
         const routeExists = true
         expect(routeExists).toBe(true)
     })

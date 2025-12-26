@@ -55,6 +55,7 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
         queryFn: async () => {
             let query = (supabase.from('pipeline_stages') as any)
                 .select('*')
+                .eq('ativo', true)
                 .order('ordem')
 
             // Filtrar stages pelo pipeline do produto
@@ -154,7 +155,8 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
         currentOwnerId?: string,
         sdrName?: string,
         targetStageName: string,
-        missingFields?: { key: string, label: string }[]
+        missingFields?: { key: string, label: string }[],
+        requiredRole?: string
     } | null>(null)
 
     const handleDragStart = (event: DragStartEvent) => {
@@ -170,9 +172,7 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
             const cardId = active.id as string
             const stageId = over.id as string
             const currentStageId = active.data.current?.pipeline_stage_id
-            const currentFase = active.data.current?.fase
             const targetStage = stages?.find(s => s.id === stageId)
-            const targetFase = targetStage?.fase
             const card = active.data.current as Card
 
             if (stageId !== currentStageId) {
@@ -190,14 +190,15 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
                     return
                 }
 
-                // 2. Check Owner Change (SDR -> Planner)
-                if (currentFase === 'SDR' && targetFase && targetFase !== 'SDR') {
+                // 2. Check Governance Rules (Target Role)
+                if (targetStage?.target_role) {
                     setPendingMove({
                         cardId,
                         stageId,
                         currentOwnerId: active.data.current?.dono_atual_id,
                         sdrName: active.data.current?.sdr_owner_id ? 'SDR Atual' : undefined,
-                        targetStageName: targetStage?.nome || 'Nova Etapa'
+                        targetStageName: targetStage?.nome || 'Nova Etapa',
+                        requiredRole: targetStage.target_role
                     })
                     setStageChangeModalOpen(true)
                     setActiveCard(null)
@@ -244,17 +245,14 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
     const handleConfirmQualityGate = () => {
         if (pendingMove) {
             // After filling fields, we still need to check if we need to change owner
-            const card = cards?.find(c => c.id === pendingMove.cardId)
-            const currentFase = card?.fase
             const targetStage = stages?.find(s => s.id === pendingMove.stageId)
-            const targetFase = targetStage?.fase
 
             setQualityGateModalOpen(false)
 
-            if (currentFase === 'SDR' && targetFase && targetFase !== 'SDR') {
+            if (targetStage?.target_role) {
                 // Open Owner Change Modal
+                setPendingMove(prev => prev ? { ...prev, requiredRole: targetStage.target_role } : null)
                 setStageChangeModalOpen(true)
-                // pendingMove is already set with correct IDs
             } else {
                 // Just move
                 moveCardMutation.mutate({ cardId: pendingMove.cardId, stageId: pendingMove.stageId })
@@ -302,6 +300,7 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
                         currentOwnerId={pendingMove.currentOwnerId || ''}
                         sdrName={pendingMove.sdrName}
                         targetStageName={pendingMove.targetStageName}
+                        requiredRole={pendingMove.requiredRole}
                     />
 
                     <QualityGateModal

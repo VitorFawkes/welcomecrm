@@ -1,0 +1,26 @@
+# 🚨 WELCOME CRM - AI BEHAVIOR RULES 🚨
+
+## 1. MANDATORY INITIALIZATION (DO THIS FIRST)
+At the start of EVERY session, you MUST:
+1. Read `docs/SYSTEM_CONTEXT.md`.
+2. Output the following checklist to the user to prove you read it:
+   - [ ] Read `docs/SYSTEM_CONTEXT.md`
+   - [ ] Checked for recent schema changes not yet documented
+
+## 2. SINGLE SOURCE OF TRUTH
+`docs/SYSTEM_CONTEXT.md` is the absolute authority.
+- If code contradicts it -> Flag to user.
+- If you change DB/Logic -> **YOU MUST UPDATE IT**.
+
+## 3. DEFINITION OF DONE
+No task is complete until you have asked yourself:
+**"Did I change the DB schema, business rules, or architecture?"**
+- **YES**: Update `docs/SYSTEM_CONTEXT.md` immediately.
+- **NO**: Proceed.
+
+## 4. CRITICAL PROTOCOLS
+- **Activities**: Historical only. Never create future activities.
+- **Tasks**: The only future-facing entity.
+- **Design**: Premium, Glassmorphism, Tailwind. No native inputs.
+- **Database**: "Database as the Brain". Use triggers/functions over frontend logic.
+- **Safety**: Never guess columns. Run `\d table` or check schema first.

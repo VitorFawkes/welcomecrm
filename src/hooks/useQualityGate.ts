@@ -1,20 +1,32 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import type { Database } from '../database.types'
 
-type StageFieldSetting = Database['public']['Tables']['stage_fields_settings']['Row']
+
+
 
 export function useQualityGate() {
     const { data: rules } = useQuery({
-        queryKey: ['stage-fields-settings'],
+        queryKey: ['stage-field-config'],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('stage_fields_settings')
-                .select('*')
+                .from('stage_field_config')
+                .select(`
+                    *,
+                    system_fields (
+                        label
+                    )
+                `)
                 .eq('required', true)
 
             if (error) throw error
-            return data as StageFieldSetting[]
+
+            // Map to expected format
+            return data?.map((item: any) => ({
+                stage_id: item.stage_id,
+                field_key: item.field_key,
+                label: item.system_fields?.label || item.field_key,
+                required: item.required
+            })) || []
         },
         staleTime: 1000 * 60 * 5 // 5 minutes
     })
@@ -44,7 +56,7 @@ export function useQualityGate() {
 
             // Special handling for nested fields if needed (e.g. produto_data->destinos)
             // But currently the card object from Kanban might be flat or have produto_data.
-            // The AVAILABLE_FIELDS in PipelineSettings had IDs like 'destinos', 'orcamento'.
+            // The AVAILABLE_FIELDS in the new Pipeline Studio have IDs like 'destinos', 'orcamento'.
             // These are usually inside 'produto_data' in the DB, but maybe flattened in the view?
             // Let's check view_cards_acoes definition again.
             // 'destinos' comes from c.produto_data -> 'destinos'.
