@@ -1,18 +1,15 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Kanban, Users, CheckSquare, Settings, List, Activity, Shield } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, CheckSquare, List, Activity, Shield } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Funil', href: '/pipeline', icon: Kanban },
     { name: 'Viagens', href: '/cards', icon: List },
-    { name: 'Pessoas', href: '/pessoas', icon: Users },
-    { name: 'Tarefas', href: '/tarefas', icon: CheckSquare },
+    { name: 'Pessoas', href: '/people', icon: Users },
+    { name: 'Tarefas', href: '/tasks', icon: CheckSquare },
     { name: 'Atividades', href: '/activities', icon: Activity },
-    { name: 'Configurações', href: '/settings/pipeline', icon: Settings },
-    { name: 'Usuários', href: '/admin/users', icon: Shield },
-
-    { name: 'Saúde do CRM', href: '/admin/health', icon: Activity },
+    { name: 'Administração', href: '/admin', icon: Shield },
 ]
 
 export default function Sidebar() {

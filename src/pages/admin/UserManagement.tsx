@@ -6,13 +6,17 @@ import {
     Users,
     Search,
     Shield,
-    MoreVertical
+    MoreVertical,
+    UserCheck,
+    UserX,
+    ShieldAlert
 } from 'lucide-react';
 import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../contexts/ToastContext';
+import AdminPageHeader from '../../components/admin/ui/AdminPageHeader';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type AppRole = Database['public']['Enums']['app_role'];
@@ -104,6 +108,12 @@ export default function UserManagement() {
         return matchesSearch && matchesRole;
     });
 
+    // Intelligence Stats
+    const totalUsers = profiles?.length || 0;
+    const activeUsers = profiles?.filter(p => p.active).length || 0;
+    const inactiveUsers = totalUsers - activeUsers;
+    const adminCount = profiles?.filter(p => p.role === 'admin').length || 0;
+
     if (isLoadingUser) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -124,18 +134,37 @@ export default function UserManagement() {
 
     return (
         <div className="p-8 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Users className="w-6 h-6" />
-                        Gestão de Usuários
-                    </h1>
-                    <p className="text-gray-500 mt-1">Gerencie acessos, papéis e status dos colaboradores.</p>
-                </div>
-                <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
-                    Total: {profiles?.length || 0} usuários
-                </div>
-            </div>
+            <AdminPageHeader
+                title="Gestão de Usuários"
+                subtitle="Gerencie acessos, papéis e monitore a atividade da equipe."
+                icon={<Users className="w-6 h-6" />}
+                stats={[
+                    {
+                        label: 'Total',
+                        value: totalUsers,
+                        icon: <Users className="w-3 h-3" />,
+                        color: 'blue'
+                    },
+                    {
+                        label: 'Ativos',
+                        value: activeUsers,
+                        icon: <UserCheck className="w-3 h-3" />,
+                        color: 'green'
+                    },
+                    {
+                        label: 'Inativos',
+                        value: inactiveUsers,
+                        icon: <UserX className="w-3 h-3" />,
+                        color: inactiveUsers > 0 ? 'red' : 'gray'
+                    },
+                    {
+                        label: 'Admins',
+                        value: adminCount,
+                        icon: <ShieldAlert className="w-3 h-3" />,
+                        color: 'purple'
+                    }
+                ]}
+            />
 
             {/* Filters */}
             <div className="flex gap-4 mb-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">

@@ -12,8 +12,12 @@ import {
     Eye,
     EyeOff,
     Loader2,
-    Save
+    Save,
+    Tags,
+    AlertTriangle,
+    Archive
 } from 'lucide-react';
+import AdminPageHeader from '../../components/admin/ui/AdminPageHeader';
 
 export default function CategoryManagement() {
     const queryClient = useQueryClient();
@@ -36,6 +40,34 @@ export default function CategoryManagement() {
             if (error) throw error;
             return data;
         }
+    });
+
+    // Fetch Usage Counts (Intelligence)
+    const { data: usageCounts, isLoading: isLoadingCounts } = useQuery({
+        queryKey: ['category-usage'],
+        queryFn: async () => {
+            if (!categories) return {};
+            const counts: Record<string, number> = {};
+
+            // Parallel queries for each category (acceptable for < 50 items)
+            // Ideally this would be a SQL View or RPC
+            await Promise.all(categories.map(async (cat) => {
+                if (cat.scope === 'change_request') {
+                    const { count } = await supabase
+                        .from('tarefas')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('tipo', 'solicitacao_mudanca')
+                        // @ts-ignore - Supabase JSON filtering syntax
+                        .eq('metadata->>change_category', cat.key);
+                    counts[cat.id] = count || 0;
+                } else {
+                    counts[cat.id] = 0; // Unknown scope usage
+                }
+            }));
+
+            return counts;
+        },
+        enabled: !!categories && categories.length > 0
     });
 
     // Create Mutation
@@ -108,21 +140,47 @@ export default function CategoryManagement() {
         createMutation.mutate();
     };
 
+    // Stats Calculation
+    const totalCategories = categories?.length || 0;
+    const unusedCategories = categories?.filter(c => (usageCounts?.[c.id] || 0) === 0).length || 0;
+    const hiddenCategories = categories?.filter(c => !c.visible).length || 0;
+
     if (isLoading) {
         return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
     }
 
     return (
-        <div className="p-8 max-w-5xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Gerenciar Categorias</h1>
-                    <p className="text-gray-500">Configure as opções disponíveis nos formulários de atividades.</p>
-                </div>
-                <Button onClick={() => setIsCreating(true)} className="gap-2">
-                    <Plus className="w-4 h-4" /> Nova Categoria
-                </Button>
-            </div>
+        <div className="p-8 max-w-7xl mx-auto">
+            <AdminPageHeader
+                title="Categorias & Motivos"
+                subtitle="Configure as opções disponíveis nos formulários de atividades."
+                icon={<Tags className="w-6 h-6" />}
+                actions={
+                    <Button onClick={() => setIsCreating(true)} className="gap-2">
+                        <Plus className="w-4 h-4" /> Nova Categoria
+                    </Button>
+                }
+                stats={[
+                    {
+                        label: 'Total',
+                        value: totalCategories,
+                        icon: <Tags className="w-3 h-3" />,
+                        color: 'blue'
+                    },
+                    {
+                        label: 'Não Utilizadas',
+                        value: unusedCategories,
+                        icon: <AlertTriangle className="w-3 h-3" />,
+                        color: unusedCategories > 0 ? 'yellow' : 'gray'
+                    },
+                    {
+                        label: 'Ocultas',
+                        value: hiddenCategories,
+                        icon: <EyeOff className="w-3 h-3" />,
+                        color: 'gray'
+                    }
+                ]}
+            />
 
             {isCreating && (
                 <div className="mb-8 p-6 bg-white rounded-xl border border-indigo-100 shadow-sm animate-in fade-in slide-in-from-top-4">
@@ -167,43 +225,72 @@ export default function CategoryManagement() {
                             <th className="px-6 py-3 font-medium text-gray-500">Escopo</th>
                             <th className="px-6 py-3 font-medium text-gray-500">Nome</th>
                             <th className="px-6 py-3 font-medium text-gray-500">Chave (Key)</th>
+                            <th className="px-6 py-3 font-medium text-gray-500 text-center">Uso</th>
                             <th className="px-6 py-3 font-medium text-gray-500 text-right">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {categories?.map((cat) => (
-                            <tr key={cat.id} className="hover:bg-gray-50/50 transition-colors">
-                                <td className="px-6 py-3 text-gray-500 font-mono text-xs uppercase">{cat.scope}</td>
-                                <td className="px-6 py-3 font-medium text-gray-900">{cat.label}</td>
-                                <td className="px-6 py-3 text-gray-400 font-mono text-xs">{cat.key}</td>
-                                <td className="px-6 py-3 text-right flex items-center justify-end gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => toggleVisibilityMutation.mutate({ id: cat.id, visible: !cat.visible })}
-                                        className={cat.visible ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-gray-400 hover:text-gray-600"}
-                                        title={cat.visible ? "Visível" : "Oculto"}
-                                    >
-                                        {cat.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            if (confirm('Tem certeza? Isso pode afetar registros existentes.')) {
-                                                deleteMutation.mutate(cat.id);
-                                            }
-                                        }}
-                                        className="text-red-400 hover:text-red-600 hover:bg-red-50"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </td>
-                            </tr>
-                        ))}
+                        {categories?.map((cat) => {
+                            const count = usageCounts?.[cat.id] || 0;
+                            const isUsed = count > 0;
+
+                            return (
+                                <tr key={cat.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="px-6 py-3 text-gray-500 font-mono text-xs uppercase">{cat.scope}</td>
+                                    <td className="px-6 py-3 font-medium text-gray-900">{cat.label}</td>
+                                    <td className="px-6 py-3 text-gray-400 font-mono text-xs">{cat.key}</td>
+                                    <td className="px-6 py-3 text-center">
+                                        {isLoadingCounts ? (
+                                            <Loader2 className="w-3 h-3 animate-spin mx-auto text-gray-300" />
+                                        ) : (
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${isUsed ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                {count}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-3 text-right flex items-center justify-end gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => toggleVisibilityMutation.mutate({ id: cat.id, visible: !cat.visible })}
+                                            className={cat.visible ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-gray-400 hover:text-gray-600"}
+                                            title={cat.visible ? "Visível" : "Oculto"}
+                                        >
+                                            {cat.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                        </Button>
+
+                                        {isUsed ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled
+                                                className="text-gray-300 cursor-not-allowed"
+                                                title="Não é possível excluir categorias em uso. Oculte-a em vez disso."
+                                            >
+                                                <Archive className="w-4 h-4" />
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (confirm('Tem certeza? Esta categoria não está em uso, mas a ação é irreversível.')) {
+                                                        deleteMutation.mutate(cat.id);
+                                                    }
+                                                }}
+                                                className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                title="Excluir (Seguro)"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                         {categories?.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                                     Nenhuma categoria encontrada.
                                 </td>
                             </tr>

@@ -461,6 +461,23 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 // 2. Date Concept (Prioritize 'epoca_viagem' then 'data_viagem_inicio')
                                 const dateField = headerFields.find(f => f.key === 'epoca_viagem') || headerFields.find(f => f.key === 'data_viagem_inicio')
 
+                                // 3. Universal Fields (Everything else configured for header)
+                                const conceptKeys = ['orcamento', 'valor_estimado', 'epoca_viagem', 'data_viagem_inicio']
+                                const extraFields = headerFields.filter(f => !conceptKeys.includes(f.key))
+
+                                // Helper: Deterministic Date Formatter (No Timezone Math)
+                                const formatDateDeterministic = (dateStr: string, includeYear = false) => {
+                                    if (!dateStr || dateStr.length < 10) return ''
+                                    const yyyy = dateStr.substring(0, 4)
+                                    const mm = parseInt(dateStr.substring(5, 7)) - 1 // 0-indexed
+                                    const dd = parseInt(dateStr.substring(8, 10))
+                                    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+                                    let res = `${dd} ${months[mm]}`
+                                    if (includeYear) res += ` '${yyyy.slice(2)}`
+                                    return res
+                                }
+
                                 return (
                                     <>
                                         {/* Budget Slot */}
@@ -485,51 +502,53 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                             )
                                         })()}
 
-                                        {/* Date Slot */}
-                                        {/* Date/Period Slot */}
+                                        {/* Date Slot (Deterministic) */}
                                         {dateField && (() => {
-                                            let date: Date | null = null
-                                            let textValue: string | null = null
+                                            let startStr = ''
+                                            let endStr = ''
+                                            let textValue = ''
+                                            let daysToTrip = null
 
                                             if (card.produto === 'TRIPS') {
                                                 const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as any
 
-                                                // Check for object format (legacy/standard)
+                                                // Object format
                                                 if (productData?.epoca_viagem?.inicio) {
-                                                    const inicio = productData.epoca_viagem.inicio
-                                                    // Robust parsing: Extract YYYY-MM-DD regardless of format (T, space, or none)
-                                                    // and append T12:00:00 to force local noon, preventing timezone shifts (UTC midnight -> previous day)
-                                                    const dateStr = inicio.substring(0, 10)
-                                                    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                                                        date = new Date(dateStr + 'T12:00:00')
-                                                    } else {
-                                                        // Fallback for non-standard strings
-                                                        date = new Date(inicio)
-                                                    }
+                                                    startStr = productData.epoca_viagem.inicio
+                                                    endStr = productData.epoca_viagem.fim
                                                 }
-                                                // Check for simple string format (custom field text)
+                                                // String format
                                                 else if (typeof productData?.epoca_viagem === 'string') {
                                                     textValue = productData.epoca_viagem
                                                 }
                                             }
 
-                                            // Fallback to column if not found in JSON or if not TRIPS
-                                            if (!date && !textValue && card.data_viagem_inicio) {
-                                                date = new Date(card.data_viagem_inicio)
+                                            // Fallback to column
+                                            if (!startStr && !textValue && card.data_viagem_inicio) {
+                                                startStr = card.data_viagem_inicio
+                                                endStr = card.data_viagem_fim || ''
                                             }
 
-                                            // Render Date Object (Countdown)
-                                            if (date && !isNaN(date.getTime())) {
-                                                const daysToTrip = Math.floor((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                                            // Calculate Countdown (still needs Date object, but only for diff)
+                                            if (startStr) {
+                                                // Use noon to be safe for countdown calc
+                                                const dateObj = new Date(startStr.substring(0, 10) + 'T12:00:00')
+                                                if (!isNaN(dateObj.getTime())) {
+                                                    daysToTrip = Math.floor((dateObj.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                                                }
+                                            }
+
+                                            if (startStr) {
                                                 return (
                                                     <div key="concept-date" className="flex items-center gap-2">
                                                         <div className="h-4 w-px bg-gray-300 mx-1" />
                                                         <div className="flex items-center gap-1.5 text-gray-600 font-medium">
                                                             <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                                                            {new Intl.NumberFormat('pt-BR').format(date.getDate())} de {date.toLocaleString('pt-BR', { month: 'short' })}
-                                                            <span className="text-gray-400 ml-0.5">'{date.getFullYear().toString().slice(2)}</span>
+                                                            {formatDateDeterministic(startStr)}
+                                                            {endStr && ` - ${formatDateDeterministic(endStr, true)}`}
+                                                            {!endStr && ` '${startStr.substring(2, 4)}`}
                                                         </div>
-                                                        {daysToTrip >= 0 && (
+                                                        {daysToTrip !== null && daysToTrip >= 0 && (
                                                             <div className={cn(
                                                                 "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                                                                 daysToTrip < 14 ? "bg-red-50 text-red-700 border border-red-200" :
@@ -543,7 +562,6 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                                 )
                                             }
 
-                                            // Render Text Value (Simple String)
                                             if (textValue) {
                                                 return (
                                                     <div key="concept-date-text" className="flex items-center gap-2">
@@ -558,6 +576,34 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
                                             return null
                                         })()}
+
+                                        {/* Universal Extra Fields Loop */}
+                                        {extraFields.map(field => {
+                                            let value = (card as any)[field.key]
+
+                                            // Handle JSON fields if needed (e.g. TRIPS data)
+                                            if (card.produto === 'TRIPS' && !value) {
+                                                const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as any
+                                                value = productData?.[field.key]
+                                            }
+
+                                            if (!value) return null
+
+                                            // Format value based on type
+                                            let displayValue = value
+                                            if (Array.isArray(value)) displayValue = value.join(', ')
+                                            if (typeof value === 'boolean') displayValue = value ? 'Sim' : 'Não'
+
+                                            return (
+                                                <div key={field.key} className="flex items-center gap-2">
+                                                    <div className="h-4 w-px bg-gray-300 mx-1" />
+                                                    <div className="flex items-center gap-1.5 text-gray-600 font-medium" title={field.label}>
+                                                        <span className="text-gray-400 text-xs uppercase font-bold">{field.label}:</span>
+                                                        {displayValue}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
                                     </>
                                 )
                             })()}

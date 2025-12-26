@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Eye, EyeOff, Save, X, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, Save } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
@@ -95,7 +95,7 @@ export default function FieldManager() {
             queryClient.invalidateQueries({ queryKey: ['system-fields'] });
             toast({ title: 'Campo excluído', type: 'success' });
         },
-        onError: (err) => {
+        onError: () => {
             toast({ title: 'Erro ao excluir', description: 'Verifique se o campo não está em uso.', type: 'error' });
         }
     });
@@ -200,8 +200,8 @@ export default function FieldManager() {
                                         <button
                                             onClick={() => toggleActiveMutation.mutate({ key: field.key, active: !field.active })}
                                             className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-colors ${field.active
-                                                    ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                                 }`}
                                         >
                                             {field.active ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}

@@ -7,11 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
 
-import PipelineStudio from './pages/admin/PipelineStudio'
-import UserManagement from './pages/admin/UserManagement'
-import CRMHealth from './pages/admin/CRMHealth'
-import CategoryManagement from './pages/admin/CategoryManagement'
-import ActivitiesPage from './pages/ActivitiesPage'
+import AdminPage from './pages/AdminPage'
 import { ToastProvider } from './contexts/ToastContext'
 
 const queryClient = new QueryClient()
@@ -35,19 +31,13 @@ function App() {
                 <Route path="/cards" element={<div className="p-8">Cards List (Placeholder)</div>} />
                 <Route path="/people" element={<div className="p-8">People (Placeholder)</div>} />
                 <Route path="/tasks" element={<div className="p-8">Tasks (Placeholder)</div>} />
-                <Route path="/activities" element={<ActivitiesPage />} />
-                <Route path="/settings/pipeline" element={<PipelineStudio />} />
-                <Route path="/admin/users" element={<UserManagement />} />
-
-                <Route path="/admin/categories" element={<CategoryManagement />} />
-                <Route path="/admin/health" element={<CRMHealth />} />
-                <Route path="/settings" element={<div className="p-8">Settings (Placeholder)</div>} />
+                <Route path="/admin" element={<AdminPage />} />
               </Route>
             </Routes>
           </BrowserRouter>
         </ToastProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </QueryClientProvider >
   )
 }
 
