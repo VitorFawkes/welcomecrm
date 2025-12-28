@@ -64,7 +64,29 @@
     @apply border-border;
   }
 
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    /* Critical for fixed layout */
+    overscroll-behavior: none;
+    /* Disables pull-to-refresh/bounce */
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Premium Focus Styles - "Brilliant Mind" Polish */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    @apply outline-none ring-1 ring-primary/30 border-primary/50 transition-all duration-300 ease-out;
+    box-shadow: 0 0 0 4px rgba(var(--primary), 0.05);
   }
 }

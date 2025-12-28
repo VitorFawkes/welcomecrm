@@ -29,8 +29,10 @@ export default function ActivitiesPage() {
 
     const userOptions = [
         { value: 'all', label: 'Todos os usuários' },
-        ...(users?.map(u => ({ value: u.id, label: u.nome || u.email || 'Sem nome' })) || [])
+        ...(users?.map((u: any) => ({ value: u.id, label: u.nome || u.email || 'Sem nome' })) || [])
     ]
+
+
 
     const typeOptions = [
         { value: 'all', label: 'Todos os tipos' },
@@ -54,75 +56,77 @@ export default function ActivitiesPage() {
     const hasActiveFilters = filters.userId !== 'all' || filters.startDate || filters.endDate || filters.type !== 'all'
 
     return (
-        <div className="p-6 max-w-4xl mx-auto">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                <h1 className="text-2xl font-bold text-gray-900">Atividades Recentes</h1>
+        <div className="h-full overflow-y-auto p-6">
+            <div className="max-w-4xl mx-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                    <h1 className="text-2xl font-bold text-gray-900">Atividades Recentes</h1>
 
-                {hasActiveFilters && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearFilters}
-                        className="text-gray-500 hover:text-gray-700 self-start sm:self-auto"
-                    >
-                        <X className="w-4 h-4 mr-2" />
-                        Limpar Filtros
-                    </Button>
-                )}
-            </div>
-
-            {/* Filters Bar */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-                <div className="flex items-center gap-2 mb-3 text-sm font-medium text-gray-700">
-                    <Filter className="w-4 h-4" />
-                    Filtros
+                    {hasActiveFilters && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="text-gray-500 hover:text-gray-700 self-start sm:self-auto"
+                        >
+                            <X className="w-4 h-4 mr-2" />
+                            Limpar Filtros
+                        </Button>
+                    )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Usuário</label>
-                        <Select
-                            value={filters.userId}
-                            onChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
-                            options={userOptions}
-                            className="w-full"
-                        />
+                {/* Filters Bar */}
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+                    <div className="flex items-center gap-2 mb-3 text-sm font-medium text-gray-700">
+                        <Filter className="w-4 h-4" />
+                        Filtros
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
-                        <Select
-                            value={filters.type}
-                            onChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
-                            options={typeOptions}
-                            className="w-full"
-                        />
-                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Usuário</label>
+                            <Select
+                                value={filters.userId}
+                                onChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
+                                options={userOptions}
+                                className="w-full"
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Data Início</label>
-                        <Input
-                            type="date"
-                            value={filters.startDate}
-                            onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
-                            className="w-full"
-                        />
-                    </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+                            <Select
+                                value={filters.type}
+                                onChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
+                                options={typeOptions}
+                                className="w-full"
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Data Fim</label>
-                        <Input
-                            type="date"
-                            value={filters.endDate}
-                            onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
-                            className="w-full"
-                        />
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Data Início</label>
+                            <Input
+                                type="date"
+                                value={filters.startDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Data Fim</label>
+                            <Input
+                                type="date"
+                                value={filters.endDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                                className="w-full"
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <ActivityFeed filters={filters} />
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <ActivityFeed filters={filters} />
+                </div>
             </div>
         </div>
     )

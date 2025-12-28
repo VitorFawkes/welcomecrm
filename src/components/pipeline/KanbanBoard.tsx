@@ -1,4 +1,6 @@
-import { useState } from 'react'
+
+import { useState, useRef } from 'react'
+import { cn } from '../../lib/utils'
 import {
     DndContext,
     DragOverlay,
@@ -10,26 +12,37 @@ import {
     type DragEndEvent,
     type DragStartEvent
 } from '@dnd-kit/core'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
+import KanbanPhaseGroup from './KanbanPhaseGroup'
 import StageChangeModal from '../card/StageChangeModal'
 import QualityGateModal from '../card/QualityGateModal'
 import { useQualityGate } from '../../hooks/useQualityGate'
+import { useAuth } from '../../contexts/AuthContext'
 import type { Database } from '../../database.types'
+import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
+import { AlertTriangle } from 'lucide-react'
+import { Button } from '../ui/Button'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
 interface KanbanBoardProps {
     productFilter: Product
+    viewMode: ViewMode
+    subView: SubView
+    filters: FilterState
+    className?: string // Allow parent to control layout/padding
 }
 
-export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
+export default function KanbanBoard({ productFilter, viewMode, subView, filters, className }: KanbanBoardProps) {
     const queryClient = useQueryClient()
     const [activeCard, setActiveCard] = useState<Card | null>(null)
+    const { collapsedPhases, setCollapsedPhases } = usePipelineFilters()
     const { validateMove } = useQualityGate()
+    const { session } = useAuth() // Need auth to know who "ME" is
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -76,8 +89,9 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
         }
     })
 
-    const { data: cards } = useQuery({
-        queryKey: ['cards', productFilter],
+    const { data: cards, isError, refetch } = useQuery({
+        queryKey: ['cards', productFilter, viewMode, subView, filters], // Re-fetch when view changes
+        placeholderData: keepPreviousData,
         queryFn: async () => {
             let query = (supabase.from('view_cards_acoes') as any)
                 .select('*')
@@ -86,6 +100,74 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
                 query = query.eq('produto', productFilter)
             }
 
+            // Apply Smart View Filters
+            if (viewMode === 'AGENT') {
+                if (subView === 'MY_QUEUE') {
+                    // Filter by current user
+                    if (session?.user?.id) {
+                        query = query.eq('dono_atual_id', session.user.id)
+                    }
+                }
+                // 'ATTENTION' logic would go here (e.g. overdue)
+            } else if (viewMode === 'MANAGER') {
+                if (subView === 'TEAM_VIEW') {
+                    // Ideally filter by team, for now show all (Macro)
+                }
+                if (subView === 'FORECAST') {
+                    // Filter by closing_date this month
+                    const startOfMonth = new Date(); startOfMonth.setDate(1);
+                    const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+                    query = query.gte('data_fechamento', startOfMonth.toISOString()).lt('data_fechamento', endOfMonth.toISOString())
+                }
+            }
+
+            // Apply Advanced Filters (from Drawer)
+            if (filters.search) {
+                query = query.ilike('titulo', `% ${filters.search}% `)
+            }
+
+            if ((filters.ownerIds?.length ?? 0) > 0) {
+                query = query.in('dono_atual_id', filters.ownerIds)
+            }
+
+            // NEW: SDR Filter
+            if ((filters.sdrIds?.length ?? 0) > 0) {
+                query = query.in('sdr_owner_id', filters.sdrIds)
+            }
+
+            // NEW: Team Filter (using new view column)
+            // if (filters.teamIds?.length > 0) {
+            //     query = query.in('owner_team_id', filters.teamIds)
+            // }
+
+            // NEW: Department Filter (using new view column)
+            // if (filters.departmentIds?.length > 0) {
+            //     query = query.in('owner_department_id', filters.departmentIds)
+            // }
+
+            // NEW: Tags Filter (using new view column)
+            // if (filters.tags?.length > 0) {
+            //     // Use JSONB containment operator @>
+            //     // We need to format the array as a Postgres array string or use .contains
+            //     // query = query.contains('tags', filters.tags)
+            // }
+
+            if (filters.startDate) {
+                query = query.gte('data_viagem_inicio', filters.startDate)
+            }
+
+            if (filters.endDate) {
+                query = query.lte('data_viagem_inicio', filters.endDate)
+            }
+
+            // NEW: Creation Date Filter
+            if (filters.creationStartDate) {
+                query = query.gte('created_at', filters.creationStartDate)
+            }
+
+            if (filters.creationEndDate) {
+                query = query.lte('created_at', filters.creationEndDate)
+            }
             const { data, error } = await query
             if (error) throw error
             return data as Card[]
@@ -103,17 +185,17 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
         },
         onMutate: ({ cardId, stageId }) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-            queryClient.cancelQueries({ queryKey: ['cards', productFilter] })
+            queryClient.cancelQueries({ queryKey: ['cards', productFilter, viewMode, subView] })
 
             // Snapshot the previous value
-            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter])
+            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView])
 
             // Find new stage info for complete update
             const newStage = stages?.find(s => s.id === stageId)
 
             // Optimistically update to the new value
             if (previousCards) {
-                queryClient.setQueryData<Card[]>(['cards', productFilter], (old) => {
+                queryClient.setQueryData<Card[]>(['cards', productFilter, viewMode, subView], (old) => {
                     if (!old) return []
                     return old.map((card) => {
                         if (card.id === cardId) {
@@ -135,7 +217,7 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
         onError: (_err, _variables, context) => {
             // If the mutation fails, use the context returned from onMutate to roll back
             if (context?.previousCards) {
-                queryClient.setQueryData(['cards', productFilter], context.previousCards)
+                queryClient.setQueryData(['cards', productFilter, viewMode, subView], context.previousCards)
             }
         },
         onSuccess: () => {
@@ -261,62 +343,190 @@ export default function KanbanBoard({ productFilter }: KanbanBoardProps) {
         }
     }
 
+    if (isError) {
+        return (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-8 text-center">
+                <div className="rounded-full bg-red-100 p-4">
+                    <AlertTriangle className="h-8 w-8 text-red-600" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Erro ao carregar o pipeline</h3>
+                    <p className="text-sm text-gray-500">Não foi possível buscar os cards. Tente novamente.</p>
+                </div>
+                <Button onClick={() => refetch()} variant="outline">
+                    Tentar Novamente
+                </Button>
+            </div>
+        )
+    }
+
     if (!stages || !cards) return <div className="h-full w-full animate-pulse bg-gray-100 rounded-lg"></div>
 
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+    const togglePhase = (phaseName: string) => {
+        const isCollapsing = !collapsedPhases.includes(phaseName)
+        const newPhases = isCollapsing
+            ? [...collapsedPhases, phaseName]
+            : collapsedPhases.filter(p => p !== phaseName)
+
+        setCollapsedPhases(newPhases)
+
+        if (isCollapsing && scrollContainerRef.current) {
+            // Wait for state update and layout shift
+            setTimeout(() => {
+                scrollContainerRef.current?.scrollTo({ left: 0, behavior: 'smooth' })
+            }, 100)
+        }
+    }
+
+    // Group stages by phase
+    const phases = stages ? Array.from(new Set(stages.map(s => s.fase || 'Outro'))) : []
+
+    // Custom sort order for phases if needed, or rely on DB order (which might be mixed)
+    // Ideally phases should be ordered. For now we trust the order of appearance or hardcode:
+    const phaseOrder = ['SDR', 'Planner', 'Pós-venda', 'Outro']
+    phases.sort((a, b) => {
+        const indexA = phaseOrder.indexOf(a)
+        const indexB = phaseOrder.indexOf(b)
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB)
+    })
+
+    // Calculate Totals for Sticky Footer
+    const totalPipelineValue = cards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
+    const totalCards = cards.length
+
     return (
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex h-full gap-4 overflow-x-auto pb-4">
-                {stages.map((stage) => (
-                    <KanbanColumn
-                        key={stage.id}
-                        stage={stage}
-                        cards={cards.filter(c => c.pipeline_stage_id === stage.id)}
-                    />
-                ))}
-            </div>
-            <DragOverlay
-                dropAnimation={{
-                    duration: 0,
-                    easing: 'ease',
-                }}
-            >
-                {activeCard ? (
-                    <div className="rotate-3 scale-105 cursor-grabbing opacity-80">
-                        <KanbanCard card={activeCard} />
+        <div className={cn("flex flex-col h-full relative", className)}>
+            {/* Kanban Columns */}
+            <div ref={scrollContainerRef} className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
+                <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                    <div className="h-full flex gap-4 w-max min-w-full px-4"> {/* Changed to w-max min-w-full to allow left alignment but scroll if needed */}
+                        <div className="flex gap-6 h-full">
+                            {phases.map((phaseName) => {
+                                const phaseStages = stages.filter(s => (s.fase || 'Outro') === phaseName)
+                                const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
+                                const totalCount = phaseCards.length
+                                const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
+
+                                return (
+                                    <KanbanPhaseGroup
+                                        key={phaseName}
+                                        phaseName={phaseName}
+                                        isCollapsed={collapsedPhases.includes(phaseName)}
+                                        onToggle={() => togglePhase(phaseName)}
+                                        totalCount={totalCount}
+                                        totalValue={totalValue}
+                                        stages={phaseStages}
+                                        cards={phaseCards}
+                                    >
+                                        {phaseStages.map((stage) => (
+                                            <KanbanColumn
+                                                key={stage.id}
+                                                stage={stage}
+                                                cards={cards.filter(c => c.pipeline_stage_id === stage.id)}
+                                            />
+                                        ))}
+                                    </KanbanPhaseGroup>
+                                )
+                            })}
+                        </div>
+                        <DragOverlay
+                            dropAnimation={{
+                                duration: 0,
+                                easing: 'ease',
+                            }}
+                        >
+                            {activeCard ? (
+                                <div className="rotate-3 scale-105 cursor-grabbing opacity-80">
+                                    <KanbanCard card={activeCard} />
+                                </div>
+                            ) : null}
+                        </DragOverlay>
+
+                        {pendingMove && (
+                            <>
+                                <StageChangeModal
+                                    isOpen={stageChangeModalOpen}
+                                    onClose={() => {
+                                        setStageChangeModalOpen(false)
+                                        setPendingMove(null)
+                                        setActiveCard(null)
+                                    }}
+                                    onConfirm={handleConfirmStageChange}
+                                    currentOwnerId={pendingMove.currentOwnerId || ''}
+                                    sdrName={pendingMove.sdrName}
+                                    targetStageName={pendingMove.targetStageName}
+                                    requiredRole={pendingMove.requiredRole}
+                                />
+
+                                <QualityGateModal
+                                    isOpen={qualityGateModalOpen}
+                                    onClose={() => {
+                                        setQualityGateModalOpen(false)
+                                        setPendingMove(null)
+                                        setActiveCard(null)
+                                    }}
+                                    onConfirm={handleConfirmQualityGate}
+                                    cardId={pendingMove.cardId}
+                                    targetStageName={pendingMove.targetStageName}
+                                    missingFields={pendingMove.missingFields || []}
+                                />
+                            </>
+                        )}
                     </div>
-                ) : null}
-            </DragOverlay>
+                </DndContext>
+            </div>
 
-            {pendingMove && (
-                <>
-                    <StageChangeModal
-                        isOpen={stageChangeModalOpen}
-                        onClose={() => {
-                            setStageChangeModalOpen(false)
-                            setPendingMove(null)
-                            setActiveCard(null)
-                        }}
-                        onConfirm={handleConfirmStageChange}
-                        currentOwnerId={pendingMove.currentOwnerId || ''}
-                        sdrName={pendingMove.sdrName}
-                        targetStageName={pendingMove.targetStageName}
-                        requiredRole={pendingMove.requiredRole}
-                    />
+            {/* Sticky Footer - Premium Redesign */}
+            <div className="fixed bottom-0 right-0 left-64 h-20 bg-white/95 backdrop-blur-2xl border-t border-primary/10 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] flex items-center justify-between px-8 z-50">
+                <div className="flex items-center gap-8">
+                    <div className="flex flex-col">
+                        <span className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Total Pipeline</span>
+                        <div className="flex items-baseline gap-3">
+                            <span className="text-2xl font-bold text-primary-dark">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPipelineValue)}
+                            </span>
+                            <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                {totalCards} cards
+                            </span>
+                        </div>
+                    </div>
 
-                    <QualityGateModal
-                        isOpen={qualityGateModalOpen}
-                        onClose={() => {
-                            setQualityGateModalOpen(false)
-                            setPendingMove(null)
-                            setActiveCard(null)
-                        }}
-                        onConfirm={handleConfirmQualityGate}
-                        cardId={pendingMove.cardId}
-                        targetStageName={pendingMove.targetStageName}
-                        missingFields={pendingMove.missingFields || []}
-                    />
-                </>
-            )}
-        </DndContext>
+                    {/* Vertical Divider */}
+                    <div className="h-10 w-px bg-gray-200" />
+
+                    {/* Quick Stats / Mini Forecast (Placeholder for now) */}
+                    <div className="flex flex-col">
+                        <span className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Forecast Mês</span>
+                        <span className="text-lg font-semibold text-gray-700">
+                            R$ --
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                    {/* Phase Summaries (Mini) */}
+                    {phases.map(phase => {
+                        const phaseStages = stages.filter(s => (s.fase || 'Outro') === phase)
+                        const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
+                        const val = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
+                        const count = phaseCards.length
+
+                        return (
+                            <div key={phase} className="flex flex-col items-end group cursor-default">
+                                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5 group-hover:text-primary transition-colors">{phase}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-400 font-medium bg-gray-50 px-1.5 rounded">{count}</span>
+                                    <span className="text-sm font-bold text-gray-700 group-hover:text-primary-dark transition-colors">
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(val)}
+                                    </span>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        </div>
     )
 }

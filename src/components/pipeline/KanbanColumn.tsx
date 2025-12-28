@@ -19,60 +19,49 @@ export default function KanbanColumn({ stage, cards }: KanbanColumnProps) {
 
     const totalValue = cards.reduce((acc, card) => acc + (card.valor_estimado || 0), 0)
 
-    // Phase color mapping
-    const phaseColors = {
-        'SDR': 'border-t-blue-500 bg-blue-50/30',
-        'Planner': 'border-t-purple-500 bg-purple-50/30',
-        'Pós-venda': 'border-t-green-500 bg-green-50/30',
-        'Outro': 'border-t-gray-500 bg-gray-50/30'
-    }
+    // Phase color mapping - Updated for Premium Look (Subtle borders)
+    // Static color map for solid visibility
+    const phaseColors: Record<string, string> = {
+        'SDR': 'border-t-blue-500',
+        'Planner': 'border-t-purple-500',
+        'Pós-venda': 'border-t-green-500',
+        'Outro': 'border-t-gray-500'
+    };
 
-    const phaseBadgeColors = {
-        'SDR': 'bg-blue-100 text-blue-700 border-blue-200',
-        'Planner': 'bg-purple-100 text-purple-700 border-purple-200',
-        'Pós-venda': 'bg-green-100 text-green-700 border-green-200',
-        'Outro': 'bg-gray-100 text-gray-700 border-gray-200'
-    }
-
-    const phaseColor = phaseColors[(stage.fase || 'Outro') as keyof typeof phaseColors] || phaseColors['Outro']
-    const phaseBadgeColor = phaseBadgeColors[(stage.fase || 'Outro') as keyof typeof phaseBadgeColors] || phaseBadgeColors['Outro']
+    // Robust fallback logic
+    const borderColor = phaseColors[stage.fase || 'Outro'];
 
     return (
         <div className={cn(
-            "flex h-full w-80 min-w-[20rem] flex-col rounded-lg bg-muted border border-border shadow-sm p-4 border-t-4",
-            phaseColor
+            "flex h-full w-80 min-w-[20rem] shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-white",
+            "border-t-4", borderColor
         )}>
-            <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold text-gray-900">{stage.nome}</h3>
-                <span className="rounded-full bg-primary-light px-2 py-1 text-xs font-medium text-primary">
-                    {cards.length}
-                </span>
+            {/* Header with White Strip */}
+            <div className="bg-white border-b border-gray-200 p-4 rounded-t-xl shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-base font-bold text-gray-800 tracking-tight">{stage.nome}</h3>
+                    <span className="rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-500">
+                        {cards.length}
+                    </span>
+                </div>
+                <div className="flex items-center justify-between">
+                    <div className="h-1 w-12 rounded-full bg-primary/20"></div>
+                    <p className="text-xs font-bold text-gray-400">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}
+                    </p>
+                </div>
             </div>
-
-            {/* Phase badge */}
-            <div className="mb-3">
-                <span className={cn(
-                    "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border",
-                    phaseBadgeColor
-                )}>
-                    {stage.fase}
-                </span>
-            </div>
-
-            <p className="text-sm text-gray-500 mb-4">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}
-            </p>
 
             <div
                 ref={setNodeRef}
                 className={cn(
-                    "flex flex-1 flex-col gap-4 overflow-y-auto transition-colors scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent pr-1",
-                    isOver ? "bg-primary-light/30 rounded-lg" : ""
+                    "flex flex-1 flex-col gap-3 overflow-y-auto transition-colors scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent px-3 pt-3 pb-24", // Added pb-24 for footer clearance
+                    isOver ? "bg-primary/5 rounded-lg ring-2 ring-primary/20 ring-inset" : ""
                 )}
             >
                 {cards.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center opacity-40">
-                        <div className="h-12 w-12 rounded-full bg-white border-2 border-dashed border-gray-200 mb-2" />
+                        <div className="h-12 w-12 rounded-full bg-white/50 border-2 border-dashed border-gray-200 mb-2" />
                         <p className="text-xs text-gray-400 font-medium">Vazio</p>
                     </div>
                 ) : (

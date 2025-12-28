@@ -10,19 +10,7 @@ type SystemField = Database['public']['Tables']['system_fields']['Row']
 type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row']
 type StageFieldConfig = Database['public']['Tables']['stage_field_config']['Row']
 
-const SECTIONS = [
-    { value: 'trip_info', label: 'Informações da Viagem', color: 'bg-blue-50 text-blue-700 border-blue-100' },
-    { value: 'people', label: 'Pessoas / Viajantes', color: 'bg-purple-50 text-purple-700 border-purple-100' },
-    { value: 'payment', label: 'Pagamento', color: 'bg-green-50 text-green-700 border-green-100' },
-    { value: 'system', label: 'Sistema / Interno', color: 'bg-gray-50 text-gray-700 border-gray-100' },
-    { value: 'details', label: 'Outros Detalhes', color: 'bg-orange-50 text-orange-700 border-orange-100' }
-]
-
-const MACRO_STAGES = [
-    { id: 'SDR', label: 'SDR (Pré-Venda)', color: 'bg-blue-500', textColor: 'text-blue-700', bgColor: 'bg-blue-50' },
-    { id: 'Planner', label: 'Planner (Venda)', color: 'bg-purple-500', textColor: 'text-purple-700', bgColor: 'bg-purple-50' },
-    { id: 'Pós-venda', label: 'Pós-Venda', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50' }
-]
+import { SECTIONS, MACRO_STAGES } from '../../../constants/admin'
 
 export default function StudioUnified() {
     const queryClient = useQueryClient()

@@ -20,4 +20,24 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ['src/components/admin/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "VariableDeclarator[id.name='SECTIONS']",
+          message: "Do not define SECTIONS locally. Import from src/constants/admin.ts"
+        },
+        {
+          selector: "VariableDeclarator[id.name='FIELD_TYPES']",
+          message: "Do not define FIELD_TYPES locally. Import from src/constants/admin.ts"
+        },
+        {
+          selector: "VariableDeclarator[id.name='MACRO_STAGES']",
+          message: "Do not define MACRO_STAGES locally. Import from src/constants/admin.ts"
+        }
+      ]
+    }
+  }
 ])

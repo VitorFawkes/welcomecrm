@@ -10,7 +10,7 @@ export default function Dashboard() {
     const [productFilter, setProductFilter] = useState<Product>('ALL')
 
     return (
-        <div className="space-y-6">
+        <div className="h-full overflow-y-auto p-8 space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                 <div className="flex items-center gap-2">

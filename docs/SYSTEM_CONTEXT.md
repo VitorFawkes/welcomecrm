@@ -8,13 +8,16 @@
 > 3.  **UPDATE ON CHANGE:** If you modify the DB Schema, add a new Hook, or change a Business Rule, you **MUST** update this file immediately after the Execution phase. Do not wait for the user to ask.
 > 4.  **INTEGRATION INTELLIGENCE:** Before suggesting a new library or pattern, check Section 3 ("Frontend Patterns") and Section 4 ("Integrations"). Consistency > Novelty.
 > 5.  **NO REGRESSIONS:** Before deleting or refactoring, check Section 2 ("Data Model") to ensure you are not breaking hidden dependencies (like Triggers or Views).
+> 6.  **EVOLUTION PROTOCOL:** When a new architectural decision is made (e.g., "All constants must be in X"), you MUST update this document immediately. This file is the "Living Constitution" of the project.
+> 7.  **AUTOMATION IMPERATIVE:** Before marking a task as DONE, you MUST ask: *"Could this error happen again?"* If yes, you MUST propose an automated fix (Lint/Type/Test) immediately. Do not wait for the user to ask.
+> 8.  **ARCHITECTURAL ALIGNMENT:** When designing new features, you MUST explicitly reference an existing feature as a "Template". (e.g., "I will build the *Invoices* module following the exact pattern of the *Contacts* module"). Consistency > Creativity.
 
 ---
 
 # 1. Core Architecture
 - **Stack:** React (Vite) + TypeScript + TailwindCSS.
 - **Backend:** Supabase (PostgreSQL + Auth + Storage).
-- **State Management:** React Query (Server State) + Context API (Auth/Toast).
+- **State Management:** React Query (Server State) + Context API (Auth/Toast) + **Zustand (User Preferences/Persistence)**.
 - **Philosophy:** "Database as the Brain". Business logic (validations, status updates, logs) prefers to live in PostgreSQL Triggers/Functions rather than Frontend code.
 
 ## 2. Data Model (Critical Rules)
@@ -54,9 +57,27 @@
     - `useCardContacts(cardId)`: Manages all contact linking logic.
     - `useQualityGate()`: Checks if card can move stages.
 
+### Design System & UX (Premium Standards)
+- **Layout Architecture:**
+    - **Viewport Units:** Use `dvh` (Dynamic Viewport Height) for full-screen layouts to handle mobile browser bars correctly.
+    - **Global Overflow:** Enforce `overflow: hidden` on `html`/`body` and `overscroll-behavior: none` to mimic native app feel.
+- **Component Polish:**
+    - **Inputs:** Standardize "Premium Input" styles (height, background, border, focus ring) for consistency.
+    - **Performance:** Avoid `backdrop-blur` on large scrollable areas (like Kanban columns) to prevent rendering artifacts. Use solid colors (e.g., `bg-gray-50`).
+- **State Persistence:**
+    - **Pattern:** Use `zustand/middleware`'s `persist` to save user preferences (filters, view modes, collapsed states) to `localStorage`.
+
+### Code Quality & Safety
+- **Date Handling:** Never use `.toISOString()` on string dates directly without validation.
+- **Type Safety:** Enforce strict types for filters (`FilterState`) to prevent runtime errors.
+
 ### UI Components
 - **Widgets:** `PessoasWidget`, `CardHeader`, `ActionButtons`.
 - **Rule:** Widgets should receive data via Props or Hooks, never fetch directly if possible. `PessoasWidget` strictly uses `useCardContacts`.
+
+### Admin Module Standards
+- **Single Source of Truth:** All static definitions (Sections, Field Types, Colors, Macro Stages) MUST live in `src/constants/admin.ts`.
+- **Rule:** Do NOT hardcode lists in components (e.g., `StudioUnified`, `FieldInspectorDrawer`). Import them from constants.
 
 ## 4. Integrations & External Services
 - **WhatsApp:** Direct link generation (`wa.me`). Depends on `contatos.telefone`.
@@ -72,6 +93,11 @@
 - **Optimistic Updates:** Frontend must update Cache immediately for good UX, but must handle Rollback on error. `useCardContacts` implements this correctly.
 
 ## 7. Recent Architecture Updates (Dec 2025)
+
+### Kanban Board 2.0 (UX Polish)
+- **Infinite Columns:** Columns must extend to the bottom of the viewport using `h-full` and `flex-1` correctly.
+- **Auto-Scroll:** Collapsing a phase must auto-scroll the board to the start (`left: 0`) for immediate visibility.
+- **Unified Header:** Collapsed phases must display Name and Count side-by-side (Horizontal) above the column, matching the open state.
 
 ### Task Management (`tarefas`)
 - **Single Source of Truth:** The `tarefas` table is the only source for "Next Steps".
@@ -96,3 +122,12 @@
 - **Data-Driven Rules:** Moved from hardcoded stage names/IDs to database columns (`is_won`, `is_lost`, `target_role`).
 - **Owner Handoff:** `KanbanBoard` checks `target_role` on drag-end. If set, it triggers `StageChangeModal` to enforce role compliance (e.g., SDR -> Planner).
 - **Automation:** `trigger_card_status_automation` now uses `is_won`/`is_lost` flags instead of string matching.
+
+### Organizational OS (Team Studio)
+- **Hierarchy:** The system now enforces a strict hierarchy: `Departments` (Macro Areas) -> `Teams` -> `Members`.
+- **Team Management:**
+    - **CRUD:** Teams are managed via `TeamManagement.tsx` and persisted in the `teams` table.
+    - **Association:** Users are linked to teams via `profiles.team_id`.
+- **Bulk Operations:**
+    - **Pattern:** Use "Selection State" + "Floating Action Bar" for bulk actions (e.g., `UserManagement.tsx`).
+    - **Mutation:** Prefer single batch mutations (e.g., `update().in('id', ids)`) over iterating in the frontend.

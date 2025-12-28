@@ -19,7 +19,7 @@ export default function Layout() {
     }
 
     return (
-        <div className="flex h-screen bg-gray-100">
+        <div className="fixed inset-0 flex bg-gray-100 overflow-hidden">
             <Sidebar />
             <div className="flex flex-1 flex-col overflow-hidden">
                 <header className="flex h-16 items-center justify-between border-b bg-white px-8 shadow-sm">
@@ -29,7 +29,7 @@ export default function Layout() {
                         <NotificationCenter />
                     </div>
                 </header>
-                <main className="flex-1 overflow-y-auto bg-muted p-8">
+                <main className="flex-1 relative flex flex-col overflow-hidden bg-muted">
                     <Outlet />
                 </main>
             </div>

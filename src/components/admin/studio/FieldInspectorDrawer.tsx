@@ -18,24 +18,7 @@ interface FieldInspectorDrawerProps {
     isCreating?: boolean
 }
 
-const SECTIONS = [
-    { value: 'trip_info', label: 'Informações da Viagem' },
-    { value: 'people', label: 'Pessoas / Viajantes' },
-    { value: 'payment', label: 'Pagamento' },
-    { value: 'system', label: 'Sistema / Interno' },
-    { value: 'details', label: 'Outros Detalhes' }
-]
-
-const FIELD_TYPES = [
-    { value: 'text', label: 'Texto Simples' },
-    { value: 'number', label: 'Número' },
-    { value: 'date', label: 'Data' },
-    { value: 'currency', label: 'Moeda' },
-    { value: 'select', label: 'Seleção Única' },
-    { value: 'multiselect', label: 'Múltipla Seleção' },
-    { value: 'boolean', label: 'Sim/Não' },
-    { value: 'json', label: 'JSON (Avançado)' }
-]
+import { SECTIONS, FIELD_TYPES } from '../../../constants/admin'
 
 const COLORS = [
     { value: 'gray', bg: 'bg-gray-100', text: 'text-gray-800' },
@@ -141,7 +124,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                     <Select
                                         value={formData.type || 'text'}
                                         onChange={val => setFormData({ ...formData, type: val })}
-                                        options={FIELD_TYPES}
+                                        options={FIELD_TYPES as any}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -149,7 +132,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                     <Select
                                         value={formData.section || 'trip_info'}
                                         onChange={val => setFormData({ ...formData, section: val })}
-                                        options={SECTIONS}
+                                        options={SECTIONS as any}
                                     />
                                 </div>
                             </div>

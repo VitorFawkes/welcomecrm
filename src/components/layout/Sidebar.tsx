@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Kanban, Users, CheckSquare, List, Activity, Shield } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { ProductSwitcher } from './ProductSwitcher'
 
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -19,6 +20,11 @@ export default function Sidebar() {
         <aside className="flex h-screen w-64 flex-col bg-primary-dark text-white shadow-lg transition-all duration-300">
             <div className="flex h-16 items-center px-6">
                 <span className="text-xl font-semibold tracking-tight">Welcome CRM</span>
+            </div>
+
+            {/* Global Product Switcher */}
+            <div className="px-4 mb-2">
+                <ProductSwitcher />
             </div>
 
             <nav className="flex-1 space-y-1 px-3 py-4">

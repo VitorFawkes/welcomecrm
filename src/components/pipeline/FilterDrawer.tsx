@@ -1,0 +1,356 @@
+import { useState, useEffect } from 'react'
+import { X, Filter, Calendar, User, Tag, Users, Search, Clock } from 'lucide-react'
+import { Button } from '../ui/Button'
+import { usePipelineFilters } from '../../hooks/usePipelineFilters'
+import { cn } from '../../lib/utils'
+import { useFilterOptions } from '../../hooks/useFilterOptions'
+
+
+interface FilterDrawerProps {
+    isOpen: boolean
+    onClose: () => void
+}
+
+
+
+export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
+    const { filters, setFilters } = usePipelineFilters()
+
+    // Use cached data from React Query
+    const { data: options } = useFilterOptions()
+
+    // Local state for the form
+    const [localFilters, setLocalFilters] = useState(filters || {})
+
+    // Search states
+    const [searchOwner, setSearchOwner] = useState('')
+    const [searchSdr, setSearchSdr] = useState('')
+    const [searchTeam, setSearchTeam] = useState('')
+
+    // Update local state when global filters change
+    useEffect(() => {
+        setLocalFilters(filters || {})
+    }, [filters])
+
+    if (!isOpen) return null
+
+    const profiles = options?.profiles || []
+    const teams = options?.teams || []
+    const departments = options?.departments || []
+
+    const applyFilters = () => {
+        setFilters(localFilters)
+        onClose()
+    }
+
+    const clearFilters = () => {
+        setLocalFilters({})
+        setFilters({})
+    }
+
+    const toggleSelection = (field: 'ownerIds' | 'sdrIds' | 'teamIds' | 'departmentIds', value: string) => {
+        setLocalFilters(prev => {
+            const current = (prev[field] as string[]) || []
+            const updated = current.includes(value)
+                ? current.filter(id => id !== value)
+                : [...current, value]
+            return { ...prev, [field]: updated }
+        })
+    }
+
+    // Filtered lists based on search
+    const filteredProfiles = profiles.filter(p =>
+        (p.full_name?.toLowerCase() || '').includes(searchOwner.toLowerCase()) ||
+        (p.email?.toLowerCase() || '').includes(searchOwner.toLowerCase())
+    )
+
+    const filteredSdrs = profiles.filter(p =>
+        (p.full_name?.toLowerCase() || '').includes(searchSdr.toLowerCase()) ||
+        (p.email?.toLowerCase() || '').includes(searchSdr.toLowerCase())
+    )
+
+    const filteredTeams = teams.filter(t => t.name.toLowerCase().includes(searchTeam.toLowerCase()))
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
+                onClick={onClose}
+            />
+
+            {/* Drawer */}
+            <div className="fixed inset-y-0 right-0 w-[500px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out border-l border-gray-100 flex flex-col">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-white">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-primary/5 rounded-xl">
+                            <Filter className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-900">Filtros Avançados</h2>
+                            <p className="text-xs text-gray-500">Refine sua visualização do pipeline</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-50/50">
+
+                    {/* Section: Dates */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                            <Calendar className="h-3 w-3" /> Datas
+                        </h3>
+
+                        {/* Data da Viagem */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Data da Viagem</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <span className="text-xs text-gray-500 ml-1">De</span>
+                                    <input
+                                        type="date"
+                                        className="w-full h-10 rounded-lg border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 bg-slate-50 outline-none transition-all px-3"
+                                        value={localFilters.startDate || ''}
+                                        onChange={(e) => setLocalFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs text-gray-500 ml-1">Até</span>
+                                    <input
+                                        type="date"
+                                        className="w-full h-10 rounded-lg border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 bg-slate-50 outline-none transition-all px-3"
+                                        value={localFilters.endDate || ''}
+                                        onChange={(e) => setLocalFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Data de Criação */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block flex items-center gap-2">
+                                <Clock className="h-3.5 w-3.5 text-gray-400" /> Data de Criação
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <span className="text-xs text-gray-500 ml-1">De</span>
+                                    <input
+                                        type="date"
+                                        className="w-full h-10 rounded-lg border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 bg-slate-50 outline-none transition-all px-3"
+                                        value={localFilters.creationStartDate || ''}
+                                        onChange={(e) => setLocalFilters(prev => ({ ...prev, creationStartDate: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs text-gray-500 ml-1">Até</span>
+                                    <input
+                                        type="date"
+                                        className="w-full h-10 rounded-lg border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 bg-slate-50 outline-none transition-all px-3"
+                                        value={localFilters.creationEndDate || ''}
+                                        onChange={(e) => setLocalFilters(prev => ({ ...prev, creationEndDate: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section: People */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                            <User className="h-3 w-3" /> Pessoas
+                        </h3>
+
+                        {/* Responsáveis */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Responsáveis (Dono Atual)</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar responsável..."
+                                    className="w-full pl-9 h-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all mb-2"
+                                    value={searchOwner}
+                                    onChange={(e) => setSearchOwner(e.target.value)}
+                                />
+                            </div>
+                            <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-1 space-y-0.5 bg-gray-50/30 custom-scrollbar">
+                                {filteredProfiles.map(profile => {
+                                    const isSelected = (localFilters.ownerIds || []).includes(profile.id)
+                                    return (
+                                        <label key={profile.id} className={cn(
+                                            "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
+                                            isSelected ? "bg-primary/5" : "hover:bg-white"
+                                        )}>
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelection('ownerIds', profile.id)}
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary border border-primary/20">
+                                                    {(profile.full_name || profile.email || '?').substring(0, 2).toUpperCase()}
+                                                </div>
+                                                <span className={cn("text-sm", isSelected ? "font-medium text-primary-dark" : "text-gray-700")}>
+                                                    {profile.full_name || profile.email}
+                                                </span>
+                                            </div>
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* SDRs */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">SDRs (Pré-venda)</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar SDR..."
+                                    className="w-full pl-9 h-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all mb-2"
+                                    value={searchSdr}
+                                    onChange={(e) => setSearchSdr(e.target.value)}
+                                />
+                            </div>
+                            <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-1 space-y-0.5 bg-gray-50/30 custom-scrollbar">
+                                {filteredSdrs.map(profile => {
+                                    const isSelected = (localFilters.sdrIds || []).includes(profile.id)
+                                    return (
+                                        <label key={`sdr-${profile.id}`} className={cn(
+                                            "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
+                                            isSelected ? "bg-secondary/5" : "hover:bg-white"
+                                        )}>
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-secondary focus:ring-secondary"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelection('sdrIds', profile.id)}
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-secondary/10 flex items-center justify-center text-xs font-bold text-secondary border border-secondary/20">
+                                                    {(profile.full_name || profile.email || '?').substring(0, 2).toUpperCase()}
+                                                </div>
+                                                <span className={cn("text-sm", isSelected ? "font-medium text-secondary-dark" : "text-gray-700")}>
+                                                    {profile.full_name || profile.email}
+                                                </span>
+                                            </div>
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section: Organization */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                            <Users className="h-3 w-3" /> Organização
+                        </h3>
+
+                        {/* Times */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Times</label>
+                            <input
+                                type="text"
+                                placeholder="Filtrar times..."
+                                className="w-full h-10 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all mb-2"
+                                value={searchTeam}
+                                onChange={(e) => setSearchTeam(e.target.value)}
+                            />
+                            <div className="flex flex-wrap gap-2">
+                                {filteredTeams.map(team => (
+                                    <button
+                                        key={team.id}
+                                        onClick={() => toggleSelection('teamIds', team.id)}
+                                        className={cn(
+                                            "px-3 py-1.5 text-xs font-medium rounded-lg border transition-all",
+                                            (localFilters.teamIds || []).includes(team.id)
+                                                ? "bg-primary text-white border-primary shadow-sm"
+                                                : "border-gray-200 text-gray-600 hover:border-primary/50 hover:text-primary bg-white"
+                                        )}
+                                    >
+                                        {team.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Macro Áreas */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Macro Áreas</label>
+                            <div className="flex flex-wrap gap-2">
+                                {departments.map(dept => (
+                                    <button
+                                        key={dept.id}
+                                        onClick={() => toggleSelection('departmentIds', dept.id)}
+                                        className={cn(
+                                            "px-3 py-1.5 text-xs font-medium rounded-lg border transition-all",
+                                            (localFilters.departmentIds || []).includes(dept.id)
+                                                ? "bg-secondary text-white border-secondary shadow-sm"
+                                                : "border-gray-200 text-gray-600 hover:border-secondary/50 hover:text-secondary bg-white"
+                                        )}
+                                    >
+                                        {dept.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section: Details */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                            <Tag className="h-3 w-3" /> Detalhes
+                        </h3>
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Tags</label>
+                            <div className="flex flex-wrap gap-2">
+                                {['VIP', 'Urgente', 'Lua de Mel', 'Corporativo', 'Indicação'].map(tag => (
+                                    <button
+                                        key={tag}
+                                        onClick={() => {
+                                            const currentTags = localFilters.tags || []
+                                            const newTags = currentTags.includes(tag)
+                                                ? currentTags.filter(t => t !== tag)
+                                                : [...currentTags, tag]
+                                            setLocalFilters(prev => ({ ...prev, tags: newTags }))
+                                        }}
+                                        className={cn(
+                                            "px-3 py-1 text-xs font-medium rounded-full border transition-all",
+                                            (localFilters.tags || []).includes(tag)
+                                                ? "bg-gray-900 text-white border-gray-900 shadow-sm"
+                                                : "border-gray-200 text-gray-600 hover:border-gray-900 hover:text-gray-900 bg-white"
+                                        )}
+                                    >
+                                        {tag}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-6 border-t border-gray-100 bg-white flex items-center justify-between gap-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-10">
+                    <button
+                        onClick={clearFilters}
+                        className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors px-4 py-2 rounded-lg hover:bg-gray-50"
+                    >
+                        Limpar Filtros
+                    </button>
+                    <Button onClick={applyFilters} className="w-full max-w-[240px] shadow-lg shadow-primary/20">
+                        Aplicar Filtros
+                    </Button>
+                </div>
+            </div>
+        </>
+    )
+}
