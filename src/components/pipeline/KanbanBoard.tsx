@@ -44,6 +44,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const { collapsedPhases, setCollapsedPhases } = usePipelineFilters()
     const { validateMove } = useQualityGate()
     const { session } = useAuth() // Need auth to know who "ME" is
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -362,8 +363,6 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     }
 
     if (!stages || !cards) return <div className="h-full w-full animate-pulse bg-gray-100 rounded-lg"></div>
-
-    const scrollContainerRef = useRef<HTMLDivElement>(null)
 
     const togglePhase = (phaseName: string) => {
         const isCollapsing = !collapsedPhases.includes(phaseName)
