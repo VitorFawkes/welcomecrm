@@ -6,7 +6,8 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 export function ActiveFilters() {
-    const { filters, setFilters } = usePipelineFilters()
+    const { filters: rawFilters, setFilters } = usePipelineFilters()
+    const filters = rawFilters || {}
     const { data: options } = useFilterOptions()
 
     const hasFilters = Object.keys(filters).length > 0 && (

@@ -37,7 +37,8 @@ interface KanbanBoardProps {
     className?: string // Allow parent to control layout/padding
 }
 
-export default function KanbanBoard({ productFilter, viewMode, subView, filters, className }: KanbanBoardProps) {
+export default function KanbanBoard({ productFilter, viewMode, subView, filters: propFilters, className }: KanbanBoardProps) {
+    const filters = propFilters || {}
     const queryClient = useQueryClient()
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases } = usePipelineFilters()
