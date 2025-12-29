@@ -41,13 +41,17 @@ export function useStageRequirements(card: Card) {
                         type
                     )
                 `)
-                .eq('required', true)
+                .eq('is_required', true)
                 .eq('pipeline_stages.pipeline_id', pipelineId)
-                .order('pipeline_stages(ordem)', { ascending: true })
+            // .order('pipeline_stages(ordem)', { ascending: true }) // Causing 400 error, sorting in JS instead
 
             if (error) throw error
 
-            return (data || []).map((config: any) => ({
+            const sortedData = (data || []).sort((a: any, b: any) => {
+                return (a.pipeline_stages?.ordem || 0) - (b.pipeline_stages?.ordem || 0)
+            })
+
+            return sortedData.map((config: any) => ({
                 field_key: config.field_key,
                 label: config.system_fields?.label || config.field_key,
                 stage_id: config.stage_id,

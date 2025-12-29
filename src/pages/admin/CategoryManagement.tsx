@@ -59,9 +59,9 @@ export default function CategoryManagement() {
                         .eq('tipo', 'solicitacao_mudanca')
                         // @ts-ignore - Supabase JSON filtering syntax
                         .eq('metadata->>change_category', cat.key);
-                    counts[cat.id] = count || 0;
+                    counts[cat.key] = count || 0;
                 } else {
-                    counts[cat.id] = 0; // Unknown scope usage
+                    counts[cat.key] = 0; // Unknown scope usage
                 }
             }));
 
@@ -100,11 +100,11 @@ export default function CategoryManagement() {
 
     // Toggle Visibility Mutation
     const toggleVisibilityMutation = useMutation({
-        mutationFn: async ({ id, visible }: { id: string, visible: boolean }) => {
+        mutationFn: async ({ key, visible }: { key: string, visible: boolean }) => {
             const { error } = await supabase
                 .from('activity_categories')
                 .update({ visible })
-                .eq('id', id);
+                .eq('key', key);
             if (error) throw error;
         },
         onSuccess: () => {
@@ -118,11 +118,11 @@ export default function CategoryManagement() {
 
     // Delete Mutation
     const deleteMutation = useMutation({
-        mutationFn: async (id: string) => {
+        mutationFn: async (key: string) => {
             const { error } = await supabase
                 .from('activity_categories')
                 .delete()
-                .eq('id', id);
+                .eq('key', key);
             if (error) throw error;
         },
         onSuccess: () => {
@@ -142,7 +142,7 @@ export default function CategoryManagement() {
 
     // Stats Calculation
     const totalCategories = categories?.length || 0;
-    const unusedCategories = categories?.filter(c => (usageCounts?.[c.id] || 0) === 0).length || 0;
+    const unusedCategories = categories?.filter(c => (usageCounts?.[c.key] || 0) === 0).length || 0;
     const hiddenCategories = categories?.filter(c => !c.visible).length || 0;
 
     if (isLoading) {
@@ -231,11 +231,11 @@ export default function CategoryManagement() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {categories?.map((cat) => {
-                            const count = usageCounts?.[cat.id] || 0;
+                            const count = usageCounts?.[cat.key] || 0;
                             const isUsed = count > 0;
 
                             return (
-                                <tr key={cat.id} className="hover:bg-gray-50/50 transition-colors">
+                                <tr key={cat.key} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="px-6 py-3 text-gray-500 font-mono text-xs uppercase">{cat.scope}</td>
                                     <td className="px-6 py-3 font-medium text-gray-900">{cat.label}</td>
                                     <td className="px-6 py-3 text-gray-400 font-mono text-xs">{cat.key}</td>
@@ -252,7 +252,7 @@ export default function CategoryManagement() {
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => toggleVisibilityMutation.mutate({ id: cat.id, visible: !cat.visible })}
+                                            onClick={() => toggleVisibilityMutation.mutate({ key: cat.key, visible: !cat.visible })}
                                             className={cat.visible ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-gray-400 hover:text-gray-600"}
                                             title={cat.visible ? "Visível" : "Oculto"}
                                         >
@@ -275,7 +275,7 @@ export default function CategoryManagement() {
                                                 size="sm"
                                                 onClick={() => {
                                                     if (confirm('Tem certeza? Esta categoria não está em uso, mas a ação é irreversível.')) {
-                                                        deleteMutation.mutate(cat.id);
+                                                        deleteMutation.mutate(cat.key);
                                                     }
                                                 }}
                                                 className="text-red-400 hover:text-red-600 hover:bg-red-50"

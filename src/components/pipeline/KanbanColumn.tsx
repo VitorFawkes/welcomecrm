@@ -9,9 +9,10 @@ type Stage = Database['public']['Tables']['pipeline_stages']['Row']
 interface KanbanColumnProps {
     stage: Stage
     cards: Card[]
+    phaseColor: string
 }
 
-export default function KanbanColumn({ stage, cards }: KanbanColumnProps) {
+export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnProps) {
     const { setNodeRef, isOver } = useDroppable({
         id: stage.id,
         data: stage
@@ -19,23 +20,20 @@ export default function KanbanColumn({ stage, cards }: KanbanColumnProps) {
 
     const totalValue = cards.reduce((acc, card) => acc + (card.valor_estimado || 0), 0)
 
-    // Phase color mapping - Updated for Premium Look (Subtle borders)
-    // Static color map for solid visibility
-    const phaseColors: Record<string, string> = {
-        'SDR': 'border-t-blue-500',
-        'Planner': 'border-t-purple-500',
-        'Pós-venda': 'border-t-green-500',
-        'Outro': 'border-t-gray-500'
-    };
-
-    // Robust fallback logic
-    const borderColor = phaseColors[stage.fase || 'Outro'];
+    // Robust color handling
+    const isHex = phaseColor.startsWith('#') || phaseColor.startsWith('rgb')
+    const borderClass = !isHex && phaseColor.startsWith('bg-') ? phaseColor.replace('bg-', 'border-t-') : ''
+    const style = isHex ? { borderTopColor: phaseColor } : {}
 
     return (
-        <div className={cn(
-            "flex h-full w-80 min-w-[20rem] shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-white",
-            "border-t-4", borderColor
-        )}>
+        <div
+            className={cn(
+                "flex h-full w-80 min-w-[20rem] shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-white",
+                "border-t-4",
+                borderClass
+            )}
+            style={style}
+        >
             {/* Header with White Strip */}
             <div className="bg-white border-b border-gray-200 p-4 rounded-t-xl shadow-sm">
                 <div className="flex items-center justify-between mb-2">

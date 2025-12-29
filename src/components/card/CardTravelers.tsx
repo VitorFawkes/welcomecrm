@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Users, Loader2, Edit2, Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
-import type { Contato } from '../../database.types'
+import type { Database } from '../../database.types'
+
+type Contato = Database['public']['Tables']['contatos']['Row']
 import { supabase } from '../../lib/supabase'
 import { calculateAge } from '../../lib/contactUtils'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'

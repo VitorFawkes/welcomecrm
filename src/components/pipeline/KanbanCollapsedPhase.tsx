@@ -1,28 +1,23 @@
 import { cn } from '../../lib/utils'
 
 interface KanbanCollapsedPhaseProps {
-    phaseName: string
     totalCount: number
     totalValue: number
+    phaseColor: string
     onClick: () => void
     onDragOver?: () => void
 }
 
 export default function KanbanCollapsedPhase({
-    phaseName,
     totalValue,
+    phaseColor,
     onClick,
     onDragOver
 }: KanbanCollapsedPhaseProps) {
-    // Phase color mapping - Consistent with KanbanColumn
-    const phaseColors: Record<string, string> = {
-        'SDR': 'border-t-blue-500',
-        'Planner': 'border-t-purple-500',
-        'Pós-venda': 'border-t-green-500',
-        'Outro': 'border-t-gray-500'
-    };
-
-    const borderColor = phaseColors[phaseName || 'Outro'];
+    // Robust color handling
+    const isHex = phaseColor.startsWith('#') || phaseColor.startsWith('rgb')
+    const borderClass = !isHex && phaseColor.startsWith('bg-') ? phaseColor.replace('bg-', 'border-t-') : ''
+    const style = isHex ? { borderTopColor: phaseColor } : {}
 
     return (
         <div
@@ -35,8 +30,10 @@ export default function KanbanCollapsedPhase({
                 "group relative flex h-full w-48 flex-col items-center justify-end pb-24", // Increased width to w-48 to match parent
                 "cursor-pointer transition-all duration-300 ease-in-out",
                 "bg-gray-50 border border-gray-200 shadow-sm hover:shadow-md hover:bg-white", // Solid background
-                "rounded-xl border-t-4", borderColor // Colored top border
+                "rounded-xl border-t-4",
+                borderClass
             )}
+            style={style}
         >
             {/* Removed internal Header (Name/Count) as it's now in PhaseGroup */}
 

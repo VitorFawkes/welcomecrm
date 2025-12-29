@@ -1,0 +1,32 @@
+export const SystemPhase = {
+    SDR: 'sdr',
+    PLANNER: 'planner',
+    POS_VENDA: 'pos_venda',
+    RESOLUCAO: 'resolucao'
+} as const
+
+export type SystemPhase = typeof SystemPhase[keyof typeof SystemPhase]
+
+export interface PipelinePhase {
+    id: string
+    name: string
+    label: string
+    color: string
+    order_index: number
+    active: boolean
+    slug: string | null
+    created_at: string
+    updated_at: string | null
+}
+
+export interface PipelineStage {
+    id: string
+    pipeline_id: string
+    phase_id: string | null
+    nome: string
+    ordem: number
+    cor: string
+    fase: string // Legacy column, will be deprecated
+    created_at: string
+    updated_at: string
+}

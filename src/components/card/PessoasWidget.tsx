@@ -3,6 +3,7 @@ import { useState } from 'react'
 import ContactSelector from './ContactSelector'
 import CardTravelers from './CardTravelers'
 import TravelHistorySection from './TravelHistorySection'
+import ContactIntelligenceWidget from './ContactIntelligenceWidget'
 import { useCardPeople } from '../../hooks/useCardPeople'
 import type { Database } from '../../database.types'
 
@@ -93,6 +94,9 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
                                 </button>
                             </div>
                         </div>
+
+                        {/* Intelligence Widget */}
+                        <ContactIntelligenceWidget contactId={primary.id} />
                     </div>
                 ) : (
                     <button

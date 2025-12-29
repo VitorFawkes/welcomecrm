@@ -24,6 +24,8 @@ import QualityGateModal from './QualityGateModal'
 import StageChangeModal from './StageChangeModal'
 import { useStageRequirements } from '../../hooks/useStageRequirements'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
+import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { SystemPhase } from '@/types/pipeline'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -56,6 +58,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
     const { missingBlocking } = useStageRequirements(card)
     const { getHeaderFields } = useFieldConfig()
     const headerFields = card.pipeline_stage_id ? getHeaderFields(card.pipeline_stage_id) : []
+    const { data: phasesData } = usePipelinePhases()
 
     useEffect(() => {
         setEditedTitle(card.titulo || '')
@@ -154,11 +157,20 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
     })
 
-    const phaseColors = {
-        'SDR': 'bg-blue-600 text-white',
-        'Planner': 'bg-purple-600 text-white',
-        'Pós-venda': 'bg-green-600 text-white',
-        'Outro': 'bg-gray-600 text-white'
+    const getPhaseColor = (phaseName: string | null | undefined) => {
+        if (!phaseName) return 'bg-gray-600 text-white'
+        const phase = phasesData?.find(p => p.name === phaseName)
+        // If we have a phase color (e.g. bg-blue-600), we use it. 
+        // If not found, fallback to gray.
+        return phase?.color ? `${phase.color} text-white` : 'bg-gray-600 text-white'
+    }
+
+    const getPhaseBgColor = (phaseName: string | null | undefined) => {
+        if (!phaseName) return 'bg-gray-500'
+        const phase = phasesData?.find(p => p.name === phaseName)
+        // Extract the color name (e.g. blue-500) from bg-blue-500 if possible, or just return the class
+        // The DB stores 'bg-blue-600'.
+        return phase?.color || 'bg-gray-500'
     }
 
     const statusColors = {
@@ -238,7 +250,13 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
 
         // 2. Check Owner Change (SDR -> Planner)
-        if (card.fase === 'SDR' && stageFase && stageFase !== 'SDR') {
+        const currentPhase = phasesData?.find(p => p.name === card.fase)
+        const targetPhase = phasesData?.find(p => p.name === stageFase)
+
+        const isSdrPhase = currentPhase?.slug === SystemPhase.SDR
+        const isTargetSdr = targetPhase?.slug === SystemPhase.SDR
+
+        if (isSdrPhase && stageFase && !isTargetSdr) {
             setPendingStageChange({
                 stageId,
                 targetStageName: stageName,
@@ -260,7 +278,13 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
             // Check owner change after quality gate
             const targetStage = stages?.find(s => s.id === pendingStageChange.stageId)
-            if (card.fase === 'SDR' && targetStage?.fase && targetStage.fase !== 'SDR') {
+            const currentPhase = phasesData?.find(p => p.name === card.fase)
+            const targetPhase = phasesData?.find(p => p.name === targetStage?.fase)
+
+            const isSdrPhase = currentPhase?.slug === SystemPhase.SDR
+            const isTargetSdr = targetPhase?.slug === SystemPhase.SDR
+
+            if (isSdrPhase && targetStage?.fase && !isTargetSdr) {
                 setStageChangeModalOpen(true)
             } else {
                 updateStageMutation.mutate(pendingStageChange.stageId)
@@ -280,14 +304,16 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     const handleOwnerSelect = (userId: string | null) => {
         updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
-        if (card.fase === 'SDR') {
+        const currentPhase = phasesData?.find(p => p.name === card.fase)
+        if (currentPhase?.slug === SystemPhase.SDR) {
             updateOwnerMutation.mutate({ field: 'sdr_owner_id', userId })
         }
     }
 
     const handleSdrSelect = (userId: string | null) => {
         updateOwnerMutation.mutate({ field: 'sdr_owner_id', userId })
-        if (card.fase === 'SDR') {
+        const currentPhase = phasesData?.find(p => p.name === card.fase)
+        if (currentPhase?.slug === SystemPhase.SDR) {
             updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
         }
     }
@@ -346,9 +372,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             >
                                 <span className={cn(
                                     "w-2 h-2 rounded-full",
-                                    card.fase === 'SDR' ? 'bg-blue-500' :
-                                        card.fase === 'Planner' ? 'bg-purple-500' :
-                                            card.fase === 'Pós-venda' ? 'bg-green-500' : 'bg-gray-500'
+                                    getPhaseBgColor(card.fase)
                                 )} />
                                 {card.etapa_nome || stages?.find(s => s.id === card.pipeline_stage_id)?.nome || 'Sem Etapa'}
                                 <ChevronDown className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
@@ -368,9 +392,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                             >
                                                 <span className={cn(
                                                     "w-2.5 h-2.5 rounded-full shrink-0",
-                                                    stage.fase === 'SDR' ? 'bg-blue-500' :
-                                                        stage.fase === 'Planner' ? 'bg-purple-500' :
-                                                            stage.fase === 'Pós-venda' ? 'bg-green-500' : 'bg-gray-500'
+                                                    getPhaseBgColor(stage.fase)
                                                 )} />
                                                 <span className="truncate">{stage.nome}</span>
                                                 {card.pipeline_stage_id === stage.id && (
@@ -435,7 +457,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                         <div className="flex flex-wrap items-center gap-3 text-sm">
                             <span className={cn(
                                 "px-2.5 py-0.5 rounded-full font-semibold text-xs uppercase tracking-wide",
-                                phaseColors[card.fase as keyof typeof phaseColors] || phaseColors['Outro']
+                                getPhaseColor(card.fase)
                             )}>
                                 {card.fase}
                             </span>
@@ -526,7 +548,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                             // Fallback to column
                                             if (!startStr && !textValue && card.data_viagem_inicio) {
                                                 startStr = card.data_viagem_inicio
-                                                endStr = card.data_viagem_fim || ''
+                                                endStr = (card as any).data_viagem_fim || ''
                                             }
 
                                             // Calculate Countdown (still needs Date object, but only for diff)

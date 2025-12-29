@@ -3,7 +3,20 @@ import { DollarSign, Check, X, Edit2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import type { Database, TripsProdutoData } from '../../database.types'
+import type { Database } from '../../database.types'
+
+// Define locally as it's missing in database.types
+interface TripsProdutoData {
+    taxa_planejamento?: string;
+    taxa_valor?: number;
+    taxa_status?: string;
+    taxa_data_status?: string;
+    taxa_alterado_por?: string;
+    taxa_meio_pagamento?: string;
+    taxa_codigo_transacao?: string;
+    taxa_ativa?: boolean;
+    [key: string]: any;
+}
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 

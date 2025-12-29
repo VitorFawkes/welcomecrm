@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react'
-import { MapPin, Calendar, DollarSign, Tag, TrendingUp, X, Check, Edit2, History, AlertCircle, FileText, Globe, CreditCard, AlertTriangle, Eraser } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { MapPin, Calendar, DollarSign, Tag, X, Check, Edit2, History, AlertCircle, Globe, AlertTriangle, Eraser, Plane, FileCheck, ThumbsUp, Upload } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { supabase } from '../../lib/supabase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '../../lib/utils'
 import { useStageRequirements } from '../../hooks/useStageRequirements'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
+import MarketingView from './MarketingView'
+import { Button } from '../ui/Button'
+import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { SystemPhase } from '../../types/pipeline'
 
 interface TripsProdutoData {
     orcamento?: {
@@ -26,11 +30,14 @@ interface TripsProdutoData {
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row'] & {
     briefing_inicial?: TripsProdutoData | null
+    marketing_data?: any | null
 }
 
 interface TripInformationProps {
     card: Card
 }
+
+type ViewMode = 'SDR' | 'PLANNER' | 'POS_VENDA' | 'MARKETING'
 
 interface EditModalProps {
     isOpen: boolean
@@ -45,10 +52,8 @@ interface EditModalProps {
 function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorrection }: EditModalProps) {
     if (!isOpen) return null
 
-    // Handle Enter key to save
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
-            // Don't trigger on textarea (allow line breaks there)
             const target = e.target as HTMLElement
             if (target.tagName !== 'TEXTAREA') {
                 e.preventDefault()
@@ -67,7 +72,6 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
                 "relative rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden transition-all",
                 isCorrection ? "bg-[#fffbf0] border-2 border-amber-200" : "bg-white"
             )}>
-                {/* Header */}
                 <div className={cn(
                     "flex items-center justify-between px-5 py-4 border-b",
                     isCorrection ? "bg-amber-100/50" : "bg-gradient-to-r from-indigo-50 to-white"
@@ -78,15 +82,11 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
                             {title}
                         </h3>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1 rounded-full hover:bg-black/5 transition-colors"
-                    >
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-black/5 transition-colors">
                         <X className="h-5 w-5 text-gray-500" />
                     </button>
                 </div>
 
-                {/* Warning for Correction Mode */}
                 {isCorrection && (
                     <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex gap-3">
                         <div className="mt-0.5">
@@ -94,22 +94,17 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
                         </div>
                         <div className="text-xs text-amber-800">
                             <span className="font-bold block mb-0.5">Modo de Correção Histórica</span>
-                            Você está alterando o registro original do pedido. Use apenas para corrigir erros de digitação ou informações que foram registradas erradas no passado.
+                            Você está alterando o registro original do SDR. Use isso para corrigir erros de digitação ou informações erradas.
                         </div>
                     </div>
                 )}
 
-                {/* Content */}
                 <div className="p-5">
                     {children}
                 </div>
 
-                {/* Footer */}
                 <div className={cn("flex items-center justify-end gap-3 px-5 py-4 border-t", isCorrection ? "bg-amber-50/50" : "bg-gray-50")}>
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
+                    <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                         Cancelar
                     </button>
                     <button
@@ -138,53 +133,74 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
     )
 }
 
-export default function TripInformation({ card }: TripInformationProps) {
-    const productData = (card.produto_data as TripsProdutoData) || {}
-    const briefingData = (card.briefing_inicial as TripsProdutoData) || {}
+const EMPTY_OBJECT = {}
 
+export default function TripInformation({ card }: TripInformationProps) {
+    // Fix: Use useMemo and a stable empty object to prevent infinite loops
+    const productData = useMemo(() => (card.produto_data as TripsProdutoData) || EMPTY_OBJECT, [card.produto_data])
+    const briefingData = useMemo(() => (card.briefing_inicial as TripsProdutoData) || EMPTY_OBJECT, [card.briefing_inicial])
+    const marketingData = useMemo(() => (card.marketing_data as any) || EMPTY_OBJECT, [card.marketing_data])
+
+    const [viewMode, setViewMode] = useState<ViewMode>('SDR')
     const [editingField, setEditingField] = useState<string | null>(null)
     const [editedData, setEditedData] = useState<TripsProdutoData>(productData)
     const [destinosInput, setDestinosInput] = useState('')
-    const [showBriefing, setShowBriefing] = useState(false)
+    const [correctionMode, setCorrectionMode] = useState(false)
+
     const queryClient = useQueryClient()
-
     const { missingBlocking, missingFuture } = useStageRequirements(card)
+    const { } = useFieldConfig()
+    const { data: phases } = usePipelinePhases()
 
-    const displayData = showBriefing ? briefingData : productData
-
-    const { getVisibleFields } = useFieldConfig()
-    // Get fields for 'trip_info' section (or 'details' if legacy)
-    // We might want to show multiple sections here? For now let's assume 'trip_info' covers it.
-    // Actually, the previous code fetched ALL active system fields. 
-    // But TripInformation is semantically about the trip.
-    // Let's get 'trip_info' section fields.
-    const visibleFields = card.pipeline_stage_id ? getVisibleFields(card.pipeline_stage_id, 'trip_info') : []
-
-    // Update editedData when card or mode changes
+    // Sync ViewMode with Card Stage
     useEffect(() => {
-        setEditedData(showBriefing ? briefingData : productData)
-    }, [card.produto_data, card.briefing_inicial, showBriefing])
+        if (!phases) return
+
+        const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
+        const plannerPhase = phases.find(p => p.slug === SystemPhase.PLANNER)
+        const posVendaPhase = phases.find(p => p.slug === SystemPhase.POS_VENDA)
+
+        if (sdrPhase && card.fase === sdrPhase.name) setViewMode('SDR')
+        else if (plannerPhase && card.fase === plannerPhase.name) setViewMode('PLANNER')
+        else if (posVendaPhase && card.fase === posVendaPhase.name) setViewMode('POS_VENDA')
+        else setViewMode('SDR') // Default
+    }, [card.fase, phases])
+
+    // Determine which data to display/edit based on ViewMode and CorrectionMode
+    // SDR View: Shows briefingData (or productData if briefing is empty/synced)
+    // Planner View: Shows productData (Proposal) AND briefingData (History)
+    const activeData = (viewMode === 'SDR' || correctionMode) ? briefingData : productData
+
+    useEffect(() => {
+        setEditedData(activeData)
+    }, [activeData, viewMode, correctionMode])
 
     const updateCardMutation = useMutation({
         mutationFn: async ({ newData, target }: { newData: TripsProdutoData, target: 'produto_data' | 'briefing_inicial' }) => {
             const updates: any = { [target]: newData }
 
-            // Only sync legacy columns if we are updating the CURRENT product data
+            // If updating 'produto_data' (Planner Proposal), sync legacy columns
             if (target === 'produto_data') {
-                // Wave 1B: Sync Budget to Value
-                if (newData.orcamento?.total) {
-                    updates.valor_estimado = newData.orcamento.total
-                }
-                // Sync Trip Dates
-                if (newData.epoca_viagem?.inicio) {
-                    updates.data_viagem_inicio = newData.epoca_viagem.inicio
-                } else {
-                    updates.data_viagem_inicio = null
-                }
-                if (newData.epoca_viagem?.fim) {
-                    updates.data_viagem_fim = newData.epoca_viagem.fim
-                } else {
-                    updates.data_viagem_fim = null
+                if (newData.orcamento?.total) updates.valor_estimado = newData.orcamento.total
+                if (newData.epoca_viagem?.inicio) updates.data_viagem_inicio = newData.epoca_viagem.inicio
+                else updates.data_viagem_inicio = null
+                if (newData.epoca_viagem?.fim) updates.data_viagem_fim = newData.epoca_viagem.fim
+                else updates.data_viagem_fim = null
+            }
+            // If updating 'briefing_inicial' (SDR Correction), ALSO sync 'produto_data' IF we are in SDR stage
+            // This keeps them in sync until the Planner starts diverging
+            else if (target === 'briefing_inicial') {
+                const sdrPhase = phases?.find(p => p.slug === SystemPhase.SDR)
+                const isSdr = sdrPhase && card.fase === sdrPhase.name
+
+                if (isSdr) {
+                    updates.produto_data = newData
+                    // And sync legacy
+                    if (newData.orcamento?.total) updates.valor_estimado = newData.orcamento.total
+                    if (newData.epoca_viagem?.inicio) updates.data_viagem_inicio = newData.epoca_viagem.inicio
+                    else updates.data_viagem_inicio = null
+                    if (newData.epoca_viagem?.fim) updates.data_viagem_fim = newData.epoca_viagem.fim
+                    else updates.data_viagem_fim = null
                 }
             }
 
@@ -197,15 +213,19 @@ export default function TripInformation({ card }: TripInformationProps) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
             queryClient.invalidateQueries({ queryKey: ['card', card.id] })
-            queryClient.invalidateQueries({ queryKey: ['cards'] })
             setEditingField(null)
         }
     })
 
     const handleFieldSave = () => {
+        // Target depends on:
+        // 1. Correction Mode -> Always 'briefing_inicial'
+        // 2. View Mode -> SDR = 'briefing_inicial', Planner = 'produto_data'
+        const target = (correctionMode || viewMode === 'SDR') ? 'briefing_inicial' : 'produto_data'
+
         updateCardMutation.mutate({
             newData: editedData,
-            target: showBriefing ? 'briefing_inicial' : 'produto_data'
+            target
         })
     }
 
@@ -214,62 +234,40 @@ export default function TripInformation({ card }: TripInformationProps) {
     }
 
     const handleCloseModal = () => {
-        setEditedData(showBriefing ? briefingData : productData)
+        setEditedData(activeData)
         setEditingField(null)
         setDestinosInput('')
     }
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return ''
-        return new Date(dateStr).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        })
+        return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
     }
 
     const formatBudget = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }).format(value)
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
     }
 
     const getFieldStatus = (dataKey: string) => {
-        // Briefing mode doesn't show validation errors (it's history)
-        if (showBriefing) return 'ok'
-
+        if (viewMode !== 'SDR' && viewMode !== 'PLANNER') return 'ok' // Only validate in early stages
+        if (correctionMode) return 'ok'
         if (missingBlocking.some(req => req.field_key === dataKey)) return 'blocking'
         if (missingFuture.some(req => req.field_key === dataKey)) return 'attention'
         return 'ok'
     }
 
-    // Field Card Component
-    const FieldCard = ({
-        icon: Icon,
-        iconColor,
-        label,
-        value,
-        subValue,
-        fieldName,
-        dataKey
-    }: {
-        icon: any
-        iconColor: string
-        label: string
-        value: string | React.ReactNode
-        subValue?: string
-        fieldName: string
-        dataKey: string
-    }) => {
+    // --- RENDERERS ---
+
+    const FieldCard = ({ icon: Icon, iconColor, label, value, subValue, fieldName, dataKey, sdrValue }: any) => {
         const status = getFieldStatus(dataKey)
+        const isPlanner = viewMode === 'PLANNER'
+        const showSdrComparison = isPlanner && sdrValue && JSON.stringify(sdrValue) !== JSON.stringify(value)
 
         return (
             <div
                 className={cn(
                     "group relative p-4 rounded-xl border transition-all duration-200",
-                    // Visual Styles based on Mode
-                    showBriefing
+                    correctionMode
                         ? "bg-[#fdfbf7] border-amber-200/50 border-dashed hover:border-amber-300 hover:bg-[#fffdf9] cursor-pointer"
                         : cn(
                             "bg-white",
@@ -284,23 +282,20 @@ export default function TripInformation({ card }: TripInformationProps) {
                 )}
                 onClick={() => handleFieldEdit(fieldName)}
             >
-                {/* Edit/Correction Icon */}
                 <div className={cn(
                     "absolute top-3 right-3 transition-opacity",
-                    showBriefing ? "opacity-0 group-hover:opacity-100" : "opacity-0 group-hover:opacity-100"
+                    correctionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 )}>
-                    {showBriefing ? (
+                    {correctionMode ? (
                         <div className="flex items-center gap-1 text-amber-600 bg-amber-100 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                            <Eraser className="h-3 w-3" />
-                            Corrigir
+                            <Eraser className="h-3 w-3" /> Corrigir
                         </div>
                     ) : (
                         <Edit2 className="h-4 w-4 text-indigo-500" />
                     )}
                 </div>
 
-                {/* Status Indicator (Only in Normal Mode) */}
-                {status !== 'ok' && !showBriefing && (
+                {status !== 'ok' && !correctionMode && (
                     <div className={cn(
                         "absolute -top-2 -right-2 p-1 rounded-full shadow-sm border",
                         status === 'blocking' ? "bg-red-100 border-red-200 text-red-600" : "bg-orange-100 border-orange-200 text-orange-600"
@@ -312,22 +307,23 @@ export default function TripInformation({ card }: TripInformationProps) {
                 <div className="flex items-start gap-3">
                     <div className={cn(
                         "p-2 rounded-lg transition-colors",
-                        showBriefing ? "bg-gray-100 text-gray-400 grayscale" : iconColor
+                        correctionMode ? "bg-gray-100 text-gray-400 grayscale" : iconColor
                     )}>
                         <Icon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className={cn(
                             "text-xs font-medium uppercase tracking-wide mb-1 flex items-center gap-2",
-                            showBriefing ? "text-gray-400 font-mono" : "text-gray-500"
+                            correctionMode ? "text-gray-400 font-mono" : "text-gray-500"
                         )}>
                             {label}
                             {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold font-sans">Obrigatório</span>}
-                            {status === 'attention' && <span className="text-[10px] text-orange-600 font-bold font-sans">Futuro</span>}
                         </p>
+
+                        {/* Main Value */}
                         <div className={cn(
                             "text-sm truncate",
-                            showBriefing ? "font-mono text-gray-700 font-medium" : "font-semibold text-gray-900"
+                            correctionMode ? "font-mono text-gray-700 font-medium" : "font-semibold text-gray-900"
                         )}>
                             {value || (
                                 status === 'blocking' ? <span className="text-red-500 italic font-medium font-sans">Obrigatório</span> :
@@ -335,525 +331,367 @@ export default function TripInformation({ card }: TripInformationProps) {
                             )}
                         </div>
                         {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
+
+                        {/* SDR Comparison (Planner View Only) */}
+                        {showSdrComparison && (
+                            <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-500">
+                                <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">SDR</span>
+                                <span className="line-through opacity-70">{sdrValue}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
         )
     }
 
-    // Generic Render Function
-    const renderField = (field: any) => {
-        // Handle Legacy/Complex Fields
-        if (field.key === 'epoca_viagem') {
-            return (
-                <FieldCard
-                    key={field.key}
-                    icon={Calendar}
-                    iconColor="bg-orange-100 text-orange-600"
-                    label={field.label}
-                    value={displayData.epoca_viagem?.inicio ? (
-                        <>
-                            {formatDate(displayData.epoca_viagem.inicio)}
-                            {displayData.epoca_viagem.fim && ` até ${formatDate(displayData.epoca_viagem.fim)}`}
-                        </>
-                    ) : undefined}
-                    subValue={displayData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
-                    fieldName="periodo" // Maps to legacy modal
-                    dataKey="epoca_viagem"
-                />
-            )
-        }
-
-        if (field.key === 'orcamento') {
-            return (
-                <FieldCard
-                    key={field.key}
-                    icon={DollarSign}
-                    iconColor="bg-green-100 text-green-600"
-                    label={field.label}
-                    value={displayData.orcamento?.total ? formatBudget(displayData.orcamento.total) : undefined}
-                    subValue={displayData.orcamento?.por_pessoa ? `${formatBudget(displayData.orcamento.por_pessoa)} por pessoa` : undefined}
-                    fieldName="orcamento" // Maps to legacy modal
-                    dataKey="orcamento"
-                />
-            )
-        }
-
-        if (field.key === 'destinos') {
-            return (
-                <FieldCard
-                    key={field.key}
-                    icon={MapPin}
-                    iconColor="bg-blue-100 text-blue-600"
-                    label={field.label}
-                    value={displayData.destinos?.length ? displayData.destinos.join(' • ') : undefined}
-                    fieldName="destinos" // Maps to legacy modal
-                    dataKey="destinos"
-                />
-            )
-        }
-
-        if (field.key === 'origem' || field.key === 'origem_lead') {
-            const val = (displayData as any).origem_lead || (displayData as any).origem
-            return (
-                <FieldCard
-                    key={field.key}
-                    icon={TrendingUp}
-                    iconColor="bg-cyan-100 text-cyan-600"
-                    label={field.label}
-                    value={val}
-                    fieldName="origem" // Maps to legacy modal
-                    dataKey="origem_lead"
-                />
-            )
-        }
-
-        if (field.key === 'motivo') {
-            return (
-                <FieldCard
-                    key={field.key}
-                    icon={Tag}
-                    iconColor="bg-purple-100 text-purple-600"
-                    label={field.label}
-                    value={displayData.motivo}
-                    fieldName="motivo" // Maps to legacy modal
-                    dataKey="motivo"
-                />
-            )
-        }
-
-        // Generic Field Rendering
-        let Icon = FileText
-        let iconColor = "bg-gray-100 text-gray-600"
-
-        if (field.type === 'date') {
-            Icon = Calendar
-            iconColor = "bg-pink-100 text-pink-600"
-        } else if (field.type === 'currency') {
-            Icon = CreditCard
-            iconColor = "bg-emerald-100 text-emerald-600"
-        } else if (field.type === 'select' || field.type === 'multiselect') {
-            Icon = Globe
-            iconColor = "bg-indigo-100 text-indigo-600"
-        }
-
-        let value = (displayData as any)[field.key]
-        if (field.type === 'date' && value) {
-            value = formatDate(value)
-        } else if (field.type === 'currency' && value) {
-            value = formatBudget(value)
-        }
-
-        return (
-            <FieldCard
-                key={field.key}
-                icon={Icon}
-                iconColor={iconColor}
-                label={field.label}
-                value={value}
-                fieldName={field.key} // Maps to generic modal
-                dataKey={field.key}
-            />
-        )
-    }
-
-    // Generic Input Renderer
-    const renderGenericInput = (field: any) => {
-        const value = (editedData as any)[field.key] || ''
-
-        if (field.type === 'text') {
-            return (
-                <input
-                    type="text"
-                    value={value}
-                    onChange={(e) => setEditedData({ ...editedData, [field.key]: e.target.value })}
-                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    autoFocus
-                />
-            )
-        }
-
-        if (field.type === 'number' || field.type === 'currency') {
-            return (
-                <input
-                    type="number"
-                    value={value}
-                    onChange={(e) => setEditedData({ ...editedData, [field.key]: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    autoFocus
-                />
-            )
-        }
-
-        if (field.type === 'date') {
-            return (
-                <input
-                    type="date"
-                    value={value}
-                    onChange={(e) => setEditedData({ ...editedData, [field.key]: e.target.value })}
-                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    autoFocus
-                />
-            )
-        }
-
-        if (field.type === 'select') {
-            return (
-                <select
-                    value={value}
-                    onChange={(e) => setEditedData({ ...editedData, [field.key]: e.target.value })}
-                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    autoFocus
-                >
-                    <option value="">Selecione...</option>
-                    {field.options?.map((opt: string) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
-            )
-        }
-
-        return (
-            <p className="text-red-500">Tipo de campo não suportado: {field.type}</p>
-        )
-    }
-
-
+    // --- MAIN RENDER ---
     return (
-        <div className={cn(
-            "rounded-xl border shadow-sm transition-all duration-500",
-            showBriefing
-                ? "border-amber-200 bg-[#fdfbf7] shadow-inner" // Blueprint Theme
-                : "border-gray-300 bg-gradient-to-br from-white via-gray-50/50 to-indigo-50/30"
-        )}>
-            <div className="mb-4 p-5 pb-0 flex items-center justify-between">
-                <div>
-                    <h3 className={cn("text-base font-semibold flex items-center gap-2", showBriefing ? "text-amber-900 font-mono tracking-tight" : "text-gray-900")}>
-                        <div className={cn("p-1.5 rounded-lg transition-colors", showBriefing ? "bg-amber-100" : "bg-indigo-100")}>
-                            {showBriefing ? <History className="h-4 w-4 text-amber-600" /> : <Tag className="h-4 w-4 text-indigo-600" />}
-                        </div>
-                        {showBriefing ? "BRIEFING_INICIAL.json" : "Informações da Viagem"}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all duration-500">
+
+            {/* VIEW SWITCHER */}
+            <div className="border-b border-gray-200 bg-gray-50/50 px-4 pt-4">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                        {viewMode === 'SDR' && <Tag className="h-4 w-4 text-blue-600" />}
+                        {viewMode === 'PLANNER' && <Plane className="h-4 w-4 text-purple-600" />}
+                        {viewMode === 'POS_VENDA' && <FileCheck className="h-4 w-4 text-green-600" />}
+                        {viewMode === 'MARKETING' && <Globe className="h-4 w-4 text-pink-600" />}
+
+                        {viewMode === 'SDR' && "Briefing & Qualificação"}
+                        {viewMode === 'PLANNER' && "Construção da Proposta"}
+                        {viewMode === 'POS_VENDA' && "Entrega & Pós-Venda"}
+                        {viewMode === 'MARKETING' && "Marketing & Origem"}
                     </h3>
-                    <p className={cn("text-xs mt-1 ml-8 transition-colors", showBriefing ? "text-amber-700 font-medium font-mono" : "text-gray-500")}>
-                        {showBriefing ? "Registro imutável do pedido original (Snapshot)" : "Clique em um campo para editar"}
-                    </p>
-                </div>
-                <button
-                    onClick={() => setShowBriefing(!showBriefing)}
-                    className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border shadow-sm",
-                        showBriefing
-                            ? "bg-white text-amber-900 border-amber-200 hover:bg-amber-50 ring-2 ring-amber-100"
-                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+
+                    {/* Correction Toggle (Only visible in Planner/SDR views) */}
+                    {(viewMode === 'SDR' || viewMode === 'PLANNER') && (
+                        <button
+                            onClick={() => setCorrectionMode(!correctionMode)}
+                            className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border shadow-sm",
+                                correctionMode
+                                    ? "bg-amber-50 text-amber-900 border-amber-200 ring-2 ring-amber-100"
+                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                            )}
+                        >
+                            <History className="h-3.5 w-3.5" />
+                            {correctionMode ? "Sair da Correção" : "Corrigir Histórico SDR"}
+                        </button>
                     )}
-                >
-                    <History className="h-3.5 w-3.5" />
-                    {showBriefing ? "Voltar ao Atual" : "Ver Original"}
-                </button>
+                </div>
+
+                <div className="flex gap-6">
+                    {[
+                        { id: 'SDR', label: 'SDR', color: 'border-blue-500 text-blue-600' },
+                        { id: 'PLANNER', label: 'Planner', color: 'border-purple-500 text-purple-600' },
+                        { id: 'POS_VENDA', label: 'Pós-Venda', color: 'border-green-500 text-green-600' },
+                        { id: 'MARKETING', label: 'Marketing', color: 'border-pink-500 text-pink-600' }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => {
+                                setViewMode(tab.id as ViewMode)
+                                setCorrectionMode(false)
+                            }}
+                            className={cn(
+                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1",
+                                viewMode === tab.id
+                                    ? tab.color
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            )}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            <div className="p-5 pt-0">
+            {/* CONTENT AREA */}
+            <div className={cn(
+                "p-5",
+                correctionMode && "bg-[#fffbf7]"
+            )}>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {visibleFields.map(field => renderField(field))}
-                </div>
+                {/* MARKETING VIEW */}
+                {viewMode === 'MARKETING' && (
+                    <MarketingView cardId={card.id!} initialData={marketingData} />
+                )}
 
-                {/* Cliente Recorrente */}
-                {card.cliente_recorrente && (
-                    <div className="mt-4 p-3 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl flex items-center gap-2">
-                        <span className="text-xl">⭐</span>
-                        <p className="text-sm font-medium text-amber-800">
-                            Cliente Recorrente — Já viajou com a Welcome antes
-                        </p>
+                {/* SDR & PLANNER VIEWS (Shared Fields, Different Context) */}
+                {(viewMode === 'SDR' || viewMode === 'PLANNER') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Motivo */}
+                        <FieldCard
+                            icon={Tag}
+                            iconColor="bg-purple-100 text-purple-600"
+                            label="Motivo da Viagem"
+                            value={activeData.motivo}
+                            fieldName="motivo"
+                            dataKey="motivo"
+                            sdrValue={briefingData.motivo}
+                        />
+
+                        {/* Destinos */}
+                        <FieldCard
+                            icon={MapPin}
+                            iconColor="bg-blue-100 text-blue-600"
+                            label="Destinos"
+                            value={activeData.destinos?.length ? activeData.destinos.join(' • ') : undefined}
+                            fieldName="destinos"
+                            dataKey="destinos"
+                            sdrValue={briefingData.destinos?.join(' • ')}
+                        />
+
+                        {/* Período */}
+                        <FieldCard
+                            icon={Calendar}
+                            iconColor="bg-orange-100 text-orange-600"
+                            label="Período"
+                            value={activeData.epoca_viagem?.inicio ? (
+                                <>
+                                    {formatDate(activeData.epoca_viagem.inicio)}
+                                    {activeData.epoca_viagem.fim && ` até ${formatDate(activeData.epoca_viagem.fim)}`}
+                                </>
+                            ) : undefined}
+                            subValue={activeData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
+                            fieldName="periodo"
+                            dataKey="epoca_viagem"
+                            sdrValue={briefingData.epoca_viagem?.inicio ? formatDate(briefingData.epoca_viagem.inicio) : undefined}
+                        />
+
+                        {/* Orçamento */}
+                        <FieldCard
+                            icon={DollarSign}
+                            iconColor="bg-green-100 text-green-600"
+                            label="Orçamento"
+                            value={activeData.orcamento?.total ? formatBudget(activeData.orcamento.total) : undefined}
+                            subValue={activeData.orcamento?.por_pessoa ? `${formatBudget(activeData.orcamento.por_pessoa)} por pessoa` : undefined}
+                            fieldName="orcamento"
+                            dataKey="orcamento"
+                            sdrValue={briefingData.orcamento?.total ? formatBudget(briefingData.orcamento.total) : undefined}
+                        />
                     </div>
                 )}
 
-                {/* === MODAIS DE EDIÇÃO === */}
+                {/* POS-VENDA VIEW */}
+                {viewMode === 'POS_VENDA' && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Pre-Trip */}
+                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <Plane className="h-4 w-4" /> Pré-Embarque
+                                </h4>
+                                <div className="space-y-3">
+                                    {/* Placeholder for Post-Sales Fields - In a real implementation these would be dynamic fields */}
+                                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <span className="text-sm font-medium text-gray-700">Vouchers Enviados</span>
+                                        <Button variant="outline" size="sm" className="h-8 text-xs">
+                                            <Upload className="h-3 w-3 mr-1" /> Upload
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <span className="text-sm font-medium text-gray-700">Check-in Online</span>
+                                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Pendente</span>
+                                    </div>
+                                </div>
+                            </div>
 
-                {/* Modal: Motivo */}
-                <EditModal
-                    isOpen={editingField === 'motivo'}
-                    onClose={handleCloseModal}
-                    onSave={handleFieldSave}
-                    title="Motivo da Viagem"
-                    isSaving={updateCardMutation.isPending}
-                    isCorrection={showBriefing}
-                >
-                    <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Qual o motivo desta viagem?
-                        </label>
+                            {/* Post-Trip */}
+                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <ThumbsUp className="h-4 w-4" /> Feedback & NPS
+                                </h4>
+                                <div className="space-y-3">
+                                    <div className="p-3 bg-gray-50 rounded-lg">
+                                        <label className="text-xs text-gray-500 block mb-1">NPS Score</label>
+                                        <div className="flex gap-1">
+                                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                                <button key={n} className="w-6 h-6 rounded bg-white border border-gray-200 text-[10px] hover:bg-indigo-50 hover:border-indigo-200 transition-colors">
+                                                    {n}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="p-3 bg-gray-50 rounded-lg">
+                                        <label className="text-xs text-gray-500 block mb-1">Depoimento</label>
+                                        <textarea className="w-full text-sm bg-white border border-gray-200 rounded p-2 h-20 resize-none" placeholder="O que o cliente achou?" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* EDIT MODALS (Shared) */}
+            <EditModal
+                isOpen={editingField === 'motivo'}
+                onClose={handleCloseModal}
+                onSave={handleFieldSave}
+                title="Motivo da Viagem"
+                isSaving={updateCardMutation.isPending}
+                isCorrection={correctionMode}
+            >
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Qual o motivo desta viagem?</label>
+                    <input
+                        type="text"
+                        value={editedData.motivo || ''}
+                        onChange={(e) => setEditedData({ ...editedData, motivo: e.target.value })}
+                        className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        autoFocus
+                    />
+                </div>
+            </EditModal>
+
+            <EditModal
+                isOpen={editingField === 'destinos'}
+                onClose={handleCloseModal}
+                onSave={handleFieldSave}
+                title="Destino(s)"
+                isSaving={updateCardMutation.isPending}
+                isCorrection={correctionMode}
+            >
+                <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Quais destinos estão sendo considerados?</label>
+                    <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg shadow-sm bg-white min-h-[100px] content-start">
+                        {editedData.destinos?.map((dest, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
+                                <MapPin className="h-3 w-3" /> {dest}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newDestinos = [...(editedData.destinos || [])]
+                                        newDestinos.splice(i, 1)
+                                        setEditedData({ ...editedData, destinos: newDestinos })
+                                    }}
+                                    className="ml-1 p-0.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-200 rounded-full"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </span>
+                        ))}
                         <input
                             type="text"
-                            value={editedData.motivo || ''}
-                            onChange={(e) => setEditedData({ ...editedData, motivo: e.target.value })}
-                            className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow"
-                            placeholder="Ex: Lua de Mel, Férias em Família, Aniversário..."
-                            autoFocus
-                        />
-                    </div>
-                </EditModal>
-
-                {/* Modal: Destinos */}
-                <EditModal
-                    isOpen={editingField === 'destinos'}
-                    onClose={handleCloseModal}
-                    onSave={handleFieldSave}
-                    title="Destino(s)"
-                    isSaving={updateCardMutation.isPending}
-                    isCorrection={showBriefing}
-                >
-                    <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Quais destinos estão sendo considerados?
-                        </label>
-                        <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 bg-white min-h-[100px] content-start">
-                            {editedData.destinos?.map((dest, i) => (
-                                <span
-                                    key={i}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm"
-                                >
-                                    <MapPin className="h-3 w-3" />
-                                    {dest}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const newDestinos = [...(editedData.destinos || [])]
-                                            newDestinos.splice(i, 1)
-                                            setEditedData({ ...editedData, destinos: newDestinos })
-                                        }}
-                                        className="ml-1 p-0.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-200 rounded-full transition-colors"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </span>
-                            ))}
-                            <input
-                                type="text"
-                                value={destinosInput}
-                                onChange={(e) => setDestinosInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ',') {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        const val = destinosInput.trim().replace(/,/g, '')
-                                        if (val) {
-                                            const current = editedData.destinos || []
-                                            if (!current.includes(val)) {
-                                                setEditedData({ ...editedData, destinos: [...current, val] })
-                                            }
-                                            setDestinosInput('')
-                                        }
-                                    } else if (e.key === 'Backspace' && destinosInput === '' && (editedData.destinos?.length || 0) > 0) {
-                                        const newDestinos = [...(editedData.destinos || [])]
-                                        newDestinos.pop()
-                                        setEditedData({ ...editedData, destinos: newDestinos })
-                                    }
-                                }}
-                                onBlur={() => {
+                            value={destinosInput}
+                            onChange={(e) => setDestinosInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault()
                                     const val = destinosInput.trim().replace(/,/g, '')
                                     if (val) {
                                         const current = editedData.destinos || []
-                                        if (!current.includes(val)) {
-                                            setEditedData({ ...editedData, destinos: [...current, val] })
-                                        }
+                                        if (!current.includes(val)) setEditedData({ ...editedData, destinos: [...current, val] })
                                         setDestinosInput('')
                                     }
-                                }}
-                                className="flex-1 min-w-[120px] border-none outline-none focus:ring-0 p-1 text-base bg-transparent"
-                                placeholder={editedData.destinos?.length ? "" : "Digite um destino..."}
-                                autoFocus
-                            />
-                        </div>
-                        <p className="text-xs text-gray-500">💡 Digite e pressione Enter ou Vírgula para adicionar</p>
-                    </div>
-                </EditModal>
-
-                {/* Modal: Período */}
-                <EditModal
-                    isOpen={editingField === 'periodo'}
-                    onClose={handleCloseModal}
-                    onSave={handleFieldSave}
-                    title="Período da Viagem"
-                    isSaving={updateCardMutation.isPending}
-                    isCorrection={showBriefing}
-                >
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Data de Ida
-                                </label>
-                                <input
-                                    type="date"
-                                    value={editedData.epoca_viagem?.inicio ? editedData.epoca_viagem.inicio.substring(0, 10) : ''}
-                                    onChange={(e) => setEditedData({
-                                        ...editedData,
-                                        epoca_viagem: {
-                                            ...editedData.epoca_viagem,
-                                            inicio: e.target.value,
-                                            fim: editedData.epoca_viagem?.fim || '',
-                                            flexivel: editedData.epoca_viagem?.flexivel || false
-                                        }
-                                    })}
-                                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Data de Volta
-                                </label>
-                                <input
-                                    type="date"
-                                    value={editedData.epoca_viagem?.fim ? editedData.epoca_viagem.fim.substring(0, 10) : ''}
-                                    onChange={(e) => setEditedData({
-                                        ...editedData,
-                                        epoca_viagem: {
-                                            ...editedData.epoca_viagem,
-                                            inicio: editedData.epoca_viagem?.inicio || '',
-                                            fim: e.target.value,
-                                            flexivel: editedData.epoca_viagem?.flexivel || false
-                                        }
-                                    })}
-                                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                />
-                            </div>
-                        </div>
-                        <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                            <input
-                                type="checkbox"
-                                checked={editedData.epoca_viagem?.flexivel || false}
-                                onChange={(e) => setEditedData({
-                                    ...editedData,
-                                    epoca_viagem: {
-                                        ...editedData.epoca_viagem,
-                                        inicio: editedData.epoca_viagem?.inicio || '',
-                                        fim: editedData.epoca_viagem?.fim || '',
-                                        flexivel: e.target.checked
-                                    }
-                                })}
-                                className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <div>
-                                <p className="text-sm font-medium text-gray-900">Datas flexíveis</p>
-                                <p className="text-xs text-gray-500">O cliente tem flexibilidade nas datas</p>
-                            </div>
-                        </label>
-                    </div>
-                </EditModal>
-
-                {/* Modal: Orçamento */}
-                <EditModal
-                    isOpen={editingField === 'orcamento'}
-                    onClose={handleCloseModal}
-                    onSave={handleFieldSave}
-                    title="Orçamento"
-                    isSaving={updateCardMutation.isPending}
-                    isCorrection={showBriefing}
-                >
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Orçamento Total (R$)
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                                <input
-                                    type="number"
-                                    value={editedData.orcamento?.total || ''}
-                                    onChange={(e) => setEditedData({
-                                        ...editedData,
-                                        orcamento: {
-                                            ...editedData.orcamento,
-                                            total: parseFloat(e.target.value) || 0,
-                                            por_pessoa: editedData.orcamento?.por_pessoa || 0
-                                        }
-                                    })}
-                                    className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                    placeholder="0,00"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Orçamento por Pessoa (R$)
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                                <input
-                                    type="number"
-                                    value={editedData.orcamento?.por_pessoa || ''}
-                                    onChange={(e) => setEditedData({
-                                        ...editedData,
-                                        orcamento: {
-                                            ...editedData.orcamento,
-                                            total: editedData.orcamento?.total || 0,
-                                            por_pessoa: parseFloat(e.target.value) || 0
-                                        }
-                                    })}
-                                    className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                    placeholder="0,00"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </EditModal>
-
-                {/* Modal: Origem do Lead */}
-                <EditModal
-                    isOpen={editingField === 'origem'}
-                    onClose={handleCloseModal}
-                    onSave={handleFieldSave}
-                    title="Origem do Lead"
-                    isSaving={updateCardMutation.isPending}
-                    isCorrection={showBriefing}
-                >
-                    <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Por onde este lead chegou?
-                        </label>
-                        <input
-                            type="text"
-                            value={(editedData as any).origem_lead || ''}
-                            onChange={(e) => setEditedData({ ...editedData, origem_lead: e.target.value } as any)}
-                            className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow"
-                            placeholder="Ex: Instagram, Indicação, Google, Feira de Turismo..."
+                                }
+                            }}
+                            className="flex-1 min-w-[120px] border-none outline-none focus:ring-0 p-1 text-base bg-transparent"
+                            placeholder={editedData.destinos?.length ? "" : "Digite um destino..."}
                             autoFocus
                         />
-                        <div className="flex flex-wrap gap-2 pt-2">
-                            {['Instagram', 'Indicação', 'Google', 'Facebook', 'Site', 'Feira'].map((option) => (
-                                <button
-                                    key={option}
-                                    type="button"
-                                    onClick={() => setEditedData({ ...editedData, origem_lead: option } as any)}
-                                    className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-indigo-100 hover:text-indigo-700 rounded-full transition-colors"
-                                >
-                                    {option}
-                                </button>
-                            ))}
+                    </div>
+                </div>
+            </EditModal>
+
+            <EditModal
+                isOpen={editingField === 'periodo'}
+                onClose={handleCloseModal}
+                onSave={handleFieldSave}
+                title="Período da Viagem"
+                isSaving={updateCardMutation.isPending}
+                isCorrection={correctionMode}
+            >
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Data de Ida</label>
+                            <input
+                                type="date"
+                                value={editedData.epoca_viagem?.inicio ? editedData.epoca_viagem.inicio.substring(0, 10) : ''}
+                                onChange={(e) => setEditedData({
+                                    ...editedData,
+                                    epoca_viagem: { ...editedData.epoca_viagem, inicio: e.target.value }
+                                })}
+                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Data de Volta</label>
+                            <input
+                                type="date"
+                                value={editedData.epoca_viagem?.fim ? editedData.epoca_viagem.fim.substring(0, 10) : ''}
+                                onChange={(e) => setEditedData({
+                                    ...editedData,
+                                    epoca_viagem: { ...editedData.epoca_viagem, fim: e.target.value }
+                                })}
+                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                            />
                         </div>
                     </div>
-                </EditModal>
-
-                {/* Generic Modal for New Fields */}
-                {editingField && !['motivo', 'destinos', 'periodo', 'orcamento', 'origem'].includes(editingField) && (
-                    <EditModal
-                        isOpen={true}
-                        onClose={handleCloseModal}
-                        onSave={handleFieldSave}
-                        title={visibleFields.find(f => f.key === editingField)?.label || 'Editar Campo'}
-                        isSaving={updateCardMutation.isPending}
-                        isCorrection={showBriefing}
-                    >
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {visibleFields.find(f => f.key === editingField)?.label}
-                            </label>
-                            {renderGenericInput(visibleFields.find(f => f.key === editingField))}
+                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                        <input
+                            type="checkbox"
+                            checked={editedData.epoca_viagem?.flexivel || false}
+                            onChange={(e) => setEditedData({
+                                ...editedData,
+                                epoca_viagem: { ...editedData.epoca_viagem, flexivel: e.target.checked }
+                            })}
+                            className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <div>
+                            <p className="text-sm font-medium text-gray-900">Datas flexíveis</p>
+                            <p className="text-xs text-gray-500">O cliente tem flexibilidade nas datas</p>
                         </div>
-                    </EditModal>
-                )}
-            </div>
+                    </label>
+                </div>
+            </EditModal>
+
+            <EditModal
+                isOpen={editingField === 'orcamento'}
+                onClose={handleCloseModal}
+                onSave={handleFieldSave}
+                title="Orçamento"
+                isSaving={updateCardMutation.isPending}
+                isCorrection={correctionMode}
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento Total (R$)</label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                            <input
+                                type="number"
+                                value={editedData.orcamento?.total || ''}
+                                onChange={(e) => setEditedData({
+                                    ...editedData,
+                                    orcamento: { ...editedData.orcamento, total: parseFloat(e.target.value) || 0 }
+                                })}
+                                className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                placeholder="0,00"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento por Pessoa (R$)</label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                            <input
+                                type="number"
+                                value={editedData.orcamento?.por_pessoa || ''}
+                                onChange={(e) => setEditedData({
+                                    ...editedData,
+                                    orcamento: { ...editedData.orcamento, por_pessoa: parseFloat(e.target.value) || 0 }
+                                })}
+                                className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                placeholder="0,00"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </EditModal>
         </div>
     )
 }

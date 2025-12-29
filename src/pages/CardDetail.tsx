@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import CardHeader from '../components/card/CardHeader'
@@ -11,6 +11,9 @@ import ConversationHistory from '../components/card/ConversationHistory'
 import PessoasWidget from '../components/card/PessoasWidget'
 import TaxaPlanejamentoCard from '../components/card/TaxaPlanejamentoCard'
 import ActivityFeed from '../components/card/ActivityFeed'
+import { ParentLinkBanner } from '../components/cards/group/ParentLinkBanner'
+import GroupDetailLayout from '../components/cards/group/GroupDetailLayout'
+import { ArrowLeft } from 'lucide-react'
 
 import type { Database } from '../database.types'
 
@@ -18,6 +21,9 @@ type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
 export default function CardDetail() {
     const { id } = useParams<{ id: string }>()
+    const navigate = useNavigate()
+
+
 
     const { data: card, isLoading } = useQuery({
         queryKey: ['card-detail', id],
@@ -37,6 +43,29 @@ export default function CardDetail() {
     if (isLoading) return <div className="p-8 text-center">Carregando...</div>
     if (!card) return <div className="p-8 text-center">Viagem não encontrada</div>
 
+    // If it is a Group Parent (Mother Trip), render the specialized layout
+    if (card.is_group_parent) {
+        return (
+            <div className="h-dvh flex flex-col bg-gray-50 relative overflow-hidden">
+                <div className="flex-none border-b border-gray-200 bg-white z-10 relative">
+                    <div className="flex items-center h-14 px-4 gap-4">
+                        <button
+                            onClick={() => navigate('/pipeline')}
+                            className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-gray-900 transition-colors"
+                        >
+                            <ArrowLeft className="h-5 w-5" />
+                        </button>
+                        <div className="h-6 w-px bg-gray-200" />
+                        <span className="font-medium text-gray-900">Detalhes do Grupo</span>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-hidden relative z-0">
+                    <GroupDetailLayout card={card} onUpdate={() => { }} />
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="h-full bg-gray-50 flex flex-col overflow-hidden">
             {/* Sticky Header */}
@@ -49,6 +78,9 @@ export default function CardDetail() {
                 {/* CENTER COLUMN - Work Area (What to do) */}
                 <div className="min-h-0 overflow-y-auto space-y-4 pr-2 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
                     {/* Stage Requirements (Checklist) */}
+                    {card.parent_card_id && (
+                        <ParentLinkBanner parentId={card.parent_card_id} />
+                    )}
                     <StageRequirements card={card} />
 
                     {/* Tasks & Meetings (Unified) */}

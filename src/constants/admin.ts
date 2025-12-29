@@ -19,6 +19,9 @@ export const FIELD_TYPES = [
     { value: 'json', label: 'JSON (Avançado)' }
 ] as const
 
+/**
+ * @deprecated Use `usePipelinePhases` hook instead. This constant is kept for legacy compatibility during migration.
+ */
 export const MACRO_STAGES = [
     { id: 'SDR', label: 'SDR (Pré-Venda)', color: 'bg-blue-500', textColor: 'text-blue-700', bgColor: 'bg-blue-50' },
     { id: 'Planner', label: 'Planner (Venda)', color: 'bg-purple-500', textColor: 'text-purple-700', bgColor: 'bg-purple-50' },

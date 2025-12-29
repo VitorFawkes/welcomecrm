@@ -16,7 +16,7 @@ export function useQualityGate() {
                         label
                     )
                 `)
-                .eq('required', true)
+                .eq('is_required', true)
 
             if (error) throw error
 

@@ -1,8 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import type { Database } from '../database.types'
 
-type Contact = Database['public']['Tables']['contatos']['Row']
+
+// Manual definition to match actual DB schema (database.types.ts is out of sync)
+interface Contact {
+    id: string
+    nome: string
+    email: string | null
+    telefone: string | null
+    tipo_pessoa: 'adulto' | 'crianca'
+    // Add other fields as needed
+}
 
 export interface CardPerson extends Contact {
     role: 'primary' | 'traveler'
@@ -18,8 +26,8 @@ export function useCardPeople(cardId: string | undefined) {
             if (!cardId) return []
 
             // 1. Fetch Card (for Primary)
-            const { data: card, error: cardError } = await supabase
-                .from('cards')
+            const { data: card, error: cardError } = await (supabase
+                .from('cards') as any)
                 .select(`
                     pessoa_principal_id,
                     contato:contatos!cards_pessoa_principal_id_fkey (*)
@@ -30,8 +38,8 @@ export function useCardPeople(cardId: string | undefined) {
             if (cardError) throw cardError
 
             // 2. Fetch Travelers
-            const { data: travelersData, error: travelersError } = await supabase
-                .from('cards_contatos')
+            const { data: travelersData, error: travelersError } = await (supabase
+                .from('cards_contatos') as any)
                 .select(`
                     contato:contatos (*)
                 `)
@@ -53,8 +61,8 @@ export function useCardPeople(cardId: string | undefined) {
             // Add Travelers
             const travelers = (travelersData || [])
                 .map((item: any) => item.contato)
-                .filter((c): c is Contact => !!c)
-                .map(c => ({ ...c, role: 'traveler' } as CardPerson))
+                .filter((c: any) => !!c)
+                .map((c: any) => ({ ...c, role: 'traveler' } as CardPerson))
 
             result.push(...travelers)
 
@@ -124,14 +132,14 @@ export function useCardPeople(cardId: string | undefined) {
             if (!cardId) throw new Error('Card ID required')
 
             if (person.role === 'primary') {
-                const { error } = await supabase
-                    .from('cards')
+                const { error } = await (supabase
+                    .from('cards') as any)
                     .update({ pessoa_principal_id: null })
                     .eq('id', cardId)
                 if (error) throw error
             } else {
-                const { error } = await supabase
-                    .from('cards_contatos')
+                const { error } = await (supabase
+                    .from('cards_contatos') as any)
                     .delete()
                     .eq('card_id', cardId)
                     .eq('contato_id', person.id)
@@ -172,8 +180,8 @@ export function useCardPeople(cardId: string | undefined) {
                 return
             }
 
-            const { error } = await supabase
-                .from('cards_contatos')
+            const { error } = await (supabase
+                .from('cards_contatos') as any)
                 .insert({
                     card_id: cardId,
                     contato_id: contact.id,

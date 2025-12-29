@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 import { X, Save, Eye, EyeOff, CheckSquare, Square } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { usePipelinePhases } from '../../../hooks/usePipelinePhases';
 import type { Database } from '../../../database.types';
 
 type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'];
@@ -47,6 +48,9 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
         },
         enabled: isOpen && !!stage
     });
+
+    const { data: phasesData } = usePipelinePhases();
+    const phases = phasesData || [];
 
     // --- Mutations ---
     const updateStageMutation = useMutation({
@@ -159,13 +163,24 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fase (Macro-Etapa)</label>
                                 <select
-                                    value={formData.fase || 'SDR'}
-                                    onChange={e => setFormData({ ...formData, fase: e.target.value })}
+                                    value={formData.phase_id || ''}
+                                    onChange={e => {
+                                        const phaseId = e.target.value;
+                                        const phase = phases.find(p => p.id === phaseId);
+                                        setFormData({
+                                            ...formData,
+                                            phase_id: phaseId,
+                                            fase: phase?.name || 'SDR' // Keep legacy sync
+                                        });
+                                    }}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 >
-                                    <option value="SDR">SDR (Pré-Venda)</option>
-                                    <option value="Planner">Planner (Venda)</option>
-                                    <option value="Pós-venda">Pós-Venda</option>
+                                    <option value="">Selecione uma fase...</option>
+                                    {phases.map(phase => (
+                                        <option key={phase.id} value={phase.id}>
+                                            {phase.label}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 

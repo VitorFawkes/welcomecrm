@@ -32,6 +32,11 @@ export default {
                     light: "#ffffff",
                     dark: "#252836",
                 },
+                glass: {
+                    DEFAULT: "rgba(255, 255, 255, 0.05)",
+                    border: "rgba(255, 255, 255, 0.1)",
+                    highlight: "rgba(255, 255, 255, 0.1)",
+                },
                 'background-light': "#f8f9fc",
                 'background-dark': "#1a1c23",
                 'text-main': {

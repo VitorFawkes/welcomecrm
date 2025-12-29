@@ -1,6 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Calendar, DollarSign, MapPin, Users, CheckSquare, AlertCircle, Clock } from 'lucide-react'
+import { Calendar, DollarSign, MapPin, Users, CheckSquare, AlertCircle, Clock, Link, Building } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
@@ -153,7 +153,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         <Users className="mr-1.5 h-3 w-3 flex-shrink-0" />
                         <span className="truncate block flex-1">
                             {pData.pessoas.adultos} Adt
-                            {pData.pessoas.criancas ? `, ${pData.pessoas.criancas} Criança(s)` : ''}
+                            {pData.pessoas.criancas ? `, ${pData.pessoas.criancas} Não Adulto(s)` : ''}
                         </span>
                     </div>
                 )
@@ -268,6 +268,22 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <div className="h-2 w-2 rounded-full bg-red-500 flex-shrink-0 mt-1.5" title="Prioridade Alta" />
                 )}
             </div>
+
+            {/* Group Affiliation Badge */}
+            {card.parent_card_title && (
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 bg-blue-50/50 px-2 py-1 rounded border border-blue-200/50 w-fit shadow-sm">
+                    <Link className="h-3 w-3" />
+                    <span className="truncate max-w-[150px]">{card.parent_card_title}</span>
+                </div>
+            )}
+
+            {/* Group Parent Badge */}
+            {card.is_group_parent && (
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-purple-600 bg-purple-50/50 px-2 py-1 rounded border border-purple-200/50 w-fit shadow-sm">
+                    <Building className="h-3 w-3" />
+                    <span>Grupo ({card.group_total_pax || 0} pax)</span>
+                </div>
+            )}
 
             {/* SLA Badge */}
             {(() => {

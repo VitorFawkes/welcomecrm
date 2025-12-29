@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import KanbanCollapsedPhase from './KanbanCollapsedPhase'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import type { Database } from '../../database.types'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -14,6 +14,7 @@ interface KanbanPhaseGroupProps {
     children: React.ReactNode
     totalCount: number
     totalValue: number
+    phaseColor: string
     stages: Stage[]
     cards: Card[]
 }
@@ -24,7 +25,8 @@ export default function KanbanPhaseGroup({
     onToggle,
     children,
     totalCount,
-    totalValue
+    totalValue,
+    phaseColor
 }: KanbanPhaseGroupProps) {
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -48,32 +50,32 @@ export default function KanbanPhaseGroup({
     return (
         <div className={cn(
             "relative flex h-full shrink-0 flex-col rounded-2xl transition-all duration-300",
-            isCollapsed ? "w-48 bg-transparent py-2" : "bg-gray-100 p-2" // Increased width to w-48
+            isCollapsed ? "w-48 bg-gray-50 border border-gray-200 py-2" : "bg-gray-100 p-2" // Changed collapsed styles
         )}>
             {/* Header - Always Visible */}
-            <div className={cn(
-                "mb-3 flex items-center justify-between px-2",
-                isCollapsed && "mb-4" // Removed flex-col gap-2
-            )}>
-                <div className={cn(
-                    "flex items-center gap-2",
-                    // Removed isCollapsed && "flex-col" to keep horizontal layout
-                )}>
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 text-center">
-                        {phaseName}
+            <div
+                className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer",
+                    isCollapsed
+                        ? "bg-gray-100 border-gray-200 hover:bg-gray-200"
+                        : "bg-white border-gray-200 shadow-sm mb-3"
+                )}
+                onClick={onToggle} // Changed to onToggle
+            >
+                <div className="flex items-center gap-3">
+                    <div className={cn(
+                        "p-1.5 rounded-md transition-transform duration-200",
+                        isCollapsed ? "-rotate-90" : "rotate-0"
+                    )}>
+                        <ChevronDown className="w-4 h-4 text-gray-500" />
+                    </div>
+                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        {phaseName} {/* Changed from groupName to phaseName */}
+                        <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                            {totalCount} {/* Changed from cards.length to totalCount */}
+                        </span>
                     </h3>
-                    <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
-                        {totalCount}
-                    </span>
                 </div>
-
-                <button
-                    onClick={onToggle}
-                    className="rounded-full p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
-                    title={isCollapsed ? "Expandir fase" : "Recolher fase"}
-                >
-                    <ChevronLeft className={cn("h-4 w-4 transition-transform duration-300", isCollapsed && "rotate-180")} />
-                </button>
             </div>
 
             {/* Content Container */}
@@ -83,9 +85,9 @@ export default function KanbanPhaseGroup({
             )}>
                 {isCollapsed ? (
                     <KanbanCollapsedPhase
-                        phaseName={phaseName}
                         totalCount={totalCount}
                         totalValue={totalValue}
+                        phaseColor={phaseColor}
                         onClick={onToggle}
                         onDragOver={handleDragOver}
                     />
@@ -93,6 +95,6 @@ export default function KanbanPhaseGroup({
                     children
                 )}
             </div>
-        </div>
+        </div >
     )
 }

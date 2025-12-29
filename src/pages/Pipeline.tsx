@@ -7,12 +7,15 @@ import { useProductContext } from '../hooks/useProductContext'
 
 import { FilterDrawer } from '../components/pipeline/FilterDrawer'
 import { ActiveFilters } from '../components/pipeline/ActiveFilters'
-import { Filter } from 'lucide-react'
+import { Filter, Building, Link, User } from 'lucide-react'
 
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 
 export default function Pipeline() {
-    const { viewMode, subView, setViewMode, setSubView } = usePipelineFilters()
+    const {
+        viewMode, subView, groupFilters,
+        setViewMode, setSubView, setGroupFilters
+    } = usePipelineFilters()
     const { currentProduct } = useProductContext()
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
@@ -38,72 +41,115 @@ export default function Pipeline() {
                         </div>
                     </header>
 
-                    <div className="flex items-center justify-between">
-                        {/* View Switcher (Persona Based) */}
-                        <div className="flex items-center space-x-4">
-                            <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 flex-wrap">
+                                {/* View Switcher (Persona Based) */}
+                                <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                                    <button
+                                        onClick={() => { setViewMode('AGENT'); setSubView('MY_QUEUE'); }}
+                                        className={cn(
+                                            "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                                            viewMode === 'AGENT' && subView === 'MY_QUEUE'
+                                                ? "bg-primary text-white shadow-sm"
+                                                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        Minha Fila
+                                    </button>
+                                    <button
+                                        onClick={() => { setViewMode('MANAGER'); setSubView('TEAM_VIEW'); }}
+                                        className={cn(
+                                            "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                                            viewMode === 'MANAGER' && subView === 'TEAM_VIEW'
+                                                ? "bg-primary text-white shadow-sm"
+                                                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        Visão de Time
+                                    </button>
+                                    <button
+                                        onClick={() => { setViewMode('MANAGER'); setSubView('ALL'); }}
+                                        className={cn(
+                                            "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                                            subView === 'ALL'
+                                                ? "bg-primary text-white shadow-sm"
+                                                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        Todos
+                                    </button>
+                                </div>
+
+                                {/* Group Filters (3 Chips) */}
+                                <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
+                                    <button
+                                        onClick={() => setGroupFilters({ ...groupFilters, showGroups: !groupFilters.showGroups })}
+                                        className={cn(
+                                            "flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border transition-all duration-200",
+                                            groupFilters.showGroups
+                                                ? "bg-purple-100 text-purple-700 border-purple-300 shadow-sm"
+                                                : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        <Building className="h-3 w-3 mr-1.5" />
+                                        Grupos
+                                    </button>
+                                    <button
+                                        onClick={() => setGroupFilters({ ...groupFilters, showLinked: !groupFilters.showLinked })}
+                                        className={cn(
+                                            "flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border transition-all duration-200",
+                                            groupFilters.showLinked
+                                                ? "bg-blue-100 text-blue-700 border-blue-300 shadow-sm"
+                                                : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        <Link className="h-3 w-3 mr-1.5" />
+                                        Vinculadas
+                                    </button>
+                                    <button
+                                        onClick={() => setGroupFilters({ ...groupFilters, showSolo: !groupFilters.showSolo })}
+                                        className={cn(
+                                            "flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border transition-all duration-200",
+                                            groupFilters.showSolo
+                                                ? "bg-emerald-100 text-emerald-700 border-emerald-300 shadow-sm"
+                                                : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        <User className="h-3 w-3 mr-1.5" />
+                                        Avulsas
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center space-x-3">
+                                {/* Smart Filter Button */}
                                 <button
-                                    onClick={() => { setViewMode('AGENT'); setSubView('MY_QUEUE'); }}
-                                    className={cn(
-                                        "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                                        viewMode === 'AGENT' && subView === 'MY_QUEUE'
-                                            ? "bg-primary text-white shadow-sm"
-                                            : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                                    )}
+                                    onClick={() => setIsFilterDrawerOpen(true)}
+                                    className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
                                 >
-                                    Minha Fila
+                                    <Filter className="h-4 w-4 mr-2 text-gray-500" />
+                                    Filtros
                                 </button>
+
                                 <button
-                                    onClick={() => { setViewMode('MANAGER'); setSubView('TEAM_VIEW'); }}
-                                    className={cn(
-                                        "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                                        viewMode === 'MANAGER' && subView === 'TEAM_VIEW'
-                                            ? "bg-primary text-white shadow-sm"
-                                            : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                                    )}
+                                    onClick={() => setIsCreateModalOpen(true)}
+                                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark border border-transparent rounded-lg shadow-sm transition-all"
                                 >
-                                    Visão de Time
-                                </button>
-                                <button
-                                    onClick={() => { setViewMode('MANAGER'); setSubView('ALL'); }}
-                                    className={cn(
-                                        "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                                        subView === 'ALL'
-                                            ? "bg-primary text-white shadow-sm"
-                                            : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                                    )}
-                                >
-                                    Todos
+                                    <span className="mr-1.5 text-lg leading-none">+</span>
+                                    Novo Card
                                 </button>
                             </div>
                         </div>
 
-                        {/* Active Filters - Centered/Flexible */}
-                        <div className="flex-1 px-4 min-w-0">
+                        {/* Active Filters - Full Width Row */}
+                        <div className="w-full">
                             <ActiveFilters />
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex items-center space-x-3">
-                            {/* Smart Filter Button */}
-                            <button
-                                onClick={() => setIsFilterDrawerOpen(true)}
-                                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
-                            >
-                                <Filter className="h-4 w-4 mr-2 text-gray-500" />
-                                Filtros
-                            </button>
-
-                            <button
-                                onClick={() => setIsCreateModalOpen(true)}
-                                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark border border-transparent rounded-lg shadow-sm transition-all"
-                            >
-                                <span className="mr-1.5 text-lg leading-none">+</span>
-                                Novo Card
-                            </button>
                         </div>
                     </div>
                 </div>
+
 
                 {/* Board Container: Fills remaining space, passes padding prop for alignment */}
                 <div className="flex-1 min-h-0 relative">
@@ -126,6 +172,6 @@ export default function Pipeline() {
                     onClose={() => setIsFilterDrawerOpen(false)}
                 />
             </div>
-        </ErrorBoundary>
+        </ErrorBoundary >
     )
 }

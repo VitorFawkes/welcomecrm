@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import KanbanPhaseGroup from './KanbanPhaseGroup'
+import { Users } from 'lucide-react'
 import StageChangeModal from '../card/StageChangeModal'
 import QualityGateModal from '../card/QualityGateModal'
 import { useQualityGate } from '../../hooks/useQualityGate'
@@ -25,6 +26,7 @@ import type { Database } from '../../database.types'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -41,10 +43,11 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const filters = propFilters || {}
     const queryClient = useQueryClient()
     const [activeCard, setActiveCard] = useState<Card | null>(null)
-    const { collapsedPhases, setCollapsedPhases } = usePipelineFilters()
+    const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
     const { validateMove } = useQualityGate()
     const { session } = useAuth() // Need auth to know who "ME" is
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const { data: phasesData } = usePipelinePhases()
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -92,7 +95,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     })
 
     const { data: cards, isError, refetch } = useQuery({
-        queryKey: ['cards', productFilter, viewMode, subView, filters], // Re-fetch when view changes
+        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters], // Re-fetch when view changes
         placeholderData: keepPreviousData,
         queryFn: async () => {
             let query = (supabase.from('view_cards_acoes') as any)
@@ -172,7 +175,25 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             }
             const { data, error } = await query
             if (error) throw error
-            return data as Card[]
+
+            let filteredData = data as Card[]
+
+            // Apply Group Filters (Client-side for flexibility)
+            const { showGroups, showLinked, showSolo } = groupFilters
+
+            filteredData = filteredData.filter(card => {
+                const isGroup = card.is_group_parent
+                const isLinked = !!card.parent_card_id
+                const isSolo = !isGroup && !isLinked
+
+                if (isGroup && showGroups) return true
+                if (isLinked && showLinked) return true
+                if (isSolo && showSolo) return true
+
+                return false
+            })
+
+            return filteredData
         }
     })
 
@@ -380,17 +401,11 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         }
     }
 
-    // Group stages by phase
-    const phases = stages ? Array.from(new Set(stages.map(s => s.fase || 'Outro'))) : []
-
-    // Custom sort order for phases if needed, or rely on DB order (which might be mixed)
-    // Ideally phases should be ordered. For now we trust the order of appearance or hardcode:
-    const phaseOrder = ['SDR', 'Planner', 'Pós-venda', 'Outro']
-    phases.sort((a, b) => {
-        const indexA = phaseOrder.indexOf(a)
-        const indexB = phaseOrder.indexOf(b)
-        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB)
-    })
+    // Group stages by phase using dynamic phases
+    // If phasesData is not loaded yet, we might want to show a loader or fallback
+    // We map over the phasesData to ensure order and color
+    const phases = phasesData || []
+    const displayPhases = [...phases]
 
     // Calculate Totals for Sticky Footer
     const totalPipelineValue = cards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
@@ -403,20 +418,40 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                     <div className="h-full flex gap-4 w-max min-w-full px-4"> {/* Changed to w-max min-w-full to allow left alignment but scroll if needed */}
                         <div className="flex gap-6 h-full">
-                            {phases.map((phaseName) => {
-                                const phaseStages = stages.filter(s => (s.fase || 'Outro') === phaseName)
+                            {cards.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center w-[calc(100vw-20rem)] py-20 bg-white/5 rounded-xl border border-dashed border-gray-300">
+                                    <div className="p-4 bg-gray-100 rounded-full mb-4">
+                                        <Users className="h-8 w-8 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Nenhum card encontrado</h3>
+                                    <p className="text-gray-500 max-w-xs text-center mt-2">
+                                        Tente ajustar os filtros de Grupos, Vinculadas ou Avulsas para ver mais resultados.
+                                    </p>
+                                </div>
+                            ) : displayPhases.map((phase) => {
+                                // Filter stages that belong to this phase
+                                // We support both phase_id (new) and fase name match (legacy migration)
+                                const phaseStages = stages.filter(s =>
+                                    s.phase_id === phase.id ||
+                                    (!s.phase_id && s.fase === phase.name)
+                                )
+
+                                // If no stages for this phase, skip rendering it (optional, but cleaner)
+                                if (phaseStages.length === 0) return null
+
                                 const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
                                 const totalCount = phaseCards.length
                                 const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
 
                                 return (
                                     <KanbanPhaseGroup
-                                        key={phaseName}
-                                        phaseName={phaseName}
-                                        isCollapsed={collapsedPhases.includes(phaseName)}
-                                        onToggle={() => togglePhase(phaseName)}
+                                        key={phase.id}
+                                        phaseName={phase.name}
+                                        isCollapsed={collapsedPhases.includes(phase.name)}
+                                        onToggle={() => togglePhase(phase.name)}
                                         totalCount={totalCount}
                                         totalValue={totalValue}
+                                        phaseColor={phase.color}
                                         stages={phaseStages}
                                         cards={phaseCards}
                                     >
@@ -425,6 +460,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                                 key={stage.id}
                                                 stage={stage}
                                                 cards={cards.filter(c => c.pipeline_stage_id === stage.id)}
+                                                phaseColor={phase.color}
                                             />
                                         ))}
                                     </KanbanPhaseGroup>
@@ -507,15 +543,20 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
                 <div className="flex items-center gap-6">
                     {/* Phase Summaries (Mini) */}
-                    {phases.map(phase => {
-                        const phaseStages = stages.filter(s => (s.fase || 'Outro') === phase)
+                    {displayPhases.map(phase => {
+                        const phaseStages = stages.filter(s =>
+                            s.phase_id === phase.id ||
+                            (!s.phase_id && s.fase === phase.name)
+                        )
+                        if (phaseStages.length === 0) return null
+
                         const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
                         const val = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
                         const count = phaseCards.length
 
                         return (
-                            <div key={phase} className="flex flex-col items-end group cursor-default">
-                                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5 group-hover:text-primary transition-colors">{phase}</span>
+                            <div key={phase.id} className="flex flex-col items-end group cursor-default">
+                                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5 group-hover:text-primary transition-colors">{phase.name}</span>
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-gray-400 font-medium bg-gray-50 px-1.5 rounded">{count}</span>
                                     <span className="text-sm font-bold text-gray-700 group-hover:text-primary-dark transition-colors">

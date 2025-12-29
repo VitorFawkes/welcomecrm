@@ -10,7 +10,27 @@ type SystemField = Database['public']['Tables']['system_fields']['Row']
 type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row']
 type StageFieldConfig = Database['public']['Tables']['stage_field_config']['Row']
 
-import { SECTIONS, MACRO_STAGES } from '../../../constants/admin'
+import { SECTIONS } from '../../../constants/admin'
+import { usePipelinePhases } from '../../../hooks/usePipelinePhases'
+import { Input } from '../../ui/Input'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuLabel
+} from '../../ui/dropdown-menu'
+
+const COLORS = [
+    { label: 'Azul', value: 'bg-blue-500' },
+    { label: 'Roxo', value: 'bg-purple-500' },
+    { label: 'Verde', value: 'bg-green-500' },
+    { label: 'Amarelo', value: 'bg-yellow-500' },
+    { label: 'Vermelho', value: 'bg-red-500' },
+    { label: 'Rosa', value: 'bg-pink-500' },
+    { label: 'Indigo', value: 'bg-indigo-500' },
+    { label: 'Cinza', value: 'bg-gray-500' },
+]
 
 export default function StudioUnified() {
     const queryClient = useQueryClient()
@@ -36,6 +56,9 @@ export default function StudioUnified() {
             return data as PipelineStage[]
         }
     })
+
+    const { data: phasesData } = usePipelinePhases()
+    const phases = phasesData || []
 
     const { data: fields, isLoading: loadingFields } = useQuery({
         queryKey: ['system-fields-unified'],
@@ -121,9 +144,53 @@ export default function StudioUnified() {
         }
     })
 
+    const updatePhaseMutation = useMutation({
+        mutationFn: async (phase: { id: string, color: string }) => {
+            const { error } = await supabase.from('pipeline_phases').update({ color: phase.color }).eq('id', phase.id)
+            if (error) throw error
+        },
+        onMutate: async (newPhase) => {
+            await queryClient.cancelQueries({ queryKey: ['pipeline-phases'] })
+            const previousPhases = queryClient.getQueryData(['pipeline-phases'])
+            queryClient.setQueryData(['pipeline-phases'], (old: any[] | undefined) => {
+                if (!old) return []
+                return old.map((p: any) => p.id === newPhase.id ? { ...p, color: newPhase.color } : p)
+            })
+            return { previousPhases }
+        },
+        onError: (err, _newPhase, context: any) => {
+            console.error('Error updating phase:', err)
+            if (context?.previousPhases) {
+                queryClient.setQueryData(['pipeline-phases'], context.previousPhases)
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['pipeline-phases'] })
+        }
+    })
+
     // --- Helpers ---
     const getConfig = (stageId: string, fieldKey: string) => {
         return localConfigs[`${stageId}-${fieldKey}`]
+    }
+
+    const getPhaseStyles = (color: string) => {
+        const isHex = color.startsWith('#') || color.startsWith('rgb')
+        if (isHex) {
+            return {
+                header: { backgroundColor: `${color}1A`, borderTopColor: color }, // 10% opacity approx
+                text: { color: color },
+                badge: { backgroundColor: color }
+            }
+        }
+        // Tailwind fallback
+        const baseColor = color.replace('bg-', '')
+        return {
+            header: {}, // Let className handle it if possible, or use style
+            headerClass: `${color}/10`,
+            textClass: `text-${baseColor}`,
+            badgeClass: color
+        }
     }
 
     const handleConfigToggle = (stageId: string, fieldKey: string, type: 'visible' | 'required' | 'header') => {
@@ -145,7 +212,13 @@ export default function StudioUnified() {
     }
 
     const handleMacroToggle = (macroStageId: string, fieldKey: string, type: 'visible' | 'required' | 'header') => {
-        const targetStages = stages?.filter(s => s.fase === macroStageId) || []
+        // Filter stages by phase_id (new) or fase name (legacy)
+        const phase = phases.find(p => p.id === macroStageId)
+        const targetStages = stages?.filter(s =>
+            s.phase_id === macroStageId ||
+            (!s.phase_id && phase && s.fase === phase.name)
+        ) || []
+
         if (targetStages.length === 0) return
 
         // Calculate current state (if ALL are true, toggle to false. Otherwise toggle to true)
@@ -184,7 +257,12 @@ export default function StudioUnified() {
     }
 
     const getMacroState = (macroStageId: string, fieldKey: string, type: 'visible' | 'required' | 'header') => {
-        const targetStages = stages?.filter(s => s.fase === macroStageId) || []
+        const phase = phases.find(p => p.id === macroStageId)
+        const targetStages = stages?.filter(s =>
+            s.phase_id === macroStageId ||
+            (!s.phase_id && phase && s.fase === phase.name)
+        ) || []
+
         if (targetStages.length === 0) return 'none'
 
         let trueCount = 0
@@ -282,31 +360,95 @@ export default function StudioUnified() {
                             </th>
 
                             {/* Headers based on View Mode */}
+                            {/* Headers based on View Mode */}
                             {viewMode === 'macro' ? (
-                                MACRO_STAGES.map(macro => (
-                                    <th key={macro.id} className={cn("sticky top-0 z-10 border-b border-gray-200 p-3 min-w-[180px] text-center", macro.bgColor)}>
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className={cn("text-xs font-bold uppercase", macro.textColor)}>{macro.label}</span>
-                                            <span className="text-[10px] text-gray-500 font-normal">
-                                                {stages?.filter(s => s.fase === macro.id).length} etapas
-                                            </span>
-                                        </div>
-                                    </th>
-                                ))
+                                phases.map(macro => {
+                                    const styles = getPhaseStyles(macro.color)
+                                    return (
+                                        <th
+                                            key={macro.id}
+                                            className={cn("sticky top-0 z-10 border-b border-gray-200 p-3 min-w-[180px] text-center", styles.headerClass)}
+                                            style={styles.header}
+                                        >
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <div className="flex flex-col items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity">
+                                                        <span
+                                                            className={cn("text-xs font-bold uppercase", styles.textClass)}
+                                                            style={styles.text}
+                                                        >
+                                                            {macro.label}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-500 font-normal">
+                                                            {stages?.filter(s => s.phase_id === macro.id || (!s.phase_id && s.fase === macro.name)).length} etapas
+                                                        </span>
+                                                    </div>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-64">
+                                                    <DropdownMenuLabel>Cor da Fase</DropdownMenuLabel>
+                                                    <div className="grid grid-cols-4 gap-2 p-2">
+                                                        {COLORS.map(c => (
+                                                            <DropdownMenuItem
+                                                                key={c.value}
+                                                                onSelect={() => {
+                                                                    console.log('Color selected via DropdownMenuItem:', c.value)
+                                                                    updatePhaseMutation.mutate({ id: macro.id, color: c.value })
+                                                                }}
+                                                                className="p-0 w-8 h-8 rounded-full justify-center cursor-pointer focus:scale-110 transition-transform"
+                                                            >
+                                                                <div
+                                                                    className={cn(
+                                                                        "w-6 h-6 rounded-full",
+                                                                        c.value,
+                                                                        macro.color === c.value && "ring-2 ring-offset-1 ring-gray-400"
+                                                                    )}
+                                                                    title={c.label}
+                                                                />
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </div>
+                                                    <div className="p-2 border-t border-gray-100 mt-2">
+                                                        <label className="text-xs font-medium text-gray-500 mb-1 block">Cor Personalizada (Hex)</label>
+                                                        <div className="flex gap-2">
+                                                            <div
+                                                                className="w-9 h-9 rounded-md border border-gray-200 shadow-sm shrink-0"
+                                                                style={{ backgroundColor: macro.color }}
+                                                            />
+                                                            <Input
+                                                                placeholder="#000000"
+                                                                defaultValue={macro.color.startsWith('#') ? macro.color : ''}
+                                                                onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                                                    const val = e.target.value
+                                                                    if (val.startsWith('#') && (val.length === 4 || val.length === 7)) {
+                                                                        updatePhaseMutation.mutate({ id: macro.id, color: val })
+                                                                    }
+                                                                }}
+                                                                className="h-9 text-xs"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </th>
+                                    )
+                                })
                             ) : (
-                                stages?.map(stage => (
-                                    <th key={stage.id} className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 p-2 min-w-[140px] text-center">
-                                        <div className="flex flex-col items-center gap-1">
-                                            <div className={cn(
-                                                "w-2 h-2 rounded-full mb-1",
-                                                stage.fase === 'SDR' ? 'bg-blue-500' :
-                                                    stage.fase === 'Planner' ? 'bg-purple-500' :
-                                                        stage.fase === 'Pós-venda' ? 'bg-green-500' : 'bg-gray-500'
-                                            )} />
-                                            <span className="text-xs font-bold text-gray-700 uppercase">{stage.nome}</span>
-                                        </div>
-                                    </th>
-                                ))
+                                stages?.map(stage => {
+                                    const phase = phases.find(p => p.id === stage.phase_id) || phases.find(p => p.name === stage.fase)
+                                    const styles = getPhaseStyles(phase?.color || 'bg-gray-500')
+
+                                    return (
+                                        <th key={stage.id} className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 p-2 min-w-[140px] text-center">
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div
+                                                    className={cn("w-2 h-2 rounded-full mb-1", styles.badgeClass)}
+                                                    style={styles.badge}
+                                                />
+                                                <span className="text-xs font-bold text-gray-700 uppercase">{stage.nome}</span>
+                                            </div>
+                                        </th>
+                                    )
+                                })
                             )}
                         </tr>
                     </thead>
@@ -319,7 +461,7 @@ export default function StudioUnified() {
                                 <>
                                     {/* Section Header */}
                                     <tr key={section.value} className="bg-gray-50/50">
-                                        <td colSpan={(viewMode === 'macro' ? MACRO_STAGES.length : (stages?.length || 0)) + 1} className="px-4 py-2 border-y border-gray-100">
+                                        <td colSpan={(viewMode === 'macro' ? phases.length : (stages?.length || 0)) + 1} className="px-4 py-2 border-y border-gray-100">
                                             <div className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide", section.color)}>
                                                 {section.label}
                                             </div>
@@ -369,7 +511,7 @@ export default function StudioUnified() {
 
                                             {/* Config Cells */}
                                             {viewMode === 'macro' ? (
-                                                MACRO_STAGES.map(macro => {
+                                                phases.map(macro => {
                                                     const visibleState = getMacroState(macro.id, field.key, 'visible')
                                                     const requiredState = getMacroState(macro.id, field.key, 'required')
                                                     const headerState = getMacroState(macro.id, field.key, 'header')

@@ -3,7 +3,9 @@ import { Users, Plus, Trash2, Loader2, User } from 'lucide-react'
 import { FieldWrapper } from './BaseField'
 import type { BaseFieldProps } from './BaseField'
 import { supabase } from '../../../lib/supabase'
-import type { Contato } from '../../../database.types'
+import type { Database } from '../../../database.types'
+
+type Contato = Database['public']['Tables']['contatos']['Row']
 import ContactSelector from '../../card/ContactSelector'
 import { calculateAge, getContactSummary } from '../../../lib/contactUtils'
 

@@ -14,59 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      departments: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      },
-      teams: {
-        Row: {
-          created_at: string
-          department_id: string | null
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          department_id?: string | null
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          department_id?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "teams_department_id_fkey"
-            columns: ["department_id"]
-            isOneToOne: false
-            referencedRelation: "departments"
-            referencedColumns: ["id"]
-          }
-        ]
-      },
       activities: {
         Row: {
           card_id: string
@@ -132,29 +79,26 @@ export type Database = {
       activity_categories: {
         Row: {
           created_at: string | null
-          id: string
           key: string
           label: string
+          ordem: number | null
           scope: string
-          updated_at: string | null
           visible: boolean | null
         }
         Insert: {
           created_at?: string | null
-          id?: string
           key: string
           label: string
+          ordem?: number | null
           scope: string
-          updated_at?: string | null
           visible?: boolean | null
         }
         Update: {
           created_at?: string | null
-          id?: string
           key?: string
           label?: string
+          ordem?: number | null
           scope?: string
-          updated_at?: string | null
           visible?: boolean | null
         }
         Relationships: []
@@ -377,10 +321,16 @@ export type Database = {
           external_id: string | null
           external_source: string | null
           forma_pagamento: string | null
+          group_capacity: number | null
+          group_total_pax: number | null
+          group_total_revenue: number | null
           id: string
+          is_group_parent: boolean | null
+          marketing_data: Json | null
           moeda: string | null
           motivo_perda_id: string | null
           origem: string | null
+          parent_card_id: string | null
           pessoa_principal_id: string | null
           pipeline_id: string
           pipeline_stage_id: string | null
@@ -425,10 +375,16 @@ export type Database = {
           external_id?: string | null
           external_source?: string | null
           forma_pagamento?: string | null
+          group_capacity?: number | null
+          group_total_pax?: number | null
+          group_total_revenue?: number | null
           id?: string
+          is_group_parent?: boolean | null
+          marketing_data?: Json | null
           moeda?: string | null
           motivo_perda_id?: string | null
           origem?: string | null
+          parent_card_id?: string | null
           pessoa_principal_id?: string | null
           pipeline_id: string
           pipeline_stage_id?: string | null
@@ -473,10 +429,16 @@ export type Database = {
           external_id?: string | null
           external_source?: string | null
           forma_pagamento?: string | null
+          group_capacity?: number | null
+          group_total_pax?: number | null
+          group_total_revenue?: number | null
           id?: string
+          is_group_parent?: boolean | null
+          marketing_data?: Json | null
           moeda?: string | null
           motivo_perda_id?: string | null
           origem?: string | null
+          parent_card_id?: string | null
           pessoa_principal_id?: string | null
           pipeline_id?: string
           pipeline_stage_id?: string | null
@@ -517,6 +479,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "motivos_perda"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
           {
             foreignKeyName: "cards_pessoa_principal_id_fkey"
@@ -620,10 +603,52 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_stats: {
+        Row: {
+          contact_id: string
+          is_group_leader: boolean | null
+          last_trip_date: string | null
+          next_trip_date: string | null
+          top_destinations: Json | null
+          total_spend: number | null
+          total_trips: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          contact_id: string
+          is_group_leader?: boolean | null
+          last_trip_date?: string | null
+          next_trip_date?: string | null
+          top_destinations?: Json | null
+          total_spend?: number | null
+          total_trips?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          contact_id?: string
+          is_group_leader?: boolean | null
+          last_trip_date?: string | null
+          next_trip_date?: string | null
+          top_destinations?: Json | null
+          total_spend?: number | null
+          total_trips?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_stats_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contatos: {
         Row: {
           cpf: string | null
           created_at: string
+          created_by: string | null
           data_nascimento: string | null
           email: string | null
           endereco: Json | null
@@ -632,6 +657,7 @@ export type Database = {
           observacoes: string | null
           passaporte: string | null
           responsavel_id: string | null
+          tags: string[] | null
           telefone: string | null
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"]
           updated_at: string
@@ -639,6 +665,7 @@ export type Database = {
         Insert: {
           cpf?: string | null
           created_at?: string
+          created_by?: string | null
           data_nascimento?: string | null
           email?: string | null
           endereco?: Json | null
@@ -647,6 +674,7 @@ export type Database = {
           observacoes?: string | null
           passaporte?: string | null
           responsavel_id?: string | null
+          tags?: string[] | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           updated_at?: string
@@ -654,6 +682,7 @@ export type Database = {
         Update: {
           cpf?: string | null
           created_at?: string
+          created_by?: string | null
           data_nascimento?: string | null
           email?: string | null
           endereco?: Json | null
@@ -662,6 +691,7 @@ export type Database = {
           observacoes?: string | null
           passaporte?: string | null
           responsavel_id?: string | null
+          tags?: string[] | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           updated_at?: string
@@ -861,6 +891,30 @@ export type Database = {
           },
         ]
       }
+      departments: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       historico_fases: {
         Row: {
           card_id: string
@@ -923,6 +977,57 @@ export type Database = {
             columns: ["etapa_nova_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invitations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          team_id: string | null
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          team_id?: string | null
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          team_id?: string | null
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1163,6 +1268,42 @@ export type Database = {
           },
         ]
       }
+      pipeline_phases: {
+        Row: {
+          active: boolean
+          color: string
+          created_at: string | null
+          id: string
+          label: string
+          name: string
+          order_index: number
+          slug: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          color: string
+          created_at?: string | null
+          id?: string
+          label: string
+          name: string
+          order_index?: number
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          color?: string
+          created_at?: string | null
+          id?: string
+          label?: string
+          name?: string
+          order_index?: number
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       pipeline_stages: {
         Row: {
           ativo: boolean | null
@@ -1174,6 +1315,7 @@ export type Database = {
           is_won: boolean | null
           nome: string
           ordem: number
+          phase_id: string | null
           pipeline_id: string
           sla_hours: number | null
           target_role: string | null
@@ -1189,6 +1331,7 @@ export type Database = {
           is_won?: boolean | null
           nome: string
           ordem: number
+          phase_id?: string | null
           pipeline_id: string
           sla_hours?: number | null
           target_role?: string | null
@@ -1204,12 +1347,20 @@ export type Database = {
           is_won?: boolean | null
           nome?: string
           ordem?: number
+          phase_id?: string | null
           pipeline_id?: string
           sla_hours?: number | null
           target_role?: string | null
           tipo_responsavel?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_phases"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pipeline_stages_pipeline_id_fkey"
             columns: ["pipeline_id"]
@@ -1218,39 +1369,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      stage_obligations: {
-        Row: {
-          active: boolean | null
-          config: Json | null
-          created_at: string | null
-          id: string
-          pipeline_id: string
-          stage_id: string
-          title: string
-          type: string
-        }
-        Insert: {
-          active?: boolean | null
-          config?: Json | null
-          created_at?: string | null
-          id?: string
-          pipeline_id: string
-          stage_id: string
-          title: string
-          type: string
-        }
-        Update: {
-          active?: boolean | null
-          config?: Json | null
-          created_at?: string | null
-          id?: string
-          pipeline_id?: string
-          stage_id?: string
-          title?: string
-          type?: string
-        }
-        Relationships: []
       }
       pipelines: {
         Row: {
@@ -1286,37 +1404,58 @@ export type Database = {
         Row: {
           active: boolean | null
           created_at: string | null
+          department_id: string | null
           email: string | null
           id: string
           is_admin: boolean | null
           nome: string | null
           produtos: Database["public"]["Enums"]["app_product"][] | null
           role: Database["public"]["Enums"]["app_role"] | null
+          team_id: string | null
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
           created_at?: string | null
+          department_id?: string | null
           email?: string | null
           id: string
           is_admin?: boolean | null
           nome?: string | null
           produtos?: Database["public"]["Enums"]["app_product"][] | null
           role?: Database["public"]["Enums"]["app_role"] | null
+          team_id?: string | null
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
           created_at?: string | null
+          department_id?: string | null
           email?: string | null
           id?: string
           is_admin?: boolean | null
           nome?: string | null
           produtos?: Database["public"]["Enums"]["app_product"][] | null
           role?: Database["public"]["Enums"]["app_role"] | null
+          team_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       proposals: {
         Row: {
@@ -1988,6 +2127,77 @@ export type Database = {
           },
         ]
       }
+      team_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: string | null
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_logs: {
         Row: {
           created_at: string | null
@@ -2074,7 +2284,6 @@ export type Database = {
           condicoes_pagamento: string | null
           created_at: string | null
           data_viagem_inicio: string | null
-          data_viagem_fim: string | null
           destinos: Json | null
           dias_ate_viagem: number | null
           dono_atual_email: string | null
@@ -2086,10 +2295,16 @@ export type Database = {
           external_id: string | null
           fase: string | null
           forma_pagamento: string | null
+          group_capacity: number | null
+          group_total_pax: number | null
+          group_total_revenue: number | null
           id: string | null
+          is_group_parent: boolean | null
           moeda: string | null
           orcamento: Json | null
           origem: string | null
+          parent_card_id: string | null
+          parent_card_title: string | null
           pessoa_nome: string | null
           pessoa_principal_id: string | null
           pipeline_id: string | null
@@ -2127,6 +2342,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
           },
           {
             foreignKeyName: "cards_pessoa_principal_id_fkey"
@@ -2177,34 +2413,43 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      generate_invite: {
+        Args: {
+          p_created_by: string
+          p_email: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_team_id: string
+        }
+        Returns: string
+      }
       get_travel_history:
-      | {
-        Args: { contact_id_param: string }
-        Returns: {
-          card_id: string
-          companions: string[]
-          data_viagem: string
-          moeda: string
-          role: string
-          status: string
-          titulo: string
-          valor: number
-        }[]
-      }
-      | {
-        Args: { contact_ids: string[] }
-        Returns: {
-          card_id: string
-          companions: string[]
-          data_viagem: string
-          moeda: string
-          relevant_contacts: string[]
-          role: string
-          status: string
-          titulo: string
-          valor: number
-        }[]
-      }
+        | {
+            Args: { contact_id_param: string }
+            Returns: {
+              card_id: string
+              companions: string[]
+              data_viagem: string
+              moeda: string
+              role: string
+              status: string
+              titulo: string
+              valor: number
+            }[]
+          }
+        | {
+            Args: { contact_ids: string[] }
+            Returns: {
+              card_id: string
+              companions: string[]
+              data_viagem: string
+              moeda: string
+              relevant_contacts: string[]
+              role: string
+              status: string
+              titulo: string
+              valor: number
+            }[]
+          }
       get_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -2239,13 +2484,13 @@ export type Database = {
     Enums: {
       app_product: "TRIPS" | "WEDDING" | "CORP"
       app_role:
-      | "admin"
-      | "gestor"
-      | "sdr"
-      | "vendas"
-      | "pos_venda"
-      | "concierge"
-      | "financeiro"
+        | "admin"
+        | "gestor"
+        | "sdr"
+        | "vendas"
+        | "pos_venda"
+        | "concierge"
+        | "financeiro"
       tipo_pessoa_enum: "adulto" | "crianca"
       tipo_viajante_enum: "titular" | "acompanhante"
     }
@@ -2265,116 +2510,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
@@ -2394,16 +2639,3 @@ export const Constants = {
     },
   },
 } as const
-
-export type Contato = Database['public']['Tables']['contatos']['Row']
-
-export type TripsProdutoData = {
-  taxa_planejamento?: {
-    status?: string
-    valor?: number
-    data_envio?: string
-    data_pagamento?: string
-    autorizada_por?: string
-  }
-  [key: string]: any
-}

@@ -17,14 +17,22 @@ export interface FilterState {
     tags?: string[]
 }
 
+export interface GroupFilters {
+    showGroups: boolean
+    showLinked: boolean
+    showSolo: boolean
+}
+
 interface PipelineFiltersState {
     viewMode: ViewMode
     subView: SubView
     filters: FilterState
+    groupFilters: GroupFilters
     collapsedPhases: string[]
     setViewMode: (mode: ViewMode) => void
     setSubView: (view: SubView) => void
     setFilters: (filters: FilterState) => void
+    setGroupFilters: (filters: GroupFilters) => void
     setCollapsedPhases: (phases: string[]) => void
 }
 
@@ -36,10 +44,16 @@ export const usePipelineFilters = create<PipelineFiltersState>()(
             viewMode: 'AGENT',
             subView: 'MY_QUEUE',
             filters: {},
+            groupFilters: {
+                showGroups: false,
+                showLinked: true,
+                showSolo: true
+            },
             collapsedPhases: [],
             setViewMode: (mode) => set({ viewMode: mode }),
             setSubView: (view) => set({ subView: view }),
             setFilters: (filters) => set({ filters }),
+            setGroupFilters: (groupFilters) => set({ groupFilters }),
             setCollapsedPhases: (phases) => set({ collapsedPhases: phases }),
         }),
         {
