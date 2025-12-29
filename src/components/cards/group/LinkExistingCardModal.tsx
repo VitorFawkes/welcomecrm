@@ -17,7 +17,7 @@ interface LinkExistingCardModalProps {
 export default function LinkExistingCardModal({ isOpen, onClose, parentCardId, onLinkSuccess }: LinkExistingCardModalProps) {
     const queryClient = useQueryClient()
     const [searchTerm, setSearchTerm] = useState('')
-    const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+    const [selectedCardIds, setSelectedCardIds] = useState<string[]>([])
     const [debouncedSearch, setDebouncedSearch] = useState('')
 
     // Debounce search
@@ -38,7 +38,7 @@ export default function LinkExistingCardModal({ isOpen, onClose, parentCardId, o
                 .ilike('titulo', `%${debouncedSearch}%`)
                 .neq('id', parentCardId) // Don't link to self
                 .is('parent_card_id', null) // Only unlinked cards
-                .limit(10)
+                .limit(20)
 
             if (error) throw error
             return data
@@ -49,12 +49,12 @@ export default function LinkExistingCardModal({ isOpen, onClose, parentCardId, o
     // Link Mutation
     const linkCardMutation = useMutation({
         mutationFn: async () => {
-            if (!selectedCardId) return
+            if (selectedCardIds.length === 0) return
 
             const { error } = await supabase
                 .from('cards')
                 .update({ parent_card_id: parentCardId })
-                .eq('id', selectedCardId)
+                .in('id', selectedCardIds)
 
             if (error) throw error
         },
@@ -63,17 +63,25 @@ export default function LinkExistingCardModal({ isOpen, onClose, parentCardId, o
             if (onLinkSuccess) onLinkSuccess()
             onClose()
             setSearchTerm('')
-            setSelectedCardId(null)
+            setSelectedCardIds([])
         }
     })
 
+    const toggleSelection = (id: string) => {
+        setSelectedCardIds(prev =>
+            prev.includes(id)
+                ? prev.filter(cardId => cardId !== id)
+                : [...prev, id]
+        )
+    }
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px] bg-white/90 backdrop-blur-xl border-white/20">
+            <DialogContent className="sm:max-w-[600px] bg-white/90 backdrop-blur-xl border-white/20">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl">
                         <LinkIcon className="w-5 h-5 text-blue-500" />
-                        Vincular Card Existente
+                        Vincular Cards Existentes
                     </DialogTitle>
                 </DialogHeader>
 
@@ -89,7 +97,7 @@ export default function LinkExistingCardModal({ isOpen, onClose, parentCardId, o
                         />
                     </div>
 
-                    <div className="min-h-[200px] max-h-[300px] overflow-y-auto border border-gray-100 rounded-lg bg-white/50">
+                    <div className="min-h-[200px] max-h-[400px] overflow-y-auto border border-gray-100 rounded-lg bg-white/50">
                         {isLoading ? (
                             <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                                 Buscando...
@@ -97,49 +105,61 @@ export default function LinkExistingCardModal({ isOpen, onClose, parentCardId, o
                         ) : searchResults?.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm p-4">
                                 <AlertCircle className="w-8 h-8 mb-2 opacity-50" />
-                                <p>Nenhum card encontrado.</p>
-                                <p className="text-xs text-gray-400 mt-1">Tente buscar por outro termo.</p>
+                                <p>Nenhum card disponível encontrado.</p>
+                                <p className="text-xs text-gray-400 mt-1">Cards já vinculados a grupos não aparecem aqui.</p>
                             </div>
                         ) : !debouncedSearch ? (
                             <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm p-4">
                                 <Search className="w-8 h-8 mb-2 opacity-50" />
-                                <p>Digite para buscar cards disponíveis.</p>
+                                <p>Digite para buscar cards soltos.</p>
                             </div>
                         ) : (
                             <div className="divide-y divide-gray-100">
-                                {searchResults?.map((card) => (
-                                    <div
-                                        key={card.id}
-                                        onClick={() => setSelectedCardId(card.id)}
-                                        className={cn(
-                                            "p-3 cursor-pointer transition-colors hover:bg-blue-50 flex items-center justify-between group",
-                                            selectedCardId === card.id ? "bg-blue-50 border-l-4 border-blue-500" : "border-l-4 border-transparent"
-                                        )}
-                                    >
-                                        <div>
-                                            <p className="font-medium text-gray-900 group-hover:text-blue-700">
-                                                {card.titulo}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                    {card.produto}
-                                                </span>
-                                                {card.valor_estimado && (
-                                                    <span className="text-xs text-gray-500">
-                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_estimado)}
+                                {searchResults?.map((card) => {
+                                    const isSelected = selectedCardIds.includes(card.id)
+                                    return (
+                                        <div
+                                            key={card.id}
+                                            onClick={() => toggleSelection(card.id)}
+                                            className={cn(
+                                                "p-3 cursor-pointer transition-colors hover:bg-blue-50 flex items-center justify-between group select-none",
+                                                isSelected ? "bg-blue-50 border-l-4 border-blue-500" : "border-l-4 border-transparent"
+                                            )}
+                                        >
+                                            <div>
+                                                <p className="font-medium text-gray-900 group-hover:text-blue-700">
+                                                    {card.titulo}
+                                                </p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                        {card.produto}
                                                     </span>
-                                                )}
+                                                    {card.valor_estimado && (
+                                                        <span className="text-xs text-gray-500">
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_estimado)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className={cn(
+                                                "h-6 w-6 rounded-full flex items-center justify-center border transition-all",
+                                                isSelected
+                                                    ? "bg-blue-500 border-blue-500 text-white"
+                                                    : "border-gray-300 bg-white group-hover:border-blue-400"
+                                            )}>
+                                                {isSelected && <Check className="w-3.5 h-3.5" />}
                                             </div>
                                         </div>
-                                        {selectedCardId === card.id && (
-                                            <div className="h-6 w-6 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-sm">
-                                                <Check className="w-3.5 h-3.5" />
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
+                    </div>
+
+                    <div className="flex justify-between items-center px-1">
+                        <span className="text-sm text-gray-500">
+                            {selectedCardIds.length} cards selecionados
+                        </span>
                     </div>
                 </div>
 
@@ -149,10 +169,10 @@ export default function LinkExistingCardModal({ isOpen, onClose, parentCardId, o
                     </Button>
                     <Button
                         onClick={() => linkCardMutation.mutate()}
-                        disabled={!selectedCardId || linkCardMutation.isPending}
+                        disabled={selectedCardIds.length === 0 || linkCardMutation.isPending}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
-                        {linkCardMutation.isPending ? 'Vinculando...' : 'Vincular Card'}
+                        {linkCardMutation.isPending ? 'Vinculando...' : `Vincular ${selectedCardIds.length > 0 ? selectedCardIds.length : ''} Cards`}
                     </Button>
                 </DialogFooter>
             </DialogContent>

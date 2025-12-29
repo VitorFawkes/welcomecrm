@@ -257,7 +257,7 @@ export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
                                     {!cardId && activity.card?.titulo && (
-                                        <Link to={`/pipeline/cards/${activity.card_id}`} className="text-xs text-indigo-600 mb-0.5 font-medium hover:underline block">
+                                        <Link to={`/cards/${activity.card_id}`} className="text-xs text-indigo-600 mb-0.5 font-medium hover:underline block">
                                             {activity.card.titulo}
                                         </Link>
                                     )}

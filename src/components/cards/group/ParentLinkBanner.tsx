@@ -31,7 +31,7 @@ export function ParentLinkBanner({ parentId }: ParentLinkBannerProps) {
 
     return (
         <div
-            onClick={() => navigate(`/pipeline/cards/${parent.id}`)}
+            onClick={() => navigate(`/cards/${parent.id}`)}
             className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-3 mb-6 flex items-center justify-between cursor-pointer hover:bg-primary-500/20 transition-all group"
         >
             <div className="flex items-center gap-3">

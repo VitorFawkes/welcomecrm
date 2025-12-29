@@ -176,8 +176,8 @@ export function GroupRoomingList({ parentId }: RoomingListProps) {
                                     </TableCell>
                                     <TableCell className="px-6 py-4">
                                         <Badge variant="outline" className={`border-0 ${item.type === 'crianca'
-                                                ? 'bg-blue-100 text-blue-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-gray-100 text-gray-800'
                                             }`}>
                                             {item.type === 'crianca' ? 'Não Adulto' : 'Adulto'}
                                         </Badge>
@@ -188,7 +188,7 @@ export function GroupRoomingList({ parentId }: RoomingListProps) {
                                     <TableCell className="px-6 py-4">
                                         <div
                                             className="flex items-center gap-2 text-primary-600 hover:text-primary-700 cursor-pointer font-medium"
-                                            onClick={() => navigate(`/pipeline/cards/${item.cardId}`)}
+                                            onClick={() => navigate(`/cards/${item.cardId}`)}
                                         >
                                             <ExternalLink className="h-3 w-3" />
                                             {item.cardTitle}

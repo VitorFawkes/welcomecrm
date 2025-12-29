@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Users, DollarSign, Plus, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { Users, DollarSign, Plus, Link as LinkIcon, ExternalLink, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import LinkExistingCardModal from './LinkExistingCardModal';
 import CreateChildCardModal from './CreateChildCardModal';
+import BulkAddTravelersModal from './BulkAddTravelersModal';
 import type { Database } from '../../../database.types'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -19,15 +20,36 @@ export function GroupDashboard({ card, onRefresh }: GroupDashboardProps) {
     const [childCount, setChildCount] = useState(0);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+
+    const [parentDetails, setParentDetails] = useState<{
+        start: string | null;
+        end: string | null;
+        origin: string | null;
+    }>({ start: null, end: null, origin: null });
 
     useEffect(() => {
-        // Just fetch count for stats if needed, or rely on card.group_total_pax
-        // But card.group_total_pax is PAX, not CARDS.
-        // So we might still need to fetch count of children cards.
         if (card.id) {
             fetchChildCount();
+            fetchParentDetails();
         }
     }, [card.id]);
+
+    const fetchParentDetails = async () => {
+        const { data } = await supabase
+            .from('cards')
+            .select('data_viagem_inicio, data_viagem_fim, origem')
+            .eq('id', card.id!)
+            .single();
+
+        if (data) {
+            setParentDetails({
+                start: data.data_viagem_inicio,
+                end: data.data_viagem_fim,
+                origin: data.origem
+            });
+        }
+    };
 
     const fetchChildCount = async () => {
         const { count } = await supabase
@@ -62,6 +84,14 @@ export function GroupDashboard({ card, onRefresh }: GroupDashboardProps) {
                     >
                         <LinkIcon className="w-4 h-4 mr-2" />
                         Vincular Existente
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700"
+                        onClick={() => setIsBulkModalOpen(true)}
+                    >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Adicionar em Massa
                     </Button>
                     <Button
                         className="bg-primary-600 hover:bg-primary-700 text-white border-none"
@@ -145,6 +175,22 @@ export function GroupDashboard({ card, onRefresh }: GroupDashboardProps) {
                         parentCardId={card.id!}
                         parentProduct={card.produto || 'TRIPS'}
                         parentTitle={card.titulo || ''}
+                    />
+
+                    <BulkAddTravelersModal
+                        isOpen={isBulkModalOpen}
+                        onClose={() => setIsBulkModalOpen(false)}
+                        parentCardId={card.id!}
+                        parentProduct={card.produto || 'TRIPS'}
+                        parentTitle={card.titulo || ''}
+                        parentDates={{
+                            start: parentDetails.start || card.data_viagem_inicio,
+                            end: parentDetails.end
+                        }}
+                        parentDestination={{
+                            origin: parentDetails.origin || card.origem,
+                            destination: null
+                        }}
                     />
                 </>
             )}

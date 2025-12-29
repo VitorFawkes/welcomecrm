@@ -111,7 +111,7 @@ export function GroupTravelersList({ parentId }: GroupTravelersListProps) {
                                 <TableRow
                                     key={child.id}
                                     className="border-gray-100 hover:bg-gray-50/50 transition-colors cursor-pointer group"
-                                    onClick={() => navigate(`/pipeline/cards/${child.id}`)}
+                                    onClick={() => navigate(`/cards/${child.id}`)}
                                 >
                                     <TableCell>
                                         <div className="flex items-center gap-3">
@@ -154,7 +154,7 @@ export function GroupTravelersList({ parentId }: GroupTravelersListProps) {
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-900 hover:bg-gray-100"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    navigate(`/pipeline/cards/${child.id}`);
+                                                    navigate(`/cards/${child.id}`);
                                                 }}
                                             >
                                                 <ExternalLink className="h-4 w-4" />
