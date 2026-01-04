@@ -261,7 +261,8 @@ export default function TripInformation({ card }: TripInformationProps) {
     const FieldCard = ({ icon: Icon, iconColor, label, value, subValue, fieldName, dataKey, sdrValue }: any) => {
         const status = getFieldStatus(dataKey)
         const isPlanner = viewMode === 'PLANNER'
-        const showSdrComparison = isPlanner && sdrValue && JSON.stringify(sdrValue) !== JSON.stringify(value)
+        // Always show SDR section if we are in Planner mode
+        const showSdrSection = isPlanner
 
         return (
             <div
@@ -320,7 +321,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                             {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold font-sans">Obrigatório</span>}
                         </p>
 
-                        {/* Main Value */}
+                        {/* Main Value (Planner's Plan) */}
                         <div className={cn(
                             "text-sm truncate",
                             correctionMode ? "font-mono text-gray-700 font-medium" : "font-semibold text-gray-900"
@@ -332,11 +333,17 @@ export default function TripInformation({ card }: TripInformationProps) {
                         </div>
                         {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
 
-                        {/* SDR Comparison (Planner View Only) */}
-                        {showSdrComparison && (
-                            <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-500">
-                                <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">SDR</span>
-                                <span className="line-through opacity-70">{sdrValue}</span>
+                        {/* SDR Reference Section (Always visible in Planner View) */}
+                        {showSdrSection && (
+                            <div className="mt-3 pt-2 border-t border-gray-100">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-wider">
+                                        SDR
+                                    </span>
+                                </div>
+                                <div className="text-xs text-gray-600 bg-gray-50/50 p-2 rounded-md border border-gray-100">
+                                    {sdrValue || <span className="text-gray-400 italic">Não informado pelo SDR</span>}
+                                </div>
                             </div>
                         )}
                     </div>

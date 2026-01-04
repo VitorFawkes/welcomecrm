@@ -4,7 +4,8 @@
 > 
 > **To the AI Agent working on this project:**
 > 1.  **MANDATORY CONTEXT:** You MUST read this file at the start of every `PLANNING` phase. Do not assume you know the architecture.
-> 2.  **SINGLE SOURCE OF TRUTH:** This file is the absolute truth. If code contradicts this file, flag it to the user.
+> 2.  **SAFETY PROTOCOL:** You MUST read `.cursorrules` immediately to load the "Iron Dome" safety protocols.
+> 3.  **SINGLE SOURCE OF TRUTH:** This file is the absolute truth. If code contradicts this file, flag it to the user.
 > 3.  **UPDATE ON CHANGE:** If you modify the DB Schema, add a new Hook, or change a Business Rule, you **MUST** update this file immediately after the Execution phase. Do not wait for the user to ask.
 > 4.  **INTEGRATION INTELLIGENCE:** Before suggesting a new library or pattern, check Section 3 ("Frontend Patterns") and Section 4 ("Integrations"). Consistency > Novelty.
 > 5.  **NO REGRESSIONS:** Before deleting or refactoring, check Section 2 ("Data Model") to ensure you are not breaking hidden dependencies (like Triggers or Views).
@@ -131,3 +132,10 @@
 - **Bulk Operations:**
     - **Pattern:** Use "Selection State" + "Floating Action Bar" for bulk actions (e.g., `UserManagement.tsx`).
     - **Mutation:** Prefer single batch mutations (e.g., `update().in('id', ids)`) over iterating in the frontend.
+
+## 8. Database Operations Protocol (MANDATORY)
+-   **The "Blind Surgery" Rule:** Never modify a View or Function based on a `.sql` file in the codebase.
+-   **SOP:** You MUST follow the **Live Schema Verification** protocol defined in `docs/SQL_SOP.md`.
+    1.  Query `pg_views` / `pg_get_functiondef` to get the *real* definition.
+    2.  Diff against your changes.
+    3.  Apply & Verify.
