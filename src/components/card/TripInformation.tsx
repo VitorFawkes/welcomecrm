@@ -149,8 +149,14 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     const queryClient = useQueryClient()
     const { missingBlocking, missingFuture } = useStageRequirements(card)
-    const { } = useFieldConfig()
+    const { getFieldConfig } = useFieldConfig()
     const { data: phases } = usePipelinePhases()
+
+    const isFieldVisible = (key: string) => {
+        if (!card.pipeline_stage_id) return true // Default to visible if no stage context
+        const config = getFieldConfig(card.pipeline_stage_id, key)
+        return config?.isVisible ?? true
+    }
 
     // Sync ViewMode with Card Stage
     useEffect(() => {
@@ -429,55 +435,63 @@ export default function TripInformation({ card }: TripInformationProps) {
                 {(viewMode === 'SDR' || viewMode === 'PLANNER') && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Motivo */}
-                        <FieldCard
-                            icon={Tag}
-                            iconColor="bg-purple-100 text-purple-600"
-                            label="Motivo da Viagem"
-                            value={activeData.motivo}
-                            fieldName="motivo"
-                            dataKey="motivo"
-                            sdrValue={briefingData.motivo}
-                        />
+                        {isFieldVisible('motivo') && (
+                            <FieldCard
+                                icon={Tag}
+                                iconColor="bg-purple-100 text-purple-600"
+                                label="Motivo da Viagem"
+                                value={activeData.motivo}
+                                fieldName="motivo"
+                                dataKey="motivo"
+                                sdrValue={briefingData.motivo}
+                            />
+                        )}
 
                         {/* Destinos */}
-                        <FieldCard
-                            icon={MapPin}
-                            iconColor="bg-blue-100 text-blue-600"
-                            label="Destinos"
-                            value={activeData.destinos?.length ? activeData.destinos.join(' • ') : undefined}
-                            fieldName="destinos"
-                            dataKey="destinos"
-                            sdrValue={briefingData.destinos?.join(' • ')}
-                        />
+                        {isFieldVisible('destinos') && (
+                            <FieldCard
+                                icon={MapPin}
+                                iconColor="bg-blue-100 text-blue-600"
+                                label="Destinos"
+                                value={activeData.destinos?.length ? activeData.destinos.join(' • ') : undefined}
+                                fieldName="destinos"
+                                dataKey="destinos"
+                                sdrValue={briefingData.destinos?.join(' • ')}
+                            />
+                        )}
 
                         {/* Período */}
-                        <FieldCard
-                            icon={Calendar}
-                            iconColor="bg-orange-100 text-orange-600"
-                            label="Período"
-                            value={activeData.epoca_viagem?.inicio ? (
-                                <>
-                                    {formatDate(activeData.epoca_viagem.inicio)}
-                                    {activeData.epoca_viagem.fim && ` até ${formatDate(activeData.epoca_viagem.fim)}`}
-                                </>
-                            ) : undefined}
-                            subValue={activeData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
-                            fieldName="periodo"
-                            dataKey="epoca_viagem"
-                            sdrValue={briefingData.epoca_viagem?.inicio ? formatDate(briefingData.epoca_viagem.inicio) : undefined}
-                        />
+                        {isFieldVisible('epoca_viagem') && (
+                            <FieldCard
+                                icon={Calendar}
+                                iconColor="bg-orange-100 text-orange-600"
+                                label="Período"
+                                value={activeData.epoca_viagem?.inicio ? (
+                                    <>
+                                        {formatDate(activeData.epoca_viagem.inicio)}
+                                        {activeData.epoca_viagem.fim && ` até ${formatDate(activeData.epoca_viagem.fim)}`}
+                                    </>
+                                ) : undefined}
+                                subValue={activeData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
+                                fieldName="periodo"
+                                dataKey="epoca_viagem"
+                                sdrValue={briefingData.epoca_viagem?.inicio ? formatDate(briefingData.epoca_viagem.inicio) : undefined}
+                            />
+                        )}
 
                         {/* Orçamento */}
-                        <FieldCard
-                            icon={DollarSign}
-                            iconColor="bg-green-100 text-green-600"
-                            label="Orçamento"
-                            value={activeData.orcamento?.total ? formatBudget(activeData.orcamento.total) : undefined}
-                            subValue={activeData.orcamento?.por_pessoa ? `${formatBudget(activeData.orcamento.por_pessoa)} por pessoa` : undefined}
-                            fieldName="orcamento"
-                            dataKey="orcamento"
-                            sdrValue={briefingData.orcamento?.total ? formatBudget(briefingData.orcamento.total) : undefined}
-                        />
+                        {isFieldVisible('orcamento') && (
+                            <FieldCard
+                                icon={DollarSign}
+                                iconColor="bg-green-100 text-green-600"
+                                label="Orçamento"
+                                value={activeData.orcamento?.total ? formatBudget(activeData.orcamento.total) : undefined}
+                                subValue={activeData.orcamento?.por_pessoa ? `${formatBudget(activeData.orcamento.por_pessoa)} por pessoa` : undefined}
+                                fieldName="orcamento"
+                                dataKey="orcamento"
+                                sdrValue={briefingData.orcamento?.total ? formatBudget(briefingData.orcamento.total) : undefined}
+                            />
+                        )}
                     </div>
                 )}
 

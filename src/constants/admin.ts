@@ -1,6 +1,8 @@
 export const SECTIONS = [
     { value: 'trip_info', label: 'Informações da Viagem', color: 'bg-blue-50 text-blue-700 border-blue-100' },
     { value: 'observacoes_criticas', label: 'Informações Importantes', color: 'bg-red-50 text-red-700 border-red-100' },
+    { value: 'observacoes_sdr', label: 'Info. Importantes (SDR)', color: 'bg-blue-50 text-blue-700 border-blue-100' },
+    { value: 'observacoes_pos_venda', label: 'Info. Importantes (Pós-Venda)', color: 'bg-green-50 text-green-700 border-green-100' },
     { value: 'people', label: 'Pessoas / Viajantes', color: 'bg-purple-50 text-purple-700 border-purple-100' },
     { value: 'payment', label: 'Pagamento', color: 'bg-green-50 text-green-700 border-green-100' },
     { value: 'system', label: 'Sistema / Interno', color: 'bg-gray-50 text-gray-700 border-gray-100' },

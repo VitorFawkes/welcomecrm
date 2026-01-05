@@ -15,6 +15,7 @@ export interface FieldConfigResult {
     isRequired: boolean
     isHeader: boolean
     customLabel?: string | null
+    options?: any
 }
 
 export function useFieldConfig() {
@@ -64,7 +65,8 @@ export function useFieldConfig() {
             isVisible: config?.is_visible ?? true, // Default visible
             isRequired: config?.is_required ?? false,
             isHeader: config?.show_in_header ?? false,
-            customLabel: config?.custom_label
+            customLabel: config?.custom_label,
+            options: field.options
         }
     }
 
