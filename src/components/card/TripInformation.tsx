@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { MapPin, Calendar, DollarSign, Tag, X, Check, Edit2, History, AlertCircle, Globe, AlertTriangle, Eraser, Plane, FileCheck, ThumbsUp, Upload } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { supabase } from '../../lib/supabase'
@@ -37,7 +37,7 @@ interface TripInformationProps {
     card: Card
 }
 
-type ViewMode = 'SDR' | 'PLANNER' | 'POS_VENDA' | 'MARKETING'
+type ViewMode = string
 
 interface EditModalProps {
     isOpen: boolean
@@ -141,7 +141,7 @@ export default function TripInformation({ card }: TripInformationProps) {
     const briefingData = useMemo(() => (card.briefing_inicial as TripsProdutoData) || EMPTY_OBJECT, [card.briefing_inicial])
     const marketingData = useMemo(() => (card.marketing_data as any) || EMPTY_OBJECT, [card.marketing_data])
 
-    const [viewMode, setViewMode] = useState<ViewMode>('SDR')
+    const [viewMode, setViewMode] = useState<ViewMode>(SystemPhase.SDR)
     const [editingField, setEditingField] = useState<string | null>(null)
     const [editedData, setEditedData] = useState<TripsProdutoData>(productData)
     const [destinosInput, setDestinosInput] = useState('')
@@ -149,7 +149,7 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     const queryClient = useQueryClient()
     const { missingBlocking, missingFuture } = useStageRequirements(card)
-    const { getFieldConfig } = useFieldConfig()
+    const { getFieldConfig, getVisibleFields } = useFieldConfig()
     const { data: phases } = usePipelinePhases()
 
     const isFieldVisible = (key: string) => {
@@ -162,20 +162,25 @@ export default function TripInformation({ card }: TripInformationProps) {
     useEffect(() => {
         if (!phases) return
 
-        const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
-        const plannerPhase = phases.find(p => p.slug === SystemPhase.PLANNER)
-        const posVendaPhase = phases.find(p => p.slug === SystemPhase.POS_VENDA)
+        const currentPhase = phases.find(p => p.name === card.fase)
 
-        if (sdrPhase && card.fase === sdrPhase.name) setViewMode('SDR')
-        else if (plannerPhase && card.fase === plannerPhase.name) setViewMode('PLANNER')
-        else if (posVendaPhase && card.fase === posVendaPhase.name) setViewMode('POS_VENDA')
-        else setViewMode('SDR') // Default
+        // Only switch to current phase if it exists, has a slug, AND is visible
+        if (currentPhase && currentPhase.slug && currentPhase.visible_in_card !== false) {
+            setViewMode(currentPhase.slug)
+        } else {
+            // Default to SDR if phase not found or hidden
+            const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
+            if (sdrPhase && sdrPhase.slug) setViewMode(sdrPhase.slug)
+        }
     }, [card.fase, phases])
 
     // Determine which data to display/edit based on ViewMode and CorrectionMode
     // SDR View: Shows briefingData (or productData if briefing is empty/synced)
     // Planner View: Shows productData (Proposal) AND briefingData (History)
-    const activeData = (viewMode === 'SDR' || correctionMode) ? briefingData : productData
+    // Determine which data to display/edit based on ViewMode and CorrectionMode
+    // SDR View: Shows briefingData (or productData if briefing is empty/synced)
+    // Planner View: Shows productData (Proposal) AND briefingData (History)
+    const activeData = (viewMode === SystemPhase.SDR || correctionMode) ? briefingData : productData
 
     useEffect(() => {
         setEditedData(activeData)
@@ -227,7 +232,10 @@ export default function TripInformation({ card }: TripInformationProps) {
         // Target depends on:
         // 1. Correction Mode -> Always 'briefing_inicial'
         // 2. View Mode -> SDR = 'briefing_inicial', Planner = 'produto_data'
-        const target = (correctionMode || viewMode === 'SDR') ? 'briefing_inicial' : 'produto_data'
+        // Target depends on:
+        // 1. Correction Mode -> Always 'briefing_inicial'
+        // 2. View Mode -> SDR = 'briefing_inicial', Planner = 'produto_data'
+        const target = (correctionMode || viewMode === SystemPhase.SDR) ? 'briefing_inicial' : 'produto_data'
 
         updateCardMutation.mutate({
             newData: editedData,
@@ -255,7 +263,7 @@ export default function TripInformation({ card }: TripInformationProps) {
     }
 
     const getFieldStatus = (dataKey: string) => {
-        if (viewMode !== 'SDR' && viewMode !== 'PLANNER') return 'ok' // Only validate in early stages
+        if (viewMode !== SystemPhase.SDR && viewMode !== SystemPhase.PLANNER) return 'ok' // Only validate in early stages
         if (correctionMode) return 'ok'
         if (missingBlocking.some(req => req.field_key === dataKey)) return 'blocking'
         if (missingFuture.some(req => req.field_key === dataKey)) return 'attention'
@@ -266,7 +274,7 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     const FieldCard = ({ icon: Icon, iconColor, label, value, subValue, fieldName, dataKey, sdrValue }: any) => {
         const status = getFieldStatus(dataKey)
-        const isPlanner = viewMode === 'PLANNER'
+        const isPlanner = viewMode === SystemPhase.PLANNER
         // Always show SDR section if we are in Planner mode
         const showSdrSection = isPlanner
 
@@ -332,10 +340,17 @@ export default function TripInformation({ card }: TripInformationProps) {
                             "text-sm truncate",
                             correctionMode ? "font-mono text-gray-700 font-medium" : "font-semibold text-gray-900"
                         )}>
-                            {value || (
-                                status === 'blocking' ? <span className="text-red-500 italic font-medium font-sans">Obrigatório</span> :
-                                    <span className="text-gray-400 italic font-normal font-sans">Não informado</span>
-                            )}
+                            {(() => {
+                                if (value === null || value === undefined || value === '') {
+                                    return status === 'blocking' ?
+                                        <span className="text-red-500 italic font-medium font-sans">Obrigatório</span> :
+                                        <span className="text-gray-400 italic font-normal font-sans">Não informado</span>
+                                }
+                                if (typeof value === 'object' && !React.isValidElement(value)) {
+                                    return JSON.stringify(value)
+                                }
+                                return value
+                            })()}
                         </div>
                         {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
 
@@ -366,19 +381,23 @@ export default function TripInformation({ card }: TripInformationProps) {
             <div className="border-b border-gray-200 bg-gray-50/50 px-4 pt-4">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                        {viewMode === 'SDR' && <Tag className="h-4 w-4 text-blue-600" />}
-                        {viewMode === 'PLANNER' && <Plane className="h-4 w-4 text-purple-600" />}
-                        {viewMode === 'POS_VENDA' && <FileCheck className="h-4 w-4 text-green-600" />}
-                        {viewMode === 'MARKETING' && <Globe className="h-4 w-4 text-pink-600" />}
+                        {viewMode === SystemPhase.SDR && <Tag className="h-4 w-4 text-blue-600" />}
+                        {viewMode === SystemPhase.PLANNER && <Plane className="h-4 w-4 text-purple-600" />}
+                        {viewMode === SystemPhase.POS_VENDA && <FileCheck className="h-4 w-4 text-green-600" />}
+                        {viewMode === 'marketing' && <Globe className="h-4 w-4 text-pink-600" />}
 
-                        {viewMode === 'SDR' && "Briefing & Qualificação"}
-                        {viewMode === 'PLANNER' && "Construção da Proposta"}
-                        {viewMode === 'POS_VENDA' && "Entrega & Pós-Venda"}
-                        {viewMode === 'MARKETING' && "Marketing & Origem"}
+                        {viewMode === SystemPhase.SDR && "Briefing & Qualificação"}
+                        {viewMode === SystemPhase.PLANNER && "Construção da Proposta"}
+                        {viewMode === SystemPhase.POS_VENDA && "Entrega & Pós-Venda"}
+                        {viewMode === 'marketing' && "Marketing & Origem"}
+                        {!['sdr', 'planner', 'pos_venda', 'marketing'].includes(viewMode) && (
+                            // Dynamic Title
+                            phases?.find(p => p.slug === viewMode)?.label || viewMode
+                        )}
                     </h3>
 
                     {/* Correction Toggle (Only visible in Planner/SDR views) */}
-                    {(viewMode === 'SDR' || viewMode === 'PLANNER') && (
+                    {(viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER) && (
                         <button
                             onClick={() => setCorrectionMode(!correctionMode)}
                             className={cn(
@@ -394,29 +413,61 @@ export default function TripInformation({ card }: TripInformationProps) {
                     )}
                 </div>
 
-                <div className="flex gap-6">
-                    {[
-                        { id: 'SDR', label: 'SDR', color: 'border-blue-500 text-blue-600' },
-                        { id: 'PLANNER', label: 'Planner', color: 'border-purple-500 text-purple-600' },
-                        { id: 'POS_VENDA', label: 'Pós-Venda', color: 'border-green-500 text-green-600' },
-                        { id: 'MARKETING', label: 'Marketing', color: 'border-pink-500 text-pink-600' }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => {
-                                setViewMode(tab.id as ViewMode)
-                                setCorrectionMode(false)
-                            }}
-                            className={cn(
-                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1",
-                                viewMode === tab.id
-                                    ? tab.color
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                            )}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                <div className="flex gap-6 overflow-x-auto pb-1 scrollbar-hide">
+                    {phases?.filter(p => p.active && p.name !== 'Marketing')
+                        .filter(p => p.visible_in_card !== false) // Respect visibility setting
+                        .slice(0, 6) // Limit to 6 phases
+                        .map(phase => {
+                            const isActive = viewMode === phase.slug
+                            // Determine icon based on slug or default
+                            const Icon = phase.slug === SystemPhase.SDR ? Tag :
+                                phase.slug === SystemPhase.PLANNER ? Plane :
+                                    phase.slug === SystemPhase.POS_VENDA ? FileCheck : Tag
+
+                            // Determine color
+                            const activeColorClass = phase.slug === SystemPhase.SDR ? 'border-blue-500 text-blue-600' :
+                                phase.slug === SystemPhase.PLANNER ? 'border-purple-500 text-purple-600' :
+                                    phase.slug === SystemPhase.POS_VENDA ? 'border-green-500 text-green-600' :
+                                        'border-indigo-500 text-indigo-600'
+
+                            return (
+                                <button
+                                    key={phase.id}
+                                    onClick={() => {
+                                        if (phase.slug) {
+                                            setViewMode(phase.slug)
+                                            setCorrectionMode(false)
+                                        }
+                                    }}
+                                    className={cn(
+                                        "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                        isActive
+                                            ? activeColorClass
+                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                    )}
+                                >
+                                    <Icon className="h-4 w-4" />
+                                    {phase.label || phase.name}
+                                </button>
+                            )
+                        })}
+
+                    {/* Fixed Marketing Button */}
+                    <button
+                        onClick={() => {
+                            setViewMode('marketing')
+                            setCorrectionMode(false)
+                        }}
+                        className={cn(
+                            "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                            viewMode === 'marketing'
+                                ? "border-pink-500 text-pink-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        )}
+                    >
+                        <Globe className="h-4 w-4" />
+                        Marketing
+                    </button>
                 </div>
             </div>
 
@@ -427,12 +478,12 @@ export default function TripInformation({ card }: TripInformationProps) {
             )}>
 
                 {/* MARKETING VIEW */}
-                {viewMode === 'MARKETING' && (
+                {viewMode === 'marketing' && (
                     <MarketingView cardId={card.id!} initialData={marketingData} />
                 )}
 
                 {/* SDR & PLANNER VIEWS (Shared Fields, Different Context) */}
-                {(viewMode === 'SDR' || viewMode === 'PLANNER') && (
+                {(viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER) && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Motivo */}
                         {isFieldVisible('motivo') && (
@@ -496,7 +547,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                 )}
 
                 {/* POS-VENDA VIEW */}
-                {viewMode === 'POS_VENDA' && (
+                {viewMode === SystemPhase.POS_VENDA && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Pre-Trip */}
@@ -542,6 +593,33 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* DYNAMIC PHASES VIEW (Generic Render) */}
+                {!['sdr', 'planner', 'pos_venda', 'marketing'].includes(viewMode) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Render ALL visible fields for this dynamic phase */}
+                        {getVisibleFields(card.pipeline_stage_id!).map((field: any) => (
+                            <FieldCard
+                                key={field.key}
+                                icon={Tag} // Default icon
+                                iconColor="bg-gray-100 text-gray-600"
+                                label={field.label}
+                                value={activeData[field.key]}
+                                fieldName={field.key}
+                                dataKey={field.key}
+                            // For dynamic fields, we don't have a specific "sdrValue" concept yet, 
+                            // unless we map it. For now, we leave it undefined.
+                            />
+                        ))}
+                        {getVisibleFields(card.pipeline_stage_id!).length === 0 && (
+                            <div className="col-span-full text-center py-8 text-gray-500 italic">
+                                Nenhum campo configurado para esta fase.
+                                <br />
+                                <span className="text-xs">Configure na Matriz de Governança.</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

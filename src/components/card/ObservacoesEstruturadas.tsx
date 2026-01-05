@@ -17,7 +17,7 @@ interface ObservacoesEstruturadasProps {
     card: Card
 }
 
-type ViewMode = 'SDR' | 'PLANNER' | 'POS_VENDA' | 'MARKETING'
+type ViewMode = string
 
 const EMPTY_OBJECT = {}
 
@@ -39,33 +39,33 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
     useEffect(() => {
         if (!phases) return
 
-        const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
-        const plannerPhase = phases.find(p => p.slug === SystemPhase.PLANNER)
-        const posVendaPhase = phases.find(p => p.slug === SystemPhase.POS_VENDA)
-
-        if (sdrPhase && card.fase === sdrPhase.name) setViewMode('SDR')
-        else if (plannerPhase && card.fase === plannerPhase.name) setViewMode('PLANNER')
-        else if (posVendaPhase && card.fase === posVendaPhase.name) setViewMode('POS_VENDA')
-        else setViewMode('SDR') // Default
+        const currentPhase = phases.find(p => p.name === card.fase)
+        if (currentPhase && currentPhase.slug) {
+            setViewMode(currentPhase.slug)
+        } else {
+            // Default to SDR if not found
+            const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
+            if (sdrPhase && sdrPhase.slug) setViewMode(sdrPhase.slug)
+        }
     }, [card.fase, phases])
 
     // Determine active section key based on viewMode
     const activeSectionKey = useMemo(() => {
         switch (viewMode) {
-            case 'SDR': return 'observacoes_sdr'
-            case 'PLANNER': return 'observacoes_criticas'
-            case 'POS_VENDA': return 'observacoes_pos_venda'
-            default: return 'observacoes_criticas'
+            case SystemPhase.SDR: return 'observacoes_sdr'
+            case SystemPhase.PLANNER: return 'observacoes_criticas'
+            case SystemPhase.POS_VENDA: return 'observacoes_pos_venda'
+            default: return viewMode // Dynamic phases use their slug as key
         }
     }, [viewMode])
 
     // Determine active data source based on viewMode
     const activeData = useMemo(() => {
         switch (viewMode) {
-            case 'SDR': return briefingData.observacoes || {}
-            case 'PLANNER': return productData.observacoes_criticas || {}
-            case 'POS_VENDA': return productData.observacoes_pos_venda || {}
-            default: return {}
+            case SystemPhase.SDR: return briefingData.observacoes || {}
+            case SystemPhase.PLANNER: return productData.observacoes_criticas || {}
+            case SystemPhase.POS_VENDA: return productData.observacoes_pos_venda || {}
+            default: return productData[viewMode] || {} // Dynamic phases stored in product_data[slug]
         }
     }, [viewMode, briefingData, productData])
 
@@ -79,35 +79,51 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
     // Fetch Field Configs
     const { getVisibleFields, isLoading: loadingConfig } = useFieldConfig()
 
-    // Get visible fields for the active section and current stage
+    // Fetch fields based on active stage and section
     const fields = useMemo(() => {
-        if (!card.pipeline_stage_id) return []
-        return getVisibleFields(card.pipeline_stage_id, activeSectionKey)
-    }, [card.pipeline_stage_id, activeSectionKey, getVisibleFields])
+        if (!card?.pipeline_stage_id) return []
+
+        // For legacy phases, we might still want to filter by section to keep backward compatibility
+        // But for dynamic phases, we want ALL visible fields configured in the Matrix
+        if (viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER || viewMode === SystemPhase.POS_VENDA) {
+            return getVisibleFields(card.pipeline_stage_id, activeSectionKey)
+        }
+
+        // Dynamic Phases: Return ALL visible fields for this stage, regardless of section
+        return getVisibleFields(card.pipeline_stage_id)
+    }, [card?.pipeline_stage_id, activeSectionKey, getVisibleFields, viewMode])
 
     const updateObsMutation = useMutation({
         mutationFn: async (newObs: any) => {
             let updates: any = {}
 
-            if (viewMode === 'SDR') {
+            if (viewMode === SystemPhase.SDR) {
                 updates = {
                     briefing_inicial: {
                         ...briefingData,
                         observacoes: newObs
                     }
                 }
-            } else if (viewMode === 'PLANNER') {
+            } else if (viewMode === SystemPhase.PLANNER) {
                 updates = {
                     produto_data: {
                         ...productData,
                         observacoes_criticas: newObs
                     }
                 }
-            } else if (viewMode === 'POS_VENDA') {
+            } else if (viewMode === SystemPhase.POS_VENDA) {
                 updates = {
                     produto_data: {
                         ...productData,
                         observacoes_pos_venda: newObs
+                    }
+                }
+            } else {
+                // Dynamic Phases
+                updates = {
+                    produto_data: {
+                        ...productData,
+                        [viewMode]: newObs
                     }
                 }
             }
@@ -231,34 +247,48 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                     ) : null}
                 </div>
 
-                <div className="flex gap-6">
-                    {[
-                        { id: 'SDR', label: 'SDR', color: 'border-blue-500 text-blue-600', icon: Tag },
-                        { id: 'PLANNER', label: 'Planner', color: 'border-purple-500 text-purple-600', icon: Plane },
-                        { id: 'POS_VENDA', label: 'Pós-Venda', color: 'border-green-500 text-green-600', icon: FileCheck },
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => {
-                                if (isDirty) {
-                                    if (confirm('Você tem alterações não salvas. Deseja descartá-las?')) {
-                                        setViewMode(tab.id as ViewMode)
-                                    }
-                                } else {
-                                    setViewMode(tab.id as ViewMode)
-                                }
-                            }}
-                            className={cn(
-                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2",
-                                viewMode === tab.id
-                                    ? tab.color
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                            )}
-                        >
-                            <tab.icon className="h-4 w-4" />
-                            {tab.label}
-                        </button>
-                    ))}
+                <div className="flex gap-6 overflow-x-auto pb-1 scrollbar-hide">
+                    {phases?.filter(p => p.active && p.name !== 'Marketing')
+                        .slice(0, 6) // Limit to 6 phases
+                        .map(phase => {
+                            const isActive = viewMode === phase.slug
+                            // Determine icon based on slug or default
+                            const Icon = phase.slug === SystemPhase.SDR ? Tag :
+                                phase.slug === SystemPhase.PLANNER ? Plane :
+                                    phase.slug === SystemPhase.POS_VENDA ? FileCheck : Tag
+
+                            // Determine color (use phase color if active, else gray)
+                            // Note: phase.color usually is a bg class like 'bg-blue-500', we need text/border
+                            // For now, let's use a simple mapping or default
+                            const activeColorClass = phase.slug === SystemPhase.SDR ? 'border-blue-500 text-blue-600' :
+                                phase.slug === SystemPhase.PLANNER ? 'border-purple-500 text-purple-600' :
+                                    phase.slug === SystemPhase.POS_VENDA ? 'border-green-500 text-green-600' :
+                                        'border-indigo-500 text-indigo-600'
+
+                            return (
+                                <button
+                                    key={phase.id}
+                                    onClick={() => {
+                                        if (isDirty) {
+                                            if (confirm('Você tem alterações não salvas. Deseja descartá-las?')) {
+                                                if (phase.slug) setViewMode(phase.slug)
+                                            }
+                                        } else {
+                                            if (phase.slug) setViewMode(phase.slug)
+                                        }
+                                    }}
+                                    className={cn(
+                                        "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                        isActive
+                                            ? activeColorClass
+                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                    )}
+                                >
+                                    <Icon className="h-4 w-4" />
+                                    {phase.label || phase.name}
+                                </button>
+                            )
+                        })}
                 </div>
             </div>
 

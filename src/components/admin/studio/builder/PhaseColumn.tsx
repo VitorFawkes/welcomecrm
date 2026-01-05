@@ -2,7 +2,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '../../../../lib/utils'
-import { GripVertical, Plus, MoreHorizontal, Trash2, Edit2 } from 'lucide-react'
+import { GripVertical, Plus, MoreHorizontal, Trash2, Edit2, Eye, EyeOff } from 'lucide-react'
 import StageCard from './StageCard'
 import { Input } from '../../../ui/Input'
 import { Button } from '../../../ui/Button'
@@ -28,6 +28,7 @@ interface PhaseColumnProps {
     onEditStage: (stage: PipelineStage) => void
     onDeleteStage: (stage: PipelineStage) => void
     onChangeColor: (color: string) => void
+    onToggleVisibility: () => void
 }
 
 const COLORS = [
@@ -49,7 +50,9 @@ export default function PhaseColumn({
     onDeletePhase,
     onEditStage,
     onDeleteStage,
-    onChangeColor
+
+    onChangeColor,
+    onToggleVisibility
 }: PhaseColumnProps) {
     const {
         attributes,
@@ -126,6 +129,20 @@ export default function PhaseColumn({
                         <DropdownMenuItem onClick={onEditPhase}>
                             <Edit2 className="w-4 h-4 mr-2" />
                             Renomear
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem onClick={onToggleVisibility}>
+                            {phase.visible_in_card !== false ? (
+                                <>
+                                    <Eye className="w-4 h-4 mr-2 text-green-600" />
+                                    Visível no Card
+                                </>
+                            ) : (
+                                <>
+                                    <EyeOff className="w-4 h-4 mr-2 text-gray-400" />
+                                    Oculto no Card
+                                </>
+                            )}
                         </DropdownMenuItem>
 
                         <DropdownMenuSeparator />

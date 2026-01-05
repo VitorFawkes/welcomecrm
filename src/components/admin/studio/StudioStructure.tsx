@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { Loader2, Plus, Layout } from 'lucide-react'
+import { cn } from '../../../lib/utils'
 import {
     DndContext,
     closestCorners,
@@ -332,10 +333,22 @@ export default function StudioStructure() {
                 </div>
                 <button
                     onClick={() => {
+                        const activePhasesCount = localPhases.filter(p => p.active && p.name !== 'Marketing').length
+                        if (activePhasesCount >= 6) {
+                            alert('Limite de gestão atingido (Máx. 6 áreas).')
+                            return
+                        }
                         const name = prompt('Nome da nova Macro-Área:')
                         if (name) createPhaseMutation.mutate(name)
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm transition-all font-medium"
+                    disabled={localPhases.filter(p => p.active && p.name !== 'Marketing').length >= 6}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all font-medium",
+                        localPhases.filter(p => p.active && p.name !== 'Marketing').length >= 6
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    )}
+                    title={localPhases.filter(p => p.active && p.name !== 'Marketing').length >= 4 ? "Limite de gestão atingido (Máx. 4 áreas)" : "Nova Macro-Área"}
                 >
                     <Plus className="w-4 h-4" />
                     Nova Macro-Área
@@ -369,6 +382,7 @@ export default function StudioStructure() {
                                         if (confirm(`Excluir fase "${phase.name}"?`)) deletePhaseMutation.mutate(phase.id)
                                     }}
                                     onChangeColor={(color) => updatePhaseMutation.mutate({ id: phase.id, color })}
+                                    onToggleVisibility={() => updatePhaseMutation.mutate({ id: phase.id, visible_in_card: !phase.visible_in_card })}
                                     onEditStage={(stage) => setEditingStage(stage)}
                                     onDeleteStage={(stage) => {
                                         if (confirm(`Excluir etapa "${stage.nome}"?`)) deleteStageMutation.mutate(stage.id)
@@ -391,6 +405,7 @@ export default function StudioStructure() {
                                 onEditStage={() => { }}
                                 onDeleteStage={() => { }}
                                 onChangeColor={() => { }}
+                                onToggleVisibility={() => { }}
                             />
                         )}
                         {activeId && activeType === 'Stage' && (
