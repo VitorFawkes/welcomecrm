@@ -5,10 +5,12 @@ import { supabase } from '../../lib/supabase'
 import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { SystemPhase } from '../../types/pipeline'
+import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row'] & {
+type Card = Database['public']['Tables']['cards']['Row'] & {
     briefing_inicial?: any | null
 }
 
@@ -24,37 +26,72 @@ const EMPTY_OBJECT = {}
 export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturadasProps) {
     const queryClient = useQueryClient()
     const { data: phases } = usePipelinePhases()
+    const { data: stages } = usePipelineStages()
 
     // Data Sources
     const productData = useMemo(() => (card.produto_data as any) || EMPTY_OBJECT, [card.produto_data])
     const briefingData = useMemo(() => (card.briefing_inicial as any) || EMPTY_OBJECT, [card.briefing_inicial])
 
     // State
-    const [viewMode, setViewMode] = useState<ViewMode>('SDR')
+    const [viewMode, setViewMode] = useState<ViewMode>(SystemPhase.SDR)
     const [editedObs, setEditedObs] = useState<any>({})
     const [lastSavedObs, setLastSavedObs] = useState<any>({})
     const [isDirty, setIsDirty] = useState(false)
+
+    // Determine the relevant stage ID for the current viewMode
+    const viewModeStageId = useMemo(() => {
+        if (!phases || !stages) return card.pipeline_stage_id
+
+        // If viewMode is a specific phase slug, find the corresponding phase
+        const currentPhase = phases.find(p => p.slug === viewMode)
+        if (!currentPhase) return card.pipeline_stage_id
+
+        // Find stages belonging to this phase (new phase_id linking OR legacy fase string linking)
+        const phaseStages = stages.filter(s =>
+            s.phase_id === currentPhase.id ||
+            (!s.phase_id && s.fase === currentPhase.name)
+        )
+
+        if (phaseStages.length > 0) {
+            // Return the last stage of the phase (most complete config)
+            return phaseStages[phaseStages.length - 1].id
+        }
+
+        return card.pipeline_stage_id
+    }, [viewMode, phases, stages, card.pipeline_stage_id])
 
     // Sync ViewMode with Card Stage
     useEffect(() => {
         if (!phases) return
 
-        const currentPhase = phases.find(p => p.name === card.fase)
-        if (currentPhase && currentPhase.slug) {
-            setViewMode(currentPhase.slug)
+        const currentStage = stages?.find(s => s.id === card.pipeline_stage_id)
+        const currentPhase = phases.find(p => p.name === currentStage?.fase)
+        let targetMode: string = SystemPhase.SDR
+
+        // Only switch to current phase if it exists, has a slug, AND is visible
+        if (currentPhase && currentPhase.slug && currentPhase.visible_in_card !== false) {
+            targetMode = currentPhase.slug
         } else {
-            // Default to SDR if not found
+            // Default to SDR if phase not found or hidden
             const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
-            if (sdrPhase && sdrPhase.slug) setViewMode(sdrPhase.slug)
+            if (sdrPhase && sdrPhase.slug) targetMode = sdrPhase.slug
         }
-    }, [card.fase, phases])
+
+        setViewMode(prev => {
+            if (prev !== targetMode) return targetMode
+            return prev
+        })
+    }, [card.pipeline_stage_id, phases, stages])
 
     // Determine active section key based on viewMode
+    // All "Informações Importantes" views use the same section ('observacoes_criticas')
+    // Visibility per stage is controlled by stage_field_config, not by different sections
     const activeSectionKey = useMemo(() => {
         switch (viewMode) {
-            case SystemPhase.SDR: return 'observacoes_sdr'
-            case SystemPhase.PLANNER: return 'observacoes_criticas'
-            case SystemPhase.POS_VENDA: return 'observacoes_pos_venda'
+            case SystemPhase.SDR:
+            case SystemPhase.PLANNER:
+            case SystemPhase.POS_VENDA:
+                return 'observacoes_criticas' // Single section for all "Info Importantes"
             default: return viewMode // Dynamic phases use their slug as key
         }
     }, [viewMode])
@@ -81,138 +118,119 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
 
     // Fetch fields based on active stage and section
     const fields = useMemo(() => {
-        if (!card?.pipeline_stage_id) return []
+        const targetStageId = viewModeStageId || card.pipeline_stage_id
+        if (!targetStageId) return []
 
         // For legacy phases, we might still want to filter by section to keep backward compatibility
         // But for dynamic phases, we want ALL visible fields configured in the Matrix
         if (viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER || viewMode === SystemPhase.POS_VENDA) {
-            return getVisibleFields(card.pipeline_stage_id, activeSectionKey)
+            return getVisibleFields(targetStageId, activeSectionKey)
         }
 
         // Dynamic Phases: Return ALL visible fields for this stage, regardless of section
-        return getVisibleFields(card.pipeline_stage_id)
-    }, [card?.pipeline_stage_id, activeSectionKey, getVisibleFields, viewMode])
+        return getVisibleFields(targetStageId)
+    }, [viewModeStageId, activeSectionKey, getVisibleFields, viewMode, card.pipeline_stage_id])
 
-    const updateObsMutation = useMutation({
-        mutationFn: async (newObs: any) => {
-            let updates: any = {}
-
-            if (viewMode === SystemPhase.SDR) {
-                updates = {
-                    briefing_inicial: {
-                        ...briefingData,
-                        observacoes: newObs
-                    }
-                }
-            } else if (viewMode === SystemPhase.PLANNER) {
-                updates = {
-                    produto_data: {
-                        ...productData,
-                        observacoes_criticas: newObs
-                    }
-                }
-            } else if (viewMode === SystemPhase.POS_VENDA) {
-                updates = {
-                    produto_data: {
-                        ...productData,
-                        observacoes_pos_venda: newObs
-                    }
-                }
-            } else {
-                // Dynamic Phases
-                updates = {
-                    produto_data: {
-                        ...productData,
-                        [viewMode]: newObs
-                    }
-                }
-            }
-
-            const { error } = await (supabase.from('cards') as any)
-                .update(updates)
-                .eq('id', card.id)
-
+    // Mutation to save changes
+    const updateCard = useMutation({
+        mutationFn: async (newData: any) => {
+            const { error } = await supabase
+                .from('cards')
+                .update(newData)
+                .eq('id', card.id!)
             if (error) throw error
         },
-        onSuccess: (_, newObs) => {
-            queryClient.invalidateQueries({ queryKey: ['card', card.id!] })
-            setLastSavedObs(newObs)
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card', card.id] })
+            queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
+            setLastSavedObs(editedObs)
             setIsDirty(false)
         }
     })
 
-    const handleSave = useCallback(() => {
-        updateObsMutation.mutate(editedObs)
-    }, [editedObs, updateObsMutation])
+    const handleSave = async () => {
+        if (!isDirty) return
 
-    const handleChange = (fieldKey: string, value: any) => {
-        const newObs = { ...editedObs, [fieldKey]: value }
-        setEditedObs(newObs)
-        setIsDirty(JSON.stringify(newObs) !== JSON.stringify(lastSavedObs))
-    }
+        let updatePayload: any = {}
 
-    // Handle Enter to save (Shift+Enter for new line)
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            const target = e.target as HTMLElement
-            if (target.tagName !== 'TEXTAREA') {
-                e.preventDefault()
-                handleSave()
+        if (viewMode === SystemPhase.SDR) {
+            updatePayload = {
+                briefing_inicial: {
+                    ...briefingData,
+                    observacoes: editedObs
+                }
+            }
+        } else if (viewMode === SystemPhase.PLANNER) {
+            updatePayload = {
+                produto_data: {
+                    ...productData,
+                    observacoes_criticas: editedObs
+                }
+            }
+        } else if (viewMode === SystemPhase.POS_VENDA) {
+            updatePayload = {
+                produto_data: {
+                    ...productData,
+                    observacoes_pos_venda: editedObs
+                }
+            }
+        } else {
+            // Dynamic Phase
+            updatePayload = {
+                produto_data: {
+                    ...productData,
+                    [viewMode]: editedObs
+                }
             }
         }
-    }
 
-    const renderFieldInput = (field: { key: string; label: string; type: string; options?: any }) => {
-        const value = editedObs[field.key] || ''
-        const options = (field.options as any[]) || []
-
-        switch (field.type) {
-            case 'textarea':
-                return (
-                    <textarea
-                        value={value}
-                        onChange={(e) => handleChange(field.key, e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-gray-50/50 focus:bg-white min-h-[80px]"
-                        placeholder={field.label}
-                    />
-                )
-            case 'select':
-                return (
-                    <select
-                        value={value}
-                        onChange={(e) => handleChange(field.key, e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                    >
-                        <option value="">Selecione...</option>
-                        {options.map((opt: any, idx: number) => (
-                            <option key={idx} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                )
-            case 'boolean':
-                return (
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={!!value}
-                            onChange={(e) => handleChange(field.key, e.target.checked)}
-                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                        />
-                        <span className="text-sm text-gray-700">{value ? 'Sim' : 'Não'}</span>
-                    </div>
-                )
-            default: // text, number, currency, etc.
-                return (
-                    <input
-                        type={field.type === 'number' || field.type === 'currency' ? 'number' : 'text'}
-                        value={value}
-                        onChange={(e) => handleChange(field.key, e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-gray-50/50 focus:bg-white"
-                        placeholder={field.label}
-                    />
-                )
+        try {
+            await updateCard.mutateAsync(updatePayload)
+        } catch (error) {
+            console.error('Failed to save observations:', error)
         }
     }
+
+    const handleChange = useCallback((key: string, value: any) => {
+        setEditedObs((prev: any) => {
+            const next = { ...prev, [key]: value }
+            setIsDirty(JSON.stringify(next) !== JSON.stringify(lastSavedObs))
+            return next
+        })
+    }, [lastSavedObs])
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+            e.preventDefault()
+            handleSave()
+        }
+    }
+
+    const renderFieldInput = (field: any) => {
+        const value = editedObs[field.key]
+
+        return (
+            <UniversalFieldRenderer
+                field={field}
+                value={value}
+                mode="edit"
+                onChange={(val) => handleChange(field.key, val)}
+            />
+        )
+    }
+
+    // Get visible phases for tabs (filter out hidden ones)
+    const visibleLegacyPhases = useMemo(() => {
+        if (!phases) return { sdr: true, planner: true, posVenda: true }
+        const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
+        const plannerPhase = phases.find(p => p.slug === SystemPhase.PLANNER)
+        const posVendaPhase = phases.find(p => p.slug === SystemPhase.POS_VENDA)
+        return {
+            sdr: sdrPhase?.visible_in_card !== false,
+            planner: plannerPhase?.visible_in_card !== false,
+            posVenda: posVendaPhase?.visible_in_card !== false
+        }
+    }, [phases])
 
     return (
         <div className="rounded-xl border border-gray-300 bg-white shadow-sm overflow-hidden">
@@ -226,7 +244,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                         <h3 className="text-sm font-semibold text-gray-900">Informações Importantes</h3>
                     </div>
 
-                    {updateObsMutation.isPending ? (
+                    {updateCard.isPending ? (
                         <div className="flex items-center gap-1.5 text-xs text-gray-500">
                             <Loader2 className="h-3 w-3 animate-spin" />
                             Salvando...
@@ -239,7 +257,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                             <Check className="h-3 w-3" />
                             Salvar Alterações
                         </button>
-                    ) : updateObsMutation.isSuccess ? (
+                    ) : updateCard.isSuccess ? (
                         <div className="flex items-center gap-1.5 text-xs text-green-600">
                             <Check className="h-3 w-3" />
                             Salvo
@@ -248,47 +266,77 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                 </div>
 
                 <div className="flex gap-6 overflow-x-auto pb-1 scrollbar-hide">
-                    {phases?.filter(p => p.active && p.name !== 'Marketing')
-                        .slice(0, 6) // Limit to 6 phases
-                        .map(phase => {
-                            const isActive = viewMode === phase.slug
-                            // Determine icon based on slug or default
-                            const Icon = phase.slug === SystemPhase.SDR ? Tag :
-                                phase.slug === SystemPhase.PLANNER ? Plane :
-                                    phase.slug === SystemPhase.POS_VENDA ? FileCheck : Tag
+                    {/* SDR Tab */}
+                    {visibleLegacyPhases.sdr && (
+                        <button
+                            onClick={() => {
+                                if (isDirty) {
+                                    if (confirm('Você tem alterações não salvas. Deseja descartá-las?')) {
+                                        setViewMode(SystemPhase.SDR)
+                                    }
+                                } else {
+                                    setViewMode(SystemPhase.SDR)
+                                }
+                            }}
+                            className={cn(
+                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                viewMode === SystemPhase.SDR
+                                    ? "border-blue-500 text-blue-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            )}
+                        >
+                            <Tag className="h-4 w-4" />
+                            SDR
+                        </button>
+                    )}
 
-                            // Determine color (use phase color if active, else gray)
-                            // Note: phase.color usually is a bg class like 'bg-blue-500', we need text/border
-                            // For now, let's use a simple mapping or default
-                            const activeColorClass = phase.slug === SystemPhase.SDR ? 'border-blue-500 text-blue-600' :
-                                phase.slug === SystemPhase.PLANNER ? 'border-purple-500 text-purple-600' :
-                                    phase.slug === SystemPhase.POS_VENDA ? 'border-green-500 text-green-600' :
-                                        'border-indigo-500 text-indigo-600'
+                    {/* Planner Tab */}
+                    {visibleLegacyPhases.planner && (
+                        <button
+                            onClick={() => {
+                                if (isDirty) {
+                                    if (confirm('Você tem alterações não salvas. Deseja descartá-las?')) {
+                                        setViewMode(SystemPhase.PLANNER)
+                                    }
+                                } else {
+                                    setViewMode(SystemPhase.PLANNER)
+                                }
+                            }}
+                            className={cn(
+                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                viewMode === SystemPhase.PLANNER
+                                    ? "border-purple-500 text-purple-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            )}
+                        >
+                            <Plane className="h-4 w-4" />
+                            Planner
+                        </button>
+                    )}
 
-                            return (
-                                <button
-                                    key={phase.id}
-                                    onClick={() => {
-                                        if (isDirty) {
-                                            if (confirm('Você tem alterações não salvas. Deseja descartá-las?')) {
-                                                if (phase.slug) setViewMode(phase.slug)
-                                            }
-                                        } else {
-                                            if (phase.slug) setViewMode(phase.slug)
-                                        }
-                                    }}
-                                    className={cn(
-                                        "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
-                                        isActive
-                                            ? activeColorClass
-                                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                    )}
-                                >
-                                    <Icon className="h-4 w-4" />
-                                    {phase.label || phase.name}
-                                </button>
-                            )
-                        })}
+                    {/* Pós-Venda Tab */}
+                    {visibleLegacyPhases.posVenda && (
+                        <button
+                            onClick={() => {
+                                if (isDirty) {
+                                    if (confirm('Você tem alterações não salvas. Deseja descartá-las?')) {
+                                        setViewMode(SystemPhase.POS_VENDA)
+                                    }
+                                } else {
+                                    setViewMode(SystemPhase.POS_VENDA)
+                                }
+                            }}
+                            className={cn(
+                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                viewMode === SystemPhase.POS_VENDA
+                                    ? "border-green-500 text-green-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            )}
+                        >
+                            <FileCheck className="h-4 w-4" />
+                            Pós-Venda
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -301,10 +349,10 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                 ) : fields.length === 0 ? (
                     <div className="text-center py-6">
                         <p className="text-sm text-gray-500 italic">
-                            Nenhum campo configurado para esta seção ({activeSectionKey}).
+                            Nenhum campo configurado para "Informações Importantes".
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
-                            Configure os campos no Painel Admin.
+                            Configure os campos no Painel Admin → Governança de Dados → Seção "Informações Importantes".
                         </p>
                     </div>
                 ) : (

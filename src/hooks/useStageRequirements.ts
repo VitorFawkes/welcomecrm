@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { Database } from '../database.types'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Card = Database['public']['Tables']['cards']['Row']
 
 export function useStageRequirements(card: Card) {
     const { data: requirements, isLoading } = useQuery({

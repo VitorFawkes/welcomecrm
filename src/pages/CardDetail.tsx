@@ -9,7 +9,7 @@ import ObservacoesEstruturadas from '../components/card/ObservacoesEstruturadas'
 import ObservacoesLivres from '../components/card/ObservacoesLivres'
 import ConversationHistory from '../components/card/ConversationHistory'
 import PessoasWidget from '../components/card/PessoasWidget'
-import TaxaPlanejamentoCard from '../components/card/TaxaPlanejamentoCard'
+
 import ActivityFeed from '../components/card/ActivityFeed'
 import { ParentLinkBanner } from '../components/cards/group/ParentLinkBanner'
 import GroupDetailLayout from '../components/cards/group/GroupDetailLayout'
@@ -17,7 +17,7 @@ import { ArrowLeft } from 'lucide-react'
 
 import type { Database } from '../database.types'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Card = Database['public']['Tables']['cards']['Row']
 
 export default function CardDetail() {
     const { id } = useParams<{ id: string }>()
@@ -29,7 +29,7 @@ export default function CardDetail() {
         queryKey: ['card-detail', id],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('view_cards_acoes')
+                .from('cards')
                 .select('*')
                 .eq('id', id!)
                 .single()
@@ -93,7 +93,7 @@ export default function CardDetail() {
                     <ObservacoesLivres card={card} />
 
                     {/* Conversation History */}
-                    <ConversationHistory cardId={card.id!} />
+                    <ConversationHistory cardId={card.id!} contactId={card.pessoa_principal_id} />
                 </div>
 
                 {/* SIDEBAR - Context & Accountability */}
@@ -104,8 +104,7 @@ export default function CardDetail() {
                     {/* 3. Trip Details */}
                     <TripInformation card={card} />
 
-                    {/* Planning Fee */}
-                    {card.produto === 'TRIPS' && <TaxaPlanejamentoCard card={card} />}
+
 
                     {/* Activity Feed (History) */}
                     <ActivityFeed cardId={card.id!} />

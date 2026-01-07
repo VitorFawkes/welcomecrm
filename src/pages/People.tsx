@@ -96,7 +96,7 @@ export default function People() {
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 min-h-0 relative px-8 pb-4">
+                <div className="flex-1 min-h-0 relative px-8 pb-4 overflow-y-auto">
                     <PeopleGrid
                         people={people}
                         loading={loading}

@@ -1,4 +1,4 @@
-
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { Database } from '../database.types'
@@ -49,7 +49,7 @@ export function useFieldConfig() {
     const isLoading = loadingFields || loadingConfigs
 
     // Helper: Get config for a specific field in a stage
-    const getFieldConfig = (stageId: string, fieldKey: string): FieldConfigResult | null => {
+    const getFieldConfig = useCallback((stageId: string, fieldKey: string): FieldConfigResult | null => {
         if (!systemFields) return null
 
         const field = systemFields.find(f => f.key === fieldKey)
@@ -68,10 +68,10 @@ export function useFieldConfig() {
             customLabel: config?.custom_label,
             options: field.options
         }
-    }
+    }, [systemFields, stageConfigs])
 
     // Helper: Get all visible fields for a stage, optionally filtered by section
-    const getVisibleFields = (stageId: string, section?: string): FieldConfigResult[] => {
+    const getVisibleFields = useCallback((stageId: string, section?: string): FieldConfigResult[] => {
         if (!systemFields) return []
 
         return systemFields
@@ -82,10 +82,10 @@ export function useFieldConfig() {
                 if (section && config.section !== section) return false
                 return true
             })
-    }
+    }, [systemFields, getFieldConfig])
 
     // Helper: Get header fields for a stage
-    const getHeaderFields = (stageId: string): FieldConfigResult[] => {
+    const getHeaderFields = useCallback((stageId: string): FieldConfigResult[] => {
         if (!systemFields) return []
 
         return systemFields
@@ -94,10 +94,10 @@ export function useFieldConfig() {
                 if (!config) return false
                 return config.isHeader && config.isVisible
             })
-    }
+    }, [systemFields, getFieldConfig])
 
     // Helper: Get required fields for a stage
-    const getRequiredFields = (stageId: string): FieldConfigResult[] => {
+    const getRequiredFields = useCallback((stageId: string): FieldConfigResult[] => {
         if (!systemFields) return []
 
         return systemFields
@@ -106,7 +106,7 @@ export function useFieldConfig() {
                 if (!config) return false
                 return config.isRequired && config.isVisible
             })
-    }
+    }, [systemFields, getFieldConfig])
 
     return {
         isLoading,

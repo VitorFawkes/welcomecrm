@@ -27,7 +27,7 @@ import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { SystemPhase } from '@/types/pipeline'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Card = Database['public']['Tables']['cards']['Row']
 
 interface CardHeaderProps {
     card: Card
@@ -59,6 +59,26 @@ export default function CardHeader({ card }: CardHeaderProps) {
     const { getHeaderFields } = useFieldConfig()
     const headerFields = card.pipeline_stage_id ? getHeaderFields(card.pipeline_stage_id) : []
     const { data: phasesData } = usePipelinePhases()
+
+    // Fetch pipeline stages
+    const { data: stages } = useQuery({
+        queryKey: ['pipeline-stages'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('pipeline_stages')
+                .select('id, nome, ordem, fase')
+                .order('ordem')
+            if (error) throw error
+            return data as { id: string; nome: string; ordem: number; fase: string }[]
+        }
+    })
+
+    // Derived fields
+    const currentStage = stages?.find(s => s.id === card.pipeline_stage_id)
+    const currentFase = currentStage?.fase
+    const daysInStage = card.stage_entered_at
+        ? Math.floor((new Date().getTime() - new Date(card.stage_entered_at).getTime()) / (1000 * 60 * 60 * 24))
+        : null
 
     useEffect(() => {
         setEditedTitle(card.titulo || '')
@@ -145,17 +165,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
     }
 
     // Fetch pipeline stages
-    const { data: stages } = useQuery({
-        queryKey: ['pipeline-stages'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('pipeline_stages')
-                .select('id, nome, ordem, fase')
-                .order('ordem')
-            if (error) throw error
-            return data as { id: string; nome: string; ordem: number; fase: string }[]
-        }
-    })
+
 
     const getPhaseColor = (phaseName: string | null | undefined) => {
         if (!phaseName) return 'bg-gray-600 text-white'
@@ -250,7 +260,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
 
         // 2. Check Owner Change (SDR -> Planner)
-        const currentPhase = phasesData?.find(p => p.name === card.fase)
+        const currentPhase = phasesData?.find(p => p.name === currentFase)
         const targetPhase = phasesData?.find(p => p.name === stageFase)
 
         const isSdrPhase = currentPhase?.slug === SystemPhase.SDR
@@ -278,7 +288,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
             // Check owner change after quality gate
             const targetStage = stages?.find(s => s.id === pendingStageChange.stageId)
-            const currentPhase = phasesData?.find(p => p.name === card.fase)
+            const currentPhase = phasesData?.find(p => p.name === currentFase)
             const targetPhase = phasesData?.find(p => p.name === targetStage?.fase)
 
             const isSdrPhase = currentPhase?.slug === SystemPhase.SDR
@@ -304,7 +314,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     const handleOwnerSelect = (userId: string | null) => {
         updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
-        const currentPhase = phasesData?.find(p => p.name === card.fase)
+        const currentPhase = phasesData?.find(p => p.name === currentFase)
         if (currentPhase?.slug === SystemPhase.SDR) {
             updateOwnerMutation.mutate({ field: 'sdr_owner_id', userId })
         }
@@ -312,7 +322,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     const handleSdrSelect = (userId: string | null) => {
         updateOwnerMutation.mutate({ field: 'sdr_owner_id', userId })
-        const currentPhase = phasesData?.find(p => p.name === card.fase)
+        const currentPhase = phasesData?.find(p => p.name === currentFase)
         if (currentPhase?.slug === SystemPhase.SDR) {
             updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
         }
@@ -358,10 +368,10 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
                     {/* Stage Selector & Time in Stage */}
                     <div className="relative z-20 flex items-center gap-3">
-                        {card.tempo_etapa_dias !== null && card.tempo_etapa_dias !== undefined && (
+                        {daysInStage !== null && (
                             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 text-xs font-medium text-gray-500" title="Tempo nesta etapa">
                                 <History className="h-3 w-3" />
-                                {card.tempo_etapa_dias}d
+                                {daysInStage}d
                             </div>
                         )}
 
@@ -372,9 +382,9 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             >
                                 <span className={cn(
                                     "w-2 h-2 rounded-full",
-                                    getPhaseBgColor(card.fase)
+                                    getPhaseBgColor(currentFase)
                                 )} />
-                                {card.etapa_nome || stages?.find(s => s.id === card.pipeline_stage_id)?.nome || 'Sem Etapa'}
+                                {currentStage?.nome || 'Sem Etapa'}
                                 <ChevronDown className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
                             </button>
 
@@ -457,9 +467,9 @@ export default function CardHeader({ card }: CardHeaderProps) {
                         <div className="flex flex-wrap items-center gap-3 text-sm">
                             <span className={cn(
                                 "px-2.5 py-0.5 rounded-full font-semibold text-xs uppercase tracking-wide",
-                                getPhaseColor(card.fase)
+                                getPhaseColor(currentFase)
                             )}>
-                                {card.fase}
+                                {currentFase}
                             </span>
 
                             {/* Operational Badge */}
@@ -531,29 +541,56 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                             let textValue = ''
                                             let daysToTrip = null
 
-                                            if (card.produto === 'TRIPS') {
-                                                const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as any
+                                            // 1. Try to get value from product_data based on field key
+                                            // Waterfall: Post-Sales (Future) > Planner (produto_data) > SDR (briefing_inicial)
 
-                                                // Object format
-                                                if (productData?.epoca_viagem?.inicio) {
-                                                    startStr = productData.epoca_viagem.inicio
-                                                    endStr = productData.epoca_viagem.fim
-                                                }
-                                                // String format
-                                                else if (typeof productData?.epoca_viagem === 'string') {
-                                                    textValue = productData.epoca_viagem
+                                            let value = null
+
+                                            // Check Planner (produto_data)
+                                            if (card.produto_data) {
+                                                const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as any
+                                                value = productData?.[dateField.key]
+                                            }
+
+                                            // Check SDR (briefing_inicial) if Planner is empty
+                                            if (!value && card.briefing_inicial) {
+                                                const briefingData = (typeof card.briefing_inicial === 'string' ? JSON.parse(card.briefing_inicial) : card.briefing_inicial) as any
+                                                value = briefingData?.[dateField.key]
+                                            }
+
+                                            // Check Root (if field exists on card root)
+                                            if (!value) {
+                                                value = (card as any)[dateField.key]
+                                            }
+
+                                            // 2. Parse value based on type
+                                            if (value) {
+                                                if (typeof value === 'object' && value.start) {
+                                                    // New date_range format
+                                                    startStr = value.start
+                                                    endStr = value.end
+                                                } else if (typeof value === 'object' && value.inicio) {
+                                                    // Legacy epoca_viagem format
+                                                    startStr = value.inicio
+                                                    endStr = value.fim
+                                                } else if (typeof value === 'string') {
+                                                    // Simple date or text
+                                                    if (value.match(/^\d{4}-\d{2}-\d{2}/)) {
+                                                        startStr = value
+                                                    } else {
+                                                        textValue = value
+                                                    }
                                                 }
                                             }
 
-                                            // Fallback to column
+                                            // 3. Fallback to legacy hardcoded columns if no dynamic value found
                                             if (!startStr && !textValue && card.data_viagem_inicio) {
                                                 startStr = card.data_viagem_inicio
                                                 endStr = (card as any).data_viagem_fim || ''
                                             }
 
-                                            // Calculate Countdown (still needs Date object, but only for diff)
+                                            // Calculate Countdown
                                             if (startStr) {
-                                                // Use noon to be safe for countdown calc
                                                 const dateObj = new Date(startStr.substring(0, 10) + 'T12:00:00')
                                                 if (!isNaN(dateObj.getTime())) {
                                                     daysToTrip = Math.floor((dateObj.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))

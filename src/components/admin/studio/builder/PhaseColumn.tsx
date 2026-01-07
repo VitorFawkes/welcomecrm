@@ -29,6 +29,7 @@ interface PhaseColumnProps {
     onDeleteStage: (stage: PipelineStage) => void
     onChangeColor: (color: string) => void
     onToggleVisibility: () => void
+    onEditPhaseSettings: () => void
 }
 
 const COLORS = [
@@ -52,7 +53,8 @@ export default function PhaseColumn({
     onDeleteStage,
 
     onChangeColor,
-    onToggleVisibility
+    onToggleVisibility,
+    onEditPhaseSettings
 }: PhaseColumnProps) {
     const {
         attributes,
@@ -143,6 +145,11 @@ export default function PhaseColumn({
                                     Oculto no Card
                                 </>
                             )}
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem onClick={onEditPhaseSettings}>
+                            <Edit2 className="w-4 h-4 mr-2" />
+                            Configurar Cards
                         </DropdownMenuItem>
 
                         <DropdownMenuSeparator />

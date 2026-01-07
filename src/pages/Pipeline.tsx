@@ -7,7 +7,7 @@ import { useProductContext } from '../hooks/useProductContext'
 
 import { FilterDrawer } from '../components/pipeline/FilterDrawer'
 import { ActiveFilters } from '../components/pipeline/ActiveFilters'
-import { Filter, Building, Link, User } from 'lucide-react'
+import { Filter, Link, User } from 'lucide-react'
 
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 
@@ -81,20 +81,8 @@ export default function Pipeline() {
                                     </button>
                                 </div>
 
-                                {/* Group Filters (3 Chips) */}
+                                {/* Group Filters (2 Chips - Linked/Solo) */}
                                 <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
-                                    <button
-                                        onClick={() => setGroupFilters({ ...groupFilters, showGroups: !groupFilters.showGroups })}
-                                        className={cn(
-                                            "flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border transition-all duration-200",
-                                            groupFilters.showGroups
-                                                ? "bg-purple-100 text-purple-700 border-purple-300 shadow-sm"
-                                                : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50"
-                                        )}
-                                    >
-                                        <Building className="h-3 w-3 mr-1.5" />
-                                        Grupos
-                                    </button>
                                     <button
                                         onClick={() => setGroupFilters({ ...groupFilters, showLinked: !groupFilters.showLinked })}
                                         className={cn(
@@ -105,7 +93,7 @@ export default function Pipeline() {
                                         )}
                                     >
                                         <Link className="h-3 w-3 mr-1.5" />
-                                        Vinculadas
+                                        Em Grupo
                                     </button>
                                     <button
                                         onClick={() => setGroupFilters({ ...groupFilters, showSolo: !groupFilters.showSolo })}

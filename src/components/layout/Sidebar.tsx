@@ -1,20 +1,24 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Kanban, Users, CheckSquare, List, Activity, Shield } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, Settings } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { ProductSwitcher } from './ProductSwitcher'
+import { useAuth } from '../../contexts/AuthContext'
+import NotificationCenter from './NotificationCenter'
 
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Funil', href: '/pipeline', icon: Kanban },
-    { name: 'Viagens', href: '/cards', icon: List },
+    { name: 'Grupos', href: '/groups', icon: Users },
     { name: 'Pessoas', href: '/people', icon: Users },
-    { name: 'Tarefas', href: '/tasks', icon: CheckSquare },
-    { name: 'Atividades', href: '/activities', icon: Activity },
-    { name: 'Administração', href: '/admin', icon: Shield },
+    { name: 'Configurações', href: '/settings', icon: Settings },
 ]
 
 export default function Sidebar() {
     const location = useLocation()
+    const { session } = useAuth()
+
+    const userInitials = session?.user?.email?.substring(0, 2).toUpperCase() || 'U'
+    const userName = session?.user?.email?.split('@')[0] || 'Usuário'
 
     return (
         <aside className="flex h-screen w-64 flex-col bg-primary-dark text-white shadow-lg transition-all duration-300">
@@ -56,12 +60,13 @@ export default function Sidebar() {
             <div className="border-t border-primary/20 p-4">
                 <div className="flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-2.5">
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-medium text-white">
-                        VG
+                        {userInitials}
                     </div>
-                    <div className="flex flex-col">
-                        <span className="text-sm font-medium text-white">Vitor Gambetti</span>
-                        <span className="text-xs text-primary-light">Admin</span>
+                    <div className="flex flex-1 flex-col overflow-hidden">
+                        <span className="text-sm font-medium text-white truncate capitalize">{userName}</span>
+                        <span className="text-xs text-primary-light truncate">{session?.user?.email}</span>
                     </div>
+                    <NotificationCenter triggerClassName="text-primary-light hover:text-white hover:bg-primary/20" />
                 </div>
             </div>
         </aside>

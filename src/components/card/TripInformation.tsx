@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { MapPin, Calendar, DollarSign, Tag, X, Check, Edit2, History, AlertCircle, Globe, AlertTriangle, Eraser, Plane, FileCheck, ThumbsUp, Upload } from 'lucide-react'
-import type { Database } from '../../database.types'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { MapPin, Calendar, DollarSign, Tag, X, Check, Edit2, History, AlertCircle, Globe, AlertTriangle, Eraser, Plane, FileCheck, ThumbsUp, Upload, Type, Hash, CalendarDays, Coins, List, CheckSquare, Banknote } from 'lucide-react'
+
 import { supabase } from '../../lib/supabase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '../../lib/utils'
@@ -10,6 +10,7 @@ import MarketingView from './MarketingView'
 import { Button } from '../ui/Button'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { SystemPhase } from '../../types/pipeline'
+import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
 
 interface TripsProdutoData {
     orcamento?: {
@@ -25,16 +26,22 @@ interface TripsProdutoData {
     origem?: string
     origem_lead?: string
     motivo?: string
+    taxa_planejamento?: string | number
     [key: string]: any
 }
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row'] & {
-    briefing_inicial?: TripsProdutoData | null
-    marketing_data?: any | null
-}
+
 
 interface TripInformationProps {
-    card: Card
+    card: {
+        id: string
+        fase?: string | null
+        pipeline_stage_id?: string | null
+        briefing_inicial?: any
+        marketing_data?: any
+        produto_data?: any
+        [key: string]: any
+    }
 }
 
 type ViewMode = string
@@ -55,7 +62,7 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             const target = e.target as HTMLElement
-            if (target.tagName !== 'TEXTAREA') {
+            if (target.tagName !== 'TEXTAREA' && target.tagName !== 'SELECT') {
                 e.preventDefault()
                 onSave()
             }
@@ -148,15 +155,16 @@ export default function TripInformation({ card }: TripInformationProps) {
     const [correctionMode, setCorrectionMode] = useState(false)
 
     const queryClient = useQueryClient()
-    const { missingBlocking, missingFuture } = useStageRequirements(card)
+    const { missingBlocking, missingFuture } = useStageRequirements(card as any)
     const { getFieldConfig, getVisibleFields } = useFieldConfig()
     const { data: phases } = usePipelinePhases()
 
-    const isFieldVisible = (key: string) => {
-        if (!card.pipeline_stage_id) return true // Default to visible if no stage context
-        const config = getFieldConfig(card.pipeline_stage_id, key)
-        return config?.isVisible ?? true
-    }
+    // --- MODULARITY: Get all visible fields for 'trip_info' section ---
+    const visibleFields = useMemo(() => {
+        if (!card.pipeline_stage_id) return []
+        // We specifically want 'trip_info' fields for the SDR/Planner view
+        return getVisibleFields(card.pipeline_stage_id!, 'trip_info')
+    }, [card.pipeline_stage_id, getVisibleFields])
 
     // Sync ViewMode with Card Stage
     useEffect(() => {
@@ -174,9 +182,6 @@ export default function TripInformation({ card }: TripInformationProps) {
         }
     }, [card.fase, phases])
 
-    // Determine which data to display/edit based on ViewMode and CorrectionMode
-    // SDR View: Shows briefingData (or productData if briefing is empty/synced)
-    // Planner View: Shows productData (Proposal) AND briefingData (History)
     // Determine which data to display/edit based on ViewMode and CorrectionMode
     // SDR View: Shows briefingData (or productData if briefing is empty/synced)
     // Planner View: Shows productData (Proposal) AND briefingData (History)
@@ -232,9 +237,6 @@ export default function TripInformation({ card }: TripInformationProps) {
         // Target depends on:
         // 1. Correction Mode -> Always 'briefing_inicial'
         // 2. View Mode -> SDR = 'briefing_inicial', Planner = 'produto_data'
-        // Target depends on:
-        // 1. Correction Mode -> Always 'briefing_inicial'
-        // 2. View Mode -> SDR = 'briefing_inicial', Planner = 'produto_data'
         const target = (correctionMode || viewMode === SystemPhase.SDR) ? 'briefing_inicial' : 'produto_data'
 
         updateCardMutation.mutate({
@@ -272,107 +274,6 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     // --- RENDERERS ---
 
-    const FieldCard = ({ icon: Icon, iconColor, label, value, subValue, fieldName, dataKey, sdrValue }: any) => {
-        const status = getFieldStatus(dataKey)
-        const isPlanner = viewMode === SystemPhase.PLANNER
-        // Always show SDR section if we are in Planner mode
-        const showSdrSection = isPlanner
-
-        return (
-            <div
-                className={cn(
-                    "group relative p-4 rounded-xl border transition-all duration-200",
-                    correctionMode
-                        ? "bg-[#fdfbf7] border-amber-200/50 border-dashed hover:border-amber-300 hover:bg-[#fffdf9] cursor-pointer"
-                        : cn(
-                            "bg-white",
-                            status === 'blocking' ? "border-red-300 bg-red-50/30" :
-                                status === 'attention' ? "border-orange-300 bg-orange-50/30" :
-                                    "border-gray-300",
-                            "hover:shadow-md cursor-pointer",
-                            status === 'blocking' && "hover:border-red-400",
-                            status === 'attention' && "hover:border-orange-400",
-                            status === 'ok' && "hover:border-indigo-400"
-                        )
-                )}
-                onClick={() => handleFieldEdit(fieldName)}
-            >
-                <div className={cn(
-                    "absolute top-3 right-3 transition-opacity",
-                    correctionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                )}>
-                    {correctionMode ? (
-                        <div className="flex items-center gap-1 text-amber-600 bg-amber-100 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                            <Eraser className="h-3 w-3" /> Corrigir
-                        </div>
-                    ) : (
-                        <Edit2 className="h-4 w-4 text-indigo-500" />
-                    )}
-                </div>
-
-                {status !== 'ok' && !correctionMode && (
-                    <div className={cn(
-                        "absolute -top-2 -right-2 p-1 rounded-full shadow-sm border",
-                        status === 'blocking' ? "bg-red-100 border-red-200 text-red-600" : "bg-orange-100 border-orange-200 text-orange-600"
-                    )}>
-                        <AlertCircle className="h-3 w-3" />
-                    </div>
-                )}
-
-                <div className="flex items-start gap-3">
-                    <div className={cn(
-                        "p-2 rounded-lg transition-colors",
-                        correctionMode ? "bg-gray-100 text-gray-400 grayscale" : iconColor
-                    )}>
-                        <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className={cn(
-                            "text-xs font-medium uppercase tracking-wide mb-1 flex items-center gap-2",
-                            correctionMode ? "text-gray-400 font-mono" : "text-gray-500"
-                        )}>
-                            {label}
-                            {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold font-sans">Obrigatório</span>}
-                        </p>
-
-                        {/* Main Value (Planner's Plan) */}
-                        <div className={cn(
-                            "text-sm truncate",
-                            correctionMode ? "font-mono text-gray-700 font-medium" : "font-semibold text-gray-900"
-                        )}>
-                            {(() => {
-                                if (value === null || value === undefined || value === '') {
-                                    return status === 'blocking' ?
-                                        <span className="text-red-500 italic font-medium font-sans">Obrigatório</span> :
-                                        <span className="text-gray-400 italic font-normal font-sans">Não informado</span>
-                                }
-                                if (typeof value === 'object' && !React.isValidElement(value)) {
-                                    return JSON.stringify(value)
-                                }
-                                return value
-                            })()}
-                        </div>
-                        {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
-
-                        {/* SDR Reference Section (Always visible in Planner View) */}
-                        {showSdrSection && (
-                            <div className="mt-3 pt-2 border-t border-gray-100">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-wider">
-                                        SDR
-                                    </span>
-                                </div>
-                                <div className="text-xs text-gray-600 bg-gray-50/50 p-2 rounded-md border border-gray-100">
-                                    {sdrValue || <span className="text-gray-400 italic">Não informado pelo SDR</span>}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
     // --- MAIN RENDER ---
     return (
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all duration-500">
@@ -381,19 +282,7 @@ export default function TripInformation({ card }: TripInformationProps) {
             <div className="border-b border-gray-200 bg-gray-50/50 px-4 pt-4">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                        {viewMode === SystemPhase.SDR && <Tag className="h-4 w-4 text-blue-600" />}
-                        {viewMode === SystemPhase.PLANNER && <Plane className="h-4 w-4 text-purple-600" />}
-                        {viewMode === SystemPhase.POS_VENDA && <FileCheck className="h-4 w-4 text-green-600" />}
-                        {viewMode === 'marketing' && <Globe className="h-4 w-4 text-pink-600" />}
-
-                        {viewMode === SystemPhase.SDR && "Briefing & Qualificação"}
-                        {viewMode === SystemPhase.PLANNER && "Construção da Proposta"}
-                        {viewMode === SystemPhase.POS_VENDA && "Entrega & Pós-Venda"}
-                        {viewMode === 'marketing' && "Marketing & Origem"}
-                        {!['sdr', 'planner', 'pos_venda', 'marketing'].includes(viewMode) && (
-                            // Dynamic Title
-                            phases?.find(p => p.slug === viewMode)?.label || viewMode
-                        )}
+                        Informações da Viagem
                     </h3>
 
                     {/* Correction Toggle (Only visible in Planner/SDR views) */}
@@ -482,71 +371,34 @@ export default function TripInformation({ card }: TripInformationProps) {
                     <MarketingView cardId={card.id!} initialData={marketingData} />
                 )}
 
-                {/* SDR & PLANNER VIEWS (Shared Fields, Different Context) */}
-                {(viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER) && (
+                {/* DYNAMIC WATERFALL VIEW (SDR, PLANNER, POS_VENDA, etc) */}
+                {(viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER || viewMode === SystemPhase.POS_VENDA || !['marketing'].includes(viewMode)) && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Motivo */}
-                        {isFieldVisible('motivo') && (
-                            <FieldCard
-                                icon={Tag}
-                                iconColor="bg-purple-100 text-purple-600"
-                                label="Motivo da Viagem"
-                                value={activeData.motivo}
-                                fieldName="motivo"
-                                dataKey="motivo"
-                                sdrValue={briefingData.motivo}
-                            />
+                        {visibleFields.length === 0 && (
+                            <div className="col-span-full text-center py-8 text-gray-500 italic">
+                                Nenhum campo configurado para esta fase.
+                                <br />
+                                <span className="text-xs">Configure na Matriz de Governança (Seção: Informações da Viagem).</span>
+                            </div>
                         )}
 
-                        {/* Destinos */}
-                        {isFieldVisible('destinos') && (
-                            <FieldCard
-                                icon={MapPin}
-                                iconColor="bg-blue-100 text-blue-600"
-                                label="Destinos"
-                                value={activeData.destinos?.length ? activeData.destinos.join(' • ') : undefined}
-                                fieldName="destinos"
-                                dataKey="destinos"
-                                sdrValue={briefingData.destinos?.join(' • ')}
+                        {visibleFields.map(field => (
+                            <UniversalFieldRenderer
+                                key={field.key}
+                                field={field}
+                                value={activeData[field.key]}
+                                sdrValue={briefingData[field.key]} // Keep SDR reference for comparison if needed
+                                status={getFieldStatus(field.key)}
+                                mode="display"
+                                onEdit={() => handleFieldEdit(field.key)}
+                                correctionMode={correctionMode}
+                                isPlanner={viewMode === SystemPhase.PLANNER} // Controls "SDR Original" display
                             />
-                        )}
-
-                        {/* Período */}
-                        {isFieldVisible('epoca_viagem') && (
-                            <FieldCard
-                                icon={Calendar}
-                                iconColor="bg-orange-100 text-orange-600"
-                                label="Período"
-                                value={activeData.epoca_viagem?.inicio ? (
-                                    <>
-                                        {formatDate(activeData.epoca_viagem.inicio)}
-                                        {activeData.epoca_viagem.fim && ` até ${formatDate(activeData.epoca_viagem.fim)}`}
-                                    </>
-                                ) : undefined}
-                                subValue={activeData.epoca_viagem?.flexivel ? '📌 Datas flexíveis' : undefined}
-                                fieldName="periodo"
-                                dataKey="epoca_viagem"
-                                sdrValue={briefingData.epoca_viagem?.inicio ? formatDate(briefingData.epoca_viagem.inicio) : undefined}
-                            />
-                        )}
-
-                        {/* Orçamento */}
-                        {isFieldVisible('orcamento') && (
-                            <FieldCard
-                                icon={DollarSign}
-                                iconColor="bg-green-100 text-green-600"
-                                label="Orçamento"
-                                value={activeData.orcamento?.total ? formatBudget(activeData.orcamento.total) : undefined}
-                                subValue={activeData.orcamento?.por_pessoa ? `${formatBudget(activeData.orcamento.por_pessoa)} por pessoa` : undefined}
-                                fieldName="orcamento"
-                                dataKey="orcamento"
-                                sdrValue={briefingData.orcamento?.total ? formatBudget(briefingData.orcamento.total) : undefined}
-                            />
-                        )}
+                        ))}
                     </div>
                 )}
 
-                {/* POS-VENDA VIEW */}
+                {/* POS-VENDA VIEW (Still Hardcoded for now as it has specific logic, but could be modularized later) */}
                 {viewMode === SystemPhase.POS_VENDA && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -695,57 +547,23 @@ export default function TripInformation({ card }: TripInformationProps) {
                 </div>
             </EditModal>
 
+            {/* Modal de Edição Genérico via UniversalFieldRenderer */}
             <EditModal
-                isOpen={editingField === 'periodo'}
+                isOpen={!!editingField && editingField !== 'orcamento' && editingField !== 'destinos'}
                 onClose={handleCloseModal}
                 onSave={handleFieldSave}
-                title="Período da Viagem"
+                title={visibleFields.find(f => f.key === editingField)?.label || 'Editar Campo'}
                 isSaving={updateCardMutation.isPending}
                 isCorrection={correctionMode}
             >
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Data de Ida</label>
-                            <input
-                                type="date"
-                                value={editedData.epoca_viagem?.inicio ? editedData.epoca_viagem.inicio.substring(0, 10) : ''}
-                                onChange={(e) => setEditedData({
-                                    ...editedData,
-                                    epoca_viagem: { ...editedData.epoca_viagem, inicio: e.target.value }
-                                })}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Data de Volta</label>
-                            <input
-                                type="date"
-                                value={editedData.epoca_viagem?.fim ? editedData.epoca_viagem.fim.substring(0, 10) : ''}
-                                onChange={(e) => setEditedData({
-                                    ...editedData,
-                                    epoca_viagem: { ...editedData.epoca_viagem, fim: e.target.value }
-                                })}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                    </div>
-                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
-                        <input
-                            type="checkbox"
-                            checked={editedData.epoca_viagem?.flexivel || false}
-                            onChange={(e) => setEditedData({
-                                ...editedData,
-                                epoca_viagem: { ...editedData.epoca_viagem, flexivel: e.target.checked }
-                            })}
-                            className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <div>
-                            <p className="text-sm font-medium text-gray-900">Datas flexíveis</p>
-                            <p className="text-xs text-gray-500">O cliente tem flexibilidade nas datas</p>
-                        </div>
-                    </label>
-                </div>
+                {editingField && (
+                    <UniversalFieldRenderer
+                        field={visibleFields.find(f => f.key === editingField) || { key: editingField, label: editingField, type: 'text' }}
+                        value={editedData[editingField]}
+                        onChange={(val) => handleFieldChange(editingField, val)}
+                        mode="edit"
+                    />
+                )}
             </EditModal>
 
             <EditModal
@@ -791,6 +609,83 @@ export default function TripInformation({ card }: TripInformationProps) {
                     </div>
                 </div>
             </EditModal>
+
+            <EditModal
+                isOpen={editingField === 'taxa_planejamento'}
+                onClose={handleCloseModal}
+                onSave={handleFieldSave}
+                title="Taxa de Planejamento"
+                isSaving={updateCardMutation.isPending}
+                isCorrection={correctionMode}
+            >
+                <div className="space-y-6">
+                    <div className="flex items-center gap-3 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                        <input
+                            type="checkbox"
+                            checked={editedData.taxa_planejamento === 'Cortesia'}
+                            onChange={(e) => {
+                                if (e.target.checked) {
+                                    setEditedData({ ...editedData, taxa_planejamento: 'Cortesia' })
+                                } else {
+                                    setEditedData({ ...editedData, taxa_planejamento: 0 })
+                                }
+                            }}
+                            className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <div className="flex-1">
+                            <p className="text-sm font-bold text-indigo-900">É Cortesia?</p>
+                            <p className="text-xs text-indigo-700">Marque se não haverá cobrança de taxa.</p>
+                        </div>
+                    </div>
+
+                    {editedData.taxa_planejamento !== 'Cortesia' && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Valor da Taxa (R$)</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">R$</span>
+                                <input
+                                    type="number"
+                                    value={typeof editedData.taxa_planejamento === 'number' ? editedData.taxa_planejamento : ''}
+                                    onChange={(e) => setEditedData({
+                                        ...editedData,
+                                        taxa_planejamento: parseFloat(e.target.value) || 0
+                                    })}
+                                    className="w-full pl-12 pr-4 py-3 text-lg font-semibold text-gray-900 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="0,00"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </EditModal>
+
+            {/* GENERIC EDIT MODAL */}
+            {editingField && !['motivo', 'destinos', 'periodo', 'orcamento', 'taxa_planejamento'].includes(editingField) && (
+                <EditModal
+                    isOpen={true}
+                    onClose={handleCloseModal}
+                    onSave={handleFieldSave}
+                    title={visibleFields.find(f => f.key === editingField)?.label || 'Editar Campo'}
+                    isSaving={updateCardMutation.isPending}
+                    isCorrection={correctionMode}
+                >
+                    <div className="space-y-2">
+                        {(() => {
+                            const field = visibleFields.find(f => f.key === editingField)
+                            if (!field) return null
+                            return (
+                                <UniversalFieldRenderer
+                                    field={field}
+                                    value={editedData[field.key]}
+                                    mode="edit"
+                                    onChange={(val) => setEditedData({ ...editedData, [field.key]: val })}
+                                />
+                            )
+                        })()}
+                    </div>
+                </EditModal>
+            )}
         </div>
     )
 }

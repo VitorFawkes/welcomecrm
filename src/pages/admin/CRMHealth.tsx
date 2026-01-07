@@ -32,7 +32,7 @@ export default function CRMHealth() {
     const healthScore = cards?.length ? Math.round(100 - (((overdueCards.length + noTaskCards.length) / (cards.length * 2)) * 100)) : 100
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
+        <div className="p-8 space-y-8">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Saúde do CRM</h1>

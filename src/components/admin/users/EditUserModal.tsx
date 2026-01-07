@@ -24,9 +24,10 @@ interface EditUserModalProps {
     isOpen: boolean;
     onClose: () => void;
     teams: Team[];
+    onSuccess?: () => void;
 }
 
-export function EditUserModal({ user, isOpen, onClose, teams }: EditUserModalProps) {
+export function EditUserModal({ user, isOpen, onClose, teams, onSuccess }: EditUserModalProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isLoading, setIsLoading] = useState(false);
@@ -69,6 +70,7 @@ export function EditUserModal({ user, isOpen, onClose, teams }: EditUserModalPro
                 description: 'As informações foram salvas com sucesso.',
                 type: 'success'
             });
+            if (onSuccess) onSuccess();
             onClose();
         },
         onError: (error: any) => {

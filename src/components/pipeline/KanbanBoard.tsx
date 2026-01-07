@@ -179,14 +179,15 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             let filteredData = data as Card[]
 
             // Apply Group Filters (Client-side for flexibility)
-            const { showGroups, showLinked, showSolo } = groupFilters
+            const { showLinked, showSolo } = groupFilters
 
             filteredData = filteredData.filter(card => {
-                const isGroup = card.is_group_parent
-                const isLinked = !!card.parent_card_id
-                const isSolo = !isGroup && !isLinked
+                // ALWAYS exclude Group Parents from Kanban
+                if (card.is_group_parent) return false
 
-                if (isGroup && showGroups) return true
+                const isLinked = !!card.parent_card_id
+                const isSolo = !isLinked
+
                 if (isLinked && showLinked) return true
                 if (isSolo && showSolo) return true
 

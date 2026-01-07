@@ -4,7 +4,7 @@ import { GroupDashboard } from './GroupDashboard'
 import { GroupTravelersList } from './GroupTravelersList'
 import { GroupRoomingList } from './GroupRoomingList'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Card = Database['public']['Tables']['cards']['Row']
 
 interface GroupDetailLayoutProps {
     card: Card

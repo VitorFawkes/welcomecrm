@@ -31,7 +31,7 @@ const MOCK_NOTIFICATIONS = [
     }
 ];
 
-export default function NotificationCenter() {
+export default function NotificationCenter({ triggerClassName }: { triggerClassName?: string }) {
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
 
@@ -50,7 +50,7 @@ export default function NotificationCenter() {
             <Button
                 variant="ghost"
                 size="icon"
-                className="relative text-gray-500 hover:text-gray-700"
+                className={cn("relative text-gray-500 hover:text-gray-700", triggerClassName)}
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <Bell className="h-5 w-5" />

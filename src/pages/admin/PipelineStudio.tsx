@@ -3,7 +3,7 @@ import StudioStructure from '../../components/admin/studio/StudioStructure'
 
 export default function PipelineStudio() {
     return (
-        <div className="max-w-7xl mx-auto p-6">
+        <div className="p-6">
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">

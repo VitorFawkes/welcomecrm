@@ -15,7 +15,7 @@ export interface PipelinePhase {
     order_index: number
     active: boolean
     slug: string | null
-    visible_in_card?: boolean
+    visible_in_card: boolean | null
     created_at: string
     updated_at: string | null
 }

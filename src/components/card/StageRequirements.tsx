@@ -3,7 +3,7 @@ import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { useStageRequirements } from '../../hooks/useStageRequirements'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Card = Database['public']['Tables']['cards']['Row']
 
 interface StageRequirementsProps {
     card: Card

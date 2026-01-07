@@ -1,0 +1,142 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { Label } from '../../ui/Label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/Tabs';
+import { useToast } from '../../../contexts/ToastContext';
+import { Loader2, Save, User, Shield } from 'lucide-react';
+import AvatarUpload from './AvatarUpload';
+import SecuritySettings from './SecuritySettings';
+
+export default function ProfileSettings() {
+    const { user, profile } = useAuth();
+    const { toast } = useToast();
+    const [loading, setLoading] = useState(false);
+
+    // Form State
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [avatarPath, setAvatarPath] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (profile) {
+            setName(profile.nome || '');
+            setPhone((profile as any).phone || '');
+            setAvatarPath((profile as any).avatar_url || null);
+        }
+    }, [profile]);
+
+    const handleUpdateProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user) return;
+
+        setLoading(true);
+        try {
+            const updates = {
+                id: user.id,
+                nome: name,
+                phone: phone,
+                avatar_url: avatarPath,
+                updated_at: new Date().toISOString(),
+            };
+
+            const { error } = await supabase
+                .from('profiles')
+                .upsert(updates);
+
+            if (error) throw error;
+            toast({ title: 'Perfil atualizado!', type: 'success' });
+        } catch (error: any) {
+            toast({ title: 'Erro ao atualizar', description: error.message, type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-8">
+            <div>
+                <h2 className="text-2xl font-bold text-gray-900">Meu Perfil</h2>
+                <p className="text-gray-500">Gerencie suas informações pessoais e segurança.</p>
+            </div>
+
+            <Tabs defaultValue="general" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 lg:w-[400px] mb-8">
+                    <TabsTrigger value="general" className="gap-2">
+                        <User className="w-4 h-4" />
+                        Dados Pessoais
+                    </TabsTrigger>
+                    <TabsTrigger value="security" className="gap-2">
+                        <Shield className="w-4 h-4" />
+                        Segurança
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="general" className="space-y-8 animate-in fade-in-50 duration-500">
+                    <div className="bg-white/50 backdrop-blur-sm rounded-xl border border-white/20 p-8 shadow-sm">
+                        <div className="flex flex-col md:flex-row gap-8 items-start">
+                            {/* Avatar Section */}
+                            <div className="w-full md:w-auto flex-shrink-0">
+                                <AvatarUpload
+                                    url={avatarPath}
+                                    onUpload={(url) => {
+                                        setAvatarPath(url);
+                                        // Auto-save avatar update
+                                        supabase.from('profiles').update({ avatar_url: url }).eq('id', user?.id).then();
+                                    }}
+                                />
+                            </div>
+
+                            {/* Form Section */}
+                            <form onSubmit={handleUpdateProfile} className="flex-1 space-y-6 w-full">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <Label>Nome Completo</Label>
+                                        <Input
+                                            value={name}
+                                            onChange={e => setName(e.target.value)}
+                                            placeholder="Seu nome"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Telefone / WhatsApp</Label>
+                                        <Input
+                                            value={phone}
+                                            onChange={e => setPhone(e.target.value)}
+                                            placeholder="(00) 00000-0000"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Email</Label>
+                                    <Input
+                                        value={user?.email}
+                                        disabled
+                                        className="bg-gray-50/50 text-gray-500"
+                                    />
+                                    <p className="text-xs text-gray-400">O email não pode ser alterado.</p>
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-100">
+                                    <Button type="submit" disabled={loading}>
+                                        {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                        Salvar Alterações
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="security" className="animate-in fade-in-50 duration-500">
+                    <div className="bg-white/50 backdrop-blur-sm rounded-xl border border-white/20 p-8 shadow-sm">
+                        <SecuritySettings />
+                    </div>
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+}

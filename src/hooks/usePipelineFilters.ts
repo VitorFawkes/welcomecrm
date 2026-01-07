@@ -18,7 +18,6 @@ export interface FilterState {
 }
 
 export interface GroupFilters {
-    showGroups: boolean
     showLinked: boolean
     showSolo: boolean
 }
@@ -45,7 +44,6 @@ export const usePipelineFilters = create<PipelineFiltersState>()(
             subView: 'MY_QUEUE',
             filters: {},
             groupFilters: {
-                showGroups: false,
                 showLinked: true,
                 showSolo: true
             },

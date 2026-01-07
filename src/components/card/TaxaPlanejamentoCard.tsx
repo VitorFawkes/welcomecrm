@@ -18,7 +18,7 @@ interface TripsProdutoData {
     [key: string]: any;
 }
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Card = Database['public']['Tables']['cards']['Row']
 
 interface TaxaPlanejamentoCardProps {
     card: Card

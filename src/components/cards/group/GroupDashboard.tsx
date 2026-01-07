@@ -8,7 +8,7 @@ import CreateChildCardModal from './CreateChildCardModal';
 import BulkAddTravelersModal from './BulkAddTravelersModal';
 import type { Database } from '../../../database.types'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Card = Database['public']['Tables']['cards']['Row']
 
 interface GroupDashboardProps {
     card: Card;

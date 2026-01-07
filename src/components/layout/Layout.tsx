@@ -22,13 +22,7 @@ export default function Layout() {
         <div className="fixed inset-0 flex bg-gray-100 overflow-hidden">
             <Sidebar />
             <div className="flex flex-1 flex-col overflow-hidden">
-                <header className="flex h-16 items-center justify-between border-b bg-white px-8 shadow-sm">
-                    <h2 className="text-lg font-semibold text-gray-800">Welcome CRM</h2>
-                    <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-500">Olá, {session.user.email}</span>
-                        <NotificationCenter />
-                    </div>
-                </header>
+
                 <main className="flex-1 relative flex flex-col overflow-hidden bg-muted">
                     <Outlet />
                 </main>

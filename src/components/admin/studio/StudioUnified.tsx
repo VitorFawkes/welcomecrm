@@ -6,8 +6,15 @@ import { cn } from '../../../lib/utils'
 import FieldInspectorDrawer from './FieldInspectorDrawer'
 import type { Database } from '../../../database.types'
 
-type SystemField = Database['public']['Tables']['system_fields']['Row']
-type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row']
+type SystemField = Database['public']['Tables']['system_fields']['Row'] & {
+    section?: string
+    is_system?: boolean
+}
+type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'] & {
+    phase_id?: string
+    fase?: string
+    nome?: string
+}
 type StageFieldConfig = Database['public']['Tables']['stage_field_config']['Row']
 
 import { SECTIONS } from '../../../constants/admin'
@@ -92,16 +99,37 @@ export default function StudioUnified() {
     // --- Mutations ---
     const createFieldMutation = useMutation({
         mutationFn: async (field: Partial<SystemField>) => {
-            const key = field.key?.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
-            const { error } = await supabase.from('system_fields').insert({ ...field, key } as any)
+            // Auto-generate key if missing
+            let key = (field.key || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+
+            if (!key && field.label) {
+                key = field.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+            }
+
+            if (!key) throw new Error("O campo 'Chave' é obrigatório.")
+
+            // Ensure we don't send extra fields that might not exist in older DB versions if not needed
+            // But we expect section and is_system to exist now.
+            const payload = {
+                key,
+                label: field.label,
+                type: field.type,
+                section: field.section || 'trip_info',
+                active: field.active ?? true,
+                is_system: field.is_system ?? false,
+                options: field.options
+            }
+
+            const { error } = await supabase.from('system_fields').insert(payload as any)
             if (error) throw error
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['system-fields-unified'] })
+            queryClient.invalidateQueries({ queryKey: ['system-fields-config'] }) // Sync with useFieldConfig
             setIsAdding(false)
             setNewField({ key: '', label: '', type: 'text', section: 'trip_info', active: true, is_system: false })
         },
-        onError: (err) => alert(err.message)
+        onError: (err) => alert(`Erro ao criar campo: ${err.message}`)
     })
 
     const updateFieldMutation = useMutation({
@@ -120,6 +148,7 @@ export default function StudioUnified() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['system-fields-unified'] })
+            queryClient.invalidateQueries({ queryKey: ['system-fields-config'] }) // Sync with useFieldConfig
             setEditingField(null)
         }
     })
@@ -129,7 +158,10 @@ export default function StudioUnified() {
             const { error } = await supabase.from('system_fields').delete().eq('key', key)
             if (error) throw error
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['system-fields-unified'] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['system-fields-unified'] })
+            queryClient.invalidateQueries({ queryKey: ['system-fields-config'] }) // Sync with useFieldConfig
+        }
     })
 
     const upsertConfigMutation = useMutation({
@@ -141,6 +173,7 @@ export default function StudioUnified() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['stage-field-configs-unified'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-field-configs-all'] }) // Sync with useFieldConfig
         }
     })
 
@@ -293,7 +326,7 @@ export default function StudioUnified() {
     if (loadingFields) return <div className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600" /></div>
 
     return (
-        <div className="p-6 max-w-[1600px] mx-auto">
+        <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900">Matriz de Governança</h2>

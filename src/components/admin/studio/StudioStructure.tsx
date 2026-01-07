@@ -28,6 +28,7 @@ import { createPortal } from 'react-dom'
 import PhaseColumn from './builder/PhaseColumn'
 import StageCard from './builder/StageCard'
 import StageInspectorDrawer from './StageInspectorDrawer'
+import PhaseSettingsDrawer from './PhaseSettingsDrawer'
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases'
 import type { Database } from '../../../database.types'
 
@@ -44,6 +45,7 @@ export default function StudioStructure() {
     const [localStages, setLocalStages] = useState<PipelineStage[]>([])
 
     const [editingStage, setEditingStage] = useState<PipelineStage | null>(null)
+    const [editingPhaseSettings, setEditingPhaseSettings] = useState<PipelinePhase | null>(null)
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -383,6 +385,7 @@ export default function StudioStructure() {
                                     }}
                                     onChangeColor={(color) => updatePhaseMutation.mutate({ id: phase.id, color })}
                                     onToggleVisibility={() => updatePhaseMutation.mutate({ id: phase.id, visible_in_card: !phase.visible_in_card })}
+                                    onEditPhaseSettings={() => setEditingPhaseSettings(phase)}
                                     onEditStage={(stage) => setEditingStage(stage)}
                                     onDeleteStage={(stage) => {
                                         if (confirm(`Excluir etapa "${stage.nome}"?`)) deleteStageMutation.mutate(stage.id)
@@ -406,6 +409,7 @@ export default function StudioStructure() {
                                 onDeleteStage={() => { }}
                                 onChangeColor={() => { }}
                                 onToggleVisibility={() => { }}
+                                onEditPhaseSettings={() => { }}
                             />
                         )}
                         {activeId && activeType === 'Stage' && (
@@ -424,6 +428,12 @@ export default function StudioStructure() {
                 isOpen={!!editingStage}
                 onClose={() => setEditingStage(null)}
                 stage={editingStage}
+            />
+
+            <PhaseSettingsDrawer
+                isOpen={!!editingPhaseSettings}
+                onClose={() => setEditingPhaseSettings(null)}
+                phase={editingPhaseSettings}
             />
         </div>
     )

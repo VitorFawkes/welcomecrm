@@ -56,7 +56,20 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         enabled: !!card.pessoa_principal_id
     })
 
-    const handleWhatsAppClick = () => {
+    const syncWhatsAppMutation = useMutation({
+        mutationFn: async (contactId: string) => {
+            const { data, error } = await supabase.functions.invoke('sync-whatsapp-history', {
+                body: { contact_id: contactId }
+            })
+            if (error) throw error
+            return data
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['conversations-whatsapp'] })
+        }
+    })
+
+    const handleWhatsAppClick = async () => {
         if (!contact?.telefone) {
             alert('Este contato não possui telefone cadastrado.')
             return
@@ -66,12 +79,19 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         const cleanNumber = contact.telefone.replace(/\D/g, '')
         const message = encodeURIComponent(`Olá! Sobre sua viagem: ${card.titulo}`)
 
+        // Optimistic UI: Log activity immediately
         logActivityMutation.mutate({
             tipo: 'whatsapp_sent',
             descricao: 'WhatsApp enviado para o cliente',
             metadata: { contact_id: card.pessoa_principal_id, phone: cleanNumber }
         })
 
+        // Trigger Handshake (Sync) in background
+        if (card.pessoa_principal_id) {
+            syncWhatsAppMutation.mutate(card.pessoa_principal_id)
+        }
+
+        // Open WhatsApp Web
         window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank')
     }
 

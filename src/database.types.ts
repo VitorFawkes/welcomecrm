@@ -646,6 +646,7 @@ export type Database = {
       }
       contatos: {
         Row: {
+          chatpro_session_id: string | null
           cpf: string | null
           created_at: string
           created_by: string | null
@@ -653,6 +654,7 @@ export type Database = {
           email: string | null
           endereco: Json | null
           id: string
+          last_whatsapp_sync: string | null
           nome: string
           observacoes: string | null
           passaporte: string | null
@@ -663,6 +665,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          chatpro_session_id?: string | null
           cpf?: string | null
           created_at?: string
           created_by?: string | null
@@ -670,6 +673,7 @@ export type Database = {
           email?: string | null
           endereco?: Json | null
           id?: string
+          last_whatsapp_sync?: string | null
           nome: string
           observacoes?: string | null
           passaporte?: string | null
@@ -680,6 +684,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          chatpro_session_id?: string | null
           cpf?: string | null
           created_at?: string
           created_by?: string | null
@@ -687,6 +692,7 @@ export type Database = {
           email?: string | null
           endereco?: Json | null
           id?: string
+          last_whatsapp_sync?: string | null
           nome?: string
           observacoes?: string | null
           passaporte?: string | null
@@ -980,6 +986,92 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      integration_events: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          idempotency_key: string | null
+          integration_id: string
+          logs: Json | null
+          next_retry_at: string | null
+          payload: Json | null
+          response: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          integration_id: string
+          logs?: Json | null
+          next_retry_at?: string | null
+          payload?: Json | null
+          response?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          integration_id?: string
+          logs?: Json | null
+          next_retry_at?: string | null
+          payload?: Json | null
+          response?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_events_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          provider: string
+          transformer_rules: Json
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          provider?: string
+          transformer_rules?: Json
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          provider?: string
+          transformer_rules?: Json
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       invitations: {
         Row: {
@@ -1279,6 +1371,7 @@ export type Database = {
           order_index: number
           slug: string | null
           updated_at: string | null
+          visible_in_card: boolean | null
         }
         Insert: {
           active?: boolean
@@ -1290,6 +1383,7 @@ export type Database = {
           order_index?: number
           slug?: string | null
           updated_at?: string | null
+          visible_in_card?: boolean | null
         }
         Update: {
           active?: boolean
@@ -1301,6 +1395,7 @@ export type Database = {
           order_index?: number
           slug?: string | null
           updated_at?: string | null
+          visible_in_card?: boolean | null
         }
         Relationships: []
       }
@@ -2219,6 +2314,80 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_config: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string | null
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      whatsapp_messages: {
+        Row: {
+          body: string | null
+          contact_id: string | null
+          created_at: string | null
+          direction: string | null
+          external_id: string | null
+          id: string
+          media_url: string | null
+          metadata: Json | null
+          processed_at: string | null
+          status: string | null
+          type: string | null
+        }
+        Insert: {
+          body?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          direction?: string | null
+          external_id?: string | null
+          id?: string
+          media_url?: string | null
+          metadata?: Json | null
+          processed_at?: string | null
+          status?: string | null
+          type?: string | null
+        }
+        Update: {
+          body?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          direction?: string | null
+          external_id?: string | null
+          id?: string
+          media_url?: string | null
+          metadata?: Json | null
+          processed_at?: string | null
+          status?: string | null
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       view_agenda: {
@@ -2278,6 +2447,7 @@ export type Database = {
       }
       view_cards_acoes: {
         Row: {
+          briefing_inicial: Json | null
           campaign_id: string | null
           cliente_recorrente: boolean | null
           concierge_owner_id: string | null
@@ -2295,16 +2465,13 @@ export type Database = {
           external_id: string | null
           fase: string | null
           forma_pagamento: string | null
-          group_capacity: number | null
-          group_total_pax: number | null
-          group_total_revenue: number | null
           id: string | null
           is_group_parent: boolean | null
+          marketing_data: Json | null
           moeda: string | null
           orcamento: Json | null
           origem: string | null
           parent_card_id: string | null
-          parent_card_title: string | null
           pessoa_nome: string | null
           pessoa_principal_id: string | null
           pipeline_id: string | null
@@ -2459,6 +2626,23 @@ export type Database = {
       is_gestor: { Args: never; Returns: boolean }
       is_operational: { Args: never; Returns: boolean }
       is_privileged_user: { Args: never; Returns: boolean }
+      match_documents_v2: {
+        Args: {
+          filter: Json
+          match_count: number
+          match_threshold: number
+          query_embedding: string
+        }
+        Returns: {
+          char_end: number
+          char_start: number
+          chunk_id: string
+          content: string
+          document_id: string
+          metadata: Json
+          similarity: number
+        }[]
+      }
       mover_card: {
         Args: {
           p_card_id: string
@@ -2467,6 +2651,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      normalize_phone: { Args: { phone_number: string }; Returns: string }
       pode_avancar_etapa: {
         Args: { p_card_id: string; p_nova_etapa_id: string }
         Returns: boolean

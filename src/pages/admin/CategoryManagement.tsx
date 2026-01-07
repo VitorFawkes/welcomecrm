@@ -150,7 +150,7 @@ export default function CategoryManagement() {
     }
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
+        <div className="p-8">
             <AdminPageHeader
                 title="Categorias & Motivos"
                 subtitle="Configure as opções disponíveis nos formulários de atividades."

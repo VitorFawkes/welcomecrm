@@ -15,6 +15,8 @@ interface KanbanCardProps {
 
 
 
+import { GroupBadge } from './GroupBadge'
+
 export default function KanbanCard({ card }: KanbanCardProps) {
     const navigate = useNavigate()
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -32,21 +34,47 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         }
     }
 
-    // Fetch field settings for this phase
+    // Fetch field settings for this phase (try phase_id first, fallback to fase)
     const { data: settings } = useQuery({
-        queryKey: ['pipeline-settings', card.fase],
+        queryKey: ['pipeline-settings', card.pipeline_stage_id, card.fase],
         queryFn: async () => {
-            if (!card.fase) return null
-            const { data, error } = await (supabase.from('pipeline_card_settings') as any)
-                .select('campos_kanban, ordem_kanban')
-                .eq('fase', card.fase)
-                .is('usuario_id', null)
-                .single()
+            if (!card.fase && !card.pipeline_stage_id) return null
 
-            if (error) return null
-            return data as any
+            // First, try to get phase_id from the current stage
+            if (card.pipeline_stage_id) {
+                const { data: stage } = await supabase
+                    .from('pipeline_stages')
+                    .select('phase_id')
+                    .eq('id', card.pipeline_stage_id)
+                    .single()
+
+                if (stage?.phase_id) {
+                    const { data: settingsByPhaseId } = await supabase
+                        .from('pipeline_card_settings')
+                        .select('campos_kanban, ordem_kanban')
+                        .eq('phase_id', stage.phase_id)
+                        .is('usuario_id', null)
+                        .single()
+
+                    if (settingsByPhaseId) return settingsByPhaseId
+                }
+            }
+
+            // Fallback: fetch by fase name
+            if (card.fase) {
+                const { data: settingsByFase } = await (supabase.from('pipeline_card_settings') as any)
+                    .select('campos_kanban, ordem_kanban')
+                    .eq('fase', card.fase)
+                    .is('usuario_id', null)
+                    .single()
+
+                if (settingsByFase) return settingsByFase
+            }
+
+            return null
         },
-        enabled: !!card.fase
+        enabled: !!(card.fase || card.pipeline_stage_id),
+        staleTime: 1000 * 60 * 5 // 5 minutes - cache for performance
     })
 
     // Fetch system fields for dynamic rendering
@@ -145,6 +173,55 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
+            case 'task_status':
+                if (!card.proxima_tarefa) {
+                    return (
+                        <div key={fieldId} className="mt-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 w-full justify-center">
+                                <AlertCircle className="w-3 h-3" />
+                                Sem Tarefa
+                            </span>
+                        </div>
+                    )
+                }
+
+                const taskData = card.proxima_tarefa as any
+                const dueDate = new Date(taskData.data_vencimento)
+                const now = new Date()
+                const isLateTask = dueDate < now
+                const isToday = dueDate.toDateString() === now.toDateString()
+
+                if (isLateTask) {
+                    return (
+                        <div key={fieldId} className="mt-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-red-50 text-red-700 border border-red-100 w-full justify-center animate-pulse">
+                                <AlertCircle className="w-3 h-3" />
+                                Atrasada
+                            </span>
+                        </div>
+                    )
+                }
+
+                if (isToday) {
+                    return (
+                        <div key={fieldId} className="mt-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100 w-full justify-center">
+                                <Clock className="w-3 h-3" />
+                                Para Hoje
+                            </span>
+                        </div>
+                    )
+                }
+
+                return (
+                    <div key={fieldId} className="mt-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 w-full justify-center">
+                            <CheckSquare className="w-3 h-3" />
+                            Em Dia
+                        </span>
+                    </div>
+                )
+
             case 'pessoas':
                 const pData = card.produto_data as any
                 if (!pData?.pessoas) return null
@@ -163,22 +240,47 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         const fieldDef = systemFields?.find(f => f.key === fieldId)
         if (!fieldDef) return null
 
-        // Resolve value (check root, then produto_data)
+        // Resolve value (check root, then produto_data, then briefing_inicial)
         let value = (card as any)[fieldId]
         if (value === undefined || value === null) {
             const produtoData = card.produto_data as any
             value = produtoData?.[fieldId]
         }
+        if (value === undefined || value === null) {
+            const briefingData = card.briefing_inicial as any
+            value = briefingData?.[fieldId]
+        }
 
         // Handle nested objects (like epoca_viagem or orcamento) if they match the key
         // This is a compatibility layer for existing complex objects stored in JSON
-        if (fieldId === 'epoca_viagem' && value?.inicio) {
+        if (fieldId === 'epoca_viagem' && value) {
+            let startStr = ''
+            let endStr = ''
+
+            if (typeof value === 'object') {
+                startStr = value.start || value.inicio
+                endStr = value.end || value.fim
+            } else if (typeof value === 'string') {
+                // Try to parse raw string if it looks like a date
+                const rangeMatch = value.match(/^(\d{4}-\d{2}-\d{2}).*?até\s+(\d{4}-\d{2}-\d{2})/)
+                const singleMatch = value.match(/^(\d{4}-\d{2}-\d{2})/)
+
+                if (rangeMatch) {
+                    startStr = rangeMatch[1]
+                    endStr = rangeMatch[2]
+                } else if (singleMatch) {
+                    startStr = singleMatch[1]
+                }
+            }
+
+            if (!startStr) return null
+
             return (
                 <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                     <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0" />
                     <span className="truncate block flex-1">
-                        {new Date(value.inicio).toLocaleDateString('pt-BR')}
-                        {value.fim && ` - ${new Date(value.fim).toLocaleDateString('pt-BR')}`}
+                        {new Date(startStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                        {endStr && ` - ${new Date(endStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`}
                     </span>
                 </div>
             )
@@ -209,29 +311,58 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             case 'currency':
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value))}</span>
+                        <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />
+                        <span className="font-medium text-gray-700">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value))}
+                        </span>
                     </div>
                 )
             case 'date':
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span>{new Date(value).toLocaleDateString('pt-BR')}</span>
+                        <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0 text-blue-600" />
+                        <span className="text-gray-700">{new Date(value).toLocaleDateString('pt-BR')}</span>
                     </div>
                 )
             case 'multiselect':
                 const vals = Array.isArray(value) ? value : [value]
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <CheckSquare className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                        <span className="truncate block flex-1">{vals.join(', ')}</span>
+                        <CheckSquare className="mr-1.5 h-3 w-3 flex-shrink-0 text-purple-600" />
+                        <span className="truncate block flex-1 text-gray-700">{vals.join(', ')}</span>
+                    </div>
+                )
+            case 'number':
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <span className="mr-1.5 h-3 w-3 flex items-center justify-center font-bold text-[9px] text-gray-400 border border-gray-300 rounded-sm flex-shrink-0">#</span>
+                        <span className="text-gray-700">{String(value)}</span>
+                    </div>
+                )
+            case 'boolean':
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        {value ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                <CheckSquare className="mr-1 h-3 w-3" /> Sim
+                            </span>
+                        ) : (
+                            <span className="text-gray-400">Não</span>
+                        )}
                     </div>
                 )
             default: // text, select, etc
+                // Special icons for specific fields
+                let Icon = null
+                if (fieldId === 'origem') Icon = Link
+                if (fieldId === 'tempo_sem_contato') Icon = Clock
+                if (fieldId === 'dias_ate_viagem') Icon = Calendar
+                if (fieldId === 'forma_pagamento') Icon = DollarSign
+
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
-                        <span className="truncate block flex-1">{String(value)}</span>
+                        {Icon && <Icon className="mr-1.5 h-3 w-3 flex-shrink-0 text-gray-400" />}
+                        <span className="truncate block flex-1 text-gray-600">{String(value)}</span>
                     </div>
                 )
         }
@@ -256,26 +387,26 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             )}
         >
             <div className="flex items-start justify-between gap-2">
-                <span className={cn(
-                    "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full transition-colors",
-                    card.produto === 'TRIPS' && "bg-product-trips/10 text-product-trips border border-product-trips/20",
-                    card.produto === 'WEDDING' && "bg-product-wedding/10 text-product-wedding border border-product-wedding/20",
-                    card.produto === 'CORP' && "bg-product-corp/10 text-product-corp border border-product-corp/20"
-                )}>
-                    {card.produto}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full transition-colors",
+                        card.produto === 'TRIPS' && "bg-product-trips/10 text-product-trips border border-product-trips/20",
+                        card.produto === 'WEDDING' && "bg-product-wedding/10 text-product-wedding border border-product-wedding/20",
+                        card.produto === 'CORP' && "bg-product-corp/10 text-product-corp border border-product-corp/20"
+                    )}>
+                        {card.produto}
+                    </span>
+
+                    {/* Group Affiliation Badge */}
+                    {(card.parent_card_id || card.parent_card_title) && (
+                        <GroupBadge card={card} />
+                    )}
+                </div>
+
                 {card.prioridade === 'alta' && (
                     <div className="h-2 w-2 rounded-full bg-red-500 flex-shrink-0 mt-1.5" title="Prioridade Alta" />
                 )}
             </div>
-
-            {/* Group Affiliation Badge */}
-            {card.parent_card_title && (
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 bg-blue-50/50 px-2 py-1 rounded border border-blue-200/50 w-fit shadow-sm">
-                    <Link className="h-3 w-3" />
-                    <span className="truncate max-w-[150px]">{card.parent_card_title}</span>
-                </div>
-            )}
 
             {/* Group Parent Badge */}
             {card.is_group_parent && (

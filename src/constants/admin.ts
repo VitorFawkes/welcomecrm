@@ -14,9 +14,11 @@ export const FIELD_TYPES = [
     { value: 'textarea', label: 'Texto Longo (Área)' },
     { value: 'number', label: 'Número' },
     { value: 'date', label: 'Data' },
+    { value: 'date_range', label: 'Período de Data (Início e Fim)' },
     { value: 'currency', label: 'Moeda' },
     { value: 'select', label: 'Seleção Única' },
     { value: 'multiselect', label: 'Múltipla Seleção' },
+    { value: 'checklist', label: 'Checklist (Lista de Marcação)' },
     { value: 'boolean', label: 'Sim/Não' },
     { value: 'json', label: 'JSON (Avançado)' }
 ] as const
