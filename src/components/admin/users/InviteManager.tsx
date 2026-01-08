@@ -39,7 +39,7 @@ export default function InviteManager() {
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data, error } = await (supabase as any)
-                .from('invites')
+                .from('invitations')
                 .select('*')
                 .order('created_at', { ascending: false });
 
@@ -63,7 +63,7 @@ export default function InviteManager() {
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error } = await (supabase as any)
-                .from('invites')
+                .from('invitations')
                 .delete()
                 .eq('id', id);
 
