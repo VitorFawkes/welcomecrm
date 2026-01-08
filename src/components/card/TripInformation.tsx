@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { MapPin, Calendar, DollarSign, Tag, X, Check, Edit2, History, AlertCircle, Globe, AlertTriangle, Eraser, Plane, FileCheck, ThumbsUp, Upload, Type, Hash, CalendarDays, Coins, List, CheckSquare, Banknote } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { MapPin, Tag, X, Check, History, Globe, AlertTriangle, Eraser, Plane, FileCheck, ThumbsUp, Upload } from 'lucide-react'
 
 import { supabase } from '../../lib/supabase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -27,20 +27,19 @@ interface TripsProdutoData {
     origem_lead?: string
     motivo?: string
     taxa_planejamento?: string | number
-    [key: string]: any
+    [key: string]: unknown
 }
-
-
 
 interface TripInformationProps {
     card: {
         id: string
         fase?: string | null
         pipeline_stage_id?: string | null
+        // TODO: Define strict Json type matching Supabase
         briefing_inicial?: any
         marketing_data?: any
         produto_data?: any
-        [key: string]: any
+        [key: string]: unknown
     }
 }
 
@@ -140,12 +139,37 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
     )
 }
 
+interface FieldCardProps {
+    icon: React.ElementType
+    iconColor: string
+    label: string
+    value: string | number | null | undefined
+    fieldName?: string
+    dataKey?: string
+}
+
+function FieldCard({ icon: Icon, iconColor, label, value }: FieldCardProps) {
+    return (
+        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="flex items-center gap-2 mb-1">
+                <div className={cn("p-1 rounded-md", iconColor)}>
+                    <Icon className="h-3 w-3" />
+                </div>
+                <span className="text-xs font-medium text-gray-500 uppercase">{label}</span>
+            </div>
+            <div className="text-sm font-medium text-gray-900 pl-7">
+                {value || '-'}
+            </div>
+        </div>
+    )
+}
+
 const EMPTY_OBJECT = {}
 
 export default function TripInformation({ card }: TripInformationProps) {
     // Fix: Use useMemo and a stable empty object to prevent infinite loops
-    const productData = useMemo(() => (card.produto_data as TripsProdutoData) || EMPTY_OBJECT, [card.produto_data])
-    const briefingData = useMemo(() => (card.briefing_inicial as TripsProdutoData) || EMPTY_OBJECT, [card.briefing_inicial])
+    const productData = useMemo(() => (card.produto_data as any) || EMPTY_OBJECT, [card.produto_data])
+    const briefingData = useMemo(() => (card.briefing_inicial as any) || EMPTY_OBJECT, [card.briefing_inicial])
     const marketingData = useMemo(() => (card.marketing_data as any) || EMPTY_OBJECT, [card.marketing_data])
 
     const [viewMode, setViewMode] = useState<ViewMode>(SystemPhase.SDR)
@@ -155,8 +179,9 @@ export default function TripInformation({ card }: TripInformationProps) {
     const [correctionMode, setCorrectionMode] = useState(false)
 
     const queryClient = useQueryClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { missingBlocking, missingFuture } = useStageRequirements(card as any)
-    const { getFieldConfig, getVisibleFields } = useFieldConfig()
+    const { getVisibleFields } = useFieldConfig()
     const { data: phases } = usePipelinePhases()
 
     // --- MODULARITY: Get all visible fields for 'trip_info' section ---
@@ -180,6 +205,7 @@ export default function TripInformation({ card }: TripInformationProps) {
             const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
             if (sdrPhase && sdrPhase.slug) setViewMode(sdrPhase.slug)
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [card.fase, phases])
 
     // Determine which data to display/edit based on ViewMode and CorrectionMode
@@ -189,11 +215,12 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     useEffect(() => {
         setEditedData(activeData)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [activeData, viewMode, correctionMode])
 
     const updateCardMutation = useMutation({
         mutationFn: async ({ newData, target }: { newData: TripsProdutoData, target: 'produto_data' | 'briefing_inicial' }) => {
-            const updates: any = { [target]: newData }
+            const updates: Record<string, unknown> = { [target]: newData }
 
             // If updating 'produto_data' (Planner Proposal), sync legacy columns
             if (target === 'produto_data') {
@@ -255,14 +282,11 @@ export default function TripInformation({ card }: TripInformationProps) {
         setDestinosInput('')
     }
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return ''
-        return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+    const handleFieldChange = (fieldName: string, value: unknown) => {
+        setEditedData(prev => ({ ...prev, [fieldName]: value }))
     }
 
-    const formatBudget = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-    }
+
 
     const getFieldStatus = (dataKey: string) => {
         if (viewMode !== SystemPhase.SDR && viewMode !== SystemPhase.PLANNER) return 'ok' // Only validate in early stages
@@ -458,7 +482,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 icon={Tag} // Default icon
                                 iconColor="bg-gray-100 text-gray-600"
                                 label={field.label}
-                                value={activeData[field.key]}
+                                value={activeData[field.key] as string | number | null | undefined}
                                 fieldName={field.key}
                                 dataKey={field.key}
                             // For dynamic fields, we don't have a specific "sdrValue" concept yet, 

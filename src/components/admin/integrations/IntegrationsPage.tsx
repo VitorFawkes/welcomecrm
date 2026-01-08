@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { IntegrationList } from './IntegrationList';
 import { IntegrationBuilder } from './IntegrationBuilder';
+import { IntegrationFieldExplorer } from './IntegrationFieldExplorer';
 import type { IntegrationType } from '@/lib/integrations';
 
 export function IntegrationsPage() {
-    const [view, setView] = useState<'list' | 'builder' | 'inspector'>('list');
+    const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer'>('list');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<IntegrationType>('input');
 
@@ -35,8 +36,13 @@ export function IntegrationsPage() {
                         setSelectedId(newId);
                     }}
                 />
+            ) : view === 'explorer' ? (
+                <IntegrationFieldExplorer onBack={() => setView('list')} />
             ) : (
-                <IntegrationList onSelect={handleSelect} />
+                <IntegrationList
+                    onSelect={handleSelect}
+                    onExploreFields={() => setView('explorer')}
+                />
             )}
         </div>
     );

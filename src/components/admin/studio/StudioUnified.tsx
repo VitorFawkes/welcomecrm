@@ -8,7 +8,7 @@ import type { Database } from '../../../database.types'
 
 type SystemField = Database['public']['Tables']['system_fields']['Row'] & {
     section?: string
-    is_system?: boolean
+    is_system?: boolean | null
 }
 type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'] & {
     phase_id?: string
@@ -375,9 +375,9 @@ export default function StudioUnified() {
                 isCreating={isAdding}
                 onSave={(field) => {
                     if (isAdding) {
-                        createFieldMutation.mutate(field)
+                        createFieldMutation.mutate(field as any)
                     } else {
-                        updateFieldMutation.mutate(field)
+                        updateFieldMutation.mutate(field as any)
                     }
                 }}
             />

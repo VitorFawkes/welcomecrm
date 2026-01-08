@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import {
     Table,
@@ -32,33 +32,37 @@ export default function InviteManager() {
     const [loading, setLoading] = useState(true);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchInvites();
-    }, []);
 
-    const fetchInvites = async () => {
+
+    const fetchInvites = useCallback(async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data, error } = await (supabase as any)
                 .from('invites')
                 .select('*')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setInvites(data || []);
+            setInvites((data as unknown as Invite[]) || []);
         } catch (error) {
             console.error('Error fetching invites:', error);
             toast({ title: 'Erro', description: 'Falha ao carregar convites.', type: 'error' });
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast]);
+
+    useEffect(() => {
+        fetchInvites();
+    }, [fetchInvites]);
 
     const handleRevoke = async (id: string) => {
         if (!confirm('Tem certeza que deseja revogar este convite?')) return;
 
         try {
-            const { error } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error } = await (supabase as any)
                 .from('invites')
                 .delete()
                 .eq('id', id);

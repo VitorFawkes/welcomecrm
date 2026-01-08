@@ -28,13 +28,6 @@ export function GroupDashboard({ card, onRefresh }: GroupDashboardProps) {
         origin: string | null;
     }>({ start: null, end: null, origin: null });
 
-    useEffect(() => {
-        if (card.id) {
-            fetchChildCount();
-            fetchParentDetails();
-        }
-    }, [card.id]);
-
     const fetchParentDetails = async () => {
         const { data } = await supabase
             .from('cards')
@@ -58,6 +51,13 @@ export function GroupDashboard({ card, onRefresh }: GroupDashboardProps) {
             .eq('parent_card_id', card.id!);
         setChildCount(count || 0);
     };
+
+    useEffect(() => {
+        if (card.id) {
+            fetchChildCount();
+            fetchParentDetails();
+        }
+    }, [card.id]);
 
     const totalRevenue = card.group_total_revenue || 0;
     const totalPax = card.group_total_pax || 0;

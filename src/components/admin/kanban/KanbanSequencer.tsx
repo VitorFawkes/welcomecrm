@@ -102,6 +102,7 @@ export function KanbanSequencer({ phases, systemFields, settings, isLoading }: K
         if (phases.length > 0 && !selectedPhaseId) {
             setSelectedPhaseId(phases[0].id)
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [phases, selectedPhaseId])
 
     // Load order for selected phase

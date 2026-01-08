@@ -57,7 +57,6 @@ export default function CategoryManagement() {
                         .from('tarefas')
                         .select('*', { count: 'exact', head: true })
                         .eq('tipo', 'solicitacao_mudanca')
-                        // @ts-ignore - Supabase JSON filtering syntax
                         .eq('metadata->>change_category', cat.key);
                     counts[cat.key] = count || 0;
                 } else {
@@ -93,7 +92,7 @@ export default function CategoryManagement() {
             setNewLabel('');
             queryClient.invalidateQueries({ queryKey: ['activity-categories'] });
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             toast.error(`Erro ao criar: ${error.message}`);
         }
     });
@@ -111,7 +110,7 @@ export default function CategoryManagement() {
             toast.success("Visibilidade atualizada!");
             queryClient.invalidateQueries({ queryKey: ['activity-categories'] });
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             toast.error(`Erro ao atualizar: ${error.message}`);
         }
     });
@@ -129,7 +128,7 @@ export default function CategoryManagement() {
             toast.success("Categoria removida!");
             queryClient.invalidateQueries({ queryKey: ['activity-categories'] });
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             toast.error(`Erro ao remover: ${error.message}`);
         }
     });

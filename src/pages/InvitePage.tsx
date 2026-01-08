@@ -28,11 +28,12 @@ export default function InvitePage() {
 
     const validateToken = async (t: string) => {
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data, error } = await supabase.rpc('get_invite_details' as any, { token_input: t });
 
             if (error) throw error;
 
-            const result = data as any;
+            const result = data as unknown as { valid: boolean; email: string; role: string } | null;
             if (result && result.valid) {
                 setValid(true);
                 setInviteData({ email: result.email, role: result.role });
@@ -83,11 +84,12 @@ export default function InvitePage() {
             // Redirect to dashboard
             navigate('/dashboard');
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('Signup error:', error);
+            const message = error instanceof Error ? error.message : 'Verifique se o convite ainda é válido.';
             toast({
                 title: 'Erro ao criar conta',
-                description: error.message || 'Verifique se o convite ainda é válido.',
+                description: message,
                 type: 'error'
             });
         } finally {

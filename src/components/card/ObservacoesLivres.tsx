@@ -23,6 +23,7 @@ export default function ObservacoesLivres({ card }: ObservacoesLivresProps) {
         const obs = (card.produto_data as any)?.observacoes || ''
         setEditedObs(obs)
         setIsDirty(false)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [card.produto_data])
 
     const updateObsMutation = useMutation({

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Button } from '../../ui/Button';
-import { Loader2, Upload, User, X } from 'lucide-react';
+
+import { Loader2, Upload, User } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 
 interface AvatarUploadProps {

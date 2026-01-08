@@ -1,7 +1,7 @@
 
 import { useNavigate } from 'react-router-dom';
 import type { Database } from '../../../database.types';
-import { Users, Calendar, MapPin, ArrowRight, Plane } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, Plane } from 'lucide-react';
 
 type Card = Database['public']['Tables']['cards']['Row'];
 

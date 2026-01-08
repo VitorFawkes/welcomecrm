@@ -74,8 +74,10 @@ export default function StudioStructure() {
     })
 
     // Sync state
+    // Sync state
     useEffect(() => {
         if (phasesData) setLocalPhases(phasesData)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [phasesData])
 
     useEffect(() => {

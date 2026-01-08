@@ -233,7 +233,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 setTime(formatLocalTime(now));
             }
         }
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, mode]);
 
     // Close time list when clicking outside
     useEffect(() => {

@@ -66,7 +66,7 @@ async function verifyLogging() {
 
 async function performChecks(cardId: string) {
     // Helper to check log
-    const checkLog = async (actionType: string, _descriptionPart: string) => {
+    const checkLog = async (actionType: string) => {
         // Give DB a moment to process trigger
         await new Promise(r => setTimeout(r, 1000))
 
@@ -93,11 +93,11 @@ async function performChecks(cardId: string) {
     }
 
     // Check 1: Card Creation Log
-    await checkLog('card_created', 'Card criado')
+    await checkLog('card_created')
 
     // 2. Create a Task
     console.log('\n2. Creating Task...')
-    const { data: _task, error: taskError } = await supabase
+    const { error: taskError } = await supabase
         .from('tarefas')
         .insert({
             card_id: cardId,
@@ -108,7 +108,7 @@ async function performChecks(cardId: string) {
         .single()
 
     if (!taskError) {
-        await checkLog('task_created', 'Tarefa criada')
+        await checkLog('task_created')
     } else {
         console.error('Failed to create task:', taskError)
     }
@@ -123,7 +123,7 @@ async function performChecks(cardId: string) {
         })
 
     if (!noteError) {
-        await checkLog('note_created', 'Nota adicionada')
+        await checkLog('note_created')
     } else {
         console.error('Failed to create note:', noteError)
     }
@@ -131,7 +131,7 @@ async function performChecks(cardId: string) {
     // 4. Update Card Title (should trigger update log if configured, or maybe stage change)
     // Let's try updating the title
     console.log('\n4. Updating Card Title...')
-    const { error: _updateError } = await supabase
+    await supabase
         .from('cards')
         .update({ titulo: 'VERIFICATION_TEST_CARD_UPDATED' })
         .eq('id', cardId)

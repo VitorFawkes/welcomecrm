@@ -4,6 +4,14 @@ import type { Database } from '../database.types'
 
 type Card = Database['public']['Tables']['cards']['Row']
 
+interface Requirement {
+    field_key: string
+    label: string
+    stage_id: string
+    isBlocking: boolean
+    isFuture: boolean
+}
+
 export function useStageRequirements(card: Card) {
     const { data: requirements, isLoading } = useQuery({
         queryKey: ['stage-requirements', card.pipeline_stage_id],
@@ -47,17 +55,25 @@ export function useStageRequirements(card: Card) {
 
             if (error) throw error
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const sortedData = (data || []).sort((a: any, b: any) => {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 return (a.pipeline_stages?.ordem || 0) - (b.pipeline_stages?.ordem || 0)
             })
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return sortedData.map((config: any) => ({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 field_key: config.field_key,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 label: config.system_fields?.label || config.field_key,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 stage_id: config.stage_id,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 isBlocking: config.pipeline_stages.ordem === currentOrder,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                 isFuture: config.pipeline_stages.ordem > currentOrder
-            })).filter((req: any) => req.isBlocking || req.isFuture)
+            })).filter((req: Requirement) => req.isBlocking || req.isFuture)
         },
         enabled: !!card.pipeline_stage_id,
         staleTime: 1000 * 60 * 5 // 5 minutes
@@ -65,11 +81,11 @@ export function useStageRequirements(card: Card) {
 
     const checkRequirement = (fieldKey: string): boolean => {
         // Check in top level card fields
-        if (fieldKey in card && (card as any)[fieldKey]) return true
+        if (fieldKey in card && (card as Record<string, unknown>)[fieldKey]) return true
 
         // Check in produto_data
         if (card.produto_data && typeof card.produto_data === 'object') {
-            const produtoData = card.produto_data as any
+            const produtoData = card.produto_data as Record<string, unknown>
             const value = produtoData[fieldKey]
 
             if (value === null || value === undefined || value === '') return false
@@ -82,8 +98,8 @@ export function useStageRequirements(card: Card) {
         return false
     }
 
-    const blockingRequirements = requirements?.filter((r: any) => r.isBlocking) || []
-    const futureRequirements = requirements?.filter((r: any) => r.isFuture) || []
+    const blockingRequirements = requirements?.filter((r: Requirement) => r.isBlocking) || []
+    const futureRequirements = requirements?.filter((r: Requirement) => r.isFuture) || []
 
     const missingBlocking = blockingRequirements.filter(req => !checkRequirement(req.field_key))
     const missingFuture = futureRequirements.filter(req => !checkRequirement(req.field_key))

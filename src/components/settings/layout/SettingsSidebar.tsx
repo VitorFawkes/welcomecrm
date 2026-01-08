@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
     User,
-    Shield,
+
     Database,
     Kanban,
     LayoutList,

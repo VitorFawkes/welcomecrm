@@ -3,8 +3,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Label } from '../../ui/Label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/Tabs';
+import { Label } from '../../ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { useToast } from '../../../contexts/ToastContext';
 import { Loader2, Save, User, Shield } from 'lucide-react';
 import AvatarUpload from './AvatarUpload';
@@ -84,7 +84,9 @@ export default function ProfileSettings() {
                                     onUpload={(url) => {
                                         setAvatarPath(url);
                                         // Auto-save avatar update
-                                        supabase.from('profiles').update({ avatar_url: url }).eq('id', user?.id).then();
+                                        if (user) {
+                                            supabase.from('profiles').update({ avatar_url: url } as any).eq('id', user.id).then();
+                                        }
                                     }}
                                 />
                             </div>

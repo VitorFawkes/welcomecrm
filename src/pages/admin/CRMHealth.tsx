@@ -110,7 +110,15 @@ export default function CRMHealth() {
     )
 }
 
-function HealthCard({ title, count, icon: Icon, color, description }: any) {
+interface HealthCardProps {
+    title: string
+    count: number
+    icon: React.ElementType
+    color: string
+    description: string
+}
+
+function HealthCard({ title, count, icon: Icon, color, description }: HealthCardProps) {
     const colors = {
         red: 'bg-red-50 text-red-700 border-red-100',
         orange: 'bg-orange-50 text-orange-700 border-orange-100',

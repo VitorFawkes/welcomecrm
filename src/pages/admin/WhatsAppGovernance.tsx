@@ -32,7 +32,7 @@ export default function WhatsAppGovernance() {
 
             if (error) throw error;
 
-            const configMap: any = {};
+            const configMap: Record<string, unknown> = {};
             data.forEach(item => {
                 configMap[item.key] = item.value;
             });
@@ -48,6 +48,7 @@ export default function WhatsAppGovernance() {
     // Sync state with remote config
     useEffect(() => {
         if (remoteConfig) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setConfig(remoteConfig);
         }
     }, [remoteConfig]);

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Label } from '../../ui/Label';
+import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
 import { Loader2, Shield, CheckCircle } from 'lucide-react';
 

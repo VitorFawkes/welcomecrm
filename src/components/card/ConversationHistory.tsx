@@ -32,7 +32,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                     table: 'whatsapp_messages',
                     filter: `contact_id=eq.${contactId}`
                 },
-                (payload) => {
+                () => {
                     queryClient.invalidateQueries({ queryKey: ['conversations-whatsapp', contactId] })
                 }
             )

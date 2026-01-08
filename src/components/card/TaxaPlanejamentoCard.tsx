@@ -3,7 +3,7 @@ import { DollarSign, Check, X, Edit2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import type { Database } from '../../database.types'
+
 
 // Define locally as it's missing in database.types
 interface TripsProdutoData {
@@ -18,10 +18,12 @@ interface TripsProdutoData {
     [key: string]: any;
 }
 
-type Card = Database['public']['Tables']['cards']['Row']
-
 interface TaxaPlanejamentoCardProps {
-    card: Card
+    card: {
+        id: string | null
+        produto_data?: any
+        [key: string]: any
+    }
 }
 
 export default function TaxaPlanejamentoCard({ card }: TaxaPlanejamentoCardProps) {

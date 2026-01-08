@@ -28,8 +28,9 @@ export default function Login() {
             })
             if (error) throw error
             navigate('/dashboard')
-        } catch (err: any) {
-            setError(err.message || 'Erro na autenticação')
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Erro na autenticação';
+            setError(message)
         } finally {
             setLoading(false)
         }

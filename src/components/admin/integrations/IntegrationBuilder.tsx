@@ -95,7 +95,7 @@ export function IntegrationBuilder({ integrationId: initialId, initialType = 'in
             }
         };
         createDraft();
-    }, [initialId, initialType, onDraftCreated]);
+    }, [initialId, initialType, onDraftCreated, currentId]);
 
     // --- 2. Fetch Data ---
     useQuery({

@@ -81,6 +81,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
             if (prev !== targetMode) return targetMode
             return prev
         })
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [card.pipeline_stage_id, phases, stages])
 
     // Determine active section key based on viewMode
@@ -111,6 +112,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
         setEditedObs(activeData)
         setLastSavedObs(activeData)
         setIsDirty(false)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [activeData])
 
     // Fetch Field Configs

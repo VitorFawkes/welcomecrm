@@ -37,7 +37,7 @@ export default function ProposalBuilderModal({ cardId, isOpen, onClose }: Propos
         ])
     }
 
-    const updateItem = (id: string, field: keyof ProposalItem, value: any) => {
+    const updateItem = (id: string, field: keyof ProposalItem, value: unknown) => {
         setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item))
     }
 
@@ -57,6 +57,7 @@ export default function ProposalBuilderModal({ cardId, isOpen, onClose }: Propos
                 totalPrice
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error } = await (supabase.from('proposals') as any).insert({
                 card_id: cardId,
                 status,
@@ -69,6 +70,7 @@ export default function ProposalBuilderModal({ cardId, isOpen, onClose }: Propos
             if (error) throw error
 
             // Log activity
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (supabase.from('activities') as any).insert({
                 card_id: cardId,
                 tipo: status === 'sent' ? 'proposal_sent' : 'proposal_created',

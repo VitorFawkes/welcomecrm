@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Play } from 'lucide-react';
@@ -27,7 +27,7 @@ export function IntegrationInspector({ integrationId }: IntegrationInspectorProp
     const queryClient = useQueryClient();
     const [selectedEvent, setSelectedEvent] = useState<IntegrationEvent | null>(null);
 
-    const { data: events, isLoading } = useQuery({
+    const { data: events } = useQuery({
         queryKey: ['integration_events', integrationId],
         queryFn: async () => {
             const { data, error } = await supabase

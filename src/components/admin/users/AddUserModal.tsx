@@ -23,9 +23,13 @@ const ROLES = [
     { value: 'admin', label: 'Administrador' },
     { value: 'gestor', label: 'Gestor' },
     { value: 'vendas', label: 'Vendas' },
-    { value: 'operacional', label: 'Operacional' },
+    { value: 'sdr', label: 'SDR' },
+    { value: 'pos_venda', label: 'Pós-Venda' },
+    { value: 'concierge', label: 'Concierge' },
     { value: 'financeiro', label: 'Financeiro' }
-];
+] as const;
+
+type UserRole = typeof ROLES[number]['value'];
 
 export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
     const { user } = useAuth(); // Added useAuth hook
@@ -33,7 +37,7 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState('');
+    const [inviteRole, setInviteRole] = useState<UserRole | ''>('');
     const [inviteTeam, setInviteTeam] = useState('');
     const [generatedLink, setGeneratedLink] = useState('');
     const [copied, setCopied] = useState(false);
@@ -50,8 +54,8 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
 
             const { data: token, error } = await supabase.rpc('generate_invite', {
                 p_email: inviteEmail,
-                p_role: inviteRole,
-                p_team_id: inviteTeam || null,
+                p_role: inviteRole as any,
+                p_team_id: (inviteTeam || null) as any,
                 p_created_by: user.id
             });
 
@@ -61,9 +65,10 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
             setGeneratedLink(link);
             toast({ title: 'Convite gerado!', description: 'Copie o link abaixo.', type: 'success' });
             onSuccess();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            toast({ title: 'Erro', description: error.message || 'Falha ao gerar convite.', type: 'error' });
+            const message = error instanceof Error ? error.message : 'Falha ao gerar convite.';
+            toast({ title: 'Erro', description: message, type: 'error' });
         } finally {
             setIsLoading(false);
         }
@@ -105,7 +110,7 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
                             <Label>Papel (Role)</Label>
                             <Select
                                 value={inviteRole}
-                                onChange={setInviteRole}
+                                onChange={(val) => setInviteRole(val as UserRole)}
                                 options={ROLES.map(r => ({ value: r.value, label: r.label }))}
                             />
                         </div>

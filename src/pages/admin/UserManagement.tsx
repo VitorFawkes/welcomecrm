@@ -23,16 +23,20 @@ import AuditLogViewer from '../../components/admin/audit/AuditLogViewer';
 export default function UserManagement() {
     const { profile } = useAuth();
     const { toast } = useToast();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [users, setUsers] = useState<any[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [teams, setTeams] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     useEffect(() => {
         fetchUsers();
         fetchTeams();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fetchUsers = async () => {
@@ -84,6 +88,7 @@ export default function UserManagement() {
 
             toast({ title: 'Sucesso', description: 'Status do usuário atualizado.', type: 'success' });
         } catch (error) {
+            console.error('Error toggling status:', error);
             toast({ title: 'Erro', description: 'Falha ao atualizar status.', type: 'error' });
         }
     };

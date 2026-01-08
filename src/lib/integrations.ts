@@ -52,7 +52,7 @@ export const IntegrationConfigSchema = z.union([
 export type IntegrationConfig = z.infer<typeof IntegrationConfigSchema>;
 
 // --- Helper to validate config based on type ---
-export const validateConfig = (type: IntegrationType, config: any) => {
+export const validateConfig = (type: IntegrationType, config: unknown) => {
     if (type === 'input') {
         return InboundConfigSchema.safeParse(config);
     } else {

@@ -59,7 +59,7 @@ serve(async (req) => {
         // 3. Normalize Phone
         // ChatPro sends "number" as "5511999999999@s.whatsapp.net" or just "5511999999999"
         // We need to strip everything non-numeric.
-        const phoneToNormalize = fromMe ? participant : rawNumber; // If from_me, 'number' is the recipient, 'participant' is me (or vice versa depending on API version, usually 'number' is the remote party in ChatPro webhooks)
+        // If from_me, 'number' is the recipient, 'participant' is me (or vice versa depending on API version, usually 'number' is the remote party in ChatPro webhooks)
         // Actually, in ChatPro 'sent_message': 'number' is the destination. 'participant' is the sender (me).
         // In 'new_message' (inbound): 'number' is the sender.
 

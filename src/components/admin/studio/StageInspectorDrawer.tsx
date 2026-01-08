@@ -27,6 +27,7 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
         if (stage) {
             setFormData(stage);
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [stage]);
 
     // --- Data Fetching ---

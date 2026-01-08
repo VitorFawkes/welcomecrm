@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Download, Search, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -34,11 +34,9 @@ export function GroupRoomingList({ parentId }: RoomingListProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const navigate = useNavigate();
 
-    useEffect(() => {
-        fetchRoomingList();
-    }, [parentId]);
 
-    const fetchRoomingList = async () => {
+
+    const fetchRoomingList = useCallback(async () => {
         try {
             // Fetch all child cards and their linked contacts
             const { data, error } = await supabase
@@ -84,7 +82,11 @@ export function GroupRoomingList({ parentId }: RoomingListProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [parentId]);
+
+    useEffect(() => {
+        fetchRoomingList();
+    }, [fetchRoomingList]);
 
     const filteredItems = items.filter(item =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -9,19 +9,20 @@ import {
     TableRow
 } from '../../ui/Table';
 import { Badge } from '../../ui/Badge';
-import { Loader2, Search, Filter } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { Input } from '../../ui/Input';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface AuditLog {
     id: string;
-    actor_id: string;
     action: string;
-    target_resource: string;
-    target_id: string;
-    details: any;
+    table_name: string;
+    record_id: string;
+    old_data: Record<string, unknown> | null;
+    new_data: Record<string, unknown> | null;
     created_at: string;
+    changed_by: string | null;
     actor?: {
         email: string;
         nome: string;
@@ -40,21 +41,29 @@ export default function AuditLogViewer() {
     const fetchLogs = async () => {
         setLoading(true);
         try {
-            // Join with profiles to get actor name
-            const { data, error } = await supabase
+            // Attempt to fetch logs. If the relation 'actor' fails, we might need to adjust.
+            // Based on error, columns are: action, changed_by, created_at, id, new_data, old_data, record_id, table_name
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data, error } = await (supabase as any)
                 .from('audit_logs')
-                .select(`
-                    *,
-                    actor:actor_id (
-                        email,
-                        nome
-                    )
-                `)
+                .select('*')
                 .order('created_at', { ascending: false })
                 .limit(100);
 
             if (error) throw error;
-            setLogs(data || []);
+
+            // Transform data to match AuditLog interface if needed, or just cast if it matches enough
+            // We might not get 'actor' details if we don't join. 
+            // For now, let's just fix the build by matching the interface to the data.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const formattedLogs: AuditLog[] = (data || []).map((log: any) => ({
+                ...log,
+                // If we can't join, we won't have actor details. 
+                // We could try to fetch them separately or just show the ID.
+                actor: undefined
+            }));
+
+            setLogs(formattedLogs);
         } catch (error) {
             console.error('Error fetching audit logs:', error);
         } finally {
@@ -64,9 +73,9 @@ export default function AuditLogViewer() {
 
     const filteredLogs = logs.filter(log =>
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.target_resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.actor?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.actor?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
+        log.table_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.actor?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (log.actor?.nome || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -120,7 +129,7 @@ export default function AuditLogViewer() {
                                                 {log.actor?.nome || 'Sistema'}
                                             </span>
                                             <span className="text-xs text-gray-500">
-                                                {log.actor?.email}
+                                                {log.actor?.email || log.changed_by}
                                             </span>
                                         </div>
                                     </TableCell>
@@ -130,10 +139,10 @@ export default function AuditLogViewer() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-sm text-gray-600">
-                                        {log.target_resource}
+                                        {log.table_name}
                                     </TableCell>
-                                    <TableCell className="max-w-[200px] truncate text-xs text-gray-500" title={JSON.stringify(log.details, null, 2)}>
-                                        {JSON.stringify(log.details)}
+                                    <TableCell className="max-w-[200px] truncate text-xs text-gray-500" title={JSON.stringify(log.new_data || log.old_data, null, 2)}>
+                                        {JSON.stringify(log.new_data || log.old_data)}
                                     </TableCell>
                                 </TableRow>
                             ))

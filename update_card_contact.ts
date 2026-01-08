@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function updateCard() {
     // 1. Try to get a contact
-    let { data: contacts, error: contactError } = await supabase
+    const { data: contacts } = await supabase
         .from('contatos')
         .select('id, nome')
         .limit(1)
@@ -40,13 +40,13 @@ async function updateCard() {
 
     // 2. Update the card
     const cardId = 'e40f8070-5ab1-4ffb-a5b6-b259dd6a7e59'
-    const { error: updateError } = await supabase
+    const { error } = await supabase
         .from('cards')
         .update({ pessoa_principal_id: contactId })
         .eq('id', cardId)
 
-    if (updateError) {
-        console.error('Error updating card:', updateError)
+    if (error) {
+        console.error('Error updating card:', error)
     } else {
         console.log('Card updated successfully with primary contact:', contactId)
     }

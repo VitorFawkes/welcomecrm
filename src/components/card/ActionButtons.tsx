@@ -2,13 +2,16 @@ import { useState } from 'react'
 import { Mail, X, Send } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import type { Database } from '../../database.types'
+
 import ProposalBuilderModal from './ProposalBuilderModal'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row']
-
 interface ActionButtonsProps {
-    card: Card
+    card: {
+        id: string
+        pessoa_principal_id?: string | null
+        titulo?: string | null
+        [key: string]: any
+    }
 }
 
 export default function ActionButtons({ card }: ActionButtonsProps) {

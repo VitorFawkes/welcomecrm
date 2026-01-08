@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Webhook, Activity, ArrowRight, Zap } from 'lucide-react';
+import { Webhook, Activity, ArrowRight, Zap, Database } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/Badge';
@@ -43,7 +43,7 @@ const PROVIDERS: ProviderDef[] = [
     }
 ];
 
-export function IntegrationList({ onSelect }: { onSelect: (id: string | null, type?: 'input' | 'output') => void }) {
+export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: string | null, type?: 'input' | 'output') => void, onExploreFields: () => void }) {
     const { data: integrations, isLoading } = useQuery({
         queryKey: ['integrations'],
         queryFn: async () => {
@@ -80,6 +80,10 @@ export function IntegrationList({ onSelect }: { onSelect: (id: string | null, ty
                         Conecte suas ferramentas favoritas e automatize seu fluxo de trabalho.
                     </p>
                 </div>
+                <Button variant="outline" onClick={onExploreFields}>
+                    <Database className="w-4 h-4 mr-2" />
+                    Explorar Campos
+                </Button>
             </div>
 
             {/* Active Integrations Section */}

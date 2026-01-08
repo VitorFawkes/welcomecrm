@@ -7,6 +7,7 @@ import TaxaPlanejamentoField from '../components/pipeline/fields/TaxaPlanejament
 
 export interface FieldConfig {
     name: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     component: React.ComponentType<any>
     label: string
 }

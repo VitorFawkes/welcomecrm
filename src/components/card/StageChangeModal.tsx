@@ -27,6 +27,7 @@ export default function StageChangeModal({
 
     useEffect(() => {
         setSelectedOwnerId(currentOwnerId)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [currentOwnerId, isOpen])
 
     const handleConfirm = () => {

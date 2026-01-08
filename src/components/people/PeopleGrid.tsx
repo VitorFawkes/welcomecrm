@@ -21,11 +21,6 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
         }
     }
 
-    const SortIcon = ({ column }: { column: PeopleSort['column'] }) => {
-        if (sort.column !== column) return <ArrowUpDown className="h-3 w-3 text-gray-300" />
-        return <ArrowUpDown className={`h-3 w-3 ${sort.direction === 'asc' ? 'text-indigo-600' : 'text-indigo-600 rotate-180'}`} />
-    }
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -55,7 +50,7 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
                         >
                             <div className="flex items-center gap-2">
                                 Pessoa
-                                <SortIcon column="nome" />
+                                <ArrowUpDown className={`h-3 w-3 ${sort.column === 'nome' ? (sort.direction === 'asc' ? 'text-indigo-600' : 'text-indigo-600 rotate-180') : 'text-gray-300'}`} />
                             </div>
                         </th>
                         <th className="px-6 py-4">Contato</th>
@@ -65,7 +60,7 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
                         >
                             <div className="flex items-center justify-end gap-2">
                                 Valor Total
-                                <SortIcon column="total_spend" />
+                                <ArrowUpDown className={`h-3 w-3 ${sort.column === 'total_spend' ? (sort.direction === 'asc' ? 'text-indigo-600' : 'text-indigo-600 rotate-180') : 'text-gray-300'}`} />
                             </div>
                         </th>
                         <th
@@ -74,7 +69,7 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
                         >
                             <div className="flex items-center justify-center gap-2">
                                 Viagens
-                                <SortIcon column="total_trips" />
+                                <ArrowUpDown className={`h-3 w-3 ${sort.column === 'total_trips' ? (sort.direction === 'asc' ? 'text-indigo-600' : 'text-indigo-600 rotate-180') : 'text-gray-300'}`} />
                             </div>
                         </th>
                         <th
@@ -83,7 +78,7 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
                         >
                             <div className="flex items-center gap-2">
                                 Última Viagem
-                                <SortIcon column="last_trip_date" />
+                                <ArrowUpDown className={`h-3 w-3 ${sort.column === 'last_trip_date' ? (sort.direction === 'asc' ? 'text-indigo-600' : 'text-indigo-600 rotate-180') : 'text-gray-300'}`} />
                             </div>
                         </th>
                     </tr>

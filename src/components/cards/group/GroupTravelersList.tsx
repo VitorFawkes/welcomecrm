@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import { ExternalLink, Plus, Search, Filter, Unlink } from 'lucide-react';
@@ -28,11 +28,9 @@ export function GroupTravelersList({ parentId }: GroupTravelersListProps) {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
-    useEffect(() => {
-        fetchChildren();
-    }, [parentId]);
 
-    const fetchChildren = async () => {
+
+    const fetchChildren = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('cards')
@@ -47,7 +45,11 @@ export function GroupTravelersList({ parentId }: GroupTravelersListProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [parentId]);
+
+    useEffect(() => {
+        fetchChildren();
+    }, [fetchChildren]);
 
     const filteredChildren = children.filter(child =>
         child.titulo?.toLowerCase().includes(searchTerm.toLowerCase())

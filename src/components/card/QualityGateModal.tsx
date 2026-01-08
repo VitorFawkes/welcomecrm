@@ -55,7 +55,7 @@ export default function QualityGateModal({
             // Or we can use jsonb_set in SQL, but supabase js client does simple updates.
             // Let's fetch current card first.
 
-            let finalUpdates = { ...topLevelUpdates }
+            const finalUpdates = { ...topLevelUpdates }
 
             if (Object.keys(produtoDataUpdates).length > 0) {
                 const { data: card } = await supabase.from('cards').select('produto_data').eq('id', cardId).single()

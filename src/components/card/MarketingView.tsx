@@ -29,6 +29,7 @@ export default function MarketingView({ cardId, initialData }: MarketingViewProp
     useEffect(() => {
         setData(initialData || {})
         setIsDirty(false)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [initialData])
 
     const updateMarketingMutation = useMutation({

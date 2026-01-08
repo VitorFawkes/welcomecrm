@@ -82,6 +82,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     useEffect(() => {
         setEditedTitle(card.titulo || '')
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [card.titulo])
 
     // Fetch active change requests
@@ -114,8 +115,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
 
         // 2. Task Status Logic
-        if (card.proxima_tarefa) {
-            const task = card.proxima_tarefa as any
+        if ((card as any).proxima_tarefa) {
+            const task = (card as any).proxima_tarefa as any
             if (task.data_vencimento) {
                 const today = new Date()
                 today.setHours(0, 0, 0, 0)
