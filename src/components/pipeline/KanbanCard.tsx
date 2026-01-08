@@ -9,16 +9,6 @@ import { supabase } from '../../lib/supabase'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row'] & {
     group_total_pax?: number | null
-    is_group_parent?: boolean | null
-    urgencia_tempo_etapa?: number | null
-    tempo_etapa_dias?: number | null
-    tarefas_pendentes?: number | null
-    prioridade?: string | null
-    proxima_tarefa?: Record<string, unknown> | null
-    ultima_interacao?: Record<string, unknown> | null
-    produto_data?: Record<string, unknown> | null
-    briefing_inicial?: Record<string, unknown> | null
-    dono_atual_nome?: string | null
     parent_card_title?: string | null
 }
 
