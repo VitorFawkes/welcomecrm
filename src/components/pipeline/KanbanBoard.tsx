@@ -209,17 +209,20 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         },
         onMutate: ({ cardId, stageId }) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-            queryClient.cancelQueries({ queryKey: ['cards', productFilter, viewMode, subView] })
+            // MUST match the exact key used in useQuery, including all filters
+            const queryKey = ['cards', productFilter, viewMode, subView, filters, groupFilters]
+
+            queryClient.cancelQueries({ queryKey })
 
             // Snapshot the previous value
-            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView])
+            const previousCards = queryClient.getQueryData<Card[]>(queryKey)
 
             // Find new stage info for complete update
             const newStage = stages?.find(s => s.id === stageId)
 
             // Optimistically update to the new value
             if (previousCards) {
-                queryClient.setQueryData<Card[]>(['cards', productFilter, viewMode, subView], (old) => {
+                queryClient.setQueryData<Card[]>(queryKey, (old) => {
                     if (!old) return []
                     return old.map((card) => {
                         if (card.id === cardId) {
@@ -236,12 +239,12 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             }
 
             // Return a context object with the snapshotted value
-            return { previousCards }
+            return { previousCards, queryKey }
         },
         onError: (_err, _variables, context) => {
             // If the mutation fails, use the context returned from onMutate to roll back
             if (context?.previousCards) {
-                queryClient.setQueryData(['cards', productFilter, viewMode, subView], context.previousCards)
+                queryClient.setQueryData(context.queryKey, context.previousCards)
             }
         },
         onSuccess: () => {
