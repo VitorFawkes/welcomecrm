@@ -20,10 +20,10 @@ export default function SettingsSidebar() {
     const isAdmin = true;
 
     return (
-        <aside className="w-64 flex flex-col h-full border-r border-gray-200/40 bg-white/40 backdrop-blur-md">
+        <aside className="w-64 flex flex-col h-full border-r border-border bg-background">
             {/* Header - Minimal & Clean - NO LOGO HERE */}
             <div className="px-6 py-8">
-                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Configurações</h2>
+                <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Configurações</h2>
             </div>
 
             <nav className="flex-1 overflow-y-auto px-3 space-y-8">
@@ -35,13 +35,13 @@ export default function SettingsSidebar() {
                             className={({ isActive }) => cn(
                                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                 isActive
-                                    ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                    : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                    ? "bg-primary/10 text-primary shadow-sm"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             )}
                         >
                             {({ isActive }) => (
                                 <>
-                                    <User className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                    <User className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                     Perfil
                                 </>
                             )}
@@ -52,7 +52,7 @@ export default function SettingsSidebar() {
                 {/* Sistema (Admin) */}
                 {isAdmin && (
                     <div>
-                        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-3 mt-6">
+                        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-3 mt-6">
                             Sistema
                         </h3>
                         <div className="space-y-0.5">
@@ -61,13 +61,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <UsersIcon className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <UsersIcon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         Gestão de Equipe
                                     </>
                                 )}
@@ -77,13 +77,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <Database className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <Database className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         Governança de Dados
                                     </>
                                 )}
@@ -93,13 +93,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <Kanban className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <Kanban className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         Pipeline de Vendas
                                     </>
                                 )}
@@ -109,13 +109,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <LayoutList className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <LayoutList className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         Cards & Visualização
                                     </>
                                 )}
@@ -125,13 +125,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <Tags className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <Tags className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         Categorias & Tags
                                     </>
                                 )}
@@ -141,13 +141,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <Webhook className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <Webhook className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         Integrações
                                     </>
                                 )}
@@ -157,13 +157,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <MessageSquare className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <MessageSquare className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         WhatsApp
                                     </>
                                 )}
@@ -173,13 +173,13 @@ export default function SettingsSidebar() {
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
-                                        : "text-gray-500 hover:bg-white/50 hover:text-gray-900"
+                                        ? "bg-primary/10 text-primary shadow-sm"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <Activity className={cn("w-4 h-4", isActive ? "text-primary" : "text-gray-400")} />
+                                        <Activity className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
                                         Saúde do Sistema
                                     </>
                                 )}

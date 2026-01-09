@@ -80,7 +80,7 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                         Conecte suas ferramentas favoritas e automatize seu fluxo de trabalho.
                     </p>
                 </div>
-                <Button variant="outline" onClick={onExploreFields}>
+                <Button variant="outline" onClick={onExploreFields} className="border-border text-foreground hover:bg-muted hover:text-foreground">
                     <Database className="w-4 h-4 mr-2" />
                     Explorar Campos
                 </Button>
@@ -97,7 +97,7 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                         {activeIntegrations.map((integration) => (
                             <Card
                                 key={integration.id}
-                                className="bg-card hover:border-primary/50 transition-all cursor-pointer group shadow-sm border-l-4 border-l-primary"
+                                className="bg-card border-border hover:border-primary/50 transition-all cursor-pointer group shadow-sm border-l-4 border-l-primary"
                                 onClick={() => onSelect(integration.id)}
                             >
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -125,7 +125,7 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                                 <CardContent>
                                     <div className="flex justify-between items-center mt-2">
                                         <span className="text-xs text-muted-foreground">Última sincronização: Hoje, 10:42</span>
-                                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 group-hover:text-primary transition-all" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -140,7 +140,7 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                     <h3 className="text-xl font-semibold text-foreground">Catálogo de Apps</h3>
                     <div className="flex gap-2">
                         {['Todos', 'Marketing', 'Finance', 'Developer'].map((cat) => (
-                            <Button key={cat} variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                            <Button key={cat} variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted">
                                 {cat}
                             </Button>
                         ))}
@@ -151,27 +151,27 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                     {PROVIDERS.map((provider) => (
                         <Card
                             key={provider.id}
-                            className="group hover:shadow-lg transition-all duration-300 border-border/50 bg-gradient-to-br from-card to-card/50 hover:from-card hover:to-primary/5"
+                            className="group hover:shadow-lg transition-all duration-300 border-border bg-card hover:bg-muted/50"
                         >
                             <CardHeader>
                                 <div className="flex justify-between items-start mb-2">
-                                    <div className="p-3 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
+                                    <div className="p-3 bg-muted rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
                                         <provider.icon className="w-8 h-8 text-foreground" />
                                     </div>
-                                    <Badge variant="outline" className="text-xs font-normal">
+                                    <Badge variant="outline" className="text-xs font-normal text-muted-foreground border-border">
                                         {provider.category}
                                     </Badge>
                                 </div>
                                 <CardTitle className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
                                     {provider.name}
                                 </CardTitle>
-                                <CardDescription className="line-clamp-2 h-10">
+                                <CardDescription className="line-clamp-2 h-10 text-muted-foreground">
                                     {provider.description}
                                 </CardDescription>
                             </CardHeader>
                             <CardFooter>
                                 <Button
-                                    className="w-full bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+                                    className="w-full bg-muted text-foreground hover:bg-primary hover:text-primary-foreground transition-colors border border-border"
                                     onClick={() => onSelect('new', provider.type)}
                                 >
                                     Conectar

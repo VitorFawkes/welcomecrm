@@ -115,7 +115,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                 <DrawerClose onClick={onClose} />
                 <DrawerHeader>
                     <DrawerTitle>{isCreating ? 'Novo Campo' : 'Editar Campo'}</DrawerTitle>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         {isCreating ? 'Defina as propriedades do novo campo.' : `Ajustando configurações de "${formData.label}"`}
                     </p>
                 </DrawerHeader>
@@ -124,9 +124,9 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                     <div className="space-y-8">
 
                         {/* LIVE PREVIEW SECTION */}
-                        <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-200/60 shadow-sm">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <div className="bg-muted/50 p-4 rounded-xl border border-border shadow-sm">
+                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                 Live Preview (Como aparecerá no Card)
                             </h4>
 
@@ -178,9 +178,9 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                 if (formData.section === 'observacoes_criticas') {
                                     // Important Info Layout: Label + Input (Edit Mode)
                                     return (
-                                        <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                                            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
+                                            <label className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
                                                 {formData.label || 'Nome do Campo'}
                                             </label>
                                             <UniversalFieldRenderer
@@ -194,7 +194,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                 } else {
                                     // Trip Info Layout: Card Display Mode
                                     return (
-                                        <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                                        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
                                             <UniversalFieldRenderer
                                                 field={previewField}
                                                 value={previewValue}
@@ -254,8 +254,8 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
 
                         {/* Options Manager */}
                         {showOptionsManager && (
-                            <div className="border-t pt-6">
-                                <h4 className="font-medium text-gray-900 mb-4">Opções de Seleção</h4>
+                            <div className="border-t border-border pt-6">
+                                <h4 className="font-medium text-foreground mb-4">Opções de Seleção</h4>
 
                                 <div className="flex gap-2 mb-2">
                                     <Input
@@ -282,25 +282,25 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                     </Button>
                                 </div>
                                 {optionError && (
-                                    <p className="text-xs text-red-500 flex items-center gap-1 mb-3">
+                                    <p className="text-xs text-destructive flex items-center gap-1 mb-3">
                                         <AlertCircle className="h-3 w-3" /> {optionError}
                                     </p>
                                 )}
 
-                                <div className="space-y-2 bg-gray-50 p-3 rounded-lg min-h-[100px]">
+                                <div className="space-y-2 bg-muted p-3 rounded-lg min-h-[100px]">
                                     {options.length === 0 && (
-                                        <p className="text-sm text-gray-400 text-center py-4">Nenhuma opção definida.</p>
+                                        <p className="text-sm text-muted-foreground text-center py-4">Nenhuma opção definida.</p>
                                     )}
                                     {options.map((opt, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded border border-gray-200 shadow-sm group">
-                                            <GripVertical className="w-4 h-4 text-gray-300 cursor-move" />
+                                        <div key={idx} className="flex items-center gap-2 bg-card p-2 rounded border border-border shadow-sm group">
+                                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-move" />
 
                                             {/* Color Picker */}
                                             <div className="relative group/color">
-                                                <div className={cn("w-4 h-4 rounded-full cursor-pointer border border-gray-200",
+                                                <div className={cn("w-4 h-4 rounded-full cursor-pointer border border-border",
                                                     COLORS.find(c => c.value === (opt.color || 'gray'))?.bg || 'bg-gray-100'
                                                 )} />
-                                                <div className="absolute left-0 top-6 bg-white border shadow-lg rounded p-1 z-10 hidden group-hover/color:flex gap-1">
+                                                <div className="absolute left-0 top-6 bg-card border border-border shadow-lg rounded p-1 z-10 hidden group-hover/color:flex gap-1">
                                                     {COLORS.map(c => (
                                                         <button
                                                             type="button"
@@ -312,13 +312,13 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                                 </div>
                                             </div>
 
-                                            <span className="text-sm font-medium flex-1">{opt.label}</span>
-                                            <span className="text-xs text-gray-400 font-mono">{opt.value}</span>
+                                            <span className="text-sm font-medium flex-1 text-foreground">{opt.label}</span>
+                                            <span className="text-xs text-muted-foreground font-mono">{opt.value}</span>
 
                                             <button
                                                 type="button"
                                                 onClick={() => removeOption(idx)}
-                                                className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -330,8 +330,8 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                     </div>
                 </div>
 
-                <DrawerFooter className="border-t bg-white">
-                    <Button onClick={handleSave} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+                <DrawerFooter className="border-t border-border bg-card">
+                    <Button onClick={handleSave} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                         {isCreating ? 'Criar Campo' : 'Salvar Alterações'}
                     </Button>
                 </DrawerFooter>

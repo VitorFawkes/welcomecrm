@@ -122,11 +122,11 @@ export default function WhatsAppGovernance() {
         <div className="p-8 space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <MessageSquare className="w-6 h-6 text-green-600" />
+                    <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                        <MessageSquare className="w-6 h-6 text-emerald-600" />
                         Governança WhatsApp
                     </h1>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-muted-foreground mt-1">
                         Configure como o CRM lida com mensagens e automações do WhatsApp.
                     </p>
                 </div>
@@ -150,12 +150,12 @@ export default function WhatsAppGovernance() {
                     </CardHeader>
                     <CardContent className="space-y-6">
 
-                        <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50 border-border">
                             <div className="space-y-0.5">
-                                <label className="text-base font-medium text-gray-900">
+                                <label className="text-base font-medium text-foreground">
                                     Criação Automática
                                 </label>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-muted-foreground">
                                     Criar automaticamente um novo Contato e Lead quando receber mensagem de um número desconhecido.
                                 </p>
                             </div>
@@ -168,7 +168,7 @@ export default function WhatsAppGovernance() {
                         {config.auto_create_leads && (
                             <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Pipeline Padrão</label>
+                                    <label className="text-sm font-medium text-foreground">Pipeline Padrão</label>
                                     <Select
                                         value={config.default_pipeline_id || ''}
                                         onChange={(val) => setConfig({ ...config, default_pipeline_id: val, default_stage_id: null })}
@@ -179,7 +179,7 @@ export default function WhatsAppGovernance() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Etapa Inicial</label>
+                                    <label className="text-sm font-medium text-foreground">Etapa Inicial</label>
                                     <Select
                                         value={config.default_stage_id || ''}
                                         onChange={(val) => setConfig({ ...config, default_stage_id: val })}
@@ -211,7 +211,7 @@ export default function WhatsAppGovernance() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="p-4 border border-dashed rounded-lg text-center text-gray-400">
+                        <div className="p-4 border border-dashed rounded-lg text-center text-muted-foreground border-border">
                             Configurações de IA estarão disponíveis na próxima atualização.
                         </div>
                     </CardContent>

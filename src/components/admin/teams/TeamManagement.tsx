@@ -116,13 +116,13 @@ export function TeamManagement() {
     return (
         <div className="space-y-6">
             {/* Header / Actions */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex justify-between items-center bg-card p-4 rounded-lg border border-border shadow-sm">
                 <div>
-                    <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                        <FolderTree className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                        <FolderTree className="w-5 h-5 text-primary" />
                         Estrutura Organizacional
                     </h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         Gerencie departamentos, times e alocação de pessoas.
                     </p>
                 </div>
@@ -132,22 +132,22 @@ export function TeamManagement() {
             {/* Hierarchy Tree */}
             <div className="space-y-4">
                 {hierarchy?.map((dept) => (
-                    <div key={dept.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                    <div key={dept.id} className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
                         {/* Department Header */}
                         <div
-                            className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                            className="flex items-center justify-between p-4 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => toggleDept(dept.id)}
                         >
                             <div className="flex items-center gap-3">
                                 {expandedDepts.has(dept.id) ? (
-                                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
                                 ) : (
-                                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
                                 )}
                                 <div className="flex items-center gap-2">
-                                    <LayoutGrid className="w-5 h-5 text-gray-500" />
-                                    <span className="font-semibold text-gray-900">{dept.name}</span>
-                                    <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                                    <LayoutGrid className="w-5 h-5 text-muted-foreground" />
+                                    <span className="font-semibold text-foreground">{dept.name}</span>
+                                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
                                         {dept.teams.length} times
                                     </span>
                                 </div>
@@ -156,32 +156,32 @@ export function TeamManagement() {
 
                         {/* Teams List */}
                         {expandedDepts.has(dept.id) && (
-                            <div className="divide-y divide-gray-100 border-t border-gray-100">
+                            <div className="divide-y divide-border border-t border-border">
                                 {dept.teams.length === 0 ? (
-                                    <div className="p-8 text-center text-gray-400 text-sm italic">
+                                    <div className="p-8 text-center text-muted-foreground text-sm italic">
                                         Nenhum time criado neste departamento.
                                     </div>
                                 ) : (
                                     dept.teams.map((team) => (
-                                        <div key={team.id} className="p-4 hover:bg-gray-50 transition-colors group">
+                                        <div key={team.id} className="p-4 hover:bg-muted/30 transition-colors group">
                                             <div className="flex items-start justify-between">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <Users className="w-4 h-4 text-blue-500" />
-                                                        <h4 className="font-medium text-gray-900">{team.name}</h4>
+                                                        <Users className="w-4 h-4 text-primary" />
+                                                        <h4 className="font-medium text-foreground">{team.name}</h4>
                                                     </div>
                                                     {team.description && (
-                                                        <p className="text-sm text-gray-500 mb-3">{team.description}</p>
+                                                        <p className="text-sm text-muted-foreground mb-3">{team.description}</p>
                                                     )}
 
                                                     {/* Members Chips */}
                                                     <div className="flex flex-wrap gap-2 mt-2">
                                                         {team.members.length === 0 ? (
-                                                            <span className="text-xs text-gray-400 italic">Sem membros</span>
+                                                            <span className="text-xs text-muted-foreground italic">Sem membros</span>
                                                         ) : (
                                                             team.members.map(member => (
-                                                                <div key={member.id} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs border border-blue-100">
-                                                                    <div className="w-4 h-4 rounded-full bg-blue-200 flex items-center justify-center text-[10px] font-bold">
+                                                                <div key={member.id} className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-md text-xs border border-primary/20">
+                                                                    <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold">
                                                                         {member.nome?.charAt(0).toUpperCase()}
                                                                     </div>
                                                                     {member.nome}
@@ -200,7 +200,7 @@ export function TeamManagement() {
                                                         handleEditClick(team);
                                                     }}
                                                 >
-                                                    <Pencil className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+                                                    <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
                                                 </Button>
                                             </div>
                                         </div>

@@ -105,7 +105,7 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
             {/* Header */}
             <div className="flex items-center justify-between print:hidden">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-gray-900">
+                    <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-foreground">
                         <Database className="w-6 h-6 text-primary" />
                         Central de Integração
                     </h2>
@@ -115,25 +115,25 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                 </div>
                 <div className="flex gap-2">
                     {activeTab === 'docs' && (
-                        <Button variant="outline" onClick={handlePrint}>
+                        <Button variant="outline" onClick={handlePrint} className="border-border text-foreground hover:bg-muted hover:text-foreground">
                             <Printer className="w-4 h-4 mr-2" />
                             Imprimir / PDF
                         </Button>
                     )}
-                    <Button variant="outline" onClick={onBack}>
+                    <Button variant="outline" onClick={onBack} className="border-border text-foreground hover:bg-muted hover:text-foreground">
                         Voltar
                     </Button>
                 </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0">
-                <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-4 print:hidden">
-                    <TabsList>
-                        <TabsTrigger value="explorer" className="gap-2">
+                <div className="flex items-center justify-between border-b border-border pb-2 mb-4 print:hidden">
+                    <TabsList className="bg-card border border-border">
+                        <TabsTrigger value="explorer" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground text-muted-foreground">
                             <Search className="w-4 h-4" />
                             Explorador Rápido
                         </TabsTrigger>
-                        <TabsTrigger value="docs" className="gap-2">
+                        <TabsTrigger value="docs" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground text-muted-foreground">
                             <BookOpen className="w-4 h-4" />
                             Documentação Técnica
                         </TabsTrigger>
@@ -146,7 +146,7 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                                 placeholder="Buscar campos..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="pl-10 h-9 bg-white border-gray-200"
+                                className="pl-10 h-9 bg-card border-border text-foreground placeholder:text-muted-foreground focus:bg-muted/50"
                             />
                         </div>
                     )}
@@ -156,43 +156,43 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                 <TabsContent value="explorer" className="flex-1 min-h-0">
                     <ScrollArea className="h-full pr-4">
                         {isLoading ? (
-                            <div className="text-center py-10 text-muted-foreground">Carregando campos...</div>
+                            <div className="text-center py-10 text-slate-400">Carregando campos...</div>
                         ) : (
                             <div className="space-y-8 pb-10">
                                 {Object.entries(filteredSections).map(([section, sectionFields]) => (
                                     <div key={section} className="space-y-3">
-                                        <div className="flex items-center gap-2 pb-2 border-b border-gray-200 sticky top-0 bg-gray-50/95 backdrop-blur z-10 py-2">
+                                        <div className="flex items-center gap-2 pb-2 border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10 py-2">
                                             <Layers className="w-4 h-4 text-primary" />
-                                            <h3 className="text-lg font-semibold text-gray-900">
+                                            <h3 className="text-lg font-semibold text-foreground">
                                                 {section}
                                             </h3>
-                                            <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+                                            <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">
                                                 {sectionFields.length}
                                             </Badge>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {sectionFields.map((field) => (
-                                                <Card key={field.key} className="bg-white border-gray-200 shadow-sm hover:shadow-md transition-all group">
+                                                <Card key={field.key} className="bg-card border-border shadow-none hover:bg-muted/50 transition-all group">
                                                     <CardContent className="p-4 space-y-3">
                                                         <div className="flex justify-between items-start">
                                                             <div>
-                                                                <h4 className="font-medium text-sm text-gray-900">{field.label}</h4>
+                                                                <h4 className="font-medium text-sm text-foreground">{field.label}</h4>
                                                                 <div className="flex items-center gap-1 mt-1">
-                                                                    <code className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600 font-mono border border-gray-200">
+                                                                    <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-primary font-mono border border-border">
                                                                         {field.key}
                                                                     </code>
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
+                                                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
                                                                         onClick={() => copyToClipboard(field.key)}
                                                                     >
                                                                         <Copy className="w-3 h-3" />
                                                                     </Button>
                                                                 </div>
                                                             </div>
-                                                            <Badge variant="outline" className="text-[10px] h-5 border-gray-200 text-gray-500">
+                                                            <Badge variant="outline" className="text-[10px] h-5 border-border text-muted-foreground">
                                                                 {field.type}
                                                             </Badge>
                                                         </div>
@@ -208,21 +208,21 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                 </TabsContent>
 
                 {/* --- DOCS TAB --- */}
-                <TabsContent value="docs" className="flex-1 min-h-0 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                <TabsContent value="docs" className="flex-1 min-h-0 bg-card rounded-lg border border-border shadow-none overflow-hidden backdrop-blur-xl">
                     <ScrollArea className="h-full">
                         <div className="p-8 max-w-4xl mx-auto space-y-10 print:p-0 print:shadow-none print:border-none">
 
                             {/* Docs Header */}
-                            <div className="space-y-4 border-b border-gray-200 pb-8">
-                                <h1 className="text-4xl font-bold text-gray-900">Documentação de Integração</h1>
-                                <p className="text-lg text-gray-600 leading-relaxed">
+                            <div className="space-y-4 border-b border-border pb-8">
+                                <h1 className="text-4xl font-bold text-foreground">Documentação de Integração</h1>
+                                <p className="text-lg text-muted-foreground leading-relaxed">
                                     Este guia descreve a estrutura de dados do CRM para desenvolvedores e integradores.
                                     Utilize as chaves abaixo para mapear campos em Webhooks de Entrada (Typeform, WordPress)
                                     ou para configurar Disparos de Saída (Zapier, n8n).
                                 </p>
                                 <div className="flex gap-4 pt-2">
-                                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg flex-1">
-                                        <h3 className="font-semibold text-blue-900 mb-1 flex items-center gap-2">
+                                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex-1">
+                                        <h3 className="font-semibold text-blue-600 mb-1 flex items-center gap-2">
                                             <Code className="w-4 h-4" /> Formato JSON
                                         </h3>
                                         <p className="text-sm text-blue-700">
@@ -233,47 +233,43 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                                 </div>
                             </div>
 
-
-
-
-
                             {/* Kanban Stages Section */}
                             <div className="break-inside-avoid">
-                                <h3 className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+                                <h3 className="text-2xl font-bold text-foreground mb-4 pb-2 border-b border-border">
                                     Pipeline & Estágios (Kanban)
                                 </h3>
-                                <p className="text-gray-600 mb-4">
+                                <p className="text-muted-foreground mb-4">
                                     Utilize os IDs abaixo para mover cards entre as etapas do funil via API.
                                 </p>
-                                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                <div className="border border-border rounded-lg overflow-hidden">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-gray-50 text-gray-700 font-semibold border-b border-gray-200">
+                                        <thead className="bg-muted/50 text-muted-foreground font-semibold border-b border-border">
                                             <tr>
                                                 <th className="px-4 py-3 w-1/3">Nome da Etapa</th>
                                                 <th className="px-4 py-3 w-1/3">ID da Etapa (Código)</th>
                                                 <th className="px-4 py-3">Pipeline</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100 bg-white">
+                                        <tbody className="divide-y divide-border bg-transparent">
                                             {kanbanStages?.map((stage) => (
-                                                <tr key={stage.id} className="hover:bg-gray-50/50">
-                                                    <td className="px-4 py-3 font-medium text-gray-900">
+                                                <tr key={stage.id} className="hover:bg-muted/50">
+                                                    <td className="px-4 py-3 font-medium text-foreground">
                                                         {stage.nome}
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <code className="text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-mono border border-indigo-100 flex items-center justify-between w-fit gap-2">
+                                                        <code className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded font-mono border border-primary/20 flex items-center justify-between w-fit gap-2">
                                                             {stage.id}
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
-                                                                className="h-4 w-4 text-indigo-400 hover:text-indigo-700 p-0"
+                                                                className="h-4 w-4 text-primary hover:text-primary/80 p-0"
                                                                 onClick={() => copyToClipboard(stage.id)}
                                                             >
                                                                 <Copy className="w-3 h-3" />
                                                             </Button>
                                                         </code>
                                                     </td>
-                                                    <td className="px-4 py-3 text-gray-500 text-xs">
+                                                    <td className="px-4 py-3 text-muted-foreground text-xs">
                                                         {stage.pipeline_id}
                                                     </td>
                                                 </tr>
@@ -287,24 +283,24 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                             <div className="space-y-8">
                                 {Object.entries(groupedFields).map(([section, sectionFields]) => (
                                     <div key={section} className="break-inside-avoid">
-                                        <h3 className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+                                        <h3 className="text-2xl font-bold text-foreground mb-4 pb-2 border-b border-border">
                                             {section}
                                         </h3>
-                                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                        <div className="border border-border rounded-lg overflow-hidden">
                                             <table className="w-full text-sm text-left">
-                                                <thead className="bg-gray-50 text-gray-700 font-semibold border-b border-gray-200">
+                                                <thead className="bg-muted/50 text-muted-foreground font-semibold border-b border-border">
                                                     <tr>
                                                         <th className="px-4 py-3 w-1/4">Campo / Chave</th>
                                                         <th className="px-4 py-3 w-1/6">Tipo</th>
                                                         <th className="px-4 py-3">Descrição & Exemplo</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-gray-100 bg-white">
+                                                <tbody className="divide-y divide-border bg-transparent">
                                                     {sectionFields.map((field) => (
-                                                        <tr key={field.key} className="hover:bg-gray-50/50">
+                                                        <tr key={field.key} className="hover:bg-muted/50">
                                                             <td className="px-4 py-3 align-top">
-                                                                <div className="font-medium text-gray-900">{field.label}</div>
-                                                                <code className="text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded mt-1 inline-block font-mono border border-indigo-100">
+                                                                <div className="font-medium text-foreground">{field.label}</div>
+                                                                <code className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded mt-1 inline-block font-mono border border-primary/20">
                                                                     {field.key}
                                                                 </code>
                                                                 {field.required && (
@@ -312,13 +308,13 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                                                                 )}
                                                             </td>
                                                             <td className="px-4 py-3 align-top">
-                                                                <Badge variant="outline" className="font-mono text-xs text-gray-500">
+                                                                <Badge variant="outline" className="font-mono text-xs text-muted-foreground border-border">
                                                                     {field.type}
                                                                 </Badge>
                                                             </td>
-                                                            <td className="px-4 py-3 align-top text-gray-600">
+                                                            <td className="px-4 py-3 align-top text-muted-foreground">
                                                                 <p className="mb-1">{field.description}</p>
-                                                                <div className="text-xs text-gray-400 font-mono bg-gray-50 p-1.5 rounded border border-gray-100 inline-block">
+                                                                <div className="text-xs text-muted-foreground font-mono bg-muted/50 p-1.5 rounded border border-border inline-block">
                                                                     Ex: {field.example}
                                                                 </div>
                                                             </td>
@@ -331,7 +327,7 @@ export function IntegrationFieldExplorer({ onBack }: { onBack: () => void }) {
                                 ))}
                             </div>
 
-                            <div className="pt-10 border-t border-gray-200 text-center text-sm text-gray-400">
+                            <div className="pt-10 border-t border-border text-center text-sm text-muted-foreground">
                                 <p>Gerado automaticamente pelo WelcomeCRM • {new Date().toLocaleDateString()}</p>
                             </div>
                         </div>

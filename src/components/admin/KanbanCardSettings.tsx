@@ -55,22 +55,22 @@ export default function KanbanCardSettings() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div>
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-indigo-100 rounded-lg">
-                            <LayoutList className="w-6 h-6 text-indigo-600" />
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                            <LayoutList className="w-6 h-6 text-primary" />
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900">Configuração de Cards Kanban</h2>
+                        <h2 className="text-2xl font-bold text-foreground">Configuração de Cards Kanban</h2>
                     </div>
-                    <p className="text-gray-500">Gerencie quais informações aparecem nos cards do funil e a ordem de exibição.</p>
+                    <p className="text-muted-foreground">Gerencie quais informações aparecem nos cards do funil e a ordem de exibição.</p>
                 </div>
 
-                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 self-start sm:self-auto">
+                <div className="flex bg-muted p-1 rounded-lg border border-border self-start sm:self-auto">
                     <button
                         onClick={() => setViewMode('grid')}
                         className={cn(
                             "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
                             viewMode === 'grid'
-                                ? "bg-white text-indigo-600 shadow-sm"
-                                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                                ? "bg-background text-primary shadow-sm"
+                                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                         )}
                     >
                         <Grid3X3 className="w-4 h-4" />
@@ -81,8 +81,8 @@ export default function KanbanCardSettings() {
                         className={cn(
                             "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
                             viewMode === 'sequencer'
-                                ? "bg-white text-indigo-600 shadow-sm"
-                                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                                ? "bg-background text-primary shadow-sm"
+                                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                         )}
                     >
                         <ArrowUpDown className="w-4 h-4" />
@@ -92,7 +92,7 @@ export default function KanbanCardSettings() {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden p-6">
+            <div className="flex-1 bg-card rounded-xl border border-border shadow-sm overflow-hidden p-6">
                 {viewMode === 'grid' ? (
                     <KanbanGrid
                         phases={phases || []}

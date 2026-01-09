@@ -7,10 +7,7 @@ import type { Database } from '../../database.types'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 
-type Card = Database['public']['Views']['view_cards_acoes']['Row'] & {
-    group_total_pax?: number | null
-    parent_card_title?: string | null
-}
+type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
 interface KanbanCardProps {
     card: Card
@@ -65,7 +62,6 @@ export default function KanbanCard({ card }: KanbanCardProps) {
 
             // Fallback: fetch by fase name
             if (card.fase) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const { data: settingsByFase } = await (supabase.from('pipeline_card_settings') as any)
                     .select('campos_kanban, ordem_kanban')
                     .eq('fase', card.fase)
@@ -89,7 +85,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 .select('*')
                 .eq('active', true)
             if (error) throw error
-            return data as Record<string, unknown>[]
+            return data as any[]
         },
         staleTime: 1000 * 60 * 5 // 5 minutes
     })
@@ -97,7 +93,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
     const renderDynamicField = (fieldId: string) => {
         // 1. Handle Special/Complex Fields (Legacy Custom UI)
         switch (fieldId) {
-            case 'prioridade': {
+            case 'prioridade':
                 if (!card.prioridade) return null
                 const priorityColors: Record<string, string> = {
                     alta: 'text-red-700 bg-red-50',
@@ -116,10 +112,9 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
-            }
-            case 'proxima_tarefa': {
+            case 'proxima_tarefa':
                 if (!card.proxima_tarefa) return null
-                const tarefa = card.proxima_tarefa as { data_vencimento: string; titulo: string }
+                const tarefa = card.proxima_tarefa as any
                 const isLate = new Date(tarefa.data_vencimento) < new Date()
                 return (
                     <div key={fieldId} className={cn(
@@ -142,10 +137,9 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </div>
                     </div>
                 )
-            }
-            case 'ultima_interacao': {
+            case 'ultima_interacao':
                 if (!card.ultima_interacao) return null
-                const interacao = card.ultima_interacao as { titulo: string; data: string }
+                const interacao = card.ultima_interacao as any
                 return (
                     <div key={fieldId} className="mt-1 flex items-center gap-1.5 text-[10px] text-gray-500">
                         <CheckSquare className="h-3 w-3 text-gray-400" />
@@ -154,9 +148,8 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
-            }
-            case 'taxa_planejamento': {
-                const data = card.produto_data as { taxa_planejamento?: { status: string } }
+            case 'taxa_planejamento':
+                const data = card.produto_data as any
                 if (!data?.taxa_planejamento?.status) return null
                 const statusColors: Record<string, string> = {
                     pendente: 'text-yellow-600 bg-yellow-50',
@@ -172,7 +165,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     nao_ativa: 'Taxa Inativa',
                     nao_aplicavel: 'N/A'
                 }
-                const status = data.taxa_planejamento.status
+                const status = data.taxa_planejamento.status as string
                 return (
                     <div key={fieldId} className="mt-2">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColors[status] || 'text-gray-500'}`}>
@@ -180,8 +173,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
-            }
-            case 'task_status': {
+            case 'task_status':
                 if (!card.proxima_tarefa) {
                     return (
                         <div key={fieldId} className="mt-2">
@@ -193,7 +185,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     )
                 }
 
-                const taskData = card.proxima_tarefa as { data_vencimento: string }
+                const taskData = card.proxima_tarefa as any
                 const dueDate = new Date(taskData.data_vencimento)
                 const now = new Date()
                 const isLateTask = dueDate < now
@@ -229,10 +221,9 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
-            }
 
-            case 'pessoas': {
-                const pData = card.produto_data as { pessoas?: { adultos: number; criancas?: number } }
+            case 'pessoas':
+                const pData = card.produto_data as any
                 if (!pData?.pessoas) return null
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
@@ -243,7 +234,6 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
-            }
         }
 
         // 2. Generic Dynamic Rendering (The "Ferrari Engine")
@@ -251,13 +241,13 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         if (!fieldDef) return null
 
         // Resolve value (check root, then produto_data, then briefing_inicial)
-        let value = (card as Record<string, unknown>)[fieldId]
+        let value = (card as any)[fieldId]
         if (value === undefined || value === null) {
-            const produtoData = card.produto_data as Record<string, unknown>
+            const produtoData = card.produto_data as any
             value = produtoData?.[fieldId]
         }
         if (value === undefined || value === null) {
-            const briefingData = card.briefing_inicial as Record<string, unknown>
+            const briefingData = card.briefing_inicial as any
             value = briefingData?.[fieldId]
         }
 
@@ -268,9 +258,8 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             let endStr = ''
 
             if (typeof value === 'object') {
-                const valObj = value as { start?: string; inicio?: string; end?: string; fim?: string }
-                startStr = valObj.start || valObj.inicio || ''
-                endStr = valObj.end || valObj.fim || ''
+                startStr = value.start || value.inicio
+                endStr = value.end || value.fim
             } else if (typeof value === 'string') {
                 // Try to parse raw string if it looks like a date
                 const rangeMatch = value.match(/^(\d{4}-\d{2}-\d{2}).*?até\s+(\d{4}-\d{2}-\d{2})/)
@@ -296,12 +285,12 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 </div>
             )
         }
-        if (fieldId === 'orcamento' && (value as { total?: number })?.total) {
+        if (fieldId === 'orcamento' && value?.total) {
             return (
                 <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                     <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0" />
                     <span className="truncate block flex-1">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((value as { total: number }).total)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value.total)}
                     </span>
                 </div>
             )
@@ -332,7 +321,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         <Calendar className="mr-1.5 h-3 w-3 flex-shrink-0 text-blue-600" />
-                        <span className="text-gray-700">{new Date(value as string).toLocaleDateString('pt-BR')}</span>
+                        <span className="text-gray-700">{new Date(value).toLocaleDateString('pt-BR')}</span>
                     </div>
                 )
             case 'multiselect':
@@ -381,7 +370,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
 
     // Default fields if no settings found (fallback)
     const defaultFields = ['destinos', 'epoca_viagem', 'orcamento']
-    const settingsAny = settings as Record<string, unknown>
+    const settingsAny = settings as any
     const fieldsToShow = (settingsAny?.campos_kanban as string[]) || defaultFields
     const orderedFields = (settingsAny?.ordem_kanban as string[]) || fieldsToShow
 
@@ -409,7 +398,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     </span>
 
                     {/* Group Affiliation Badge */}
-                    {(card.parent_card_id || card.parent_card_title) && (
+                    {card.parent_card_id && (
                         <GroupBadge card={card} />
                     )}
                 </div>
@@ -423,7 +412,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             {card.is_group_parent && (
                 <div className="flex items-center gap-1.5 text-[10px] font-semibold text-purple-600 bg-purple-50/50 px-2 py-1 rounded border border-purple-200/50 w-fit shadow-sm">
                     <Building className="h-3 w-3" />
-                    <span>Grupo ({card.group_total_pax || 0} pax)</span>
+                    <span>Grupo</span>
                 </div>
             )}
 

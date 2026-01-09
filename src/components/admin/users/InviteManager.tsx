@@ -32,8 +32,6 @@ export default function InviteManager() {
     const [loading, setLoading] = useState(true);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
-
-
     const fetchInvites = useCallback(async () => {
         setLoading(true);
         try {
@@ -86,35 +84,35 @@ export default function InviteManager() {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">Convites Pendentes</h3>
-                <Button variant="outline" size="sm" onClick={fetchInvites}>
+                <h3 className="text-lg font-medium text-foreground">Convites Pendentes</h3>
+                <Button variant="outline" size="sm" onClick={fetchInvites} className="border-border text-foreground hover:bg-muted hover:text-foreground">
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Atualizar
                 </Button>
             </div>
 
-            <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
+            <div className="bg-card backdrop-blur-xl rounded-xl border border-border overflow-hidden">
                 <Table>
                     <TableHeader>
-                        <TableRow>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Papel</TableHead>
-                            <TableHead>Criado em</TableHead>
-                            <TableHead>Expira em</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
+                        <TableRow className="border-border hover:bg-muted/50">
+                            <TableHead className="text-muted-foreground">Email</TableHead>
+                            <TableHead className="text-muted-foreground">Papel</TableHead>
+                            <TableHead className="text-muted-foreground">Criado em</TableHead>
+                            <TableHead className="text-muted-foreground">Expira em</TableHead>
+                            <TableHead className="text-muted-foreground">Status</TableHead>
+                            <TableHead className="text-right text-muted-foreground">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading ? (
-                            <TableRow>
+                            <TableRow className="border-border hover:bg-muted/50">
                                 <TableCell colSpan={6} className="text-center py-8">
-                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                                 </TableCell>
                             </TableRow>
                         ) : invites.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                            <TableRow className="border-border hover:bg-muted/50">
+                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                     Nenhum convite encontrado.
                                 </TableCell>
                             </TableRow>
@@ -124,28 +122,28 @@ export default function InviteManager() {
                                 const isUsed = !!invite.used_at;
 
                                 return (
-                                    <TableRow key={invite.id}>
-                                        <TableCell className="font-medium text-gray-900">
+                                    <TableRow key={invite.id} className="border-border hover:bg-muted/50">
+                                        <TableCell className="font-medium text-foreground">
                                             {invite.email}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="secondary" className="capitalize">
+                                            <Badge variant="secondary" className="capitalize bg-muted text-muted-foreground hover:bg-muted/80 border-border">
                                                 {invite.role}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-gray-500">
+                                        <TableCell className="text-muted-foreground">
                                             {format(new Date(invite.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
                                         </TableCell>
-                                        <TableCell className="text-gray-500">
+                                        <TableCell className="text-muted-foreground">
                                             {format(new Date(invite.expires_at), "dd/MM/yy", { locale: ptBR })}
                                         </TableCell>
                                         <TableCell>
                                             {isUsed ? (
-                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Aceito</Badge>
+                                                <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Aceito</Badge>
                                             ) : isExpired ? (
-                                                <Badge variant="destructive">Expirado</Badge>
+                                                <Badge variant="destructive" className="bg-red-500/10 text-red-600 border-red-500/20">Expirado</Badge>
                                             ) : (
-                                                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">Pendente</Badge>
+                                                <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">Pendente</Badge>
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -156,18 +154,19 @@ export default function InviteManager() {
                                                         size="icon"
                                                         onClick={() => copyLink(invite.token, invite.id)}
                                                         title="Copiar Link"
+                                                        className="hover:bg-muted text-muted-foreground hover:text-foreground"
                                                     >
                                                         {copiedId === invite.id ? (
-                                                            <Check className="w-4 h-4 text-green-600" />
+                                                            <Check className="w-4 h-4 text-emerald-600" />
                                                         ) : (
-                                                            <Copy className="w-4 h-4 text-gray-500" />
+                                                            <Copy className="w-4 h-4" />
                                                         )}
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => handleRevoke(invite.id)}
-                                                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
                                                         title="Revogar"
                                                     >
                                                         <Trash2 className="w-4 h-4" />

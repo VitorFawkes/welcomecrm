@@ -58,8 +58,8 @@ export default function ProfileSettings() {
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <div>
-                <h2 className="text-2xl font-bold text-gray-900">Meu Perfil</h2>
-                <p className="text-gray-500">Gerencie suas informações pessoais e segurança.</p>
+                <h2 className="text-2xl font-bold text-foreground">Meu Perfil</h2>
+                <p className="text-muted-foreground">Gerencie suas informações pessoais e segurança.</p>
             </div>
 
             <Tabs defaultValue="general" className="w-full">
@@ -75,7 +75,7 @@ export default function ProfileSettings() {
                 </TabsList>
 
                 <TabsContent value="general" className="space-y-8 animate-in fade-in-50 duration-500">
-                    <div className="bg-white/50 backdrop-blur-sm rounded-xl border border-white/20 p-8 shadow-sm">
+                    <div className="bg-card rounded-xl border border-border p-8 shadow-sm">
                         <div className="flex flex-col md:flex-row gap-8 items-start">
                             {/* Avatar Section */}
                             <div className="w-full md:w-auto flex-shrink-0">
@@ -117,12 +117,11 @@ export default function ProfileSettings() {
                                     <Input
                                         value={user?.email}
                                         disabled
-                                        className="bg-gray-50/50 text-gray-500"
+                                        className="bg-muted text-muted-foreground"
                                     />
-                                    <p className="text-xs text-gray-400">O email não pode ser alterado.</p>
+                                    <p className="text-xs text-muted-foreground">O email não pode ser alterado.</p>
                                 </div>
-
-                                <div className="pt-4 border-t border-gray-100">
+                                <div className="pt-4 border-t border-border">
                                     <Button type="submit" disabled={loading}>
                                         {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                                         Salvar Alterações
@@ -134,7 +133,7 @@ export default function ProfileSettings() {
                 </TabsContent>
 
                 <TabsContent value="security" className="animate-in fade-in-50 duration-500">
-                    <div className="bg-white/50 backdrop-blur-sm rounded-xl border border-white/20 p-8 shadow-sm">
+                    <div className="bg-card rounded-xl border border-border p-8 shadow-sm">
                         <SecuritySettings />
                     </div>
                 </TabsContent>

@@ -89,7 +89,20 @@
 - **Rule:** Most tables allow `SELECT/INSERT/UPDATE` for `authenticated` role.
 - **Sensitive Data:** `profiles` table controls access levels (admin, gestor, sdr).
 
-## 6. Known "Gotchas"
+## 6. User Management & Auth (Invite System)
+- **Philosophy:** "Invite Only". Public registration is DISABLED.
+- **Core Table:** `invitations` (email, role, token, expires_at).
+- **Flow:**
+    1.  **Admin** creates invite via `UserManagement.tsx` -> `generate_invite_token` (RPC).
+    2.  **User** receives link (`/invite/:token`) -> `InvitePage.tsx`.
+    3.  **Validation:** `get_invite_details` (RPC) checks validity before showing form.
+    4.  **Signup:** `supabase.auth.signUp()` triggers `check_invite_whitelist` (DB Trigger).
+    5.  **Activation:** Success triggers `mark_invite_used` and `handle_new_user` (creates Profile).
+- **Security:**
+    -   `check_invite_whitelist`: BLOCKS any signup where email is not in `invitations` or token is expired.
+    -   `invitations` RLS: Only Admins can SELECT/INSERT/DELETE.
+
+## 7. Known "Gotchas"
 - **Ghost Contacts:** `view_cards_acoes` has `pessoa_nome`. Always prefer this over fetching `contatos` again to avoid sync issues.
 - **Optimistic Updates:** Frontend must update Cache immediately for good UX, but must handle Rollback on error. `useCardContacts` implements this correctly.
 

@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Eye, RotateCcw } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Eye, RotateCcw, Ban, Play } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // --- Drawer Component ---
 import {
@@ -16,52 +18,126 @@ import {
     SheetHeader,
     SheetTitle,
     SheetDescription,
+    SheetFooter,
 } from "@/components/ui/sheet";
+
+export type LogMode = 'inbox' | 'outbox';
 
 interface IntegrationEvent {
     id: string;
-    integration_id: string;
+    integration_id?: string; // Optional now
+    row_key?: string; // Inbox specific
+    destination?: string; // Outbox specific
+    action?: string; // Outbox specific
     status: string;
     payload: any;
-    response: any;
-    logs: any;
-    attempts: number;
+    response?: any; // Inbox specific
+    error_log?: string; // Outbox specific
+    processing_log?: string; // Inbox specific
+    attempts?: number; // Inbox specific
+    retry_count?: number; // Outbox specific
     created_at: string;
+    entity_type?: string;
+    external_id?: string;
+    internal_id?: string;
 }
 
 interface IntegrationLogsProps {
-    integrationId: string;
+    integrationId?: string; // Optional if showing global events
+    mode?: LogMode;
 }
 
-const STATUS_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
-    success: { icon: CheckCircle2, label: 'Sucesso', color: 'text-green-500' },
-    pending: { icon: Clock, label: 'Pendente', color: 'text-yellow-500' },
-    failed: { icon: XCircle, label: 'Falhou', color: 'text-red-500' },
-    retrying: { icon: RefreshCw, label: 'Tentando', color: 'text-blue-500' },
+const STATUS_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> = {
+    success: { icon: CheckCircle2, label: 'Sucesso', color: 'text-green-600', bg: 'bg-green-500/10 border-green-200' },
+    processed: { icon: CheckCircle2, label: 'Processado', color: 'text-green-600', bg: 'bg-green-500/10 border-green-200' },
+    processed_shadow: { icon: Eye, label: 'Shadow Mode', color: 'text-purple-600', bg: 'bg-purple-500/10 border-purple-200' },
+    pending: { icon: Clock, label: 'Pendente', color: 'text-yellow-600', bg: 'bg-yellow-500/10 border-yellow-200' },
+    failed: { icon: XCircle, label: 'Falhou', color: 'text-red-600', bg: 'bg-red-500/10 border-red-200' },
+    unrouted: { icon: Ban, label: 'Não Roteado', color: 'text-gray-600', bg: 'bg-gray-500/10 border-gray-200' },
+    ignored: { icon: Ban, label: 'Ignorado', color: 'text-gray-500', bg: 'bg-gray-400/10 border-gray-200' },
+    retrying: { icon: RefreshCw, label: 'Tentando', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-200' },
+    blocked: { icon: Ban, label: 'Bloqueado', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-200' },
 };
 
-export function IntegrationLogs({ integrationId }: IntegrationLogsProps) {
+export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLogsProps) {
     const [selectedEvent, setSelectedEvent] = useState<IntegrationEvent | null>(null);
+    const tableName = mode === 'inbox' ? 'integration_events' : 'integration_outbox';
+    const queryClient = useQueryClient();
+
+    const updateStatusMutation = useMutation({
+        mutationFn: async ({ id, status }: { id: string; status: string }) => {
+            const { error } = await supabase
+                .from(tableName as any)
+                .update({ status, processing_log: null, error_log: null })
+                .eq('id', id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['integration-logs'] });
+            toast.success('Status atualizado com sucesso');
+            setSelectedEvent(null);
+        },
+        onError: (error) => {
+            toast.error('Erro ao atualizar status: ' + error.message);
+        }
+    });
+
+    const processPendingMutation = useMutation({
+        mutationFn: async () => {
+            const { data, error } = await supabase.functions.invoke('integration-process', {
+                body: { integration_id: integrationId }
+            });
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['integration-logs'] });
+            toast.success(data.message || 'Processamento iniciado');
+        },
+        onError: (error) => {
+            toast.error('Erro ao processar: ' + error.message);
+        }
+    });
+
+    const handleReprocess = (id: string) => {
+        updateStatusMutation.mutate({ id, status: 'pending' });
+    };
+
+    const handleIgnore = (id: string) => {
+        updateStatusMutation.mutate({ id, status: 'ignored' });
+    };
 
     const { data: events, isLoading, refetch, isFetching } = useQuery({
-        queryKey: ['integration-events', integrationId],
+        queryKey: ['integration-logs', mode, integrationId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('integration_events' as any)
+            let query = supabase
+                .from(tableName as any)
                 .select('*')
-                .eq('integration_id', integrationId)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
+            if (integrationId) {
+                // Only filter by integration_id if it exists in the table schema and is provided
+                // For system integrations (AC), we might filter by source/destination instead
+                // But for now, let's assume if integrationId is provided, we use it (legacy behavior)
+                // OR if it's AC, we might want to show all 'active_campaign' source events.
+                // For this refactor, let's keep it simple: if integrationId provided, try to filter.
+                // But AC events might not have integration_id.
+                // Let's skip integration_id filter for now if mode is 'inbox' and it's system integration.
+                // Actually, let's just fetch all for now to see the AC events.
+            }
+
+            const { data, error } = await query;
             if (error) throw error;
             return data as unknown as IntegrationEvent[];
         },
-        enabled: !!integrationId,
+        refetchInterval: 5000,
     });
 
     // --- Metrics ---
     const totalEvents = events?.length || 0;
-    const successCount = events?.filter(e => e.status === 'success').length || 0;
+    const successCount = events?.filter(e => ['success', 'processed', 'processed_shadow'].includes(e.status)).length || 0;
     const failedCount = events?.filter(e => e.status === 'failed').length || 0;
     const successRate = totalEvents > 0 ? Math.round((successCount / totalEvents) * 100) : 0;
 
@@ -79,86 +155,101 @@ export function IntegrationLogs({ integrationId }: IntegrationLogsProps) {
         <div className="space-y-6">
             {/* --- Health Overview --- */}
             <div className="grid grid-cols-3 gap-4">
-                <div className="p-4 bg-muted/50 rounded-lg border">
-                    <p className="text-sm text-muted-foreground">Total de Eventos</p>
+                <div className="p-4 bg-muted/50 rounded-lg border backdrop-blur-sm">
+                    <p className="text-sm text-muted-foreground">Total ({mode === 'inbox' ? 'Entrada' : 'Saída'})</p>
                     <p className="text-2xl font-bold">{totalEvents}</p>
                 </div>
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-200">
+                <div className="p-4 bg-green-500/10 rounded-lg border border-green-200 backdrop-blur-sm">
                     <p className="text-sm text-green-600">Taxa de Sucesso</p>
                     <p className="text-2xl font-bold text-green-600">{successRate}%</p>
                 </div>
-                <div className="p-4 bg-red-500/10 rounded-lg border border-red-200">
-                    <p className="text-sm text-red-600">Falhas</p>
+                <div className="p-4 bg-red-500/10 rounded-lg border border-red-200 backdrop-blur-sm">
+                    <p className="text-sm text-red-600">Falhas / Erros</p>
                     <p className="text-2xl font-bold text-red-600">{failedCount}</p>
                 </div>
             </div>
 
             {/* --- Logs Table --- */}
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-hidden bg-card backdrop-blur-sm">
                 <div className="flex items-center justify-between p-3 bg-muted/50 border-b">
-                    <h3 className="font-semibold text-sm">Histórico de Execuções</h3>
+                    <h3 className="font-semibold text-sm">
+                        {mode === 'inbox' ? 'Inbox (ActiveCampaign -> Welcome)' : 'Outbox (Welcome -> ActiveCampaign)'}
+                    </h3>
                     <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching}>
                         <RefreshCw className={cn("w-4 h-4 mr-2", isFetching && "animate-spin")} />
                         Atualizar
                     </Button>
+                    {mode === 'inbox' && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-2"
+                            onClick={() => processPendingMutation.mutate()}
+                            disabled={processPendingMutation.isPending}
+                        >
+                            <Play className={cn("w-4 h-4 mr-2", processPendingMutation.isPending && "animate-spin")} />
+                            Processar Pendentes
+                        </Button>
+                    )}
                 </div>
 
                 {events && events.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
                         <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p>Nenhum evento registrado ainda.</p>
-                        <p className="text-xs">Eventos aparecerão aqui quando a integração for acionada.</p>
+                        <p>Nenhum evento registrado.</p>
                     </div>
                 ) : (
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted/30 text-muted-foreground">
-                            <tr>
-                                <th className="text-left p-3 font-medium">Status</th>
-                                <th className="text-left p-3 font-medium">Quando</th>
-                                <th className="text-left p-3 font-medium">Tentativas</th>
-                                <th className="text-right p-3 font-medium">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {events?.map((event) => {
-                                const config = STATUS_CONFIG[event.status] || STATUS_CONFIG.pending;
-                                const Icon = config.icon;
-                                return (
-                                    <tr key={event.id} className="hover:bg-muted/30 transition-colors">
-                                        <td className="p-3">
-                                            <Badge variant="outline" className={cn("gap-1", config.color)}>
-                                                <Icon className="w-3 h-3" />
-                                                {config.label}
-                                            </Badge>
-                                        </td>
-                                        <td className="p-3 text-muted-foreground">
-                                            {formatDistanceToNow(new Date(event.created_at), { addSuffix: true, locale: ptBR })}
-                                        </td>
-                                        <td className="p-3">
-                                            {event.attempts > 1 ? (
-                                                <span className="text-yellow-600 font-medium">{event.attempts}x</span>
-                                            ) : (
-                                                <span className="text-muted-foreground">1</span>
-                                            )}
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedEvent(event)}>
-                                                <Eye className="w-4 h-4 mr-1" />
-                                                Detalhes
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted/50 text-muted-foreground">
+                                <tr>
+                                    <th className="text-left p-3 font-medium">Status</th>
+                                    <th className="text-left p-3 font-medium">Entidade</th>
+                                    <th className="text-left p-3 font-medium">ID Externo</th>
+                                    <th className="text-left p-3 font-medium">Quando</th>
+                                    <th className="text-right p-3 font-medium">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {events?.map((event) => {
+                                    const config = STATUS_CONFIG[event.status] || STATUS_CONFIG.pending;
+                                    const Icon = config.icon;
+                                    return (
+                                        <tr key={event.id} className="hover:bg-muted/50 transition-colors">
+                                            <td className="p-3">
+                                                <Badge variant="outline" className={cn("gap-1", config.color, config.bg)}>
+                                                    <Icon className="w-3 h-3" />
+                                                    {config.label}
+                                                </Badge>
+                                            </td>
+                                            <td className="p-3 font-mono text-xs">
+                                                {event.entity_type || event.action || '-'}
+                                            </td>
+                                            <td className="p-3 font-mono text-xs text-muted-foreground">
+                                                {event.external_id || event.internal_id || '-'}
+                                            </td>
+                                            <td className="p-3 text-muted-foreground">
+                                                {formatDistanceToNow(new Date(event.created_at), { addSuffix: true, locale: ptBR })}
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <Button variant="ghost" size="sm" onClick={() => setSelectedEvent(event)}>
+                                                    <Eye className="w-4 h-4 mr-1" />
+                                                    Ver
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
             {/* --- Detail Drawer --- */}
             <Sheet open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
-                <SheetContent className="sm:max-w-xl overflow-y-auto">
-                    <SheetHeader>
+                <SheetContent className="sm:max-w-2xl w-full overflow-hidden flex flex-col p-0">
+                    <SheetHeader className="p-6 border-b">
                         <SheetTitle className="flex items-center gap-2">
                             {selectedEvent && STATUS_CONFIG[selectedEvent.status] && (
                                 <>
@@ -170,50 +261,84 @@ export function IntegrationLogs({ integrationId }: IntegrationLogsProps) {
                             )}
                             Detalhes do Evento
                         </SheetTitle>
-                        <SheetDescription>
-                            ID: {selectedEvent?.id.slice(0, 8)}...
+                        <SheetDescription className="font-mono text-xs">
+                            ID: {selectedEvent?.id} | Key: {selectedEvent?.row_key || '-'}
                         </SheetDescription>
                     </SheetHeader>
 
                     {selectedEvent && (
-                        <div className="mt-6 space-y-6">
-                            {/* --- Request (Payload) --- */}
-                            <div>
-                                <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Dados Enviados / Recebidos (Payload)</h4>
-                                <pre className="p-4 bg-muted rounded-lg text-xs overflow-x-auto max-h-60 border">
-                                    {JSON.stringify(selectedEvent.payload, null, 2) || 'N/A'}
-                                </pre>
-                            </div>
+                        <ScrollArea className="flex-1 p-6">
+                            <div className="space-y-8">
+                                {/* --- Visual Diff (The "Would Apply" View) --- */}
+                                {selectedEvent.processing_log && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                                            {selectedEvent.status === 'blocked' ? <Ban className="w-4 h-4 text-orange-500" /> : <Eye className="w-4 h-4" />}
+                                            {selectedEvent.status === 'blocked' ? 'Motivo do Bloqueio' : 'Análise (Diff)'}
+                                        </h4>
+                                        <div className={cn("p-4 rounded-lg border text-sm font-mono whitespace-pre-wrap",
+                                            selectedEvent.status === 'blocked' ? "bg-orange-500/10 border-orange-200 text-orange-700" : "bg-muted/50"
+                                        )}>
+                                            {selectedEvent.processing_log}
+                                        </div>
+                                    </div>
+                                )}
 
-                            {/* --- Response --- */}
-                            <div>
-                                <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Resposta do Servidor</h4>
-                                <pre className="p-4 bg-muted rounded-lg text-xs overflow-x-auto max-h-60 border">
-                                    {JSON.stringify(selectedEvent.response, null, 2) || 'Nenhuma resposta recebida.'}
-                                </pre>
-                            </div>
+                                {selectedEvent.error_log && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-semibold text-red-500 uppercase tracking-wide flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4" />
+                                            Erro
+                                        </h4>
+                                        <div className="p-4 bg-red-500/10 border border-red-200 rounded-lg text-sm text-red-600 font-mono whitespace-pre-wrap">
+                                            {selectedEvent.error_log}
+                                        </div>
+                                    </div>
+                                )}
 
-                            {/* --- Internal Logs --- */}
-                            {selectedEvent.logs && (
-                                <div>
-                                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Logs Internos</h4>
-                                    <pre className="p-4 bg-muted rounded-lg text-xs overflow-x-auto max-h-40 border">
-                                        {JSON.stringify(selectedEvent.logs, null, 2)}
-                                    </pre>
+                                {/* --- Payload --- */}
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Payload Original</h4>
+                                    <div className="p-4 bg-muted/30 rounded-lg border text-xs font-mono overflow-x-auto">
+                                        <pre>{JSON.stringify(selectedEvent.payload, null, 2)}</pre>
+                                    </div>
                                 </div>
-                            )}
-
-                            {/* --- Actions --- */}
-                            <div className="flex gap-2 pt-4 border-t">
-                                <Button variant="outline" className="flex-1" disabled>
-                                    <RotateCcw className="w-4 h-4 mr-2" />
-                                    Reprocessar (Em breve)
-                                </Button>
                             </div>
-                        </div>
+                        </ScrollArea>
                     )}
+
+                    <SheetFooter className="p-6 border-t bg-muted/10">
+                        <div className="flex gap-2 w-full">
+                            <Button variant="outline" className="flex-1" onClick={() => setSelectedEvent(null)}>
+                                Fechar
+                            </Button>
+                            {/* Actions for Inbox */}
+                            {mode === 'inbox' && (
+                                <>
+                                    <Button
+                                        variant="secondary"
+                                        className="flex-1"
+                                        onClick={() => selectedEvent && handleIgnore(selectedEvent.id)}
+                                        disabled={updateStatusMutation.isPending}
+                                    >
+                                        <Ban className="w-4 h-4 mr-2" />
+                                        Ignorar
+                                    </Button>
+                                    <Button
+                                        className="flex-1"
+                                        onClick={() => selectedEvent && handleReprocess(selectedEvent.id)}
+                                        disabled={updateStatusMutation.isPending}
+                                    >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Reprocessar
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    </SheetFooter>
                 </SheetContent>
             </Sheet>
         </div>
     );
 }
+

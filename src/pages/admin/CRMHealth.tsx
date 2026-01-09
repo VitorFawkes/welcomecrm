@@ -35,10 +35,10 @@ export default function CRMHealth() {
         <div className="p-8 space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Saúde do CRM</h1>
-                    <p className="text-gray-500">Diagnóstico operacional e gargalos</p>
+                    <h1 className="text-2xl font-bold text-foreground">Saúde do CRM</h1>
+                    <p className="text-muted-foreground">Diagnóstico operacional e gargalos</p>
                 </div>
-                <div className={`px-4 py-2 rounded-lg font-bold text-xl ${healthScore > 80 ? 'bg-green-100 text-green-700' :
+                <div className={`px-4 py-2 rounded-lg font-bold text-xl ${healthScore > 80 ? 'bg-emerald-100 text-emerald-700' :
                     healthScore > 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
                     }`}>
                     Score: {healthScore}/100
@@ -71,20 +71,20 @@ export default function CRMHealth() {
 
             {/* Detailed Lists */}
             <div className="space-y-6">
-                <h2 className="text-lg font-semibold text-gray-900">Atenção Necessária</h2>
+                <h2 className="text-lg font-semibold text-foreground">Atenção Necessária</h2>
 
                 {overdueCards.length > 0 && (
-                    <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
                         <div className="p-4 bg-red-50 border-b border-red-100 flex items-center gap-2">
                             <Clock className="w-5 h-5 text-red-600" />
                             <h3 className="font-medium text-red-900">SLA Estourado ({overdueCards.length})</h3>
                         </div>
-                        <div className="divide-y">
+                        <div className="divide-y divide-border">
                             {overdueCards.slice(0, 5).map(card => (
                                 <CardRow key={card.id} card={card} reason="Tempo na etapa excedido" />
                             ))}
                             {overdueCards.length > 5 && (
-                                <div className="p-3 text-center text-sm text-gray-500">
+                                <div className="p-3 text-center text-sm text-muted-foreground">
                                     + {overdueCards.length - 5} outros cards
                                 </div>
                             )}
@@ -93,12 +93,12 @@ export default function CRMHealth() {
                 )}
 
                 {noTaskCards.length > 0 && (
-                    <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
                         <div className="p-4 bg-orange-50 border-b border-orange-100 flex items-center gap-2">
                             <CalendarX className="w-5 h-5 text-orange-600" />
                             <h3 className="font-medium text-orange-900">Sem Próxima Tarefa ({noTaskCards.length})</h3>
                         </div>
-                        <div className="divide-y">
+                        <div className="divide-y divide-border">
                             {noTaskCards.slice(0, 5).map(card => (
                                 <CardRow key={card.id} card={card} reason="Nenhuma tarefa agendada" />
                             ))}
@@ -123,7 +123,7 @@ function HealthCard({ title, count, icon: Icon, color, description }: HealthCard
         red: 'bg-red-50 text-red-700 border-red-100',
         orange: 'bg-orange-50 text-orange-700 border-orange-100',
         yellow: 'bg-yellow-50 text-yellow-700 border-yellow-100',
-        green: 'bg-green-50 text-green-700 border-green-100',
+        green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
     }
 
     return (
@@ -142,22 +142,22 @@ function HealthCard({ title, count, icon: Icon, color, description }: HealthCard
 
 function CardRow({ card, reason }: { card: Card, reason: string }) {
     return (
-        <div className="p-4 flex items-center justify-between hover:bg-gray-50 group">
+        <div className="p-4 flex items-center justify-between hover:bg-muted/50 group transition-colors">
             <div>
-                <Link to={`/app/cards/${card.id}`} className="font-medium text-gray-900 hover:text-blue-600">
+                <Link to={`/app/cards/${card.id}`} className="font-medium text-foreground hover:text-primary">
                     {card.titulo}
                 </Link>
-                <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                     <span>{card.etapa_nome}</span>
                     <span>•</span>
                     <span>{card.dono_atual_nome}</span>
                 </div>
             </div>
             <div className="text-right">
-                <span className="text-sm font-medium text-red-600">{reason}</span>
+                <span className="text-sm font-medium text-destructive">{reason}</span>
                 <Link
                     to={`/app/cards/${card.id}`}
-                    className="flex items-center gap-1 text-xs text-blue-600 mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end"
+                    className="flex items-center gap-1 text-xs text-primary mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end"
                 >
                     Ver Card <ArrowRight className="w-3 h-3" />
                 </Link>

@@ -182,8 +182,8 @@ export default function CategoryManagement() {
             />
 
             {isCreating && (
-                <div className="mb-8 p-6 bg-white rounded-xl border border-indigo-100 shadow-sm animate-in fade-in slide-in-from-top-4">
-                    <h3 className="font-medium text-gray-900 mb-4">Nova Categoria</h3>
+                <div className="mb-8 p-6 bg-card rounded-xl border border-border shadow-sm animate-in fade-in slide-in-from-top-4">
+                    <h3 className="font-medium text-foreground mb-4">Nova Categoria</h3>
                     <form onSubmit={handleCreate} className="grid gap-4 sm:grid-cols-4 items-end">
                         <div className="grid gap-2">
                             <Label>Escopo</Label>
@@ -217,32 +217,32 @@ export default function CategoryManagement() {
                 </div>
             )}
 
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-muted border-b border-border">
                         <tr>
-                            <th className="px-6 py-3 font-medium text-gray-500">Escopo</th>
-                            <th className="px-6 py-3 font-medium text-gray-500">Nome</th>
-                            <th className="px-6 py-3 font-medium text-gray-500">Chave (Key)</th>
-                            <th className="px-6 py-3 font-medium text-gray-500 text-center">Uso</th>
-                            <th className="px-6 py-3 font-medium text-gray-500 text-right">Ações</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground">Escopo</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground">Nome</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground">Chave (Key)</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground text-center">Uso</th>
+                            <th className="px-6 py-3 font-medium text-muted-foreground text-right">Ações</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-border">
                         {categories?.map((cat) => {
                             const count = usageCounts?.[cat.key] || 0;
                             const isUsed = count > 0;
 
                             return (
-                                <tr key={cat.key} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="px-6 py-3 text-gray-500 font-mono text-xs uppercase">{cat.scope}</td>
-                                    <td className="px-6 py-3 font-medium text-gray-900">{cat.label}</td>
-                                    <td className="px-6 py-3 text-gray-400 font-mono text-xs">{cat.key}</td>
+                                <tr key={cat.key} className="hover:bg-muted/50 transition-colors">
+                                    <td className="px-6 py-3 text-muted-foreground font-mono text-xs uppercase">{cat.scope}</td>
+                                    <td className="px-6 py-3 font-medium text-foreground">{cat.label}</td>
+                                    <td className="px-6 py-3 text-muted-foreground font-mono text-xs">{cat.key}</td>
                                     <td className="px-6 py-3 text-center">
                                         {isLoadingCounts ? (
-                                            <Loader2 className="w-3 h-3 animate-spin mx-auto text-gray-300" />
+                                            <Loader2 className="w-3 h-3 animate-spin mx-auto text-muted-foreground" />
                                         ) : (
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${isUsed ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${isUsed ? 'bg-blue-50 text-blue-700' : 'bg-muted text-muted-foreground'}`}>
                                                 {count}
                                             </span>
                                         )}
@@ -252,7 +252,7 @@ export default function CategoryManagement() {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => toggleVisibilityMutation.mutate({ key: cat.key, visible: !cat.visible })}
-                                            className={cat.visible ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-gray-400 hover:text-gray-600"}
+                                            className={cat.visible ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" : "text-muted-foreground hover:text-foreground"}
                                             title={cat.visible ? "Visível" : "Oculto"}
                                         >
                                             {cat.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -263,7 +263,7 @@ export default function CategoryManagement() {
                                                 variant="ghost"
                                                 size="sm"
                                                 disabled
-                                                className="text-gray-300 cursor-not-allowed"
+                                                className="text-muted-foreground/50 cursor-not-allowed"
                                                 title="Não é possível excluir categorias em uso. Oculte-a em vez disso."
                                             >
                                                 <Archive className="w-4 h-4" />
@@ -277,7 +277,7 @@ export default function CategoryManagement() {
                                                         deleteMutation.mutate(cat.key);
                                                     }
                                                 }}
-                                                className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                 title="Excluir (Seguro)"
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -289,7 +289,7 @@ export default function CategoryManagement() {
                         })}
                         {categories?.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
                                     Nenhuma categoria encontrada.
                                 </td>
                             </tr>

@@ -81,67 +81,67 @@ export default function AuditLogViewer() {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">Logs de Auditoria</h3>
+                <h3 className="text-lg font-medium text-foreground">Logs de Auditoria</h3>
                 <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                         placeholder="Buscar logs..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="pl-9"
+                        className="pl-9 bg-card border-border text-foreground placeholder:text-muted-foreground focus:bg-muted/50"
                     />
                 </div>
             </div>
 
-            <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
+            <div className="bg-card backdrop-blur-xl rounded-xl border border-border overflow-hidden">
                 <Table>
                     <TableHeader>
-                        <TableRow>
-                            <TableHead>Data/Hora</TableHead>
-                            <TableHead>Usuário</TableHead>
-                            <TableHead>Ação</TableHead>
-                            <TableHead>Recurso</TableHead>
-                            <TableHead>Detalhes</TableHead>
+                        <TableRow className="border-border hover:bg-muted/50">
+                            <TableHead className="text-muted-foreground">Data/Hora</TableHead>
+                            <TableHead className="text-muted-foreground">Usuário</TableHead>
+                            <TableHead className="text-muted-foreground">Ação</TableHead>
+                            <TableHead className="text-muted-foreground">Recurso</TableHead>
+                            <TableHead className="text-muted-foreground">Detalhes</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading ? (
-                            <TableRow>
+                            <TableRow className="border-border hover:bg-muted/50">
                                 <TableCell colSpan={5} className="text-center py-8">
-                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                                 </TableCell>
                             </TableRow>
                         ) : filteredLogs.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                            <TableRow className="border-border hover:bg-muted/50">
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                     Nenhum registro encontrado.
                                 </TableCell>
                             </TableRow>
                         ) : (
                             filteredLogs.map(log => (
-                                <TableRow key={log.id}>
-                                    <TableCell className="text-xs text-gray-500">
+                                <TableRow key={log.id} className="border-border hover:bg-muted/50">
+                                    <TableCell className="text-xs text-muted-foreground">
                                         {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-medium text-gray-900">
+                                            <span className="text-sm font-medium text-foreground">
                                                 {log.actor?.nome || 'Sistema'}
                                             </span>
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-xs text-muted-foreground">
                                                 {log.actor?.email || log.changed_by}
                                             </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className="uppercase text-[10px]">
+                                        <Badge variant="outline" className="uppercase text-[10px] border-border text-muted-foreground">
                                             {log.action}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-sm text-gray-600">
+                                    <TableCell className="text-sm text-muted-foreground">
                                         {log.table_name}
                                     </TableCell>
-                                    <TableCell className="max-w-[200px] truncate text-xs text-gray-500" title={JSON.stringify(log.new_data || log.old_data, null, 2)}>
+                                    <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground" title={JSON.stringify(log.new_data || log.old_data, null, 2)}>
                                         {JSON.stringify(log.new_data || log.old_data)}
                                     </TableCell>
                                 </TableRow>

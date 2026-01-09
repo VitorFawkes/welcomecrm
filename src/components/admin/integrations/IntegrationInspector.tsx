@@ -73,7 +73,7 @@ export function IntegrationInspector({ integrationId }: IntegrationInspectorProp
 
     return (
         <div className="grid grid-cols-3 gap-6 h-[600px]">
-            <div className="col-span-1 border-r border-white/10 pr-4 flex flex-col h-full">
+            <div className="col-span-1 border-r border-border pr-4 flex flex-col h-full">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4">Histórico de Eventos</h3>
                 <ScrollArea className="flex-1">
                     <div className="space-y-2">
@@ -83,7 +83,7 @@ export function IntegrationInspector({ integrationId }: IntegrationInspectorProp
                                 onClick={() => setSelectedEvent(event)}
                                 className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedEvent?.id === event.id
                                     ? 'bg-primary/10 border-primary/50'
-                                    : 'bg-card/30 border-white/5 hover:bg-card/50'
+                                    : 'bg-card border-border hover:bg-muted/50'
                                     }`}
                             >
                                 <div className="flex justify-between items-center mb-1">
@@ -97,7 +97,7 @@ export function IntegrationInspector({ integrationId }: IntegrationInspectorProp
                                         {event.status}
                                     </Badge>
                                 </div>
-                                <div className="text-xs text-white truncate font-mono opacity-70">
+                                <div className="text-xs text-foreground truncate font-mono opacity-70">
                                     ID: {event.id.slice(0, 8)}...
                                 </div>
                             </div>
@@ -111,7 +111,7 @@ export function IntegrationInspector({ integrationId }: IntegrationInspectorProp
                     <div className="space-y-6 h-full flex flex-col">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h3 className="text-lg font-bold text-white">Detalhes do Evento</h3>
+                                <h3 className="text-lg font-bold text-foreground">Detalhes do Evento</h3>
                                 <p className="text-xs text-muted-foreground font-mono">{selectedEvent.id}</p>
                             </div>
                             <div className="flex space-x-2">
@@ -128,23 +128,23 @@ export function IntegrationInspector({ integrationId }: IntegrationInspectorProp
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 flex-1 overflow-hidden">
-                            <Card className="bg-black/20 border-white/10 flex flex-col">
+                            <Card className="bg-muted/50 border-border flex flex-col">
                                 <CardHeader className="py-2">
                                     <CardTitle className="text-xs uppercase text-muted-foreground">Payload (Input)</CardTitle>
                                 </CardHeader>
                                 <CardContent className="flex-1 overflow-auto p-0">
-                                    <pre className="text-xs font-mono text-emerald-400 p-4">
+                                    <pre className="text-xs font-mono text-emerald-600 p-4">
                                         {JSON.stringify(selectedEvent.payload, null, 2)}
                                     </pre>
                                 </CardContent>
                             </Card>
 
-                            <Card className="bg-black/20 border-white/10 flex flex-col">
+                            <Card className="bg-muted/50 border-border flex flex-col">
                                 <CardHeader className="py-2">
                                     <CardTitle className="text-xs uppercase text-muted-foreground">Response / Logs</CardTitle>
                                 </CardHeader>
                                 <CardContent className="flex-1 overflow-auto p-0">
-                                    <pre className="text-xs font-mono text-blue-400 p-4">
+                                    <pre className="text-xs font-mono text-blue-600 p-4">
                                         {JSON.stringify(selectedEvent.response || selectedEvent.logs, null, 2)}
                                     </pre>
                                 </CardContent>

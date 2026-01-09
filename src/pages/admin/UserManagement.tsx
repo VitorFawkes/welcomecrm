@@ -113,8 +113,8 @@ export default function UserManagement() {
     return (
         <div className="space-y-8">
             <div>
-                <h2 className="text-2xl font-bold text-gray-900">Gestão de Equipe</h2>
-                <p className="text-gray-500">Gerencie usuários, convites e auditoria.</p>
+                <h2 className="text-2xl font-bold text-foreground">Gestão de Equipe</h2>
+                <p className="text-muted-foreground">Gerencie usuários, convites e auditoria.</p>
             </div>
 
             <Tabs defaultValue="users" className="w-full">
@@ -136,7 +136,7 @@ export default function UserManagement() {
                 <TabsContent value="users" className="space-y-4 animate-in fade-in-50 duration-500">
                     <div className="flex items-center justify-between gap-4">
                         <div className="relative flex-1 max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 placeholder="Buscar usuários..."
                                 value={searchTerm}
@@ -147,7 +147,7 @@ export default function UserManagement() {
                         <AddUserModal teams={teams} onSuccess={fetchUsers} />
                     </div>
 
-                    <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
+                    <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -162,12 +162,12 @@ export default function UserManagement() {
                                 {loading ? (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center py-8">
-                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                                         </TableCell>
                                     </TableRow>
                                 ) : filteredUsers.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                             Nenhum usuário encontrado.
                                         </TableCell>
                                     </TableRow>
@@ -176,8 +176,8 @@ export default function UserManagement() {
                                         <TableRow key={user.id}>
                                             <TableCell>
                                                 <div className="flex flex-col">
-                                                    <span className="font-medium text-gray-900">{user.nome}</span>
-                                                    <span className="text-xs text-gray-500">{user.email}</span>
+                                                    <span className="font-medium text-foreground">{user.nome}</span>
+                                                    <span className="text-xs text-muted-foreground">{user.email}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -185,12 +185,12 @@ export default function UserManagement() {
                                                     {user.role}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="text-muted-foreground">
                                                 {user.teams?.name || '-'}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge
-                                                    className={user.active ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}
+                                                    className={user.active ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-slate-500/10 text-slate-600 border-slate-500/20 hover:bg-slate-500/20'}
                                                 >
                                                     {user.active ? 'Ativo' : 'Inativo'}
                                                 </Badge>
@@ -204,14 +204,15 @@ export default function UserManagement() {
                                                             setSelectedUser(user);
                                                             setIsEditModalOpen(true);
                                                         }}
+                                                        className="text-muted-foreground hover:text-foreground"
                                                     >
-                                                        <Edit2 className="w-4 h-4 text-gray-500" />
+                                                        <Edit2 className="w-4 h-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => handleToggleStatus(user.id, user.active)}
-                                                        className={user.active ? 'text-red-500 hover:text-red-700 hover:bg-red-50' : 'text-green-500 hover:text-green-700 hover:bg-green-50'}
+                                                        className={user.active ? 'text-destructive hover:text-destructive/90 hover:bg-destructive/10' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}
                                                     >
                                                         {user.active ? <Trash2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
                                                     </Button>

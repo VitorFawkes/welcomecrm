@@ -329,11 +329,11 @@ export default function StudioStructure() {
         <div className="h-full flex flex-col p-6 max-w-[1800px] mx-auto overflow-hidden">
             <div className="flex justify-between items-center mb-6 flex-shrink-0">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Layout className="w-6 h-6 text-indigo-600" />
+                    <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                        <Layout className="w-6 h-6 text-primary" />
                         Construtor de Pipeline
                     </h2>
-                    <p className="text-gray-500 mt-1">Gerencie macro-áreas e etapas visualmente.</p>
+                    <p className="text-muted-foreground mt-1">Gerencie macro-áreas e etapas visualmente.</p>
                 </div>
                 <button
                     onClick={() => {
@@ -349,8 +349,8 @@ export default function StudioStructure() {
                     className={cn(
                         "flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-all font-medium",
                         localPhases.filter(p => p.active && p.name !== 'Marketing').length >= 6
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                            ? "bg-muted text-muted-foreground cursor-not-allowed"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90"
                     )}
                     title={localPhases.filter(p => p.active && p.name !== 'Marketing').length >= 4 ? "Limite de gestão atingido (Máx. 4 áreas)" : "Nova Macro-Área"}
                 >
