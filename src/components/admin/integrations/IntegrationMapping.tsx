@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { GitBranch, User, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export function IntegrationMapping() {
     const queryClient = useQueryClient();
@@ -77,7 +78,21 @@ export function IntegrationMapping() {
         }
     });
 
-    // 5. Audit: Detect External Stages/Users from Events
+    // 5. Fetch Catalog (Source of Truth for Names)
+    const { data: catalogStages } = useQuery({
+        queryKey: ['integration-catalog', integrationId],
+        enabled: !!integrationId,
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('integration_catalog')
+                .select('*')
+                .eq('integration_id', integrationId!)
+                .eq('entity_type', 'stage');
+            return data || [];
+        }
+    });
+
+    // 6. Audit: Detect External Stages/Users from Events
     const { data: detectedStages } = useQuery({
         queryKey: ['detected-stages', integrationId],
         enabled: !!integrationId,
@@ -137,6 +152,22 @@ export function IntegrationMapping() {
 
     // --- Mutations ---
 
+    const syncCatalog = useMutation({
+        mutationFn: async () => {
+            if (!integrationId) return;
+            const { data, error } = await supabase.functions.invoke('integration-sync-catalog', {
+                body: { integration_id: integrationId }
+            });
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            toast.success(`Catálogo sincronizado: ${data.stages_synced} estágios atualizados.`);
+            queryClient.invalidateQueries({ queryKey: ['integration-catalog'] });
+        },
+        onError: (e) => toast.error('Erro ao sincronizar: ' + e.message)
+    });
+
     const saveStageMapping = useMutation({
         mutationFn: async ({ externalId, pipelineId, internalStageId, externalName }: any) => {
             if (!integrationId) return;
@@ -190,33 +221,60 @@ export function IntegrationMapping() {
         label: `${u.nome} (${u.email})`
     })) || [];
 
+    // Combine Detected + Catalog for display
+    // We want to show all stages from catalog, AND any extra detected ones not in catalog
+    const combinedStages = [
+        ...(catalogStages?.map(s => ({
+            id: s.external_id,
+            name: s.external_name,
+            pipeline: s.parent_external_id,
+            source: 'catalog'
+        })) || []),
+        ...(detectedStages?.filter(ds => !catalogStages?.some(cs => cs.external_id === ds.id && cs.parent_external_id === ds.pipeline)).map(ds => ({
+            ...ds,
+            source: 'detected'
+        })) || [])
+    ];
+
     // --- Render ---
 
     return (
         <div className="space-y-6">
-            <div className="flex gap-4 border-b border-border pb-4">
+            <div className="flex gap-4 border-b border-border pb-4 justify-between items-center">
+                <div className="flex gap-4">
+                    <Button
+                        variant={activeTab === 'stages' ? 'default' : 'ghost'}
+                        onClick={() => setActiveTab('stages')}
+                        className="gap-2"
+                    >
+                        <GitBranch className="w-4 h-4" />
+                        Mapeamento de Estágios
+                    </Button>
+                    <Button
+                        variant={activeTab === 'users' ? 'default' : 'ghost'}
+                        onClick={() => setActiveTab('users')}
+                        className="gap-2"
+                    >
+                        <User className="w-4 h-4" />
+                        Mapeamento de Usuários
+                    </Button>
+                </div>
                 <Button
-                    variant={activeTab === 'stages' ? 'default' : 'ghost'}
-                    onClick={() => setActiveTab('stages')}
-                    className="gap-2"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncCatalog.mutate()}
+                    disabled={syncCatalog.isPending}
+                    className="gap-2 border-primary/20 hover:bg-primary/10 text-primary"
                 >
-                    <GitBranch className="w-4 h-4" />
-                    Mapeamento de Estágios
-                </Button>
-                <Button
-                    variant={activeTab === 'users' ? 'default' : 'ghost'}
-                    onClick={() => setActiveTab('users')}
-                    className="gap-2"
-                >
-                    <User className="w-4 h-4" />
-                    Mapeamento de Usuários
+                    <Check className={cn("w-4 h-4", syncCatalog.isPending ? "animate-spin" : "")} />
+                    {syncCatalog.isPending ? 'Sincronizando...' : 'Sincronizar Catálogo AC'}
                 </Button>
             </div>
 
             {activeTab === 'stages' && (
                 <Card className="bg-card border-border">
                     <CardHeader>
-                        <CardTitle className="text-foreground">Estágios Detectados (Pipelines 6 e 8)</CardTitle>
+                        <CardTitle className="text-foreground">Estágios (Catálogo + Detectados)</CardTitle>
                         <CardDescription>
                             Associe os estágios do ActiveCampaign aos estágios do Welcome CRM.
                             <br />
@@ -225,7 +283,7 @@ export function IntegrationMapping() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {detectedStages?.map(stage => {
+                            {combinedStages?.map(stage => {
                                 const mapping = stageMappings?.find(
                                     m => m.pipeline_id === stage.pipeline && m.external_stage_id === stage.id
                                 );
@@ -237,6 +295,7 @@ export function IntegrationMapping() {
                                                 <Badge variant="outline">Pipeline {stage.pipeline}</Badge>
                                                 <span className="font-medium text-foreground">{stage.name}</span>
                                                 <span className="text-xs text-muted-foreground font-mono">ID: {stage.id}</span>
+                                                {stage.source === 'catalog' && <Badge variant="secondary" className="text-[10px] h-5">Catálogo</Badge>}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -258,9 +317,9 @@ export function IntegrationMapping() {
                                     </div>
                                 );
                             })}
-                            {(!detectedStages || detectedStages.length === 0) && (
+                            {(!combinedStages || combinedStages.length === 0) && (
                                 <div className="text-center py-8 text-muted-foreground">
-                                    Nenhum estágio detectado ainda. Importe eventos ou aguarde webhooks.
+                                    Nenhum estágio encontrado. Sincronize o catálogo ou aguarde eventos.
                                 </div>
                             )}
                         </div>

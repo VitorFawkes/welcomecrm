@@ -76,6 +76,31 @@ export function IntegrationImport() {
         enabled: !!integrationId
     });
 
+    // Fetch Catalog for Names
+    const { data: catalogStages } = useQuery({
+        queryKey: ['integration-catalog', integrationId],
+        enabled: !!integrationId,
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('integration_catalog')
+                .select('*')
+                .eq('integration_id', integrationId!)
+                .eq('entity_type', 'stage');
+            return data || [];
+        }
+    });
+
+    // Fetch Welcome Stages for Names
+    const { data: welcomeStages } = useQuery({
+        queryKey: ['pipeline-stages-all'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('pipeline_stages')
+                .select('id, nome');
+            return data || [];
+        }
+    });
+
     const validateUuid = (id: string) => {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         return uuidRegex.test(id);
@@ -416,6 +441,7 @@ export function IntegrationImport() {
                                             <th className="p-3">ID</th>
                                             <th className="p-3">Pipeline (AC)</th>
                                             <th className="p-3">Stage (AC &rarr; Welcome)</th>
+                                            {importMode === 'new_lead' && <th className="p-3 text-blue-400">Target Stage (Welcome)</th>}
                                             <th className="p-3">Deal ID</th>
                                             <th className="p-3">Change Type</th>
                                         </tr>
@@ -427,17 +453,22 @@ export function IntegrationImport() {
                                             const mapping = stageMappings?.find(m => m.external_stage_id === acStageId && m.pipeline_id === acPipelineId);
 
                                             let welcomeStageId = mapping?.internal_stage_id;
-                                            let isDefault = false;
+                                            let targetStage = null;
+
+                                            // Resolve Names
+                                            const acStageName = catalogStages?.find(s => s.external_id === acStageId && s.parent_external_id === acPipelineId)?.external_name || acStageId || '-';
+                                            const welcomeStageName = welcomeStages?.find(s => s.id === welcomeStageId)?.nome || welcomeStageId;
 
                                             // Override for New Lead Mode
                                             if (importMode === 'new_lead') {
                                                 if (defaultStageId) {
-                                                    welcomeStageId = defaultStageId;
-                                                    isDefault = true;
+                                                    targetStage = defaultStageId;
                                                 } else if (welcomeStageId) {
-                                                    // Keep mapped stage
+                                                    targetStage = welcomeStageId;
                                                 }
                                             }
+
+                                            const targetStageName = welcomeStages?.find(s => s.id === targetStage)?.nome || targetStage;
 
                                             return (
                                                 <tr key={i} className="hover:bg-muted/50">
@@ -456,18 +487,32 @@ export function IntegrationImport() {
                                                     </td>
                                                     <td className="p-3">
                                                         <div className="flex flex-col gap-1">
-                                                            <span className="text-xs text-muted-foreground">AC: {acStageId || '-'}</span>
+                                                            <span className="text-xs text-muted-foreground" title={acStageId}>AC: {acStageName}</span>
                                                             {welcomeStageId ? (
-                                                                <span className={cn("text-xs flex items-center gap-1", isDefault ? "text-blue-400" : "text-green-400")}>
+                                                                <span className="text-xs text-green-400 flex items-center gap-1" title={welcomeStageId}>
                                                                     <Check className="w-3 h-3" />
-                                                                    {welcomeStageId.slice(0, 8)}...
-                                                                    {isDefault && "(Target)"}
+                                                                    {welcomeStageName}
                                                                 </span>
                                                             ) : (
                                                                 acStageId && <span className="text-xs text-red-400">Sem Mapa</span>
                                                             )}
                                                         </div>
                                                     </td>
+                                                    {importMode === 'new_lead' && (
+                                                        <td className="p-3">
+                                                            {targetStage ? (
+                                                                <span className="text-xs text-blue-400 flex items-center gap-1 font-bold" title={targetStage}>
+                                                                    <CheckCircle2 className="w-3 h-3" />
+                                                                    {targetStageName}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs text-red-400 flex items-center gap-1">
+                                                                    <AlertTriangle className="w-3 h-3" />
+                                                                    Indefinido
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                     <td className="p-3 font-mono text-xs text-foreground">{row.deal_id}</td>
                                                     <td className="p-3 text-muted-foreground">{row.change_type}</td>
                                                 </tr>

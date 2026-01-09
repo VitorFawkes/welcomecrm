@@ -62,9 +62,31 @@ Deno.serve(async (req) => {
             })
         }
 
-        // 2. Fetch Mappings & Config
+        // 2. Fetch Mappings & Config & Catalog
         const { data: stageMappings } = await supabase.from('integration_stage_map').select('*')
         const { data: userMappings } = await supabase.from('integration_user_map').select('*')
+
+        // Fetch Catalog (AC Names)
+        const { data: catalogStages } = await supabase
+            .from('integration_catalog')
+            .select('external_id, external_name, parent_external_id')
+            .eq('entity_type', 'stage');
+
+        // Fetch Welcome Stages (Internal Names)
+        const { data: welcomeStages } = await supabase
+            .from('pipeline_stages')
+            .select('id, nome');
+
+        // Helper to get names
+        const getACStageName = (id: string, pipelineId: string) => {
+            const stage = catalogStages?.find(s => s.external_id === id && s.parent_external_id === pipelineId);
+            return stage?.external_name || '(nome desconhecido)';
+        }
+
+        const getWelcomeStageName = (id: string) => {
+            const stage = welcomeStages?.find(s => s.id === id);
+            return stage?.nome || '(nome desconhecido)';
+        }
 
         // 3. Process Events
         const results = []
@@ -106,20 +128,35 @@ Deno.serve(async (req) => {
 
                     const userMapFound = userMappings?.find(m => m.external_id === ownerId);
 
+                    const acStageName = getACStageName(stageId, pipelineId);
+
                     // MODE SPECIFIC LOGIC
                     if (importMode === 'replay') {
                         // REPLAY MODE: Strict Snapshot & Mapping
                         const hasSnapshot = payload.deal_state || (entity === 'deal');
+                        const isStageChange = payload.change_type === 'd_stageid' || entity === 'deal'; // 'deal' implies initial state
+                        const isCustomField = payload.change_type === 'custom_field_data';
 
-                        if (!hasSnapshot) {
+                        if (!hasSnapshot && !isCustomField) {
+                            // Allow custom_field_data without snapshot if we want to be lenient, 
+                            // but usually replay needs snapshot first. 
+                            // However, user said "custom_field_data NÃO bloqueia por stage".
+                            // Let's stick to: if it's custom_field, we process it (shadow) even if stage map missing.
+                        }
+
+                        if (!hasSnapshot && !isCustomField) {
                             status = 'blocked'
                             log = `Blocked (Replay): Missing Snapshot (deal_state or entity=deal). dealActivity cannot define initial stage.`
                             stats.blocked++;
-                        } else if (stageId && !stageMap) {
+                        } else if (isStageChange && stageId && !stageMap) {
+                            // Only block on stage map if it IS a stage change or initial deal
                             status = 'blocked'
-                            log = `Blocked (Replay): Missing mapping for Stage ID ${stageId} (Pipeline ${pipelineId})`
+                            log = `Blocked (Replay): Missing mapping for Stage "${acStageName}" (ID ${stageId}) in Pipeline ${pipelineId}`
                             stats.blocked++;
                         } else if (ownerId && !userMapFound) {
+                            // User map is usually critical for ownership, but maybe we can relax for custom fields too?
+                            // User didn't specify. Let's keep strict for owner for now, or maybe relax?
+                            // "Bloqueio indevido por Stage" was the complaint.
                             status = 'blocked'
                             log = `Blocked (Replay): Missing mapping for Owner ID ${ownerId}`
                             stats.blocked++;
@@ -127,9 +164,16 @@ Deno.serve(async (req) => {
                             // All good -> Shadow Mode
                             const internalStage = stageMap?.internal_stage_id || '?'
                             const internalUser = userMapFound?.internal_user_id || '?'
+                            const welcomeStageName = getWelcomeStageName(internalStage);
 
                             // ENHANCED LOGGING
-                            const mappingLog = `[MAPPING] AC(p:${pipelineId}, s:${stageId}) -> Welcome(s:${internalStage})`;
+                            let mappingLog = '';
+                            if (stageMap) {
+                                mappingLog = `[MAPPING] AC(p:${pipelineId}, s:${stageId} "${acStageName}") -> Welcome(s:${internalStage} "${welcomeStageName}")`;
+                            } else {
+                                mappingLog = `[MAPPING] No Stage Map (Allowed for ${payload.change_type})`;
+                            }
+
                             log = `${mappingLog}. WOULD SYNC (Replay): Deal ${event.external_id} -> Owner ${internalUser}`
                             stats.updated++;
                         }
@@ -144,12 +188,14 @@ Deno.serve(async (req) => {
 
                         if (!targetStage) {
                             status = 'blocked'
-                            log = `Blocked (New Lead): No target stage determined (Default Stage not set, and no mapping for original stage ${stageId})`
+                            log = `Blocked (New Lead): No target stage determined (Default Stage not set, and no mapping for original stage ${stageId} "${acStageName}")`
                             stats.blocked++;
                         } else {
                             const internalUser = userMapFound?.internal_user_id || '?'
+                            const welcomeStageName = getWelcomeStageName(targetStage);
+
                             // ENHANCED LOGGING
-                            const mappingLog = `[MAPPING] AC(p:${pipelineId}, s:${stageId}) -> Welcome(s:${targetStage})`;
+                            const mappingLog = `[MAPPING] AC(p:${pipelineId}, s:${stageId} "${acStageName}") -> Welcome(s:${targetStage} "${welcomeStageName}")`;
                             log = `[IMPORT] mode=${importMode} target_stage=${targetStage}. ${mappingLog}. WOULD CREATE (New Lead): Deal ${event.external_id} -> Owner ${internalUser}`
                             stats.updated++;
                         }

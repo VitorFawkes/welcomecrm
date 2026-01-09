@@ -103,6 +103,39 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_catalog: {
+        Row: {
+          id: string
+          integration_id: string
+          entity_type: string
+          external_id: string
+          external_name: string
+          parent_external_id: string | null
+          metadata: Json | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          integration_id: string
+          entity_type: string
+          external_id: string
+          external_name: string
+          parent_external_id?: string | null
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          integration_id?: string
+          entity_type?: string
+          external_id?: string
+          external_name?: string
+          parent_external_id?: string | null
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       integration_settings: {
         Row: {
           key: string

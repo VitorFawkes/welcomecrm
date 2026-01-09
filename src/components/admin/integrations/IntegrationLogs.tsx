@@ -135,6 +135,44 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
         refetchInterval: 5000,
     });
 
+    // Fetch Catalog for Names (AC)
+    const { data: catalogStages } = useQuery({
+        queryKey: ['integration-catalog-logs', integrationId],
+        enabled: !!integrationId,
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('integration_catalog')
+                .select('*')
+                .eq('integration_id', integrationId!)
+                .eq('entity_type', 'stage');
+            return data || [];
+        }
+    });
+
+    // Fetch Welcome Stages for Names
+    const { data: welcomeStages } = useQuery({
+        queryKey: ['pipeline-stages-logs'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('pipeline_stages')
+                .select('id, nome');
+            return data || [];
+        }
+    });
+
+    // Fetch Mappings
+    const { data: stageMappings } = useQuery({
+        queryKey: ['integration-stage-map-logs', integrationId],
+        enabled: !!integrationId,
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('integration_stage_map')
+                .select('*')
+                .eq('integration_id', integrationId!);
+            return data || [];
+        }
+    });
+
     // --- Metrics ---
     const totalEvents = events?.length || 0;
     const successCount = events?.filter(e => ['success', 'processed', 'processed_shadow'].includes(e.status)).length || 0;
@@ -205,6 +243,7 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                                 <tr>
                                     <th className="text-left p-3 font-medium">Status</th>
                                     <th className="text-left p-3 font-medium">Entidade</th>
+                                    <th className="text-left p-3 font-medium">Stage Info (AC &rarr; Welcome)</th>
                                     <th className="text-left p-3 font-medium">ID Externo</th>
                                     <th className="text-left p-3 font-medium">Quando</th>
                                     <th className="text-right p-3 font-medium">Ações</th>
@@ -214,6 +253,55 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                                 {events?.map((event) => {
                                     const config = STATUS_CONFIG[event.status] || STATUS_CONFIG.pending;
                                     const Icon = config.icon;
+
+                                    // Resolve Stage Info
+                                    const payload = event.payload || {};
+                                    const acStageId = payload.stage || payload.stage_id;
+                                    const acPipelineId = payload.pipeline || payload.pipeline_id;
+                                    const entity = event.entity_type;
+                                    const changeType = payload.change_type;
+
+                                    // Determine if Stage Info is relevant
+                                    const isStageRelevant =
+                                        (entity === 'deal' && (!changeType || changeType === 'd_stageid')) || // Deal snapshot or stage change
+                                        (entity === 'dealActivity' && changeType === 'd_stageid') || // Activity stage change
+                                        (payload.import_mode === 'new_lead'); // New Lead always targets a stage
+
+                                    let stageInfo = null;
+
+                                    if (isStageRelevant && (acStageId || payload.default_stage_id)) {
+                                        const acStageName = catalogStages?.find(s => s.external_id === acStageId && s.parent_external_id === acPipelineId)?.external_name || acStageId;
+
+                                        // Determine Target Stage
+                                        let targetStageId = null;
+                                        if (payload.import_mode === 'new_lead' && payload.default_stage_id) {
+                                            targetStageId = payload.default_stage_id;
+                                        } else {
+                                            const mapping = stageMappings?.find(m => m.external_stage_id === acStageId && m.pipeline_id === acPipelineId);
+                                            targetStageId = mapping?.internal_stage_id;
+                                        }
+
+                                        const welcomeStageName = welcomeStages?.find(s => s.id === targetStageId)?.nome || (targetStageId ? targetStageId.slice(0, 8) + '...' : '?');
+
+                                        stageInfo = (
+                                            <div className="flex flex-col text-xs">
+                                                <span className="text-muted-foreground" title={`AC ID: ${acStageId}`}>
+                                                    AC: {acStageName} <span className="text-[10px] opacity-50">({acStageId})</span>
+                                                </span>
+                                                <span className={cn("flex items-center gap-1", targetStageId ? "text-green-600" : "text-red-400")} title={`Welcome ID: ${targetStageId}`}>
+                                                    &rarr; {welcomeStageName}
+                                                </span>
+                                            </div>
+                                        );
+                                    } else if (!isStageRelevant) {
+                                        // Show relevant info for other types if possible
+                                        if (changeType === 'custom_field_data') {
+                                            stageInfo = <span className="text-xs text-muted-foreground">Field Update</span>
+                                        } else if (entity === 'contactAutomation') {
+                                            stageInfo = <span className="text-xs text-muted-foreground">Automation</span>
+                                        }
+                                    }
+
                                     return (
                                         <tr key={event.id} className="hover:bg-muted/50 transition-colors">
                                             <td className="p-3">
@@ -224,6 +312,9 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                                             </td>
                                             <td className="p-3 font-mono text-xs">
                                                 {event.entity_type || event.action || '-'}
+                                            </td>
+                                            <td className="p-3">
+                                                {stageInfo || <span className="text-muted-foreground">-</span>}
                                             </td>
                                             <td className="p-3 font-mono text-xs text-muted-foreground">
                                                 {event.external_id || event.internal_id || '-'}
