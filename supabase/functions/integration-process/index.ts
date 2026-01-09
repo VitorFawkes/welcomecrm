@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
                             const internalUser = userMapFound?.internal_user_id || '?'
                             // ENHANCED LOGGING
                             const mappingLog = `[MAPPING] AC(p:${pipelineId}, s:${stageId}) -> Welcome(s:${targetStage})`;
-                            log = `${mappingLog}. WOULD CREATE (New Lead): Deal ${event.external_id} -> Owner ${internalUser}`
+                            log = `[IMPORT] mode=${importMode} target_stage=${targetStage}. ${mappingLog}. WOULD CREATE (New Lead): Deal ${event.external_id} -> Owner ${internalUser}`
                             stats.updated++;
                         }
                     }

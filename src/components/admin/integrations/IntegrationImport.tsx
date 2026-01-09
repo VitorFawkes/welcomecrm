@@ -33,8 +33,31 @@ export function IntegrationImport() {
     const [file, setFile] = useState<File | null>(null);
     const [previewData, setPreviewData] = useState<any[]>([]);
     const [debugInfo, setDebugInfo] = useState<{ headers: string[], firstRow: any } | null>(null);
-    const [importMode, setImportMode] = useState<'replay' | 'new_lead'>('replay');
-    const [defaultStageId, setDefaultStageId] = useState<string>('');
+    // State with Persistence
+    const [importMode, setImportModeState] = useState<'replay' | 'new_lead'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('import_mode') as 'replay' | 'new_lead') || 'replay';
+        }
+        return 'replay';
+    });
+
+    const [defaultStageId, setDefaultStageIdState] = useState<string>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('import_default_stage_id') || '';
+        }
+        return '';
+    });
+
+    const setImportMode = (mode: 'replay' | 'new_lead') => {
+        setImportModeState(mode);
+        localStorage.setItem('import_mode', mode);
+    };
+
+    const setDefaultStageId = (id: string) => {
+        setDefaultStageIdState(id);
+        localStorage.setItem('import_default_stage_id', id);
+    };
+
     const [defaultStageError, setDefaultStageError] = useState<string | null>(null);
     const [, setIsParsing] = useState(false);
 
@@ -342,7 +365,7 @@ export function IntegrationImport() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {debugInfo && (
-                                <div className="p-3 bg-muted/50 rounded text-xs font-mono overflow-x-auto mb-4 border border-dashed">
+                                <div className="p-3 bg-muted/50 rounded text-xs font-mono overflow-auto max-h-40 mb-4 border border-dashed break-all whitespace-pre-wrap">
                                     <p className="font-bold mb-1">Debug Info:</p>
                                     <p>Headers: {JSON.stringify(debugInfo.headers)}</p>
                                     <p className="mt-1">First Row: {JSON.stringify(debugInfo.firstRow)}</p>
@@ -402,7 +425,19 @@ export function IntegrationImport() {
                                             const acStageId = row.stage || row.stage_id;
                                             const acPipelineId = row.pipeline || row.pipeline_id;
                                             const mapping = stageMappings?.find(m => m.external_stage_id === acStageId && m.pipeline_id === acPipelineId);
-                                            const welcomeStageId = mapping?.internal_stage_id;
+
+                                            let welcomeStageId = mapping?.internal_stage_id;
+                                            let isDefault = false;
+
+                                            // Override for New Lead Mode
+                                            if (importMode === 'new_lead') {
+                                                if (defaultStageId) {
+                                                    welcomeStageId = defaultStageId;
+                                                    isDefault = true;
+                                                } else if (welcomeStageId) {
+                                                    // Keep mapped stage
+                                                }
+                                            }
 
                                             return (
                                                 <tr key={i} className="hover:bg-muted/50">
@@ -423,9 +458,10 @@ export function IntegrationImport() {
                                                         <div className="flex flex-col gap-1">
                                                             <span className="text-xs text-muted-foreground">AC: {acStageId || '-'}</span>
                                                             {welcomeStageId ? (
-                                                                <span className="text-xs text-green-400 flex items-center gap-1">
+                                                                <span className={cn("text-xs flex items-center gap-1", isDefault ? "text-blue-400" : "text-green-400")}>
                                                                     <Check className="w-3 h-3" />
                                                                     {welcomeStageId.slice(0, 8)}...
+                                                                    {isDefault && "(Target)"}
                                                                 </span>
                                                             ) : (
                                                                 acStageId && <span className="text-xs text-red-400">Sem Mapa</span>
