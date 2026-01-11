@@ -137,7 +137,7 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
 
     // Fetch Catalog for Names (AC)
     const { data: catalogStages } = useQuery({
-        queryKey: ['integration-catalog-logs', integrationId],
+        queryKey: ['integration-catalog-logs-stages', integrationId],
         enabled: !!integrationId,
         queryFn: async () => {
             const { data } = await supabase
@@ -145,6 +145,19 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                 .select('*')
                 .eq('integration_id', integrationId!)
                 .eq('entity_type', 'stage');
+            return data || [];
+        }
+    });
+
+    const { data: catalogFields } = useQuery({
+        queryKey: ['integration-catalog-logs-fields', integrationId],
+        enabled: !!integrationId,
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('integration_catalog')
+                .select('*')
+                .eq('integration_id', integrationId!)
+                .eq('entity_type', 'field');
             return data || [];
         }
     });
@@ -296,7 +309,14 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                                     } else if (!isStageRelevant) {
                                         // Show relevant info for other types if possible
                                         if (changeType === 'custom_field_data') {
-                                            stageInfo = <span className="text-xs text-muted-foreground">Field Update</span>
+                                            const fieldId = payload.field_id || payload.relid;
+                                            const fieldName = catalogFields?.find(f => f.external_id === fieldId)?.external_name || fieldId;
+                                            stageInfo = (
+                                                <div className="flex flex-col text-xs">
+                                                    <span className="text-muted-foreground">Field: {fieldName}</span>
+                                                    <span className="text-[10px] opacity-50 truncate max-w-[150px]">{payload.value}</span>
+                                                </div>
+                                            );
                                         } else if (entity === 'contactAutomation') {
                                             stageInfo = <span className="text-xs text-muted-foreground">Automation</span>
                                         }

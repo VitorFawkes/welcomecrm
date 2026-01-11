@@ -1,6 +1,7 @@
 import { Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import Sidebar from './Sidebar'
+import { ThemeBoundary } from "../ui/ThemeBoundary";
 
 
 export default function Layout() {
@@ -19,14 +20,16 @@ export default function Layout() {
     }
 
     return (
-        <div className="fixed inset-0 flex bg-gray-100 overflow-hidden">
-            <Sidebar />
-            <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="fixed inset-0 flex overflow-hidden">
+            <ThemeBoundary mode="dark" className="flex-shrink-0">
+                <Sidebar />
+            </ThemeBoundary>
 
-                <main className="flex-1 relative flex flex-col overflow-hidden bg-muted">
+            <ThemeBoundary mode="light" className="flex flex-1 flex-col overflow-hidden relative">
+                <main className="flex-1 relative flex flex-col overflow-hidden bg-surface-secondary">
                     <Outlet />
                 </main>
-            </div>
+            </ThemeBoundary>
         </div>
-    )
+    );
 }

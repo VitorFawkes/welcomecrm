@@ -78,7 +78,7 @@ export function IntegrationsPage() {
                     </TabsContent>
 
                     <TabsContent value="mapping">
-                        <IntegrationMapping />
+                        <IntegrationMapping integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
                     </TabsContent>
 
                     <TabsContent value="import">

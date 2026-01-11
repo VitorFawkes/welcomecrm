@@ -20,10 +20,30 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 85%;
-    --input: 214.3 31.8% 85%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* --- ELITE SEMANTIC TOKENS (LIGHT UNIVERSE) --- */
+    --surface-primary: 0 0% 100%;
+    /* White */
+    --surface-secondary: 210 40% 96.1%;
+    /* Gray-50/100 */
+    --surface-tertiary: 210 40% 93%;
+    /* Gray-200 */
+    --border-subtle: 214.3 31.8% 91.4%;
+    /* Gray-200 */
+    --border-strong: 214.3 31.8% 80%;
+    /* Gray-300 */
+    --text-primary: 222.2 84% 4.9%;
+    /* Gray-900 */
+    --text-secondary: 215.4 16.3% 46.9%;
+    /* Gray-500 */
+    --status-neutral-bg: 210 40% 96.1%;
+    /* Gray-100 */
+    --status-neutral-text: 215.4 16.3% 46.9%;
+    /* Gray-600 */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -51,6 +71,26 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* --- ELITE SEMANTIC TOKENS (DARK UNIVERSE) --- */
+    --surface-primary: 222.2 84% 4.9%;
+    /* Gray-950 */
+    --surface-secondary: 217.2 32.6% 17.5%;
+    /* Gray-900/Muted */
+    --surface-tertiary: 217.2 32.6% 25%;
+    /* Gray-800 */
+    --border-subtle: 0 0% 100% 0.1;
+    /* White/10 */
+    --border-strong: 0 0% 100% 0.2;
+    /* White/20 */
+    --text-primary: 210 40% 98%;
+    /* White */
+    --text-secondary: 215 20.2% 65.1%;
+    /* Gray-400 */
+    --status-neutral-bg: 0 0% 100% 0.1;
+    /* White/10 */
+    --status-neutral-text: 210 40% 98%;
+    /* White */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;

@@ -258,6 +258,7 @@ export type Database = {
           id: string
           integration_id: string
           pipeline_id: string
+          external_pipeline_id: string | null
           external_list_id: string | null
           business_unit: string
           is_active: boolean
@@ -267,6 +268,7 @@ export type Database = {
           id?: string
           integration_id: string
           pipeline_id: string
+          external_pipeline_id?: string | null
           external_list_id?: string | null
           business_unit: string
           is_active?: boolean
@@ -276,6 +278,7 @@ export type Database = {
           id?: string
           integration_id?: string
           pipeline_id?: string
+          external_pipeline_id?: string | null
           external_list_id?: string | null
           business_unit?: string
           is_active?: boolean
@@ -287,32 +290,29 @@ export type Database = {
         Row: {
           id: string
           integration_id: string
-          local_entity: string
-          local_field: string
-          remote_field: string
+          entity_type: string
+          local_field_key: string
+          external_field_id: string
           direction: string
-          is_active: boolean
-          created_at: string
+          source: string
         }
         Insert: {
           id?: string
           integration_id: string
-          local_entity: string
-          local_field: string
-          remote_field: string
+          entity_type: string
+          local_field_key: string
+          external_field_id: string
           direction: string
-          is_active?: boolean
-          created_at?: string
+          source: string
         }
         Update: {
           id?: string
           integration_id?: string
-          local_entity?: string
-          local_field?: string
-          remote_field?: string
+          entity_type?: string
+          local_field_key?: string
+          external_field_id?: string
           direction?: string
-          is_active?: boolean
-          created_at?: string
+          source?: string
         }
         Relationships: []
       }
