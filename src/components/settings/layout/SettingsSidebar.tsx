@@ -7,9 +7,9 @@ import {
     LayoutList,
     Tags,
     Webhook,
-    MessageSquare,
     Activity,
-    Users as UsersIcon
+    Users as UsersIcon,
+    MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -168,6 +168,7 @@ export default function SettingsSidebar() {
                                     </>
                                 )}
                             </NavLink>
+
                             <NavLink
                                 to="/settings/system/health"
                                 className={({ isActive }) => cn(

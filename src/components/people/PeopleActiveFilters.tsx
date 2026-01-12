@@ -20,7 +20,6 @@ export function PeopleActiveFilters({ filters, setFilters }: PeopleActiveFilters
         filters.lastTripAfter ||
         filters.lastTripBefore ||
         filters.isGroupLeader ||
-        (filters.tags && filters.tags.length > 0) ||
         (filters.createdByIds && filters.createdByIds.length > 0) ||
         filters.createdAtStart ||
         filters.createdAtEnd
@@ -75,10 +74,6 @@ export function PeopleActiveFilters({ filters, setFilters }: PeopleActiveFilters
                     return <Chip key={id} label={`Criado por: ${name}`} onRemove={() => removeFilter('createdByIds', id)} />
                 })}
 
-                {/* Tags */}
-                {filters.tags?.map(tag => (
-                    <Chip key={tag} label={`Tag: ${tag}`} onRemove={() => removeFilter('tags', tag)} />
-                ))}
 
                 {/* Last Trip Date */}
                 {(filters.lastTripAfter || filters.lastTripBefore) && (

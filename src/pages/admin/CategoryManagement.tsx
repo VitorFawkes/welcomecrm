@@ -1,32 +1,34 @@
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/Select";
 import { toast } from 'sonner';
 import {
-    Plus,
-    Trash2,
-    Eye,
-    EyeOff,
-    Loader2,
-    Save,
     Tags,
-    AlertTriangle,
-    Archive
+    GitPullRequest,
+    AlertCircle
 } from 'lucide-react';
 import AdminPageHeader from '../../components/admin/ui/AdminPageHeader';
+import { CategoryContextCard } from '../../components/admin/categories/CategoryContextCard';
+import { Loader2 } from 'lucide-react';
+
+// Configuration for the different contexts
+const CONTEXTS = [
+    {
+        id: 'change_request',
+        title: 'Solicitações de Mudança',
+        description: 'Define as opções disponíveis para o agente ao classificar o motivo de uma alteração em uma reserva ou ficha.',
+        icon: <GitPullRequest className="w-5 h-5" />
+    },
+    // Future contexts can be added here easily
+    // {
+    //     id: 'task_type',
+    //     title: 'Tipos de Tarefa',
+    //     description: 'Categorias gerais para organização de tarefas do dia a dia.',
+    //     icon: <Layers className="w-5 h-5" />
+    // }
+];
 
 export default function CategoryManagement() {
     const queryClient = useQueryClient();
-    const [isCreating, setIsCreating] = useState(false);
-
-    // New Category State
-    const [newScope, setNewScope] = useState('change_request');
-    const [newKey, setNewKey] = useState('');
-    const [newLabel, setNewLabel] = useState('');
 
     // Fetch Categories
     const { data: categories, isLoading } = useQuery({
@@ -35,7 +37,6 @@ export default function CategoryManagement() {
             const { data, error } = await supabase
                 .from('activity_categories')
                 .select('*')
-                .order('scope')
                 .order('label');
             if (error) throw error;
             return data;
@@ -43,14 +44,13 @@ export default function CategoryManagement() {
     });
 
     // Fetch Usage Counts (Intelligence)
-    const { data: usageCounts, isLoading: isLoadingCounts } = useQuery({
+    const { data: usageCounts } = useQuery({
         queryKey: ['category-usage'],
         queryFn: async () => {
             if (!categories) return {};
             const counts: Record<string, number> = {};
 
-            // Parallel queries for each category (acceptable for < 50 items)
-            // Ideally this would be a SQL View or RPC
+            // Parallel queries for each category
             await Promise.all(categories.map(async (cat) => {
                 if (cat.scope === 'change_request') {
                     const { count } = await supabase
@@ -60,7 +60,7 @@ export default function CategoryManagement() {
                         .eq('metadata->>change_category', cat.key);
                     counts[cat.key] = count || 0;
                 } else {
-                    counts[cat.key] = 0; // Unknown scope usage
+                    counts[cat.key] = 0;
                 }
             }));
 
@@ -71,25 +71,22 @@ export default function CategoryManagement() {
 
     // Create Mutation
     const createMutation = useMutation({
-        mutationFn: async () => {
-            // Auto-generate key if empty
-            const key = newKey || newLabel.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        mutationFn: async ({ scope, label }: { scope: string, label: string }) => {
+            // Auto-generate key
+            const key = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 
             const { error } = await supabase
                 .from('activity_categories')
                 .insert([{
-                    scope: newScope,
-                    key: key,
-                    label: newLabel,
+                    scope,
+                    key,
+                    label,
                     visible: true
                 }]);
             if (error) throw error;
         },
         onSuccess: () => {
-            toast.success("Categoria criada!");
-            setIsCreating(false);
-            setNewKey('');
-            setNewLabel('');
+            toast.success("Opção adicionada com sucesso!");
             queryClient.invalidateQueries({ queryKey: ['activity-categories'] });
         },
         onError: (error: Error) => {
@@ -125,7 +122,7 @@ export default function CategoryManagement() {
             if (error) throw error;
         },
         onSuccess: () => {
-            toast.success("Categoria removida!");
+            toast.success("Opção removida!");
             queryClient.invalidateQueries({ queryKey: ['activity-categories'] });
         },
         onError: (error: Error) => {
@@ -133,169 +130,66 @@ export default function CategoryManagement() {
         }
     });
 
-    const handleCreate = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newLabel) return;
-        createMutation.mutate();
-    };
-
-    // Stats Calculation
-    const totalCategories = categories?.length || 0;
-    const unusedCategories = categories?.filter(c => (usageCounts?.[c.key] || 0) === 0).length || 0;
-    const hiddenCategories = categories?.filter(c => !c.visible).length || 0;
-
     if (isLoading) {
-        return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+        return (
+            <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            </div>
+        );
     }
 
+    // Group categories by scope
+    const getCategoriesByScope = (scope: string) => {
+        return categories?.filter(c => c.scope === scope) || [];
+    };
+
+    // Find categories that don't match any known context (orphans)
+    const knownScopes = CONTEXTS.map(c => c.id);
+    const orphanCategories = categories?.filter(c => !knownScopes.includes(c.scope)) || [];
+
     return (
-        <div className="p-8">
+        <div className="p-8 max-w-[1600px] mx-auto space-y-8">
             <AdminPageHeader
                 title="Categorias & Motivos"
-                subtitle="Configure as opções disponíveis nos formulários de atividades."
-                icon={<Tags className="w-6 h-6" />}
-                actions={
-                    <Button onClick={() => setIsCreating(true)} className="gap-2">
-                        <Plus className="w-4 h-4" /> Nova Categoria
-                    </Button>
-                }
-                stats={[
-                    {
-                        label: 'Total',
-                        value: totalCategories,
-                        icon: <Tags className="w-3 h-3" />,
-                        color: 'blue'
-                    },
-                    {
-                        label: 'Não Utilizadas',
-                        value: unusedCategories,
-                        icon: <AlertTriangle className="w-3 h-3" />,
-                        color: unusedCategories > 0 ? 'yellow' : 'gray'
-                    },
-                    {
-                        label: 'Ocultas',
-                        value: hiddenCategories,
-                        icon: <EyeOff className="w-3 h-3" />,
-                        color: 'gray'
-                    }
-                ]}
+                subtitle="Configure as opções de classificação disponíveis em cada contexto do sistema."
+                icon={<Tags className="w-6 h-6 text-indigo-400" />}
+                actions={null} // Actions are now contextual
+                stats={[]} // Removed global stats to focus on context
             />
 
-            {isCreating && (
-                <div className="mb-8 p-6 bg-card rounded-xl border border-border shadow-sm animate-in fade-in slide-in-from-top-4">
-                    <h3 className="font-medium text-foreground mb-4">Nova Categoria</h3>
-                    <form onSubmit={handleCreate} className="grid gap-4 sm:grid-cols-4 items-end">
-                        <div className="grid gap-2">
-                            <Label>Escopo</Label>
-                            <Select
-                                value={newScope}
-                                onChange={setNewScope}
-                                options={[
-                                    { value: 'change_request', label: 'Solicitação de Mudança' }
-                                ]}
-                            />
-                        </div>
-                        <div className="grid gap-2 sm:col-span-2">
-                            <Label>Nome (Label)</Label>
-                            <Input
-                                value={newLabel}
-                                onChange={e => setNewLabel(e.target.value)}
-                                placeholder="Ex: Upgrade de Quarto"
-                                required
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <Button type="submit" disabled={createMutation.isPending} className="flex-1">
-                                {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                                Salvar
-                            </Button>
-                            <Button type="button" variant="ghost" onClick={() => setIsCreating(false)}>
-                                Cancelar
-                            </Button>
-                        </div>
-                    </form>
-                </div>
-            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {CONTEXTS.map(context => (
+                    <CategoryContextCard
+                        key={context.id}
+                        title={context.title}
+                        description={context.description}
+                        icon={context.icon}
+                        categories={(getCategoriesByScope(context.id) || []).map(c => ({ ...c, visible: c.visible ?? false }))}
+                        usageCounts={usageCounts || {}}
+                        onAdd={async (label) => {
+                            await createMutation.mutateAsync({ scope: context.id, label });
+                        }}
+                        onToggleVisibility={(key, visible) => toggleVisibilityMutation.mutate({ key, visible })}
+                        onDelete={(key) => deleteMutation.mutate(key)}
+                    />
+                ))}
 
-            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-muted border-b border-border">
-                        <tr>
-                            <th className="px-6 py-3 font-medium text-muted-foreground">Escopo</th>
-                            <th className="px-6 py-3 font-medium text-muted-foreground">Nome</th>
-                            <th className="px-6 py-3 font-medium text-muted-foreground">Chave (Key)</th>
-                            <th className="px-6 py-3 font-medium text-muted-foreground text-center">Uso</th>
-                            <th className="px-6 py-3 font-medium text-muted-foreground text-right">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                        {categories?.map((cat) => {
-                            const count = usageCounts?.[cat.key] || 0;
-                            const isUsed = count > 0;
-
-                            return (
-                                <tr key={cat.key} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-3 text-muted-foreground font-mono text-xs uppercase">{cat.scope}</td>
-                                    <td className="px-6 py-3 font-medium text-foreground">{cat.label}</td>
-                                    <td className="px-6 py-3 text-muted-foreground font-mono text-xs">{cat.key}</td>
-                                    <td className="px-6 py-3 text-center">
-                                        {isLoadingCounts ? (
-                                            <Loader2 className="w-3 h-3 animate-spin mx-auto text-muted-foreground" />
-                                        ) : (
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${isUsed ? 'bg-blue-50 text-blue-700' : 'bg-muted text-muted-foreground'}`}>
-                                                {count}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-3 text-right flex items-center justify-end gap-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => toggleVisibilityMutation.mutate({ key: cat.key, visible: !cat.visible })}
-                                            className={cat.visible ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" : "text-muted-foreground hover:text-foreground"}
-                                            title={cat.visible ? "Visível" : "Oculto"}
-                                        >
-                                            {cat.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                        </Button>
-
-                                        {isUsed ? (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                disabled
-                                                className="text-muted-foreground/50 cursor-not-allowed"
-                                                title="Não é possível excluir categorias em uso. Oculte-a em vez disso."
-                                            >
-                                                <Archive className="w-4 h-4" />
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    if (confirm('Tem certeza? Esta categoria não está em uso, mas a ação é irreversível.')) {
-                                                        deleteMutation.mutate(cat.key);
-                                                    }
-                                                }}
-                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                title="Excluir (Seguro)"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                        {categories?.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
-                                    Nenhuma categoria encontrada.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                {/* Fallback for unknown scopes if any exist */}
+                {orphanCategories.length > 0 && (
+                    <CategoryContextCard
+                        title="Outros / Legado"
+                        description="Categorias encontradas no sistema que não pertencem a um contexto ativo."
+                        icon={<AlertCircle className="w-5 h-5 text-amber-500" />}
+                        categories={orphanCategories.map(c => ({ ...c, visible: c.visible ?? false }))}
+                        usageCounts={usageCounts || {}}
+                        onAdd={async (label) => {
+                            // Default to 'other' scope for orphans
+                            await createMutation.mutateAsync({ scope: 'other', label });
+                        }}
+                        onToggleVisibility={(key, visible) => toggleVisibilityMutation.mutate({ key, visible })}
+                        onDelete={(key) => deleteMutation.mutate(key)}
+                    />
+                )}
             </div>
         </div>
     );

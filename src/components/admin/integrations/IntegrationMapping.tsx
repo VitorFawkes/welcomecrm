@@ -28,7 +28,6 @@ interface CatalogItem {
 }
 
 interface RouterConfig {
-    id: string;
     integration_id: string;
     external_pipeline_id: string;
     pipeline_id: string;

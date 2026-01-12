@@ -58,6 +58,11 @@
     - `useCardContacts(cardId)`: Manages all contact linking logic.
     - `useQualityGate()`: Checks if card can move stages.
 
+### Design System (The Law)
+-   **MANDATORY REFERENCE:** You MUST read `docs/DESIGN_SYSTEM.md` before writing any UI code.
+    -   **Rule #1:** Light Mode First. Never assume dark backgrounds.
+    -   **Rule #2:** No `text-white` on default backgrounds.
+
 ### Design System & UX (Premium Standards)
 - **Layout Architecture:**
     - **Viewport Units:** Use `dvh` (Dynamic Viewport Height) for full-screen layouts to handle mobile browser bars correctly.

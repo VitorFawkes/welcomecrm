@@ -16,7 +16,6 @@ export function ActiveFilters() {
         filters.sdrIds?.length ||
         filters.teamIds?.length ||
         filters.departmentIds?.length ||
-        filters.tags?.length ||
         filters.startDate ||
         filters.endDate ||
         filters.creationStartDate ||
@@ -74,10 +73,6 @@ export function ActiveFilters() {
                     return <Chip key={id} label={`Depto: ${name}`} onRemove={() => removeFilter('departmentIds', id)} />
                 })}
 
-                {/* Tags */}
-                {filters.tags?.map(tag => (
-                    <Chip key={tag} label={`Tag: ${tag}`} onRemove={() => removeFilter('tags', tag)} />
-                ))}
 
                 {/* Dates */}
                 {(filters.startDate || filters.endDate) && (

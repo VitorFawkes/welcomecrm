@@ -11,6 +11,7 @@ import ConversationHistory from '../components/card/ConversationHistory'
 import PessoasWidget from '../components/card/PessoasWidget'
 
 import ActivityFeed from '../components/card/ActivityFeed'
+import { ProposalsWidget } from '../components/card/ProposalsWidget'
 import { ParentLinkBanner } from '../components/cards/group/ParentLinkBanner'
 import GroupDetailLayout from '../components/cards/group/GroupDetailLayout'
 import { ArrowLeft } from 'lucide-react'
@@ -104,7 +105,8 @@ export default function CardDetail() {
                     {/* 3. Trip Details */}
                     <TripInformation card={card} />
 
-
+                    {/* 4. Proposals */}
+                    <ProposalsWidget cardId={card.id!} />
 
                     {/* Activity Feed (History) */}
                     <ActivityFeed cardId={card.id!} />

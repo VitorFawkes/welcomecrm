@@ -17,7 +17,6 @@ export interface FilterState {
     sdrIds?: string[] // Multi-select
     teamIds?: string[]
     departmentIds?: string[]
-    tags?: string[]
     sortBy?: SortBy
     sortDirection?: SortDirection
 }

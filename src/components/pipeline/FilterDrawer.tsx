@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Filter, Calendar, User, Tag, Users, Search, Clock } from 'lucide-react'
+import { X, Filter, Calendar, User, Users, Search, Clock } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { usePipelineFilters } from '../../hooks/usePipelineFilters'
 import { cn } from '../../lib/utils'
@@ -305,37 +305,6 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
                         </div>
                     </div>
 
-                    {/* Section: Details */}
-                    <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-                            <Tag className="h-3 w-3" /> Detalhes
-                        </h3>
-                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
-                            <label className="text-sm font-semibold text-gray-700 block">Tags</label>
-                            <div className="flex flex-wrap gap-2">
-                                {['VIP', 'Urgente', 'Lua de Mel', 'Corporativo', 'Indicação'].map(tag => (
-                                    <button
-                                        key={tag}
-                                        onClick={() => {
-                                            const currentTags = localFilters.tags || []
-                                            const newTags = currentTags.includes(tag)
-                                                ? currentTags.filter(t => t !== tag)
-                                                : [...currentTags, tag]
-                                            setLocalFilters(prev => ({ ...prev, tags: newTags }))
-                                        }}
-                                        className={cn(
-                                            "px-3 py-1 text-xs font-medium rounded-full border transition-all",
-                                            (localFilters.tags || []).includes(tag)
-                                                ? "bg-gray-900 text-white border-gray-900 shadow-sm"
-                                                : "border-gray-200 text-gray-600 hover:border-gray-900 hover:text-gray-900 bg-white"
-                                        )}
-                                    >
-                                        {tag}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Footer Actions */}

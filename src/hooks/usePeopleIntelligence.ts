@@ -27,7 +27,6 @@ export interface PeopleFilters {
     lastTripAfter?: string
     lastTripBefore?: string
     isGroupLeader?: boolean
-    tags?: string[]
     createdByIds?: string[]
     createdAtStart?: string
     createdAtEnd?: string
@@ -72,10 +71,6 @@ export function usePeopleIntelligence() {
                 query = query.eq('tipo_pessoa', filters.type)
             }
 
-            // Tags (Array overlap)
-            if (filters.tags && filters.tags.length > 0) {
-                query = query.contains('tags', filters.tags)
-            }
 
             // Created By
             if (filters.createdByIds && filters.createdByIds.length > 0) {

@@ -20,5 +20,12 @@
     *   **Old Way:** "I added the column. It works."
     *   **New Way:** "I added the column. I also queried the *old* columns (`is_group_parent`) and confirmed they are still there."
 
+## 4. The "Design System" Requirement
+**"An Agent must adhere to the 'Light Mode First' principle."**
+*   **Implementation:**
+    *   **READ:** `docs/DESIGN_SYSTEM.md` before writing any UI code.
+    *   **FORBIDDEN:** Using `text-white` or `bg-white/10` on default backgrounds.
+    *   **MANDATORY:** Use `border-slate-200` and `shadow-sm` for card depth in Light Mode.
+
 ---
 **Violation of this protocol is a Critical Engineering Failure.**

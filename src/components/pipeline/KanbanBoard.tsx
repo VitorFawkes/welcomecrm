@@ -150,12 +150,6 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             //     query = query.in('owner_department_id', filters.departmentIds)
             // }
 
-            // NEW: Tags Filter (using new view column)
-            // if (filters.tags?.length > 0) {
-            //     // Use JSONB containment operator @>
-            //     // We need to format the array as a Postgres array string or use .contains
-            //     // query = query.contains('tags', filters.tags)
-            // }
 
             if (filters.startDate) {
                 query = query.gte('data_viagem_inicio', filters.startDate)

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Kanban, Users, Settings } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, Settings, FileText } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { ProductSwitcher } from './ProductSwitcher'
 import { useAuth } from '../../contexts/AuthContext'
@@ -8,6 +8,7 @@ import NotificationCenter from './NotificationCenter'
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Funil', href: '/pipeline', icon: Kanban },
+    { name: 'Propostas', href: '/proposals', icon: FileText },
     { name: 'Grupos', href: '/groups', icon: Users },
     { name: 'Pessoas', href: '/people', icon: Users },
     { name: 'Configurações', href: '/settings', icon: Settings },

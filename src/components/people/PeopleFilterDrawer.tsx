@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Filter, Calendar, User, Tag, DollarSign, Crown } from 'lucide-react'
+import { X, Filter, Calendar, User, DollarSign, Crown } from 'lucide-react'
 import { Button } from '../ui/Button'
 import type { PeopleFilters } from '../../hooks/usePeopleIntelligence'
 import { cn } from '../../lib/utils'
@@ -47,7 +47,7 @@ export function PeopleFilterDrawer({ isOpen, onClose, filters, setFilters }: Peo
         })
     }
 
-    const toggleSelection = (field: 'createdByIds' | 'tags', value: string) => {
+    const toggleSelection = (field: 'createdByIds', value: string) => {
         setLocalFilters(prev => {
             const current = (prev[field] as string[]) || []
             const updated = current.includes(value)
@@ -242,32 +242,6 @@ export function PeopleFilterDrawer({ isOpen, onClose, filters, setFilters }: Peo
                                     )} />
                                 </div>
                             </label>
-                        </div>
-                    </div>
-
-                    {/* Section: Details */}
-                    <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-                            <Tag className="h-3 w-3" /> Detalhes
-                        </h3>
-                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
-                            <label className="text-sm font-semibold text-gray-700 block">Tags</label>
-                            <div className="flex flex-wrap gap-2">
-                                {['VIP', 'Urgente', 'Lua de Mel', 'Corporativo', 'Indicação'].map(tag => (
-                                    <button
-                                        key={tag}
-                                        onClick={() => toggleSelection('tags', tag)}
-                                        className={cn(
-                                            "px-3 py-1 text-xs font-medium rounded-full border transition-all",
-                                            (localFilters.tags || []).includes(tag)
-                                                ? "bg-gray-900 text-white border-gray-900 shadow-sm"
-                                                : "border-gray-200 text-gray-600 hover:border-gray-900 hover:text-gray-900 bg-white"
-                                        )}
-                                    >
-                                        {tag}
-                                    </button>
-                                ))}
-                            </div>
                         </div>
                     </div>
 

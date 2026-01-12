@@ -103,219 +103,6 @@ export type Database = {
         }
         Relationships: []
       }
-      integration_catalog: {
-        Row: {
-          id: string
-          integration_id: string
-          entity_type: string
-          external_id: string
-          external_name: string
-          parent_external_id: string | null
-          metadata: Json | null
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          integration_id: string
-          entity_type: string
-          external_id: string
-          external_name: string
-          parent_external_id?: string | null
-          metadata?: Json | null
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          integration_id?: string
-          entity_type?: string
-          external_id?: string
-          external_name?: string
-          parent_external_id?: string | null
-          metadata?: Json | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      integration_settings: {
-        Row: {
-          key: string
-          value: string
-          description: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          key: string
-          value: string
-          description?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          key?: string
-          value?: string
-          description?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      integration_events: {
-        Row: {
-          id: string
-          integration_id: string
-          source: string
-          entity_type: string
-          event_type: string
-          external_id: string | null
-          payload: Json
-          status: string
-          processing_log: string | null
-          error_log: string | null
-          attempts: number
-          created_at: string
-          updated_at: string
-          row_key: string | null
-        }
-        Insert: {
-          id?: string
-          integration_id: string
-          source: string
-          entity_type: string
-          event_type: string
-          external_id?: string | null
-          payload: Json
-          status?: string
-          processing_log?: string | null
-          error_log?: string | null
-          attempts?: number
-          created_at?: string
-          updated_at?: string
-          row_key?: string | null
-        }
-        Update: {
-          id?: string
-          integration_id?: string
-          source?: string
-          entity_type?: string
-          event_type?: string
-          external_id?: string | null
-          payload?: Json
-          status?: string
-          processing_log?: string | null
-          error_log?: string | null
-          attempts?: number
-          created_at?: string
-          updated_at?: string
-          row_key?: string | null
-        }
-        Relationships: []
-      }
-      integration_outbox: {
-        Row: {
-          id: string
-          integration_id: string
-          destination: string
-          entity_type: string
-          action: string
-          internal_id: string
-          payload: Json
-          status: string
-          retry_count: number
-          error_log: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          integration_id: string
-          destination: string
-          entity_type: string
-          action: string
-          internal_id: string
-          payload: Json
-          status?: string
-          retry_count?: number
-          error_log?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          integration_id?: string
-          destination?: string
-          entity_type?: string
-          action?: string
-          internal_id?: string
-          payload?: Json
-          status?: string
-          retry_count?: number
-          error_log?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      integration_router_config: {
-        Row: {
-          id: string
-          integration_id: string
-          pipeline_id: string
-          external_pipeline_id: string | null
-          external_list_id: string | null
-          business_unit: string
-          is_active: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          integration_id: string
-          pipeline_id: string
-          external_pipeline_id?: string | null
-          external_list_id?: string | null
-          business_unit: string
-          is_active?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          integration_id?: string
-          pipeline_id?: string
-          external_pipeline_id?: string | null
-          external_list_id?: string | null
-          business_unit?: string
-          is_active?: boolean
-          created_at?: string
-        }
-        Relationships: []
-      }
-      integration_field_map: {
-        Row: {
-          id: string
-          integration_id: string
-          entity_type: string
-          local_field_key: string
-          external_field_id: string
-          direction: string
-          source: string
-        }
-        Insert: {
-          id?: string
-          integration_id: string
-          entity_type: string
-          local_field_key: string
-          external_field_id: string
-          direction: string
-          source: string
-        }
-        Update: {
-          id?: string
-          integration_id?: string
-          entity_type?: string
-          local_field_key?: string
-          external_field_id?: string
-          direction?: string
-          source?: string
-        }
-        Relationships: []
-      }
       arquivos: {
         Row: {
           caminho_arquivo: string
@@ -1134,6 +921,42 @@ export type Database = {
         }
         Relationships: []
       }
+      external_refs: {
+        Row: {
+          business_unit: string
+          created_at: string | null
+          entity_type: string
+          external_id: string
+          id: string
+          internal_id: string
+          metadata: Json | null
+          source: string
+          updated_at: string | null
+        }
+        Insert: {
+          business_unit?: string
+          created_at?: string | null
+          entity_type: string
+          external_id: string
+          id?: string
+          internal_id: string
+          metadata?: Json | null
+          source?: string
+          updated_at?: string | null
+        }
+        Update: {
+          business_unit?: string
+          created_at?: string | null
+          entity_type?: string
+          external_id?: string
+          id?: string
+          internal_id?: string
+          metadata?: Json | null
+          source?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       historico_fases: {
         Row: {
           card_id: string
@@ -1200,7 +1023,385 @@ export type Database = {
           },
         ]
       }
-
+      integration_catalog: {
+        Row: {
+          created_at: string | null
+          entity_type: string
+          external_id: string
+          external_name: string
+          id: string
+          integration_id: string
+          metadata: Json | null
+          parent_external_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_type: string
+          external_id: string
+          external_name: string
+          id?: string
+          integration_id: string
+          metadata?: Json | null
+          parent_external_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_type?: string
+          external_id?: string
+          external_name?: string
+          id?: string
+          integration_id?: string
+          metadata?: Json | null
+          parent_external_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_catalog_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_events: {
+        Row: {
+          attempts: number
+          created_at: string
+          entity_type: string | null
+          event_type: string | null
+          external_id: string | null
+          id: string
+          idempotency_key: string | null
+          integration_id: string
+          logs: Json | null
+          next_retry_at: string | null
+          payload: Json | null
+          processed_at: string | null
+          processing_log: string | null
+          response: Json | null
+          row_key: string | null
+          source: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          entity_type?: string | null
+          event_type?: string | null
+          external_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          integration_id: string
+          logs?: Json | null
+          next_retry_at?: string | null
+          payload?: Json | null
+          processed_at?: string | null
+          processing_log?: string | null
+          response?: Json | null
+          row_key?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          entity_type?: string | null
+          event_type?: string | null
+          external_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          integration_id?: string
+          logs?: Json | null
+          next_retry_at?: string | null
+          payload?: Json | null
+          processed_at?: string | null
+          processing_log?: string | null
+          response?: Json | null
+          row_key?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_events_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_field_map: {
+        Row: {
+          direction: string | null
+          entity_type: string
+          external_field_id: string
+          id: string
+          integration_id: string | null
+          local_field_key: string
+          source: string
+        }
+        Insert: {
+          direction?: string | null
+          entity_type: string
+          external_field_id: string
+          id?: string
+          integration_id?: string | null
+          local_field_key: string
+          source?: string
+        }
+        Update: {
+          direction?: string | null
+          entity_type?: string
+          external_field_id?: string
+          id?: string
+          integration_id?: string | null
+          local_field_key?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_field_map_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_outbox: {
+        Row: {
+          action: string
+          created_at: string | null
+          destination: string
+          entity_type: string
+          error_log: string | null
+          id: string
+          internal_id: string
+          payload: Json
+          retry_count: number | null
+          status: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          destination?: string
+          entity_type: string
+          error_log?: string | null
+          id?: string
+          internal_id: string
+          payload: Json
+          retry_count?: number | null
+          status?: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          destination?: string
+          entity_type?: string
+          error_log?: string | null
+          id?: string
+          internal_id?: string
+          payload?: Json
+          retry_count?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
+      integration_router_config: {
+        Row: {
+          ac_pipeline_id: string
+          business_unit: string
+          created_at: string | null
+          description: string | null
+          external_list_id: string | null
+          external_pipeline_id: string | null
+          integration_id: string | null
+          internal_pipeline_id: string | null
+          is_active: boolean | null
+          pipeline_id: string | null
+          target_pipeline_id: string | null
+        }
+        Insert: {
+          ac_pipeline_id: string
+          business_unit: string
+          created_at?: string | null
+          description?: string | null
+          external_list_id?: string | null
+          external_pipeline_id?: string | null
+          integration_id?: string | null
+          internal_pipeline_id?: string | null
+          is_active?: boolean | null
+          pipeline_id?: string | null
+          target_pipeline_id?: string | null
+        }
+        Update: {
+          ac_pipeline_id?: string
+          business_unit?: string
+          created_at?: string | null
+          description?: string | null
+          external_list_id?: string | null
+          external_pipeline_id?: string | null
+          integration_id?: string | null
+          internal_pipeline_id?: string | null
+          is_active?: boolean | null
+          pipeline_id?: string | null
+          target_pipeline_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_router_config_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_router_config_internal_pipeline_id_fkey"
+            columns: ["internal_pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_router_config_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
+      integration_stage_map: {
+        Row: {
+          created_at: string | null
+          direction: string | null
+          external_stage_id: string
+          external_stage_name: string
+          id: string
+          integration_id: string
+          internal_stage_id: string
+          label: string | null
+          pipeline_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          direction?: string | null
+          external_stage_id: string
+          external_stage_name: string
+          id?: string
+          integration_id: string
+          internal_stage_id: string
+          label?: string | null
+          pipeline_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string | null
+          external_stage_id?: string
+          external_stage_name?: string
+          id?: string
+          integration_id?: string
+          internal_stage_id?: string
+          label?: string | null
+          pipeline_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_stage_map_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_stage_map_internal_stage_id_fkey"
+            columns: ["internal_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_user_map: {
+        Row: {
+          created_at: string | null
+          direction: string | null
+          external_user_id: string
+          id: string
+          integration_id: string
+          internal_user_id: string
+          label: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          direction?: string | null
+          external_user_id: string
+          id?: string
+          integration_id: string
+          internal_user_id: string
+          label?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string | null
+          external_user_id?: string
+          id?: string
+          integration_id?: string
+          internal_user_id?: string
+          label?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_user_map_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_user_map_internal_user_id_fkey"
+            columns: ["internal_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
           config: Json
@@ -1236,96 +1437,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      integration_stage_map: {
-        Row: {
-          created_at: string | null
-          external_stage_id: string
-          external_stage_name: string
-          id: string
-          integration_id: string
-          internal_stage_id: string
-          pipeline_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          external_stage_id: string
-          external_stage_name: string
-          id?: string
-          integration_id: string
-          internal_stage_id: string
-          pipeline_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          external_stage_id?: string
-          external_stage_name?: string
-          id?: string
-          integration_id?: string
-          internal_stage_id?: string
-          pipeline_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "integration_stage_map_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_stage_map_internal_stage_id_fkey"
-            columns: ["internal_stage_id"]
-            isOneToOne: false
-            referencedRelation: "pipeline_stages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      integration_user_map: {
-        Row: {
-          created_at: string | null
-          external_user_id: string
-          id: string
-          integration_id: string
-          internal_user_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          external_user_id: string
-          id?: string
-          integration_id: string
-          internal_user_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          external_user_id?: string
-          id?: string
-          integration_id?: string
-          internal_user_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "integration_user_map_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_user_map_internal_user_id_fkey"
-            columns: ["internal_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       invitations: {
         Row: {
@@ -1460,6 +1571,108 @@ export type Database = {
         }
         Relationships: []
       }
+      n8n_active_dump: {
+        Row: {
+          action: string | null
+          actor_user_id: string | null
+          change_type: string | null
+          contact_email: string | null
+          contact_first_name: string | null
+          contact_id: string | null
+          contact_last_name: string | null
+          contact_phone: string | null
+          deal_cdate: string | null
+          deal_currency: string | null
+          deal_id: string | null
+          deal_mdate: string | null
+          deal_probability: string | null
+          deal_status: string | null
+          deal_title: string | null
+          deal_value: string | null
+          details: string | null
+          entity: string | null
+          entity_id: string | null
+          event_date: string | null
+          event_type: string | null
+          extracted_at: string | null
+          field_id: string | null
+          new_value: string | null
+          old_value: string | null
+          organization_id: string | null
+          owner_id: string | null
+          pipeline_id: string | null
+          raw_json_string: string | null
+          row_key: string | null
+          stage_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          actor_user_id?: string | null
+          change_type?: string | null
+          contact_email?: string | null
+          contact_first_name?: string | null
+          contact_id?: string | null
+          contact_last_name?: string | null
+          contact_phone?: string | null
+          deal_cdate?: string | null
+          deal_currency?: string | null
+          deal_id?: string | null
+          deal_mdate?: string | null
+          deal_probability?: string | null
+          deal_status?: string | null
+          deal_title?: string | null
+          deal_value?: string | null
+          details?: string | null
+          entity?: string | null
+          entity_id?: string | null
+          event_date?: string | null
+          event_type?: string | null
+          extracted_at?: string | null
+          field_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          owner_id?: string | null
+          pipeline_id?: string | null
+          raw_json_string?: string | null
+          row_key?: string | null
+          stage_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          actor_user_id?: string | null
+          change_type?: string | null
+          contact_email?: string | null
+          contact_first_name?: string | null
+          contact_id?: string | null
+          contact_last_name?: string | null
+          contact_phone?: string | null
+          deal_cdate?: string | null
+          deal_currency?: string | null
+          deal_id?: string | null
+          deal_mdate?: string | null
+          deal_probability?: string | null
+          deal_status?: string | null
+          deal_title?: string | null
+          deal_value?: string | null
+          details?: string | null
+          entity?: string | null
+          entity_id?: string | null
+          event_date?: string | null
+          event_type?: string | null
+          extracted_at?: string | null
+          field_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          owner_id?: string | null
+          pipeline_id?: string | null
+          raw_json_string?: string | null
+          row_key?: string | null
+          stage_id?: string | null
+        }
+        Relationships: []
+      }
       participacoes: {
         Row: {
           card_id: string
@@ -1518,6 +1731,7 @@ export type Database = {
           id: string
           ordem_campos: Json | null
           ordem_kanban: Json
+          phase_id: string | null
           updated_at: string | null
           usuario_id: string | null
         }
@@ -1529,6 +1743,7 @@ export type Database = {
           id?: string
           ordem_campos?: Json | null
           ordem_kanban?: Json
+          phase_id?: string | null
           updated_at?: string | null
           usuario_id?: string | null
         }
@@ -1540,10 +1755,18 @@ export type Database = {
           id?: string
           ordem_campos?: Json | null
           ordem_kanban?: Json
+          phase_id?: string | null
           updated_at?: string | null
           usuario_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pipeline_card_settings_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_phases"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pipeline_card_settings_usuario_id_fkey"
             columns: ["usuario_id"]
@@ -1752,12 +1975,14 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean | null
+          avatar_url: string | null
           created_at: string | null
           department_id: string | null
           email: string | null
           id: string
           is_admin: boolean | null
           nome: string | null
+          phone: string | null
           produtos: Database["public"]["Enums"]["app_product"][] | null
           role: Database["public"]["Enums"]["app_role"] | null
           team_id: string | null
@@ -1765,12 +1990,14 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          avatar_url?: string | null
           created_at?: string | null
           department_id?: string | null
           email?: string | null
           id: string
           is_admin?: boolean | null
           nome?: string | null
+          phone?: string | null
           produtos?: Database["public"]["Enums"]["app_product"][] | null
           role?: Database["public"]["Enums"]["app_role"] | null
           team_id?: string | null
@@ -1778,12 +2005,14 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          avatar_url?: string | null
           created_at?: string | null
           department_id?: string | null
           email?: string | null
           id?: string
           is_admin?: boolean | null
           nome?: string | null
+          phone?: string | null
           produtos?: Database["public"]["Enums"]["app_product"][] | null
           role?: Database["public"]["Enums"]["app_role"] | null
           team_id?: string | null
@@ -1806,41 +2035,337 @@ export type Database = {
           },
         ]
       }
+      proposal_client_selections: {
+        Row: {
+          id: string
+          item_id: string
+          option_id: string | null
+          proposal_id: string
+          selected: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          option_id?: string | null
+          proposal_id: string
+          selected?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          option_id?: string | null
+          proposal_id?: string
+          selected?: boolean
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_client_selections_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_client_selections_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_client_selections_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_events: {
+        Row: {
+          client_ip: string | null
+          created_at: string | null
+          event_type: string
+          id: string
+          payload: Json | null
+          proposal_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          client_ip?: string | null
+          created_at?: string | null
+          event_type: string
+          id?: string
+          payload?: Json | null
+          proposal_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          client_ip?: string | null
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          proposal_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_items: {
+        Row: {
+          base_price: number
+          created_at: string | null
+          description: string | null
+          id: string
+          is_default_selected: boolean
+          is_optional: boolean
+          item_type: Database["public"]["Enums"]["proposal_item_type"]
+          ordem: number
+          rich_content: Json | null
+          section_id: string
+          title: string
+        }
+        Insert: {
+          base_price?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_default_selected?: boolean
+          is_optional?: boolean
+          item_type: Database["public"]["Enums"]["proposal_item_type"]
+          ordem?: number
+          rich_content?: Json | null
+          section_id: string
+          title: string
+        }
+        Update: {
+          base_price?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_default_selected?: boolean
+          is_optional?: boolean
+          item_type?: Database["public"]["Enums"]["proposal_item_type"]
+          ordem?: number
+          rich_content?: Json | null
+          section_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_items_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_options: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          details: Json | null
+          id: string
+          item_id: string
+          option_label: string
+          ordem: number
+          price_delta: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          details?: Json | null
+          id?: string
+          item_id: string
+          option_label: string
+          ordem?: number
+          price_delta?: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          details?: Json | null
+          id?: string
+          item_id?: string
+          option_label?: string
+          ordem?: number
+          price_delta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_options_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_sections: {
+        Row: {
+          config: Json | null
+          created_at: string | null
+          id: string
+          ordem: number
+          section_type: Database["public"]["Enums"]["proposal_section_type"]
+          title: string
+          version_id: string
+          visible: boolean
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          ordem?: number
+          section_type: Database["public"]["Enums"]["proposal_section_type"]
+          title: string
+          version_id: string
+          visible?: boolean
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          ordem?: number
+          section_type?: Database["public"]["Enums"]["proposal_section_type"]
+          title?: string
+          version_id?: string
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_sections_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_versions: {
+        Row: {
+          change_summary: string | null
+          created_at: string | null
+          created_by: string
+          id: string
+          metadata: Json | null
+          proposal_id: string
+          title: string
+          version_number: number
+        }
+        Insert: {
+          change_summary?: string | null
+          created_at?: string | null
+          created_by: string
+          id?: string
+          metadata?: Json | null
+          proposal_id: string
+          title: string
+          version_number: number
+        }
+        Update: {
+          change_summary?: string | null
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          metadata?: Json | null
+          proposal_id?: string
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_versions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposals: {
         Row: {
+          accepted_at: string | null
+          accepted_version_id: string | null
+          active_version_id: string | null
           card_id: string
           content: Json | null
           created_at: string | null
           created_by: string | null
+          expires_at: string | null
           id: string
+          public_token: string | null
           status: string
           updated_at: string | null
           valid_until: string | null
           version: number | null
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_version_id?: string | null
+          active_version_id?: string | null
           card_id: string
           content?: Json | null
           created_at?: string | null
           created_by?: string | null
+          expires_at?: string | null
           id?: string
+          public_token?: string | null
           status?: string
           updated_at?: string | null
           valid_until?: string | null
           version?: number | null
         }
         Update: {
+          accepted_at?: string | null
+          accepted_version_id?: string | null
+          active_version_id?: string | null
           card_id?: string
           content?: Json | null
           created_at?: string | null
           created_by?: string | null
+          expires_at?: string | null
           id?: string
+          public_token?: string | null
           status?: string
           updated_at?: string | null
           valid_until?: string | null
           version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_proposals_accepted_version"
+            columns: ["accepted_version_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_proposals_active_version"
+            columns: ["active_version_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proposals_card_id_fkey"
             columns: ["card_id"]
@@ -2568,69 +3093,163 @@ export type Database = {
         }
         Relationships: []
       }
-      whatsapp_config: {
+      whatsapp_conversations: {
         Row: {
-          description: string | null
-          key: string
+          contact_id: string | null
+          created_at: string | null
+          id: string
+          instance_id: string | null
+          last_message_at: string | null
+          status: string | null
+          unread_count: number | null
           updated_at: string | null
-          updated_by: string | null
-          value: Json
         }
         Insert: {
-          description?: string | null
-          key: string
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          instance_id?: string | null
+          last_message_at?: string | null
+          status?: string | null
+          unread_count?: number | null
           updated_at?: string | null
-          updated_by?: string | null
-          value: Json
         }
         Update: {
-          description?: string | null
-          key?: string
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          instance_id?: string | null
+          last_message_at?: string | null
+          status?: string | null
+          unread_count?: number | null
           updated_at?: string | null
-          updated_by?: string | null
-          value?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_field_mappings: {
+        Row: {
+          created_at: string | null
+          external_path: string
+          id: string
+          internal_field: string
+          is_active: boolean | null
+          platform_id: string | null
+          transform_config: Json | null
+          transform_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          external_path: string
+          id?: string
+          internal_field: string
+          is_active?: boolean | null
+          platform_id?: string | null
+          transform_config?: Json | null
+          transform_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          external_path?: string
+          id?: string
+          internal_field?: string
+          is_active?: boolean | null
+          platform_id?: string | null
+          transform_config?: Json | null
+          transform_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_field_mappings_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_messages: {
         Row: {
+          ack_status: number | null
           body: string | null
           contact_id: string | null
+          conversation_id: string | null
           created_at: string | null
           direction: string | null
           external_id: string | null
           id: string
+          is_from_me: boolean | null
+          lead_id: string | null
           media_url: string | null
+          message_type: string | null
           metadata: Json | null
-          processed_at: string | null
+          origem: string | null
+          platform_id: string | null
+          raw_event_id: string | null
+          sender_name: string | null
+          sender_phone: string | null
+          session_id: string | null
           status: string | null
           type: string | null
+          updated_at: string | null
         }
         Insert: {
+          ack_status?: number | null
           body?: string | null
           contact_id?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           direction?: string | null
           external_id?: string | null
           id?: string
+          is_from_me?: boolean | null
+          lead_id?: string | null
           media_url?: string | null
+          message_type?: string | null
           metadata?: Json | null
-          processed_at?: string | null
+          origem?: string | null
+          platform_id?: string | null
+          raw_event_id?: string | null
+          sender_name?: string | null
+          sender_phone?: string | null
+          session_id?: string | null
           status?: string | null
           type?: string | null
+          updated_at?: string | null
         }
         Update: {
+          ack_status?: number | null
           body?: string | null
           contact_id?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           direction?: string | null
           external_id?: string | null
           id?: string
+          is_from_me?: boolean | null
+          lead_id?: string | null
           media_url?: string | null
+          message_type?: string | null
           metadata?: Json | null
-          processed_at?: string | null
+          origem?: string | null
+          platform_id?: string | null
+          raw_event_id?: string | null
+          sender_name?: string | null
+          sender_phone?: string | null
+          session_id?: string | null
           status?: string | null
           type?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -2638,6 +3257,149 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_platforms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_raw_event_id_fkey"
+            columns: ["raw_event_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_raw_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_platforms: {
+        Row: {
+          api_base_url: string | null
+          api_key_encrypted: string | null
+          config: Json | null
+          created_at: string | null
+          created_by: string | null
+          dashboard_url_template: string | null
+          id: string
+          instance_id: string | null
+          is_active: boolean | null
+          last_event_at: string | null
+          name: string
+          provider: string
+          updated_at: string | null
+        }
+        Insert: {
+          api_base_url?: string | null
+          api_key_encrypted?: string | null
+          config?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          dashboard_url_template?: string | null
+          id?: string
+          instance_id?: string | null
+          is_active?: boolean | null
+          last_event_at?: string | null
+          name: string
+          provider: string
+          updated_at?: string | null
+        }
+        Update: {
+          api_base_url?: string | null
+          api_key_encrypted?: string | null
+          config?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          dashboard_url_template?: string | null
+          id?: string
+          instance_id?: string | null
+          is_active?: boolean | null
+          last_event_at?: string | null
+          name?: string
+          provider?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      whatsapp_raw_events: {
+        Row: {
+          card_id: string | null
+          contact_id: string | null
+          created_at: string | null
+          error_message: string | null
+          event_type: string | null
+          id: string
+          idempotency_key: string | null
+          origem: string | null
+          platform_id: string | null
+          processed_at: string | null
+          raw_payload: Json
+          status: string | null
+        }
+        Insert: {
+          card_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          idempotency_key?: string | null
+          origem?: string | null
+          platform_id?: string | null
+          processed_at?: string | null
+          raw_payload: Json
+          status?: string | null
+        }
+        Update: {
+          card_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          idempotency_key?: string | null
+          origem?: string | null
+          platform_id?: string | null
+          processed_at?: string | null
+          raw_payload?: Json
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_raw_events_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_raw_events_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_raw_events_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_raw_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_raw_events_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_platforms"
             referencedColumns: ["id"]
           },
         ]
@@ -2707,6 +3469,7 @@ export type Database = {
           concierge_owner_id: string | null
           condicoes_pagamento: string | null
           created_at: string | null
+          data_proxima_tarefa: string | null
           data_viagem_inicio: string | null
           destinos: Json | null
           dias_ate_viagem: number | null
@@ -2822,8 +3585,70 @@ export type Database = {
         }
         Relationships: []
       }
+      view_integration_classification: {
+        Row: {
+          change_type: string | null
+          created_at: string | null
+          entity_type: string | null
+          id: string | null
+          processing_mode: string | null
+          processing_order: number | null
+        }
+        Insert: {
+          change_type?: never
+          created_at?: string | null
+          entity_type?: string | null
+          id?: string | null
+          processing_mode?: never
+          processing_order?: never
+        }
+        Update: {
+          change_type?: never
+          created_at?: string | null
+          entity_type?: string | null
+          id?: string | null
+          processing_mode?: never
+          processing_order?: never
+        }
+        Relationships: []
+      }
+      view_integration_router_audit: {
+        Row: {
+          count: number | null
+          entity_type: string | null
+          pipeline_id: string | null
+          routing_status: string | null
+          stage_id: string | null
+        }
+        Relationships: []
+      }
+      view_integration_would_apply: {
+        Row: {
+          change_type: string | null
+          entity_type: string | null
+          event_date: string | null
+          external_id: string | null
+          row_key: string | null
+          target_unit: string | null
+          would_action: string | null
+        }
+        Relationships: []
+      }
+      view_router_discovery_report: {
+        Row: {
+          ac_pipeline_id: string | null
+          ac_stage_id: string | null
+          event_count: number | null
+          first_seen: string | null
+          last_seen: string | null
+          mapped_unit: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      auto_expire_proposals: { Args: never; Returns: number }
       find_jsonb_diffs: {
         Args: { p_new: Json; p_old: Json; p_path: string }
         Returns: Database["public"]["CompositeTypes"]["jsonb_diff_record"][]
@@ -2843,34 +3668,36 @@ export type Database = {
         }
         Returns: string
       }
+      generate_proposal_public_token: { Args: never; Returns: string }
+      get_invite_details: { Args: { token_input: string }; Returns: Json }
       get_travel_history:
-      | {
-        Args: { contact_id_param: string }
-        Returns: {
-          card_id: string
-          companions: string[]
-          data_viagem: string
-          moeda: string
-          role: string
-          status: string
-          titulo: string
-          valor: number
-        }[]
-      }
-      | {
-        Args: { contact_ids: string[] }
-        Returns: {
-          card_id: string
-          companions: string[]
-          data_viagem: string
-          moeda: string
-          relevant_contacts: string[]
-          role: string
-          status: string
-          titulo: string
-          valor: number
-        }[]
-      }
+        | {
+            Args: { contact_id_param: string }
+            Returns: {
+              card_id: string
+              companions: string[]
+              data_viagem: string
+              moeda: string
+              role: string
+              status: string
+              titulo: string
+              valor: number
+            }[]
+          }
+        | {
+            Args: { contact_ids: string[] }
+            Returns: {
+              card_id: string
+              companions: string[]
+              data_viagem: string
+              moeda: string
+              relevant_contacts: string[]
+              role: string
+              status: string
+              titulo: string
+              valor: number
+            }[]
+          }
       get_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -2880,6 +3707,7 @@ export type Database = {
       is_gestor: { Args: never; Returns: boolean }
       is_operational: { Args: never; Returns: boolean }
       is_privileged_user: { Args: never; Returns: boolean }
+      jsonb_get_path: { Args: { data: Json; path: string }; Returns: string }
       match_documents_v2: {
         Args: {
           filter: Json
@@ -2923,13 +3751,41 @@ export type Database = {
     Enums: {
       app_product: "TRIPS" | "WEDDING" | "CORP"
       app_role:
-      | "admin"
-      | "gestor"
-      | "sdr"
-      | "vendas"
-      | "pos_venda"
-      | "concierge"
-      | "financeiro"
+        | "admin"
+        | "gestor"
+        | "sdr"
+        | "vendas"
+        | "pos_venda"
+        | "concierge"
+        | "financeiro"
+      proposal_item_type:
+        | "hotel"
+        | "flight"
+        | "transfer"
+        | "experience"
+        | "service"
+        | "insurance"
+        | "fee"
+        | "custom"
+      proposal_section_type:
+        | "cover"
+        | "itinerary"
+        | "flights"
+        | "hotels"
+        | "experiences"
+        | "transfers"
+        | "services"
+        | "terms"
+        | "summary"
+        | "custom"
+      proposal_status:
+        | "draft"
+        | "sent"
+        | "viewed"
+        | "in_progress"
+        | "accepted"
+        | "rejected"
+        | "expired"
       tipo_pessoa_enum: "adulto" | "crianca"
       tipo_viajante_enum: "titular" | "acompanhante"
     }
@@ -2949,116 +3805,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
@@ -3072,6 +3928,37 @@ export const Constants = {
         "pos_venda",
         "concierge",
         "financeiro",
+      ],
+      proposal_item_type: [
+        "hotel",
+        "flight",
+        "transfer",
+        "experience",
+        "service",
+        "insurance",
+        "fee",
+        "custom",
+      ],
+      proposal_section_type: [
+        "cover",
+        "itinerary",
+        "flights",
+        "hotels",
+        "experiences",
+        "transfers",
+        "services",
+        "terms",
+        "summary",
+        "custom",
+      ],
+      proposal_status: [
+        "draft",
+        "sent",
+        "viewed",
+        "in_progress",
+        "accepted",
+        "rejected",
+        "expired",
       ],
       tipo_pessoa_enum: ["adulto", "crianca"],
       tipo_viajante_enum: ["titular", "acompanhante"],
