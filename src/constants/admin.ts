@@ -5,8 +5,7 @@ export const SECTIONS = [
     { value: 'observacoes_pos_venda', label: 'Info. Importantes (Pós-Venda)', color: 'bg-green-50 text-green-700 border-green-100' },
     { value: 'people', label: 'Pessoas / Viajantes', color: 'bg-purple-50 text-purple-700 border-purple-100' },
     { value: 'payment', label: 'Pagamento', color: 'bg-green-50 text-green-700 border-green-100' },
-    { value: 'system', label: 'Sistema / Interno', color: 'bg-gray-50 text-gray-700 border-gray-100' },
-    { value: 'details', label: 'Outros Detalhes', color: 'bg-orange-50 text-orange-700 border-orange-100' }
+    { value: 'system', label: 'Sistema / Interno', color: 'bg-gray-50 text-gray-700 border-gray-100' }
 ] as const
 
 export const FIELD_TYPES = [

@@ -29,6 +29,24 @@ export default function Pipeline() {
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
 
 
+    const getSortLabel = () => {
+        const { sortBy, sortDirection } = filters
+        if (!sortBy) return 'Ordenar'
+
+        switch (sortBy) {
+            case 'created_at':
+                return sortDirection === 'asc' ? 'Criação (Antigos)' : 'Criação (Novos)'
+            case 'updated_at':
+                return sortDirection === 'asc' ? 'Atualização (Antigos)' : 'Atualização (Recentes)'
+            case 'data_viagem_inicio':
+                return sortDirection === 'asc' ? 'Viagem (Próximas)' : 'Viagem (Distantes)'
+            case 'data_proxima_tarefa':
+                return sortDirection === 'asc' ? 'Tarefa (Urgentes)' : 'Tarefa (Futuras)'
+            default:
+                return 'Ordenar'
+        }
+    }
+
     return (
         <ErrorBoundary>
             {/* Main Container: Uses h-full to fill the Layout shell */}
@@ -123,9 +141,12 @@ export default function Pipeline() {
                                 {/* Sort Dropdown */}
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all">
-                                            <ArrowUpDown className="h-4 w-4 mr-2 text-gray-500" />
-                                            Ordenar
+                                        <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all min-w-[140px] justify-between group">
+                                            <div className="flex items-center">
+                                                <ArrowUpDown className="h-4 w-4 mr-2 text-gray-500 group-hover:text-primary transition-colors" />
+                                                <span className="text-gray-500 mr-1">Ordenar:</span>
+                                                <span className="text-gray-900">{getSortLabel()}</span>
+                                            </div>
                                         </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-72">
