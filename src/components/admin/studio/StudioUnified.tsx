@@ -388,7 +388,7 @@ export default function StudioUnified() {
                     <thead>
                         <tr>
                             {/* Sticky Corner */}
-                            <th className="sticky left-0 top-0 z-20 bg-muted border-b border-r border-border p-4 min-w-[250px] text-left">
+                            <th className="sticky left-0 top-0 z-30 bg-muted border-b border-r border-border p-4 min-w-[250px] text-left">
                                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Campos do Sistema</span>
                             </th>
 
@@ -399,7 +399,7 @@ export default function StudioUnified() {
                                     return (
                                         <th
                                             key={macro.id}
-                                            className={cn("sticky top-0 z-10 border-b border-border p-3 min-w-[180px] text-center bg-muted", styles.headerClass)}
+                                            className={cn("sticky top-0 z-20 border-b border-border p-3 min-w-[180px] text-center bg-muted", styles.headerClass)}
                                             style={styles.header}
                                         >
                                             <DropdownMenu>
@@ -470,7 +470,7 @@ export default function StudioUnified() {
                                     const styles = getPhaseStyles(phase?.color || 'bg-gray-500')
 
                                     return (
-                                        <th key={stage.id} className="sticky top-0 z-10 bg-muted border-b border-border p-2 min-w-[140px] text-center">
+                                        <th key={stage.id} className="sticky top-0 z-20 bg-muted border-b border-border p-2 min-w-[140px] text-center">
                                             <div className="flex flex-col items-center gap-1">
                                                 <div
                                                     className={cn("w-2 h-2 rounded-full mb-1", styles.badgeClass)}
@@ -493,18 +493,19 @@ export default function StudioUnified() {
                                 <>
                                     {/* Section Header */}
                                     <tr key={section.value} className="bg-muted/50">
-                                        <td colSpan={(viewMode === 'macro' ? phases.length : (stages?.length || 0)) + 1} className="px-4 py-2 border-y border-border">
+                                        <td className="sticky left-0 z-10 bg-muted border-y border-border px-4 py-2">
                                             <div className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide", section.color)}>
                                                 {section.label}
                                             </div>
                                         </td>
+                                        <td colSpan={(viewMode === 'macro' ? phases.length : (stages?.length || 0))} className="border-y border-border"></td>
                                     </tr>
 
                                     {/* Field Rows */}
                                     {sectionFields.map(field => (
                                         <tr key={field.key} className="group hover:bg-muted/50 transition-colors">
                                             {/* Field Name Column (Sticky Left) */}
-                                            <td className="sticky left-0 z-10 bg-card group-hover:bg-muted/50 border-r border-border px-4 py-3 transition-colors">
+                                            <td className="sticky left-0 z-10 bg-card group-hover:bg-muted border-r border-border px-4 py-3 transition-colors">
                                                 <div className="flex items-center justify-between group/cell">
                                                     <div
                                                         className="cursor-pointer"
