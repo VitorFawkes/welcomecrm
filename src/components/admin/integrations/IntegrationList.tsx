@@ -146,17 +146,19 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                                         <Badge variant={integration.is_active ? 'default' : 'secondary'} className="text-[10px]">
                                             {integration.is_active ? 'Ativo' : 'Inativo'}
                                         </Badge>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setDeleteConfirmation(integration.id);
-                                            }}
-                                        >
-                                            <Trash2 className="h-3 w-3" />
-                                        </Button>
+                                        {integration.id !== 'a2141b92-561f-4514-92b4-9412a068d236' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDeleteConfirmation(integration.id);
+                                                }}
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </CardHeader>
                                 <CardContent>
