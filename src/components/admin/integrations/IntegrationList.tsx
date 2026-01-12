@@ -1,11 +1,12 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Webhook, Activity, ArrowRight, Zap, Database } from 'lucide-react';
+import { Webhook, Activity, ArrowRight, Zap, Database, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Integration {
     id: string;
@@ -44,6 +45,9 @@ const PROVIDERS: ProviderDef[] = [
 ];
 
 export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: string | null, type?: 'input' | 'output') => void, onExploreFields: () => void }) {
+    const [deleteConfirmation, setDeleteConfirmation] = React.useState<string | null>(null);
+    const queryClient = useQueryClient();
+
     const { data: integrations, isLoading } = useQuery({
         queryKey: ['integrations'],
         queryFn: async () => {
@@ -57,6 +61,26 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
             return data as unknown as Integration[];
         },
     });
+
+    const handleDelete = async () => {
+        if (!deleteConfirmation) return;
+
+        try {
+            const { error } = await supabase
+                .from('integrations')
+                .delete()
+                .eq('id', deleteConfirmation);
+
+            if (error) throw error;
+
+            // Invalidate query to refresh list
+            queryClient.invalidateQueries({ queryKey: ['integrations'] });
+            setDeleteConfirmation(null);
+        } catch (error) {
+            console.error('Error deleting integration:', error);
+            alert('Erro ao deletar integração');
+        }
+    };
 
     if (isLoading) {
         return (
@@ -97,7 +121,7 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                         {activeIntegrations.map((integration) => (
                             <Card
                                 key={integration.id}
-                                className="bg-card border-border hover:border-primary/50 transition-all cursor-pointer group shadow-sm border-l-4 border-l-primary"
+                                className="bg-card border-border hover:border-primary/50 transition-all cursor-pointer group shadow-sm border-l-4 border-l-primary relative"
                                 onClick={() => onSelect(integration.id)}
                             >
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -118,9 +142,22 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                                             </p>
                                         </div>
                                     </div>
-                                    <Badge variant={integration.is_active ? 'default' : 'secondary'} className="text-[10px]">
-                                        {integration.is_active ? 'Ativo' : 'Inativo'}
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant={integration.is_active ? 'default' : 'secondary'} className="text-[10px]">
+                                            {integration.is_active ? 'Ativo' : 'Inativo'}
+                                        </Badge>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDeleteConfirmation(integration.id);
+                                            }}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex justify-between items-center mt-2">
@@ -180,6 +217,25 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                         </Card>
                     ))}
                 </div>
+
+                <Dialog open={!!deleteConfirmation} onOpenChange={(open) => !open && setDeleteConfirmation(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Excluir Integração?</DialogTitle>
+                            <DialogDescription>
+                                Tem certeza que deseja excluir esta integração? Esta ação não pode ser desfeita e irá parar qualquer sincronização ativa.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setDeleteConfirmation(null)}>
+                                Cancelar
+                            </Button>
+                            <Button variant="destructive" onClick={handleDelete}>
+                                Excluir
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );
