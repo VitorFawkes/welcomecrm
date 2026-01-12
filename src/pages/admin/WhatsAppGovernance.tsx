@@ -6,6 +6,19 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Select } from '../../components/ui/Select';
 import { toast } from 'sonner';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from "../../components/ui/dialog";
+import { Input } from "../../components/ui/Input";
+import { Label } from "../../components/ui/label";
+import { Badge } from "../../components/ui/Badge";
+import { Plus, CheckCircle, XCircle, Smartphone } from 'lucide-react';
 
 // Types
 type WhatsAppConfig = {
@@ -20,6 +33,16 @@ export default function WhatsAppGovernance() {
         auto_create_leads: true,
         default_pipeline_id: null,
         default_stage_id: null
+    });
+
+    // Instance State
+    const [isAddInstanceOpen, setIsAddInstanceOpen] = useState(false);
+    const [newInstance, setNewInstance] = useState({
+        name: '',
+        provider: 'chatpro',
+        external_id: '',
+        api_url: '',
+        api_key: ''
     });
 
     // Fetch Config
@@ -81,6 +104,32 @@ export default function WhatsAppGovernance() {
         }
     });
 
+    // Types
+    interface WhatsAppInstance {
+        id: string;
+        created_at: string;
+        name: string;
+        provider: string;
+        external_id: string;
+        api_url: string;
+        api_key: string;
+        status: string;
+        is_primary: boolean;
+    }
+
+    // Fetch Instances
+    const { data: instances, refetch: refetchInstances } = useQuery({
+        queryKey: ['whatsapp_instances'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('whatsapp_instances' as any)
+                .select('*')
+                .order('created_at');
+            if (error) throw error;
+            return data as unknown as WhatsAppInstance[];
+        }
+    });
+
     // Mutation to Save Config
     const saveMutation = useMutation({
         mutationFn: async (newConfig: WhatsAppConfig) => {
@@ -110,6 +159,27 @@ export default function WhatsAppGovernance() {
         }
     });
 
+    // Add Instance Mutation
+    const addInstanceMutation = useMutation({
+        mutationFn: async () => {
+            const { error } = await supabase
+                .from('whatsapp_instances' as any)
+                .insert({
+                    ...newInstance,
+                    status: 'active',
+                    is_primary: (instances?.length || 0) === 0
+                });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            toast.success('Instância adicionada!');
+            setIsAddInstanceOpen(false);
+            setNewInstance({ name: '', provider: 'chatpro', external_id: '', api_url: '', api_key: '' });
+            refetchInstances();
+        },
+        onError: (error) => toast.error(error.message)
+    });
+
     const handleSave = () => {
         saveMutation.mutate(config);
     };
@@ -137,6 +207,123 @@ export default function WhatsAppGovernance() {
             </div>
 
             <div className="grid gap-6">
+                {/* Instances Management */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Smartphone className="w-5 h-5" />
+                                Instâncias Conectadas
+                            </CardTitle>
+                            <CardDescription>
+                                Gerencie suas conexões com ChatPro e ECHO.
+                            </CardDescription>
+                        </div>
+                        <Dialog open={isAddInstanceOpen} onOpenChange={setIsAddInstanceOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="gap-2">
+                                    <Plus className="w-4 h-4" />
+                                    Nova Instância
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Adicionar Nova Instância</DialogTitle>
+                                    <DialogDescription>
+                                        Preencha os dados de conexão da sua API de WhatsApp.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label>Nome da Instância</Label>
+                                        <Input
+                                            placeholder="Ex: Vendas 1"
+                                            value={newInstance.name}
+                                            onChange={e => setNewInstance({ ...newInstance, name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Provedor</Label>
+                                            <Select
+                                                value={newInstance.provider}
+                                                onChange={val => setNewInstance({ ...newInstance, provider: val })}
+                                                options={[
+                                                    { value: 'chatpro', label: 'ChatPro' },
+                                                    { value: 'echo', label: 'ECHO' }
+                                                ]}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>ID Externo / Instância</Label>
+                                            <Input
+                                                placeholder="Ex: chatpro-123"
+                                                value={newInstance.external_id}
+                                                onChange={e => setNewInstance({ ...newInstance, external_id: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>URL da API</Label>
+                                        <Input
+                                            placeholder="https://..."
+                                            value={newInstance.api_url}
+                                            onChange={e => setNewInstance({ ...newInstance, api_url: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Token / API Key</Label>
+                                        <Input
+                                            type="password"
+                                            placeholder="Token de acesso"
+                                            value={newInstance.api_key}
+                                            onChange={e => setNewInstance({ ...newInstance, api_key: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setIsAddInstanceOpen(false)}>Cancelar</Button>
+                                    <Button onClick={() => addInstanceMutation.mutate()} disabled={addInstanceMutation.isPending}>
+                                        {addInstanceMutation.isPending ? 'Salvando...' : 'Adicionar'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {instances?.length === 0 && (
+                                <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                                    Nenhuma instância conectada.
+                                </div>
+                            )}
+                            {instances?.map(instance => (
+                                <div key={instance.id} className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-2 rounded-full ${instance.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                            <Smartphone className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-semibold text-foreground">{instance.name}</h3>
+                                                {instance.is_primary && <Badge variant="secondary" className="text-xs">Principal</Badge>}
+                                                <Badge variant="outline" className="uppercase text-[10px]">{instance.provider}</Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground font-mono mt-1">{instance.external_id}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className={`flex items-center gap-1 text-sm ${instance.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+                                            {instance.status === 'active' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                                            <span className="capitalize">{instance.status === 'active' ? 'Ativo' : 'Desconectado'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Automation Settings */}
                 <Card>
                     <CardHeader>

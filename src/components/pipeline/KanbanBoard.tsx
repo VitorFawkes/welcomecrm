@@ -173,6 +173,19 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             if (filters.creationEndDate) {
                 query = query.lte('created_at', filters.creationEndDate)
             }
+
+            // Apply Sorting
+            if (filters.sortBy) {
+                // Handle special case for 'data_proxima_tarefa' which might be null
+                // We want nulls last usually, but Supabase/Postgres handles this.
+                // For 'data_proxima_tarefa' asc, we want earliest dates first. Nulls (no task) should be last.
+                // Postgres default for ASC is NULLS LAST, for DESC is NULLS FIRST.
+                // We might need to adjust if we want strict behavior, but standard order is fine for now.
+                query = query.order(filters.sortBy, { ascending: filters.sortDirection === 'asc', nullsFirst: false })
+            } else {
+                query = query.order('created_at', { ascending: false })
+            }
+
             const { data, error } = await query
             if (error) throw error
 

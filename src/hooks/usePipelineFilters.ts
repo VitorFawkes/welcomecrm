@@ -3,6 +3,9 @@ import { create } from 'zustand'
 export type ViewMode = 'AGENT' | 'MANAGER'
 export type SubView = 'MY_QUEUE' | 'ATTENTION' | 'TEAM_VIEW' | 'FORECAST' | 'ALL'
 
+export type SortBy = 'created_at' | 'updated_at' | 'data_viagem_inicio' | 'data_proxima_tarefa'
+export type SortDirection = 'asc' | 'desc'
+
 export interface FilterState {
     search?: string
     startDate?: string
@@ -15,6 +18,8 @@ export interface FilterState {
     teamIds?: string[]
     departmentIds?: string[]
     tags?: string[]
+    sortBy?: SortBy
+    sortDirection?: SortDirection
 }
 
 export interface GroupFilters {
@@ -42,7 +47,10 @@ export const usePipelineFilters = create<PipelineFiltersState>()(
         (set) => ({
             viewMode: 'AGENT',
             subView: 'MY_QUEUE',
-            filters: {},
+            filters: {
+                sortBy: 'created_at',
+                sortDirection: 'desc'
+            },
             groupFilters: {
                 showLinked: true,
                 showSolo: true

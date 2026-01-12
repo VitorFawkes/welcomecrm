@@ -236,11 +236,11 @@ export function KanbanGrid({ phases, systemFields, settings, isLoading }: Kanban
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
                         <tr>
-                            <th className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-gray-50 z-10 w-64">
+                            <th className="px-4 py-3 font-medium text-gray-900 sticky top-0 left-0 bg-gray-50 z-20 w-64 shadow-sm">
                                 Campo / Fase
                             </th>
                             {phases.map(phase => (
-                                <th key={phase.id} className="px-4 py-3 font-medium text-center min-w-[100px]">
+                                <th key={phase.id} className="px-4 py-3 font-medium text-center min-w-[100px] sticky top-0 bg-gray-50 z-10 shadow-sm">
                                     <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => toggleColumn(phase.id)}>
                                         <div className="flex items-center gap-2">
                                             <div
@@ -255,7 +255,7 @@ export function KanbanGrid({ phases, systemFields, settings, isLoading }: Kanban
                                     </div>
                                 </th>
                             ))}
-                            <th className="px-4 py-3 font-medium text-center w-24 bg-gray-100/50">
+                            <th className="px-4 py-3 font-medium text-center w-24 bg-gray-50 sticky top-0 z-10 shadow-sm">
                                 Ações
                             </th>
                         </tr>

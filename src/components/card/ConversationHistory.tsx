@@ -112,6 +112,34 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
         enabled: isExpanded && activeTab === 'meetings'
     })
 
+    // Send Message Mutation
+    const [newMessage, setNewMessage] = useState('')
+    const sendMutation = useMutation({
+        mutationFn: async () => {
+            if (!contactId || !newMessage.trim()) return
+            const { error } = await supabase.functions.invoke('send-whatsapp', {
+                body: {
+                    contact_id: contactId,
+                    text: newMessage
+                }
+            })
+            if (error) throw error
+        },
+        onSuccess: () => {
+            toast.success('Mensagem enviada!')
+            setNewMessage('')
+            queryClient.invalidateQueries({ queryKey: ['conversations-whatsapp', contactId] })
+        },
+        onError: (error) => {
+            toast.error('Erro ao enviar mensagem: ' + error.message)
+        }
+    })
+
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault()
+        sendMutation.mutate()
+    }
+
     return (
         <div className="rounded-lg border bg-white shadow-sm">
             {/* Header */}
@@ -185,7 +213,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                     {/* Content Area */}
                     <div className="p-0">
                         {activeTab === 'whatsapp' && (
-                            <div className="flex flex-col h-[400px]">
+                            <div className="flex flex-col h-[500px]">
                                 {/* Toolbar */}
                                 <div className="p-2 border-b flex justify-end bg-gray-50/50">
                                     <button
@@ -257,6 +285,33 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                                             )
                                         })
                                     )}
+                                </div>
+
+                                {/* Input Area */}
+                                <div className="p-3 bg-white border-t">
+                                    <form onSubmit={handleSendMessage} className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={newMessage}
+                                            onChange={(e) => setNewMessage(e.target.value)}
+                                            placeholder="Digite sua mensagem..."
+                                            className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                                            disabled={sendMutation.isPending || !contactId}
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={sendMutation.isPending || !contactId || !newMessage.trim()}
+                                            className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {sendMutation.isPending ? (
+                                                <RefreshCw className="w-5 h-5 animate-spin" />
+                                            ) : (
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                                                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         )}

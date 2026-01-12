@@ -17,154 +17,80 @@ serve(async (req) => {
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
+        const url = new URL(req.url);
+        const providerParam = url.searchParams.get("provider"); // 'chatpro' | 'echo'
         const payload = await req.json();
+
         console.log("Webhook received:", JSON.stringify(payload));
 
-        // 1. Validate Payload Structure (ChatPro specific)
-        const messageData = payload.body?.message_data || payload.message_data;
-        if (!messageData) {
-            console.log("Ignored: No message_data found (likely a status update or other event)");
-            return new Response(JSON.stringify({ message: "Ignored event type" }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
+        // 1. Identify Instance
+        let instance = null;
+        let provider = providerParam;
 
-        const {
-            id: externalId,
-            number: rawNumber,
-            message: body,
-            from_me: fromMe,
-            type: messageType,
-            file_type: fileType,
-            url: mediaUrl,
-            participant
-        } = messageData;
+        // Try to find instance by external_id in payload
+        // ChatPro: instance_id
+        // ECHO: instance_id (assumed based on user input)
+        const payloadInstanceId = payload.instance_id || payload.body?.instance_id;
 
-        // 2. Idempotency Check
-        const { data: existing } = await supabase
-            .from("whatsapp_messages")
-            .select("id")
-            .eq("external_id", externalId)
-            .single();
-
-        if (existing) {
-            console.log(`Duplicate message ignored: ${externalId}`);
-            return new Response(JSON.stringify({ message: "Duplicate" }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-
-        // 3. Normalize Phone
-        // ChatPro sends "number" as "5511999999999@s.whatsapp.net" or just "5511999999999"
-        // We need to strip everything non-numeric.
-        // If from_me, 'number' is the recipient, 'participant' is me (or vice versa depending on API version, usually 'number' is the remote party in ChatPro webhooks)
-        // Actually, in ChatPro 'sent_message': 'number' is the destination. 'participant' is the sender (me).
-        // In 'new_message' (inbound): 'number' is the sender.
-
-        // Let's rely on 'number' field which usually points to the "Remote" party (the contact).
-        // If it's a group, logic might differ, but for 1:1:
-        // Inbound: number = sender
-        // Outbound: number = recipient
-        // So 'number' is ALWAYS the Contact's number.
-
-        const { data: normalizedPhone } = await supabase.rpc('normalize_phone', { phone_number: rawNumber });
-
-        if (!normalizedPhone) {
-            throw new Error("Failed to normalize phone number");
-        }
-
-        // 4. Find Contact
-        let { data: contact } = await supabase
-            .from("contatos")
-            .select("id, nome")
-            .or(`telefone.eq.${normalizedPhone},telefone.eq.+${normalizedPhone}`) // Try exact match or with +
-            .maybeSingle();
-
-        // 5. Auto-Create Logic (Governance)
-        if (!contact) {
-            // Fetch Config
-            const { data: config } = await supabase
-                .from("whatsapp_config")
-                .select("value")
-                .eq("key", "auto_create_leads")
+        if (payloadInstanceId) {
+            const { data: foundInstance } = await supabase
+                .from("whatsapp_instances")
+                .select("*")
+                .eq("external_id", payloadInstanceId)
                 .single();
 
-            const autoCreate = config?.value === true;
-
-            if (autoCreate) {
-                console.log(`Contact not found for ${normalizedPhone}. Auto-creating...`);
-
-                // Create Contact
-                const { data: newContact, error: contactError } = await supabase
-                    .from("contatos")
-                    .insert({
-                        nome: `WhatsApp ${normalizedPhone}`,
-                        telefone: normalizedPhone,
-                        tipo_pessoa: 'adulto', // Default
-                        observacoes: 'Criado automaticamente via integração WhatsApp'
-                    })
-                    .select("id")
-                    .single();
-
-                if (contactError) {
-                    console.error("Failed to create contact:", contactError);
-                    // Fallback: Store as orphan (contact_id null)
-                } else {
-                    contact = newContact;
-
-                    // Create Lead (Card) if configured
-                    const { data: pipelineConfig } = await supabase
-                        .from("whatsapp_config")
-                        .select("value")
-                        .eq("key", "default_pipeline_id")
-                        .single();
-
-                    const pipelineId = pipelineConfig?.value;
-
-                    if (pipelineId) {
-                        const { error: cardError } = await supabase
-                            .from("cards")
-                            .insert({
-                                titulo: `Lead WhatsApp ${normalizedPhone}`,
-                                pessoa_principal_id: contact.id,
-                                pipeline_id: pipelineId,
-                                produto: 'TRIPS', // Default
-                                origem: 'WhatsApp',
-                                status_comercial: 'novo'
-                            });
-                        if (cardError) console.error("Failed to create card:", cardError);
-                    }
-                }
-            } else {
-                console.log(`Contact not found for ${normalizedPhone}. Auto-create disabled.`);
+            if (foundInstance) {
+                instance = foundInstance;
+                provider = foundInstance.provider;
             }
         }
 
-        // 6. Insert Message
-        const { error: insertError } = await supabase
-            .from("whatsapp_messages")
-            .insert({
-                external_id: externalId,
-                contact_id: contact?.id || null, // Null if orphan
-                direction: fromMe ? 'outbound' : 'inbound',
-                type: fileType || messageType || 'text',
-                body: body,
-                media_url: mediaUrl,
-                status: 'delivered',
-                metadata: messageData,
-                created_at: new Date().toISOString() // Use current time for ingestion, or messageData.ts_receive if available
-            });
+        // Fallback: If no instance found, check if we have a primary instance for the provider
+        if (!instance && provider) {
+            const { data: primaryInstance } = await supabase
+                .from("whatsapp_instances")
+                .select("*")
+                .eq("provider", provider)
+                .eq("is_primary", true)
+                .single();
 
-        if (insertError) {
-            throw insertError;
+            instance = primaryInstance;
         }
 
-        return new Response(JSON.stringify({ success: true }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-        });
+        // Fallback: Legacy ChatPro (if no provider specified and looks like ChatPro)
+        if (!instance && !provider) {
+            // Heuristic: ChatPro usually has 'message_data' or 'body.message_data'
+            if (payload.message_data || payload.body?.message_data) {
+                provider = 'chatpro';
+                // Try to find legacy instance
+                const { data: legacyInstance } = await supabase
+                    .from("whatsapp_instances")
+                    .select("*")
+                    .eq("external_id", "legacy-chatpro")
+                    .single();
+                instance = legacyInstance;
+            }
+        }
+
+        if (!instance) {
+            console.warn("No matching instance found. Processing as orphan/generic if possible, or logging error.");
+            // We can still process if we know the provider, but we won't have an instance_id to link.
+            // Ideally we should reject or log.
+        }
+
+        console.log(`Processing for Provider: ${provider}, Instance: ${instance?.name || 'Unknown'}`);
+
+        // 2. Route to Handler
+        if (provider === 'chatpro') {
+            return await handleChatPro(supabase, payload, instance);
+        } else if (provider === 'echo') {
+            return await handleEcho(supabase, payload, instance);
+        } else {
+            return new Response(JSON.stringify({ message: "Unknown provider or format" }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200, // Return 200 to acknowledge receipt
+            });
+        }
 
     } catch (error) {
         console.error("Error processing webhook:", error);
@@ -174,3 +100,217 @@ serve(async (req) => {
         });
     }
 });
+
+// --- Handlers ---
+
+async function handleChatPro(supabase: any, payload: any, instance: any) {
+    const messageData = payload.body?.message_data || payload.message_data;
+
+    if (!messageData) {
+        return new Response(JSON.stringify({ message: "Ignored event type (no message_data)" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+        });
+    }
+
+    const {
+        id: externalId,
+        number: rawNumber, // Sender (inbound) or Recipient (outbound)
+        message: body,
+        from_me: fromMe,
+        type: messageType,
+        file_type: fileType,
+        url: mediaUrl,
+        participant
+    } = messageData;
+
+    // Idempotency Check
+    const { data: existing } = await supabase
+        .from("whatsapp_messages")
+        .select("id")
+        .eq("external_id", externalId)
+        .eq("instance_id", instance?.id) // Check within instance scope if possible
+        .maybeSingle();
+
+    if (existing) {
+        return new Response(JSON.stringify({ message: "Duplicate" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+        });
+    }
+
+    // Normalize Phone
+    const { data: normalizedPhone } = await supabase.rpc('normalize_phone', { phone_number: rawNumber });
+    if (!normalizedPhone) throw new Error("Failed to normalize phone");
+
+    // Find/Create Contact & Conversation
+    const { contact, conversation } = await findOrCreateContactAndConversation(supabase, normalizedPhone, instance?.id);
+
+    // Insert Message
+    const { error } = await supabase
+        .from("whatsapp_messages")
+        .insert({
+            external_id: externalId,
+            instance_id: instance?.id,
+            contact_id: contact?.id,
+            conversation_id: conversation?.id,
+            direction: fromMe ? 'outbound' : 'inbound',
+            type: fileType || messageType || 'text',
+            body: body,
+            media_url: mediaUrl,
+            status: 'delivered',
+            metadata: messageData,
+            created_at: new Date().toISOString()
+        });
+
+    if (error) throw error;
+
+    return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+    });
+}
+
+async function handleEcho(supabase: any, payload: any, instance: any) {
+    // ECHO Logic (Based on user provided node config)
+    // "event": "received_message" | "sent_message"
+    // "message_data_json": ...
+
+    const event = payload.event;
+    const messageData = payload.message_data || {};
+    // Or if payload is flattened as per user node:
+    // User node: "message_data_json": "={{JSON.stringify($json.message_data || {})}}"
+
+    // Let's assume standard ECHO payload structure based on "message_data" presence
+    // If it's a status update, we might ignore for now or update status.
+
+    const externalId = payload.message_id || messageData.id;
+    const rawNumber = payload.contact_number || messageData.number;
+    const body = payload.text || messageData.text || messageData.caption; // Echo might use caption for media
+    const fromMe = payload.direction === 'outgoing' || payload.from_me;
+    const messageType = payload.message_type || 'text';
+    const mediaUrl = payload.url || messageData.url;
+
+    if (!externalId || !rawNumber) {
+        return new Response(JSON.stringify({ message: "Ignored (missing id or number)" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+        });
+    }
+
+    // Idempotency Check
+    const { data: existing } = await supabase
+        .from("whatsapp_messages")
+        .select("id")
+        .eq("external_id", externalId)
+        .eq("instance_id", instance?.id)
+        .maybeSingle();
+
+    if (existing) {
+        return new Response(JSON.stringify({ message: "Duplicate" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+        });
+    }
+
+    // Normalize Phone
+    const { data: normalizedPhone } = await supabase.rpc('normalize_phone', { phone_number: rawNumber });
+    if (!normalizedPhone) throw new Error("Failed to normalize phone");
+
+    // Find/Create Contact & Conversation
+    const { contact, conversation } = await findOrCreateContactAndConversation(supabase, normalizedPhone, instance?.id);
+
+    // Insert Message
+    const { error } = await supabase
+        .from("whatsapp_messages")
+        .insert({
+            external_id: externalId,
+            instance_id: instance?.id,
+            contact_id: contact?.id,
+            conversation_id: conversation?.id,
+            direction: fromMe ? 'outbound' : 'inbound',
+            type: messageType,
+            body: body,
+            media_url: mediaUrl,
+            status: 'delivered',
+            metadata: payload,
+            created_at: new Date().toISOString()
+        });
+
+    if (error) throw error;
+
+    return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+    });
+}
+
+// --- Helpers ---
+
+async function findOrCreateContactAndConversation(supabase: any, phone: string, instanceId: string) {
+    // 1. Find Contact
+    let { data: contact } = await supabase
+        .from("contatos")
+        .select("id, nome")
+        .or(`telefone.eq.${phone},telefone.eq.+${phone}`)
+        .maybeSingle();
+
+    // 2. Auto-Create Contact if needed
+    if (!contact) {
+        const { data: config } = await supabase
+            .from("whatsapp_config")
+            .select("value")
+            .eq("key", "auto_create_leads")
+            .single();
+
+        if (config?.value === true) {
+            const { data: newContact, error } = await supabase
+                .from("contatos")
+                .insert({
+                    nome: `WhatsApp ${phone}`,
+                    telefone: phone,
+                    tipo_pessoa: 'adulto',
+                    observacoes: 'Criado via WhatsApp'
+                })
+                .select("id")
+                .single();
+
+            if (!error) contact = newContact;
+        }
+    }
+
+    // 3. Find/Create Conversation
+    let conversation = null;
+    if (contact && instanceId) {
+        const { data: conv } = await supabase
+            .from("whatsapp_conversations")
+            .select("id")
+            .eq("contact_id", contact.id)
+            .eq("instance_id", instanceId)
+            .maybeSingle();
+
+        if (conv) {
+            conversation = conv;
+            // Update last_message_at
+            await supabase
+                .from("whatsapp_conversations")
+                .update({ last_message_at: new Date().toISOString() })
+                .eq("id", conv.id);
+        } else {
+            // Create new conversation
+            const { data: newConv } = await supabase
+                .from("whatsapp_conversations")
+                .insert({
+                    contact_id: contact.id,
+                    instance_id: instanceId,
+                    last_message_at: new Date().toISOString(),
+                    status: 'open'
+                })
+                .select("id")
+                .single();
+            conversation = newConv;
+        }
+    }
+
+    return { contact, conversation };
+}

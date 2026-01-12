@@ -7,14 +7,22 @@ import { useProductContext } from '../hooks/useProductContext'
 
 import { FilterDrawer } from '../components/pipeline/FilterDrawer'
 import { ActiveFilters } from '../components/pipeline/ActiveFilters'
-import { Filter, Link, User } from 'lucide-react'
+import { Filter, Link, User, ArrowUpDown, Calendar, Clock, CheckSquare } from 'lucide-react'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu"
 
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 
 export default function Pipeline() {
     const {
-        viewMode, subView, groupFilters,
-        setViewMode, setSubView, setGroupFilters
+        viewMode, subView, groupFilters, filters,
+        setViewMode, setSubView, setGroupFilters, setFilters
     } = usePipelineFilters()
     const { currentProduct } = useProductContext()
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -112,6 +120,64 @@ export default function Pipeline() {
 
                             {/* Action Buttons */}
                             <div className="flex items-center space-x-3">
+                                {/* Sort Dropdown */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all">
+                                            <ArrowUpDown className="h-4 w-4 mr-2 text-gray-500" />
+                                            Ordenar
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-72">
+                                        <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem className="flex items-center justify-between cursor-pointer" onClick={() => setFilters({ ...filters, sortBy: 'created_at', sortDirection: 'desc' })}>
+                                            <div className="flex items-center">
+                                                <Calendar className="mr-2 h-4 w-4 text-gray-400" />
+                                                <span>Data de Criação</span>
+                                            </div>
+                                            {filters.sortBy === 'created_at' && (
+                                                <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                                    {filters.sortDirection === 'asc' ? 'Antigos' : 'Novos'}
+                                                </span>
+                                            )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="flex items-center justify-between cursor-pointer" onClick={() => setFilters({ ...filters, sortBy: 'updated_at', sortDirection: 'desc' })}>
+                                            <div className="flex items-center">
+                                                <Clock className="mr-2 h-4 w-4 text-gray-400" />
+                                                <span>Última Atualização</span>
+                                            </div>
+                                            {filters.sortBy === 'updated_at' && (
+                                                <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                                    {filters.sortDirection === 'asc' ? 'Antigos' : 'Recentes'}
+                                                </span>
+                                            )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="flex items-center justify-between cursor-pointer" onClick={() => setFilters({ ...filters, sortBy: 'data_viagem_inicio', sortDirection: 'asc' })}>
+                                            <div className="flex items-center">
+                                                <Calendar className="mr-2 h-4 w-4 text-gray-400" />
+                                                <span>Data da Viagem</span>
+                                            </div>
+                                            {filters.sortBy === 'data_viagem_inicio' && (
+                                                <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                                    {filters.sortDirection === 'asc' ? 'Próximas' : 'Distantes'}
+                                                </span>
+                                            )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="flex items-center justify-between cursor-pointer" onClick={() => setFilters({ ...filters, sortBy: 'data_proxima_tarefa', sortDirection: 'asc' })}>
+                                            <div className="flex items-center">
+                                                <CheckSquare className="mr-2 h-4 w-4 text-gray-400" />
+                                                <span>Próxima Tarefa</span>
+                                            </div>
+                                            {filters.sortBy === 'data_proxima_tarefa' && (
+                                                <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                                    {filters.sortDirection === 'asc' ? 'Urgentes' : 'Futuras'}
+                                                </span>
+                                            )}
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
                                 {/* Smart Filter Button */}
                                 <button
                                     onClick={() => setIsFilterDrawerOpen(true)}

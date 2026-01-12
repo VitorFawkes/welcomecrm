@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { IntegrationList } from './IntegrationList';
 import { IntegrationBuilder } from './IntegrationBuilder';
 import { IntegrationFieldExplorer } from './IntegrationFieldExplorer';
@@ -13,6 +14,7 @@ import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch } from 'lucide-reac
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export function IntegrationsPage() {
+    const navigate = useNavigate();
     const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer' | 'active_campaign'>('list');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<IntegrationType>('input');
@@ -127,6 +129,22 @@ export function IntegrationsPage() {
                                         Sincronização oficial (TRIPS).
                                         <br />
                                         <span className="text-xs text-blue-500">Pipeline 6 • Bidirecional</span>
+                                    </CardDescription>
+                                </CardHeader>
+                            </Card>
+
+                            <Card
+                                className="hover:bg-muted/50 transition-colors cursor-pointer border-green-500/20 bg-green-500/5"
+                                onClick={() => navigate('/settings/system/whatsapp')}
+                            >
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-foreground">
+                                        WhatsApp
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Gerencie instâncias e automações.
+                                        <br />
+                                        <span className="text-xs text-green-500">ChatPro • ECHO • Multi-Provider</span>
                                     </CardDescription>
                                 </CardHeader>
                             </Card>
