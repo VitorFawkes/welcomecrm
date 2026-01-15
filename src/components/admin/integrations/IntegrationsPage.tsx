@@ -9,11 +9,12 @@ import { IntegrationSettings } from './IntegrationSettings';
 import { IntegrationMapping } from './IntegrationMapping';
 import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
+import { ACFieldManager } from './ACFieldManager';
 import { PhaseInstanceMappingTab } from './PhaseInstanceMappingTab';
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/Button';
-import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch, ArrowUpRight, Link2 } from 'lucide-react';
+import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch, ArrowUpRight, Link2, Database } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export function IntegrationsPage() {
@@ -71,6 +72,10 @@ export function IntegrationsPage() {
                             <ArrowUpRight className="w-4 h-4" />
                             Saída: Campos
                         </TabsTrigger>
+                        <TabsTrigger value="ac-fields" className="gap-2">
+                            <Database className="w-4 h-4" />
+                            Campos AC
+                        </TabsTrigger>
                         <TabsTrigger value="whatsapp" className="gap-2">
                             <Link2 className="w-4 h-4" />
                             WhatsApp
@@ -103,6 +108,10 @@ export function IntegrationsPage() {
 
                     <TabsContent value="outbound-fields">
                         <OutboundFieldMappingTab integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
+                    </TabsContent>
+
+                    <TabsContent value="ac-fields">
+                        <ACFieldManager integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
                     </TabsContent>
 
                     <TabsContent value="whatsapp">

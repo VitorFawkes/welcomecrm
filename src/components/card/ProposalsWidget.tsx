@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProposalsByCard, useCreateProposal, useDeleteProposal } from '@/hooks/useProposal'
+import { useProposalsByCard, useCreateProposal, useDeleteProposal, useCloneProposal } from '@/hooks/useProposal'
 import { PROPOSAL_STATUS_CONFIG } from '@/types/proposals'
 import { Button } from '@/components/ui/Button'
 import {
@@ -12,6 +12,7 @@ import {
     Eye,
     Clock,
     Loader2,
+    Copy,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -34,6 +35,7 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
     const { data: proposals = [], isLoading } = useProposalsByCard(cardId)
     const createProposal = useCreateProposal()
     const deleteProposal = useDeleteProposal()
+    const cloneProposal = useCloneProposal()
 
     const handleCreateProposal = async () => {
         setIsCreating(true)
@@ -68,7 +70,24 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
     const handleCopyLink = (token: string) => {
         const url = `${window.location.origin}/p/${token}`
         navigator.clipboard.writeText(url)
-        // Could add toast notification here
+        toast.success('Link copiado!')
+    }
+
+    const handleCloneProposal = async (proposalId: string, title: string) => {
+        try {
+            const { proposal } = await cloneProposal.mutateAsync({
+                sourceProposalId: proposalId,
+                targetCardId: cardId,
+                newTitle: `${title} (Cópia)`,
+            })
+            toast.success('Proposta duplicada!', {
+                description: 'Abrindo editor...',
+            })
+            navigate(`/proposals/${proposal.id}/edit`)
+        } catch (error) {
+            console.error('Error cloning proposal:', error)
+            toast.error('Erro ao duplicar proposta')
+        }
     }
 
     return (
@@ -189,6 +208,14 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
                                                     Copiar Link
                                                 </DropdownMenuItem>
                                             )}
+
+                                            <DropdownMenuItem
+                                                onClick={() => handleCloneProposal(proposal.id, proposal.active_version?.title || 'Proposta')}
+                                                disabled={cloneProposal.isPending}
+                                            >
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                {cloneProposal.isPending ? 'Duplicando...' : 'Duplicar'}
+                                            </DropdownMenuItem>
 
                                             {proposal.status === 'draft' && (
                                                 <DropdownMenuItem

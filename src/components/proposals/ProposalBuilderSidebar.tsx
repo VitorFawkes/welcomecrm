@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
 import { LibrarySearch } from '@/components/proposals/LibrarySearch'
+import { VersionHistory } from '@/components/proposals/VersionHistory'
 import { Input } from '@/components/ui/Input'
 import {
     Calendar,
@@ -8,6 +9,7 @@ import {
     Calculator,
     Settings,
     Library,
+    History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Proposal } from '@/types/proposals'
@@ -18,7 +20,7 @@ interface ProposalBuilderSidebarProps {
     proposal: Proposal
 }
 
-type SidebarTab = 'config' | 'library'
+type SidebarTab = 'config' | 'library' | 'history'
 
 export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps) {
     const [activeTab, setActiveTab] = useState<SidebarTab>('config')
@@ -95,6 +97,18 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
                     <Library className="h-4 w-4" />
                     Biblioteca
                 </button>
+                <button
+                    onClick={() => setActiveTab('history')}
+                    className={cn(
+                        'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors',
+                        activeTab === 'history'
+                            ? 'text-amber-600 border-b-2 border-amber-600 bg-amber-50/50'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    )}
+                >
+                    <History className="h-4 w-4" />
+                    Versões
+                </button>
             </div>
 
             {/* Tab Content */}
@@ -109,10 +123,15 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
                         grandTotal={grandTotal}
                         formatCurrency={formatCurrency}
                     />
-                ) : (
+                ) : activeTab === 'library' ? (
                     <LibraryTab
                         onSelectItem={handleSelectLibraryItem}
                         hasSelectedSection={!!selectedSectionId}
+                    />
+                ) : (
+                    <VersionHistory
+                        proposalId={proposal.id}
+                        currentVersionId={proposal.active_version_id}
                     />
                 )}
             </div>

@@ -1,17 +1,25 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProposal } from '@/hooks/useProposal'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import { ProposalBuilderHeader } from '@/components/proposals/ProposalBuilderHeader'
 import { ProposalBuilderSidebar } from '@/components/proposals/ProposalBuilderSidebar'
 import { SectionList } from '@/components/proposals/SectionList'
-import { Loader2 } from 'lucide-react'
+import { ProposalPreview } from '@/components/proposals/ProposalPreview'
+import { Loader2, Eye, EyeOff, PanelRightClose, PanelRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function ProposalBuilder() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const { data: proposal, isLoading, error } = useProposal(id!)
     const { initialize, reset } = useProposalBuilder()
+    const [showPreview, setShowPreview] = useState(true)
+    const [showSidebar, setShowSidebar] = useState(true)
+
+    // Auto-save hook
+    useAutoSave()
 
     // Initialize builder with proposal data
     useEffect(() => {
@@ -59,19 +67,71 @@ export default function ProposalBuilder() {
             {/* Header */}
             <ProposalBuilderHeader proposal={proposal} />
 
+            {/* Toolbar */}
+            <div className="flex-none h-10 px-4 flex items-center justify-between bg-white border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Layout:</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setShowPreview(!showPreview)}
+                        className={cn(
+                            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors',
+                            showPreview
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                    >
+                        {showPreview ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                        Prévia
+                    </button>
+                    <button
+                        onClick={() => setShowSidebar(!showSidebar)}
+                        className={cn(
+                            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors',
+                            showSidebar
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                    >
+                        {showSidebar ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
+                        Painel
+                    </button>
+                </div>
+            </div>
+
             {/* Main Content */}
             <div className="flex-1 min-h-0 flex">
-                {/* Editor Area - 65% */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    <div className="max-w-4xl mx-auto">
+                {/* Editor Area */}
+                <div className={cn(
+                    'overflow-y-auto p-6 transition-all duration-300',
+                    showPreview && showSidebar ? 'w-1/3' : showPreview || showSidebar ? 'w-1/2' : 'flex-1'
+                )}>
+                    <div className="max-w-2xl mx-auto">
                         <SectionList />
                     </div>
                 </div>
 
-                {/* Sidebar - 35% */}
-                <div className="w-[400px] border-l border-slate-200 bg-white overflow-y-auto">
-                    <ProposalBuilderSidebar proposal={proposal} />
-                </div>
+                {/* Preview Panel */}
+                {showPreview && (
+                    <div className={cn(
+                        'border-l border-slate-200 transition-all duration-300',
+                        showSidebar ? 'w-1/3' : 'w-1/2'
+                    )}>
+                        <ProposalPreview />
+                    </div>
+                )}
+
+                {/* Sidebar */}
+                {showSidebar && (
+                    <div className={cn(
+                        'border-l border-slate-200 bg-white overflow-y-auto transition-all duration-300',
+                        showPreview ? 'w-1/3' : 'w-1/2',
+                        'max-w-[400px]'
+                    )}>
+                        <ProposalBuilderSidebar proposal={proposal} />
+                    </div>
+                )}
             </div>
         </div>
     )

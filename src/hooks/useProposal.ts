@@ -295,3 +295,152 @@ export function useDeleteProposal() {
         },
     })
 }
+
+// ============================================
+// Clone Proposal
+// ============================================
+export function useCloneProposal() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({
+            sourceProposalId,
+            targetCardId,
+            newTitle,
+        }: {
+            sourceProposalId: string
+            targetCardId?: string
+            newTitle?: string
+        }) => {
+            // 1. Fetch source proposal with all data
+            const { data: source, error: fetchError } = await supabase
+                .from('proposals')
+                .select(`
+                    *,
+                    active_version:proposal_versions!fk_proposals_active_version(*)
+                `)
+                .eq('id', sourceProposalId)
+                .single()
+
+            if (fetchError) throw fetchError
+            if (!source) throw new Error('Proposta não encontrada')
+
+            const sourceAny = source as any
+
+            // 2. Fetch sections and items from active version
+            let sections: any[] = []
+            if (sourceAny.active_version_id) {
+                const { data: sectionsData } = await supabase
+                    .from('proposal_sections')
+                    .select(`
+                        *,
+                        items:proposal_items(
+                            *,
+                            options:proposal_options(*)
+                        )
+                    `)
+                    .eq('version_id', sourceAny.active_version_id)
+                    .order('ordem')
+
+                sections = sectionsData || []
+            }
+
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Usuário não autenticado')
+
+            // 3. Create new proposal
+            const proposalTitle = newTitle || `${sourceAny.title || 'Proposta'} (Cópia)`
+            const { data: newProposal, error: proposalError } = await supabase
+                .from('proposals')
+                .insert({
+                    title: proposalTitle,
+                    status: 'draft',
+                    card_id: targetCardId || sourceAny.card_id,
+                    created_by: user.id,
+                } as any)
+                .select()
+                .single()
+
+            if (proposalError) throw proposalError
+
+            // 4. Create new version
+            const { data: newVersion, error: versionError } = await supabase
+                .from('proposal_versions')
+                .insert({
+                    proposal_id: newProposal.id,
+                    version_number: 1,
+                    title: proposalTitle,
+                    status: 'draft',
+                    created_by: user.id,
+                } as any)
+                .select()
+                .single()
+
+            if (versionError) throw versionError
+
+            // 5. Clone sections and items
+            for (const section of sections) {
+                const { data: newSection, error: sectionError } = await supabase
+                    .from('proposal_sections')
+                    .insert({
+                        version_id: newVersion.id,
+                        section_type: section.section_type || section.type,
+                        title: section.title,
+                        ordem: section.ordem,
+                        config: section.config || section.content,
+                        visible: section.visible ?? section.is_visible ?? true,
+                    } as any)
+                    .select()
+                    .single()
+
+                if (sectionError) throw sectionError
+
+                // Clone items
+                for (const item of section.items || []) {
+                    const { data: newItem, error: itemError } = await supabase
+                        .from('proposal_items')
+                        .insert({
+                            section_id: newSection.id,
+                            item_type: item.item_type,
+                            title: item.title,
+                            description: item.description,
+                            details: item.details || item.rich_content,
+                            base_price: item.base_price,
+                            ordem: item.ordem,
+                            is_optional: item.is_optional,
+                            quantity: item.quantity,
+                            unit: item.unit,
+                        } as any)
+                        .select()
+                        .single()
+
+                    if (itemError) throw itemError
+
+                    // Clone options
+                    for (const option of item.options || []) {
+                        await supabase
+                            .from('proposal_options')
+                            .insert({
+                                item_id: newItem.id,
+                                option_label: option.option_label || option.label,
+                                description: option.description,
+                                price_delta: option.price_delta || option.price_adjustment,
+                            } as any)
+                    }
+                }
+            }
+
+            // 6. Update proposal with active_version_id
+            await supabase
+                .from('proposals')
+                .update({ active_version_id: newVersion.id })
+                .eq('id', newProposal.id)
+
+            return { proposal: newProposal as any, version: newVersion as any }
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: proposalKeys.listByCard(variables.targetCardId || data.proposal.card_id) })
+        },
+    })
+}
+

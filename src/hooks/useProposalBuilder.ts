@@ -33,6 +33,7 @@ interface ProposalBuilderState {
     // Actions
     initialize: (proposal: Proposal, version: ProposalVersion, sections: ProposalSectionWithItems[]) => void
     reset: () => void
+    updateTitle: (title: string) => void
 
     // Section actions
     addSection: (type: ProposalSectionType, title?: string) => void
@@ -96,6 +97,15 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             lastSavedAt: null,
             selectedSectionId: null,
             selectedItemId: null,
+        })
+    },
+
+    updateTitle: (title: string) => {
+        const { version } = get()
+        if (!version) return
+        set({
+            version: { ...version, title },
+            isDirty: true,
         })
     },
 

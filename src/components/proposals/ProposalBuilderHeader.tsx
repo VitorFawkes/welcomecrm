@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
+import { useOpenPDFPreview } from '@/hooks/useGeneratePDF'
 import { Button } from '@/components/ui/Button'
 import {
     ArrowLeft,
@@ -11,6 +12,8 @@ import {
     Loader2,
     Clock,
     Copy,
+    Pencil,
+    FileDown,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -28,10 +31,35 @@ interface ProposalBuilderHeaderProps {
 
 export function ProposalBuilderHeader({ proposal }: ProposalBuilderHeaderProps) {
     const navigate = useNavigate()
-    const { version, isDirty, isSaving, lastSavedAt, save, publish } = useProposalBuilder()
+    const { version, isDirty, isSaving, lastSavedAt, save, publish, updateTitle } = useProposalBuilder()
+    const { openPreview: openPDFPreview, isPending: isPDFLoading } = useOpenPDFPreview()
     const [isPublishing, setIsPublishing] = useState(false)
+    const [isEditingTitle, setIsEditingTitle] = useState(false)
+    const [titleValue, setTitleValue] = useState('')
 
     const statusConfig = PROPOSAL_STATUS_CONFIG[proposal.status as ProposalStatus]
+
+    // Sync title value when version changes
+    const handleStartEditTitle = () => {
+        setTitleValue(version?.title || 'Nova Proposta')
+        setIsEditingTitle(true)
+    }
+
+    const handleTitleBlur = () => {
+        setIsEditingTitle(false)
+        if (titleValue.trim() && titleValue !== version?.title) {
+            updateTitle(titleValue.trim())
+        }
+    }
+
+    const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleTitleBlur()
+        } else if (e.key === 'Escape') {
+            setIsEditingTitle(false)
+            setTitleValue(version?.title || 'Nova Proposta')
+        }
+    }
 
     const handleSave = async () => {
         try {
@@ -82,10 +110,27 @@ export function ProposalBuilderHeader({ proposal }: ProposalBuilderHeaderProps) 
                 <div className="h-6 w-px bg-slate-200" />
 
                 <div>
-                    <h1 className="font-semibold text-slate-900 text-sm">
-                        {version?.title || 'Nova Proposta'}
-                    </h1>
-                    <div className="flex items-center gap-2 text-xs">
+                    {isEditingTitle ? (
+                        <input
+                            type="text"
+                            value={titleValue}
+                            onChange={(e) => setTitleValue(e.target.value)}
+                            onBlur={handleTitleBlur}
+                            onKeyDown={handleTitleKeyDown}
+                            autoFocus
+                            className="font-semibold text-slate-900 text-sm bg-slate-50 border border-slate-300 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+                            placeholder="Nome da proposta..."
+                        />
+                    ) : (
+                        <button
+                            onClick={handleStartEditTitle}
+                            className="group flex items-center gap-1.5 font-semibold text-slate-900 text-sm hover:text-blue-600 transition-colors"
+                        >
+                            {version?.title || 'Nova Proposta'}
+                            <Pencil className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2 text-xs mt-0.5">
                         <span className={`px-1.5 py-0.5 rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
                             {statusConfig.label}
                         </span>
@@ -161,6 +206,22 @@ export function ProposalBuilderHeader({ proposal }: ProposalBuilderHeaderProps) 
                         Copiar Link
                     </Button>
                 )}
+
+                {/* PDF Export Button */}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openPDFPreview(proposal.id)}
+                    disabled={isPDFLoading}
+                    className="h-8"
+                >
+                    {isPDFLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : (
+                        <FileDown className="h-4 w-4 mr-1" />
+                    )}
+                    PDF
+                </Button>
 
                 {/* More Options */}
                 <DropdownMenu>
