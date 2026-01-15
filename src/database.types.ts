@@ -509,6 +509,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cards_pessoa_principal_id_fkey"
+            columns: ["pessoa_principal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
+          },
+          {
             foreignKeyName: "cards_pipeline_id_fkey"
             columns: ["pipeline_id"]
             isOneToOne: false
@@ -573,6 +580,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contatos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_contatos_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
           },
         ]
       }
@@ -642,6 +656,13 @@ export type Database = {
             referencedRelation: "contatos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contact_stats_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
+          },
         ]
       }
       contatos: {
@@ -709,6 +730,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contatos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contatos_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
           },
         ]
       }
@@ -2310,6 +2338,13 @@ export type Database = {
             referencedRelation: "proposals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "proposal_client_selections_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["proposal_id"]
+          },
         ]
       }
       proposal_events: {
@@ -2347,6 +2382,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proposals"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["proposal_id"]
           },
         ]
       }
@@ -2631,6 +2673,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proposals"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_versions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["proposal_id"]
           },
         ]
       }
@@ -3470,6 +3519,13 @@ export type Database = {
             referencedRelation: "contatos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "whatsapp_conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
+          },
         ]
       }
       whatsapp_field_mappings: {
@@ -3596,6 +3652,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contatos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
           },
           {
             foreignKeyName: "whatsapp_messages_platform_id_fkey"
@@ -3785,6 +3848,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "whatsapp_raw_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
+          },
+          {
             foreignKeyName: "whatsapp_raw_events_platform_id_fkey"
             columns: ["platform_id"]
             isOneToOne: false
@@ -3795,6 +3865,47 @@ export type Database = {
       }
     }
     Views: {
+      v_contact_proposals: {
+        Row: {
+          accepted_at: string | null
+          card_id: string | null
+          card_title: string | null
+          contact_id: string | null
+          contact_name: string | null
+          created_at: string | null
+          data_viagem_fim: string | null
+          data_viagem_inicio: string | null
+          proposal_id: string | null
+          proposal_title: string | null
+          role: string | null
+          status: string | null
+          total_value: number | null
+          valid_until: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+        ]
+      }
       view_agenda: {
         Row: {
           card_id: string | null
@@ -3943,6 +4054,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contatos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_pessoa_principal_id_fkey"
+            columns: ["pessoa_principal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
           },
           {
             foreignKeyName: "cards_pipeline_id_fkey"

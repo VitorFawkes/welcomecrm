@@ -14,6 +14,7 @@ import {
     Copy,
     Pencil,
     FileDown,
+    MessageCircle,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -88,6 +89,17 @@ export function ProposalBuilderHeader({ proposal }: ProposalBuilderHeaderProps) 
             const url = `${window.location.origin}/p/${proposal.public_token}`
             navigator.clipboard.writeText(url)
         }
+    }
+
+    const handleWhatsApp = () => {
+        if (!proposal.public_token) {
+            alert('Publique a proposta primeiro para gerar o link.')
+            return
+        }
+        const url = `${window.location.origin}/p/${proposal.public_token}`
+        const title = version?.title || 'Proposta'
+        const message = encodeURIComponent(`Olá! Segue sua proposta: ${title}\n\n${url}`)
+        window.open(`https://wa.me/?text=${message}`, '_blank')
     }
 
     const handlePreview = () => {
@@ -196,15 +208,25 @@ export function ProposalBuilderHeader({ proposal }: ProposalBuilderHeaderProps) 
                         Enviar
                     </Button>
                 ) : (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyLink}
-                        className="h-8"
-                    >
-                        <Copy className="h-4 w-4 mr-1" />
-                        Copiar Link
-                    </Button>
+                    <>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCopyLink}
+                            className="h-8"
+                        >
+                            <Copy className="h-4 w-4 mr-1" />
+                            Copiar Link
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={handleWhatsApp}
+                            className="h-8 bg-green-600 hover:bg-green-700"
+                        >
+                            <MessageCircle className="h-4 w-4 mr-1" />
+                            WhatsApp
+                        </Button>
+                    </>
                 )}
 
                 {/* PDF Export Button */}

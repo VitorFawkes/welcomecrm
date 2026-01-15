@@ -9,7 +9,8 @@ import { Badge } from '../ui/Badge'
 import ContactForm from '../card/ContactForm'
 import type { Person } from '../../hooks/usePeopleIntelligence'
 import type { Database } from '../../database.types'
-import { Loader2, Plane, Crown, Calendar, DollarSign, MapPin } from 'lucide-react'
+import { Loader2, Plane, Crown, Calendar, DollarSign, MapPin, FileText } from 'lucide-react'
+import { ContactProposalsWidget } from '../proposals/ContactProposalsWidget'
 
 type Card = Database['public']['Tables']['cards']['Row']
 
@@ -126,7 +127,11 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="w-full justify-start mb-6 bg-gray-100/50 p-1">
                             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
-                            <TabsTrigger value="trips" className="flex-1">Histórico de Viagens</TabsTrigger>
+                            <TabsTrigger value="proposals" className="flex-1">
+                                <FileText className="h-3.5 w-3.5 mr-1" />
+                                Propostas
+                            </TabsTrigger>
+                            <TabsTrigger value="trips" className="flex-1">Viagens</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="info" className="mt-0">
@@ -135,6 +140,10 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
                                 onSave={handleSaveContact}
                                 onCancel={onClose}
                             />
+                        </TabsContent>
+
+                        <TabsContent value="proposals" className="mt-0">
+                            <ContactProposalsWidget contactId={person.id} />
                         </TabsContent>
 
                         <TabsContent value="trips" className="mt-0 space-y-4">
@@ -193,6 +202,6 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
                     </Tabs>
                 </div>
             </DrawerContent>
-        </Drawer>
+        </Drawer >
     )
 }
