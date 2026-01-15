@@ -62,7 +62,7 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] });
-            alert('Etapa atualizada com sucesso!');
+            // alert('Etapa atualizada com sucesso!'); // Removed to avoid native prompt
         }
     });
 

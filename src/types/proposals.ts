@@ -32,7 +32,7 @@ export type ProposalClientSelectionUpdate = Database['public']['Tables']['propos
 // ============================================
 // Enum Types
 // ============================================
-export type ProposalStatus = Database['public']['Enums']['proposal_status']
+export type ProposalStatus = Database['public']['Enums']['proposal_status'] | 'in_progress'
 export type ProposalSectionType = Database['public']['Enums']['proposal_section_type']
 export type ProposalItemType = Database['public']['Enums']['proposal_item_type']
 

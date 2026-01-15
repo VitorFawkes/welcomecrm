@@ -93,11 +93,11 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
                             <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
                                     <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium text-sm group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                                        {person.nome.charAt(0).toUpperCase()}
+                                        {(person.nome || 'S').charAt(0).toUpperCase()}
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-gray-900">{person.nome}</span>
+                                            <span className="font-medium text-gray-900">{person.nome || 'Sem Nome'}</span>
                                             {person.stats?.is_group_leader && (
                                                 <Crown className="h-3 w-3 text-amber-500 fill-amber-500" />
                                             )}

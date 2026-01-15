@@ -155,11 +155,11 @@ export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
                 .from('activities')
                 .select(`
                     *,
-                    created_by_user:profiles (
+                    created_by_user:profiles!created_by (
                         nome,
                         email
                     ),
-                    card:cards (
+                    card:cards!card_id (
                         titulo
                     )
                 `)

@@ -21,7 +21,7 @@ export default function StageCard({ stage, onEdit, onDelete }: StageCardProps) {
         transition,
         isDragging
     } = useSortable({
-        id: stage.id,
+        id: String(stage.id),
         data: {
             type: 'Stage',
             stage

@@ -29,6 +29,7 @@ import PhaseColumn from './builder/PhaseColumn'
 import StageCard from './builder/StageCard'
 import StageInspectorDrawer from './StageInspectorDrawer'
 import PhaseSettingsDrawer from './PhaseSettingsDrawer'
+import PromptModal, { ConfirmModal } from './PromptModal'
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases'
 import type { Database } from '../../../database.types'
 
@@ -46,6 +47,23 @@ export default function StudioStructure() {
 
     const [editingStage, setEditingStage] = useState<PipelineStage | null>(null)
     const [editingPhaseSettings, setEditingPhaseSettings] = useState<PipelinePhase | null>(null)
+
+    // Modal States for premium prompt/confirm replacements
+    const [promptModal, setPromptModal] = useState<{
+        isOpen: boolean
+        title: string
+        description?: string
+        placeholder?: string
+        defaultValue?: string
+        onConfirm: (value: string) => void
+    } | null>(null)
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean
+        title: string
+        description: string
+        variant?: 'default' | 'destructive'
+        onConfirm: () => void
+    } | null>(null)
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -82,6 +100,7 @@ export default function StudioStructure() {
 
     useEffect(() => {
         if (stagesData) setLocalStages(stagesData)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [stagesData])
 
     // --- Mutations ---
@@ -153,20 +172,50 @@ export default function StudioStructure() {
             const phaseStages = localStages.filter(s => s.phase_id === phaseId)
             const maxOrder = Math.max(...phaseStages.map(s => s.ordem || 0), 0)
 
-            // Need a pipeline_id - grab from first stage or default
-            const pipelineId = localStages[0]?.pipeline_id || 'default-pipeline-id' // Ideally fetch pipelines
+            // Get valid pipeline_id from existing stages
+            const pipelineId = localStages[0]?.pipeline_id
+            if (!pipelineId) {
+                throw new Error('Não foi possível determinar o pipeline. Recarregue a página.')
+            }
 
-            const { error } = await supabase.from('pipeline_stages').insert({
+            // ELITE: Inherit role from parent phase, with smart fallback based on phase name
+            const getDefaultRoleForPhase = (phaseName?: string): string => {
+                if (!phaseName) return 'vendas'
+                const lower = phaseName.toLowerCase()
+                if (lower.includes('sdr') || lower.includes('lead') || lower.includes('prosp')) return 'sdr'
+                if (lower.includes('vend') || lower.includes('clos') || lower.includes('negoc')) return 'vendas'
+                if (lower.includes('pós') || lower.includes('pos') || lower.includes('sucesso')) return 'pos_venda'
+                if (lower.includes('conc')) return 'concierge'
+                if (lower.includes('finan')) return 'financeiro'
+                return 'vendas'
+            }
+            const inheritedRole = (phase as any)?.target_role || getDefaultRoleForPhase(phase?.name)
+
+            const { data, error } = await (supabase.from('pipeline_stages') as any).insert({
                 nome: name,
                 fase: phase?.name || 'SDR',
                 phase_id: phaseId,
                 ordem: maxOrder + 1,
                 pipeline_id: pipelineId,
-                ativo: true
-            } as any)
-            if (error) throw error
+                ativo: true,
+                tipo_responsavel: inheritedRole // Inherited from phase or smart default
+            }).select()
+            if (error) {
+                console.error('Stage creation error:', error)
+                throw new Error(error.message || 'Erro ao criar etapa')
+            }
+            return data
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] })
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] }),
+        onError: (err: Error) => {
+            setConfirmModal({
+                isOpen: true,
+                title: 'Erro ao Criar Etapa',
+                description: err.message,
+                variant: 'destructive',
+                onConfirm: () => { }
+            })
+        }
     })
 
     const deleteStageMutation = useMutation({
@@ -185,17 +234,32 @@ export default function StudioStructure() {
         onError: (err) => alert(err.message)
     })
 
-    const updateStageMutation = useMutation({
-        mutationFn: async (stage: Partial<PipelineStage>) => {
-            const { error } = await supabase.from('pipeline_stages').update(stage).eq('id', stage.id!)
+
+    const reorderStagesMutation = useMutation({
+        mutationFn: async (stages: Partial<PipelineStage>[]) => {
+            const { error } = await (supabase.from('pipeline_stages') as any).upsert(stages)
             if (error) throw error
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] })
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] })
+        },
+        onError: (err) => {
+            console.error('Reorder error:', err)
+            queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] })
+            setConfirmModal({
+                isOpen: true,
+                title: 'Erro ao Reordenar',
+                description: 'Não foi possível salvar a nova ordem. A página será recarregada.',
+                variant: 'destructive',
+                onConfirm: () => window.location.reload()
+            })
+        }
     })
 
     // --- Dnd Handlers ---
     const onDragStart = (event: DragStartEvent) => {
         const { active } = event
+        console.log('DEBUG: onDragStart', active.id)
         setActiveId(active.id as string)
         setActiveType(active.data.current?.type)
     }
@@ -215,40 +279,47 @@ export default function StudioStructure() {
 
         if (!isActiveStage) return
 
-        // Implements Stage dragging over other Stages or Phases
-        if (isActiveStage && isOverStage) {
-            setLocalStages((stages) => {
-                const activeIndex = stages.findIndex((t) => t.id === activeId)
-                const overIndex = stages.findIndex((t) => t.id === overId)
+        // CRITICAL: Do NOT reorder during drag - it breaks dnd-kit
+        // Only update phase_id if moving to a different phase
 
-                if (stages[activeIndex].phase_id !== stages[overIndex].phase_id) {
-                    // Moving to another phase
-                    const newStages = [...stages]
-                    newStages[activeIndex] = {
-                        ...newStages[activeIndex],
-                        phase_id: stages[overIndex].phase_id,
-                        fase: localPhases.find(p => p.id === stages[overIndex].phase_id)?.name || 'Outro'
-                    }
-                    return arrayMove(newStages, activeIndex, overIndex - 1) // Insert before
-                }
-                return arrayMove(stages, activeIndex, overIndex)
-            })
+        if (isActiveStage && isOverStage) {
+            const activeStage = localStages.find(s => String(s.id) === String(activeId))
+            const overStage = localStages.find(s => String(s.id) === String(overId))
+
+            // Only update if changing phases
+            if (activeStage && overStage && activeStage.phase_id !== overStage.phase_id) {
+                setLocalStages((stages) => {
+                    return stages.map(s => {
+                        if (String(s.id) === String(activeId)) {
+                            return {
+                                ...s,
+                                phase_id: overStage.phase_id,
+                                fase: localPhases.find(p => p.id === overStage.phase_id)?.name || 'Outro'
+                            }
+                        }
+                        return s
+                    })
+                })
+            }
         }
 
         if (isActiveStage && isOverPhase) {
-            setLocalStages((stages) => {
-                const activeIndex = stages.findIndex((t) => t.id === activeId)
-                if (stages[activeIndex].phase_id !== overId) {
-                    const newStages = [...stages]
-                    newStages[activeIndex] = {
-                        ...newStages[activeIndex],
-                        phase_id: overId as string,
-                        fase: localPhases.find(p => p.id === overId)?.name || 'Outro'
-                    }
-                    return arrayMove(newStages, activeIndex, activeIndex) // Just update phase
-                }
-                return stages
-            })
+            const activeStage = localStages.find(s => String(s.id) === String(activeId))
+
+            if (activeStage && activeStage.phase_id !== overId) {
+                setLocalStages((stages) => {
+                    return stages.map(s => {
+                        if (String(s.id) === String(activeId)) {
+                            return {
+                                ...s,
+                                phase_id: overId as string,
+                                fase: localPhases.find(p => p.id === overId)?.name || 'Outro'
+                            }
+                        }
+                        return s
+                    })
+                })
+            }
         }
     }
 
@@ -277,38 +348,59 @@ export default function StudioStructure() {
 
         // Stage Reordering (Persistence)
         if (active.data.current?.type === 'Stage') {
-            // The state is already updated in onDragOver, we just need to persist
-            // We need to re-calculate orders for the affected phases
-            const activeStage = localStages.find(s => s.id === activeId)
-            if (activeStage) {
-                // Find all stages in this phase and update their order
-                // We rely on the fact that localStages array order reflects the visual order roughly
-                // But arrayMove in onDragOver might not be perfect for persistence
-                // Let's re-sort based on the array index
+            const activeId = active.id
+            const overId = over.id
 
-                // Actually, let's just trigger a full update for the affected phase(s)
-                // This is a bit heavy but safe.
-                // Ideally we send the new order of IDs to the backend.
+            if (activeId === overId) return
 
-                // For now, let's just update the single moved stage if it changed phase
-                // And update orders if it changed position.
+            console.log('DEBUG: DragEnd Stage', { activeId, overId })
 
-                // Simplest: Update ALL stages order based on current array index
-                // Filter by phase first
+            // ELITE: Explicitly calculate new order to ensure persistence works
+            // Use String() to ensure ID matching works regardless of type
+            const oldIndex = localStages.findIndex((s) => String(s.id) === String(activeId))
+            const newIndex = localStages.findIndex((s) => String(s.id) === String(overId))
 
+            if (oldIndex !== -1 && newIndex !== -1) {
+                // Apply move locally first
+                const newStages = arrayMove(localStages, oldIndex, newIndex)
+                setLocalStages(newStages)
+
+                // Calculate updates based on the NEW order
                 const updates: Partial<PipelineStage>[] = []
+
+                // We need to check if phase changed during drag (handled in onDragOver but we need to be sure)
+                // If onDragOver ran, localStages already has the new phase_id for the active item?
+                // Actually, arrayMove just moves the item. If phase_id was changed in onDragOver, it persists.
+                // But to be safe, let's ensure we are using the phase_id from the newStages state
+
                 localPhases.forEach(phase => {
-                    const stagesInPhase = localStages.filter(s => s.phase_id === phase.id)
+                    // Get stages for this phase from our calculated newStages
+                    const stagesInPhase = newStages.filter(s => s.phase_id === phase.id)
+
                     stagesInPhase.forEach((s, idx) => {
-                        if (s.ordem !== idx + 1 || s.phase_id !== activeStage.phase_id) { // Check if changed
-                            updates.push({ id: s.id, ordem: idx + 1, phase_id: phase.id, fase: phase.name })
+                        // Check if order changed OR if it's the moved item (to ensure phase_id is saved)
+                        if (s.ordem !== idx + 1 || String(s.id) === String(activeId)) {
+                            updates.push({
+                                id: s.id,
+                                nome: s.nome,
+                                ordem: idx + 1,
+                                tipo_responsavel: (s as any).tipo_responsavel || 'vendas',
+                                pipeline_id: s.pipeline_id,
+                                ativo: s.ativo ?? true,
+                                fase: phase.name,
+                                phase_id: phase.id
+                            })
                         }
                     })
                 })
 
-                // Batch update? Supabase doesn't have easy batch update.
-                // Let's just update the ones that changed.
-                updates.forEach(u => updateStageMutation.mutate(u))
+                console.log('DEBUG: Updates', updates)
+
+                if (updates.length > 0) {
+                    reorderStagesMutation.mutate(updates)
+                }
+            } else {
+                console.error('DEBUG: Stage not found in local state', { activeId, overId })
             }
         }
     }
@@ -339,11 +431,22 @@ export default function StudioStructure() {
                     onClick={() => {
                         const activePhasesCount = localPhases.filter(p => p.active && p.name !== 'Marketing').length
                         if (activePhasesCount >= 6) {
-                            alert('Limite de gestão atingido (Máx. 6 áreas).')
+                            setConfirmModal({
+                                isOpen: true,
+                                title: 'Limite Atingido',
+                                description: 'Limite de gestão atingido (Máx. 6 áreas).',
+                                variant: 'default',
+                                onConfirm: () => { }
+                            })
                             return
                         }
-                        const name = prompt('Nome da nova Macro-Área:')
-                        if (name) createPhaseMutation.mutate(name)
+                        setPromptModal({
+                            isOpen: true,
+                            title: 'Nova Macro-Área',
+                            description: 'Insira o nome da nova macro-área do pipeline.',
+                            placeholder: 'Ex: Pós-Venda',
+                            onConfirm: (name) => createPhaseMutation.mutate(name)
+                        })
                     }}
                     disabled={localPhases.filter(p => p.active && p.name !== 'Marketing').length >= 6}
                     className={cn(
@@ -365,32 +468,60 @@ export default function StudioStructure() {
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}
                 onDragEnd={onDragEnd}
+                onDragCancel={(e) => {
+                    console.error('DEBUG: onDragCancel', e)
+                    setActiveId(null)
+                    setActiveType(null)
+                }}
             >
                 <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
                     <div className="flex gap-6 h-full min-w-max px-2">
-                        <SortableContext items={localPhases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                        <SortableContext items={localPhases.map(p => String(p.id))} strategy={horizontalListSortingStrategy}>
                             {localPhases.map(phase => (
                                 <PhaseColumn
                                     key={phase.id}
                                     phase={phase}
                                     stages={localStages.filter(s => s.phase_id === phase.id)}
                                     onAddStage={() => {
-                                        const name = prompt('Nome da nova etapa:')
-                                        if (name) createStageMutation.mutate({ name, phaseId: phase.id })
+                                        setPromptModal({
+                                            isOpen: true,
+                                            title: 'Nova Etapa',
+                                            description: `Adicionar etapa na fase "${phase.name}".`,
+                                            placeholder: 'Ex: Qualificação',
+                                            onConfirm: (name) => createStageMutation.mutate({ name, phaseId: phase.id })
+                                        })
                                     }}
                                     onEditPhase={() => {
-                                        const name = prompt('Novo nome da fase:', phase.name)
-                                        if (name) updatePhaseMutation.mutate({ id: phase.id, name, label: name })
+                                        setPromptModal({
+                                            isOpen: true,
+                                            title: 'Renomear Fase',
+                                            description: 'Altere o nome desta macro-área.',
+                                            placeholder: 'Nome da fase',
+                                            defaultValue: phase.name,
+                                            onConfirm: (name) => updatePhaseMutation.mutate({ id: phase.id, name, label: name })
+                                        })
                                     }}
                                     onDeletePhase={() => {
-                                        if (confirm(`Excluir fase "${phase.name}"?`)) deletePhaseMutation.mutate(phase.id)
+                                        setConfirmModal({
+                                            isOpen: true,
+                                            title: 'Excluir Fase',
+                                            description: `Tem certeza que deseja excluir a fase "${phase.name}"? Esta ação não pode ser desfeita.`,
+                                            variant: 'destructive',
+                                            onConfirm: () => deletePhaseMutation.mutate(phase.id)
+                                        })
                                     }}
                                     onChangeColor={(color) => updatePhaseMutation.mutate({ id: phase.id, color })}
                                     onToggleVisibility={() => updatePhaseMutation.mutate({ id: phase.id, visible_in_card: !phase.visible_in_card })}
                                     onEditPhaseSettings={() => setEditingPhaseSettings(phase)}
                                     onEditStage={(stage) => setEditingStage(stage)}
                                     onDeleteStage={(stage) => {
-                                        if (confirm(`Excluir etapa "${stage.nome}"?`)) deleteStageMutation.mutate(stage.id)
+                                        setConfirmModal({
+                                            isOpen: true,
+                                            title: 'Excluir Etapa',
+                                            description: `Tem certeza que deseja excluir a etapa "${stage.nome}"? Esta ação não pode ser desfeita.`,
+                                            variant: 'destructive',
+                                            onConfirm: () => deleteStageMutation.mutate(stage.id)
+                                        })
                                     }}
                                 />
                             ))}
@@ -414,13 +545,20 @@ export default function StudioStructure() {
                                 onEditPhaseSettings={() => { }}
                             />
                         )}
-                        {activeId && activeType === 'Stage' && (
-                            <StageCard
-                                stage={localStages.find(s => s.id === activeId)!}
-                                onEdit={() => { }}
-                                onDelete={() => { }}
-                            />
-                        )}
+                        {activeId && activeType === 'Stage' && (() => {
+                            const stage = localStages.find(s => String(s.id) === String(activeId))
+                            if (!stage) {
+                                console.error('DEBUG: DragOverlay stage not found!', activeId)
+                                return null
+                            }
+                            return (
+                                <StageCard
+                                    stage={stage}
+                                    onEdit={() => { }}
+                                    onDelete={() => { }}
+                                />
+                            )
+                        })()}
                     </DragOverlay>,
                     document.body
                 )}
@@ -436,6 +574,26 @@ export default function StudioStructure() {
                 isOpen={!!editingPhaseSettings}
                 onClose={() => setEditingPhaseSettings(null)}
                 phase={editingPhaseSettings}
+            />
+
+            {/* Premium Modal replacements for native prompt/confirm */}
+            <PromptModal
+                isOpen={promptModal?.isOpen ?? false}
+                onClose={() => setPromptModal(null)}
+                onConfirm={promptModal?.onConfirm ?? (() => { })}
+                title={promptModal?.title ?? ''}
+                description={promptModal?.description}
+                placeholder={promptModal?.placeholder}
+                defaultValue={promptModal?.defaultValue}
+            />
+
+            <ConfirmModal
+                isOpen={confirmModal?.isOpen ?? false}
+                onClose={() => setConfirmModal(null)}
+                onConfirm={confirmModal?.onConfirm ?? (() => { })}
+                title={confirmModal?.title ?? ''}
+                description={confirmModal?.description ?? ''}
+                variant={confirmModal?.variant}
             />
         </div>
     )

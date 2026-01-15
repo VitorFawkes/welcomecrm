@@ -30,8 +30,8 @@ export function useStageRequirements(card: Card) {
                 .single()
 
             if (stageError) throw stageError
-            const pipelineId = currentStageData.pipeline_id
-            const currentOrder = currentStageData.ordem
+            const pipelineId = (currentStageData as any).pipeline_id
+            const currentOrder = (currentStageData as any).ordem
 
             // Now fetch all stage configs for this pipeline where required is true
             const { data, error } = await supabase

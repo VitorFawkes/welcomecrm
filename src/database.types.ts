@@ -1138,6 +1138,50 @@ export type Database = {
           },
         ]
       }
+      integration_field_catalog: {
+        Row: {
+          created_at: string | null
+          direction: string
+          field_key: string
+          field_name: string
+          field_type: string | null
+          id: string
+          integration_id: string | null
+          is_required: boolean | null
+          source: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          direction: string
+          field_key: string
+          field_name: string
+          field_type?: string | null
+          id?: string
+          integration_id?: string | null
+          is_required?: boolean | null
+          source?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string
+          field_key?: string
+          field_name?: string
+          field_type?: string | null
+          id?: string
+          integration_id?: string | null
+          is_required?: boolean | null
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_field_catalog_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_field_map: {
         Row: {
           direction: string | null
@@ -1172,6 +1216,187 @@ export type Database = {
             columns: ["integration_id"]
             isOneToOne: false
             referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_outbound_field_map: {
+        Row: {
+          created_at: string | null
+          external_field_id: string
+          external_field_name: string | null
+          id: string
+          integration_id: string | null
+          internal_field: string
+          internal_field_label: string | null
+          is_active: boolean | null
+          sync_always: boolean | null
+          sync_on_phases: string[] | null
+          transform_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          external_field_id: string
+          external_field_name?: string | null
+          id?: string
+          integration_id?: string | null
+          internal_field: string
+          internal_field_label?: string | null
+          is_active?: boolean | null
+          sync_always?: boolean | null
+          sync_on_phases?: string[] | null
+          transform_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          external_field_id?: string
+          external_field_name?: string | null
+          id?: string
+          integration_id?: string | null
+          internal_field?: string
+          internal_field_label?: string | null
+          is_active?: boolean | null
+          sync_always?: boolean | null
+          sync_on_phases?: string[] | null
+          transform_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_outbound_field_map_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_outbound_queue: {
+        Row: {
+          attempts: number | null
+          card_id: string | null
+          created_at: string | null
+          event_type: string
+          external_id: string
+          id: string
+          integration_id: string | null
+          max_attempts: number | null
+          next_retry_at: string | null
+          payload: Json
+          processed_at: string | null
+          processing_log: string | null
+          status: string | null
+          triggered_by: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          card_id?: string | null
+          created_at?: string | null
+          event_type: string
+          external_id: string
+          id?: string
+          integration_id?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          payload: Json
+          processed_at?: string | null
+          processing_log?: string | null
+          status?: string | null
+          triggered_by?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          card_id?: string | null
+          created_at?: string | null
+          event_type?: string
+          external_id?: string
+          id?: string
+          integration_id?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          payload?: Json
+          processed_at?: string | null
+          processing_log?: string | null
+          status?: string | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_outbound_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_outbound_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_outbound_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "integration_outbound_queue_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_outbound_stage_map: {
+        Row: {
+          created_at: string | null
+          external_stage_id: string
+          external_stage_name: string | null
+          id: string
+          integration_id: string | null
+          internal_stage_id: string | null
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          external_stage_id: string
+          external_stage_name?: string | null
+          id?: string
+          integration_id?: string | null
+          internal_stage_id?: string | null
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          external_stage_id?: string
+          external_stage_name?: string | null
+          id?: string
+          integration_id?: string | null
+          internal_stage_id?: string | null
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_outbound_stage_map_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_outbound_stage_map_internal_stage_id_fkey"
+            columns: ["internal_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
         ]
@@ -2172,6 +2397,68 @@ export type Database = {
           },
         ]
       }
+      proposal_library: {
+        Row: {
+          base_price: number | null
+          category: string
+          content: Json
+          created_at: string | null
+          created_by: string
+          currency: string | null
+          destination: string | null
+          id: string
+          is_shared: boolean
+          name: string
+          name_search: string | null
+          supplier: string | null
+          tags: string[] | null
+          updated_at: string | null
+          usage_count: number
+        }
+        Insert: {
+          base_price?: number | null
+          category: string
+          content?: Json
+          created_at?: string | null
+          created_by: string
+          currency?: string | null
+          destination?: string | null
+          id?: string
+          is_shared?: boolean
+          name: string
+          name_search?: string | null
+          supplier?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          usage_count?: number
+        }
+        Update: {
+          base_price?: number | null
+          category?: string
+          content?: Json
+          created_at?: string | null
+          created_by?: string
+          currency?: string | null
+          destination?: string | null
+          id?: string
+          is_shared?: boolean
+          name?: string
+          name_search?: string | null
+          supplier?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          usage_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_library_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_options: {
         Row: {
           created_at: string | null
@@ -3097,6 +3384,8 @@ export type Database = {
         Row: {
           contact_id: string | null
           created_at: string | null
+          external_conversation_id: string | null
+          external_conversation_url: string | null
           id: string
           instance_id: string | null
           last_message_at: string | null
@@ -3107,6 +3396,8 @@ export type Database = {
         Insert: {
           contact_id?: string | null
           created_at?: string | null
+          external_conversation_id?: string | null
+          external_conversation_url?: string | null
           id?: string
           instance_id?: string | null
           last_message_at?: string | null
@@ -3117,6 +3408,8 @@ export type Database = {
         Update: {
           contact_id?: string | null
           created_at?: string | null
+          external_conversation_id?: string | null
+          external_conversation_url?: string | null
           id?: string
           instance_id?: string | null
           last_message_at?: string | null
@@ -3275,16 +3568,63 @@ export type Database = {
           },
         ]
       }
+      whatsapp_phase_instance_map: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          phase_id: string | null
+          platform_id: string | null
+          priority: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          phase_id?: string | null
+          platform_id?: string | null
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          phase_id?: string | null
+          platform_id?: string | null
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_phase_instance_map_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_phase_instance_map_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_platforms: {
         Row: {
           api_base_url: string | null
           api_key_encrypted: string | null
+          capabilities: Json | null
           config: Json | null
           created_at: string | null
           created_by: string | null
           dashboard_url_template: string | null
           id: string
           instance_id: string | null
+          instance_label: string | null
           is_active: boolean | null
           last_event_at: string | null
           name: string
@@ -3294,12 +3634,14 @@ export type Database = {
         Insert: {
           api_base_url?: string | null
           api_key_encrypted?: string | null
+          capabilities?: Json | null
           config?: Json | null
           created_at?: string | null
           created_by?: string | null
           dashboard_url_template?: string | null
           id?: string
           instance_id?: string | null
+          instance_label?: string | null
           is_active?: boolean | null
           last_event_at?: string | null
           name: string
@@ -3309,12 +3651,14 @@ export type Database = {
         Update: {
           api_base_url?: string | null
           api_key_encrypted?: string | null
+          capabilities?: Json | null
           config?: Json | null
           created_at?: string | null
           created_by?: string | null
           dashboard_url_template?: string | null
           id?: string
           instance_id?: string | null
+          instance_label?: string | null
           is_active?: boolean | null
           last_event_at?: string | null
           name?: string
@@ -3649,6 +3993,7 @@ export type Database = {
     }
     Functions: {
       auto_expire_proposals: { Args: never; Returns: number }
+      f_unaccent: { Args: { "": string }; Returns: string }
       find_jsonb_diffs: {
         Args: { p_new: Json; p_old: Json; p_path: string }
         Returns: Database["public"]["CompositeTypes"]["jsonb_diff_record"][]
@@ -3702,6 +4047,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      increment_library_usage: {
+        Args: { library_id: string }
+        Returns: undefined
+      }
       is_admin: { Args: never; Returns: boolean }
       is_card_owner: { Args: { p_card_id: string }; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
@@ -3739,10 +4088,45 @@ export type Database = {
         Returns: boolean
       }
       process_task_queue: { Args: never; Returns: number }
+      search_proposal_library: {
+        Args: {
+          category_filter?: string
+          destination_filter?: string
+          limit_count?: number
+          search_term: string
+        }
+        Returns: {
+          base_price: number
+          category: string
+          content: Json
+          created_at: string
+          created_by: string
+          currency: string
+          destination: string
+          id: string
+          is_shared: boolean
+          name: string
+          similarity_score: number
+          supplier: string
+          tags: string[]
+          usage_count: number
+        }[]
+      }
       set_card_primary_contact: {
         Args: { p_card_id: string; p_contact_id: string }
         Returns: undefined
       }
+      should_sync_field: {
+        Args: {
+          p_current_phase_id: string
+          p_integration_id: string
+          p_internal_field: string
+        }
+        Returns: boolean
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
       validate_transition: {
         Args: { p_card_id: string; p_target_stage_id: string }
         Returns: boolean

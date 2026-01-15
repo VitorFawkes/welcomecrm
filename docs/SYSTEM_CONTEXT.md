@@ -157,3 +157,17 @@
     1.  Query `pg_views` / `pg_get_functiondef` to get the *real* definition.
     2.  Diff against your changes.
     3.  Apply & Verify.
+
+## 9. Proposals Platform (Jan 2025)
+
+### Core Tables
+- `proposals`: Main entity, linked to `cards` via `card_id`.
+- `proposal_versions`, `proposal_sections`, `proposal_items`, `proposal_options`.
+- `proposal_events`, `proposal_client_selections`.
+
+### Content Library (`proposal_library`)
+- **Purpose:** Reusable items (hotels, experiences, transfers) for proposal building.
+- **Fuzzy Search:** Uses `pg_trgm` + `unaccent` extensions for typo-tolerant search.
+- **RLS:** Shared items visible to all; private items only to owner.
+- **Hooks:** `useLibrarySearch()`, `useSaveToLibrary()`.
+- **UI:** `LibrarySearch.tsx` integrated in `AddItemMenu.tsx`.

@@ -12,7 +12,7 @@ interface Activity {
         titulo: string
     }
     created_by_user?: {
-        full_name: string | null
+        nome: string | null
         email: string | null
     }
 }
@@ -28,11 +28,11 @@ export default function RecentActivity() {
                     tipo,
                     descricao,
                     created_at,
-                    card:cards (
+                    card:cards!card_id (
                         titulo
                     ),
-                    created_by_user:profiles (
-                        full_name,
+                    created_by_user:profiles!created_by (
+                        nome,
                         email
                     )
                 `)
@@ -60,14 +60,14 @@ export default function RecentActivity() {
                                 <div className="relative flex space-x-3">
                                     <div>
                                         <span className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center ring-8 ring-white text-indigo-600 font-bold text-xs">
-                                            {(activity.created_by_user?.full_name || activity.created_by_user?.email || '?').charAt(0).toUpperCase()}
+                                            {(activity.created_by_user?.nome || activity.created_by_user?.email || '?').charAt(0).toUpperCase()}
                                         </span>
                                     </div>
                                     <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
                                         <div>
                                             <p className="text-sm text-gray-500">
                                                 <span className="font-medium text-gray-900">
-                                                    {activity.created_by_user?.full_name || activity.created_by_user?.email || 'Sistema'}
+                                                    {activity.created_by_user?.nome || activity.created_by_user?.email || 'Sistema'}
                                                 </span>
                                                 {' '}
                                                 {activity.tipo.replace('_', ' ')}

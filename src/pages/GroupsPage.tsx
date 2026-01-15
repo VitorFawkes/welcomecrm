@@ -34,44 +34,41 @@ export default function GroupsPage() {
     return (
         <div className="h-full flex flex-col bg-gray-50/50 relative overflow-hidden">
             {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-primary-100/30 via-primary-50/10 to-transparent pointer-events-none" />
-            <div className="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] bg-primary-200/10 rounded-full blur-3xl pointer-events-none" />
-
             {/* Header */}
             <div className="flex-none p-8 pb-6 relative z-10">
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-4 tracking-tight">
-                            <div className="p-3 bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl shadow-sm">
-                                <Plane className="h-8 w-8 text-primary-600" />
+                        <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3 tracking-tight">
+                            <div className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                <Plane className="h-6 w-6 text-indigo-600" />
                             </div>
                             Galeria de Grupos
                         </h1>
-                        <p className="text-gray-500 mt-3 ml-[4.5rem] max-w-2xl text-lg font-medium">
-                            Gerencie suas excursões e grupos de viagem com uma visão panorâmica e inteligente.
+                        <p className="text-slate-500 mt-2 ml-[3.5rem] max-w-2xl text-base font-medium">
+                            Gerencie suas excursões e grupos de viagem com uma visão panorâmica.
                         </p>
                     </div>
-                    <Button className="bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20 h-12 px-8 text-base font-medium rounded-xl transition-all hover:scale-105 active:scale-95">
-                        <Plus className="h-5 w-5 mr-2" />
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-10 px-6 text-sm font-medium rounded-lg transition-all">
+                        <Plus className="h-4 w-4 mr-2" />
                         Novo Grupo
                     </Button>
                 </div>
 
                 {/* Filters Bar */}
-                <div className="flex items-center gap-4 bg-white/60 backdrop-blur-xl p-2 rounded-2xl border border-white/40 shadow-sm max-w-4xl">
+                <div className="flex items-center gap-4 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm max-w-4xl">
                     <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input
                             placeholder="Buscar por nome, origem ou destino..."
-                            className="pl-12 bg-white/50 border-transparent focus:border-primary/30 focus:bg-white transition-all h-12 text-base rounded-xl"
+                            className="pl-10 bg-slate-50 border-transparent focus:border-indigo-500 focus:bg-white transition-all h-10 text-sm rounded-lg"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="h-8 w-px bg-gray-200/50" />
-                    <Button variant="ghost" className="text-gray-600 hover:bg-white/50 hover:text-primary h-12 px-6 rounded-xl font-medium">
+                    <div className="h-6 w-px bg-slate-200" />
+                    <Button variant="ghost" className="text-slate-600 hover:bg-slate-50 hover:text-indigo-600 h-10 px-4 rounded-lg font-medium text-sm">
                         <Filter className="h-4 w-4 mr-2" />
-                        Filtros Avançados
+                        Filtros
                     </Button>
                 </div>
             </div>

@@ -1,7 +1,8 @@
-
 import { useNavigate } from 'react-router-dom';
 import type { Database } from '../../../database.types';
-import { Calendar, MapPin, ArrowRight, Plane } from 'lucide-react';
+import { Calendar, MapPin, ArrowRight, Plane, Users } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type Card = Database['public']['Tables']['cards']['Row'];
 
@@ -19,70 +20,121 @@ export function GroupSummaryCard({ group }: GroupSummaryCardProps) {
         if (normalized === 'em_andamento' || normalized === 'em_aberto') return 'Em Aberto';
         if (normalized === 'concluido' || normalized === 'encerrado') return 'Encerrado';
         if (normalized === 'cancelado') return 'Cancelado';
-        return status.replace(/_/g, ' '); // Fallback for other statuses
+        return status.replace(/_/g, ' ');
     };
 
     const getStatusColor = (status: string | null) => {
-        if (!status) return 'bg-gray-100 text-gray-600 border-gray-200';
+        if (!status) return 'bg-slate-100 text-slate-600 border-slate-200';
         const normalized = status.toLowerCase();
 
         if (normalized === 'em_andamento' || normalized === 'em_aberto') {
-            return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+            return 'bg-emerald-50 text-emerald-700 border-emerald-200';
         }
         if (normalized === 'concluido' || normalized === 'encerrado') {
-            return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+            return 'bg-blue-50 text-blue-700 border-blue-200';
         }
         if (normalized === 'cancelado') {
-            return 'bg-red-500/10 text-red-600 border-red-500/20';
+            return 'bg-red-50 text-red-700 border-red-200';
         }
-        return 'bg-gray-100 text-gray-600 border-gray-200';
+        return 'bg-slate-100 text-slate-600 border-slate-200';
     };
 
     const statusLabel = getStatusLabel(group.status_comercial);
     const statusColor = getStatusColor(group.status_comercial);
 
+    // Format dates safely
+    const formatDate = (dateStr: string | null) => {
+        if (!dateStr) return null;
+        try {
+            return format(new Date(dateStr), "dd MMM, yyyy", { locale: ptBR });
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const startDate = formatDate(group.data_viagem_inicio);
+    const endDate = formatDate(group.data_viagem_fim);
+
+    // Occupancy Logic
+    const capacity = group.group_capacity || 0;
+    const pax = group.group_total_pax || 0;
+    const occupancyRate = capacity > 0 ? (pax / capacity) * 100 : 0;
+
     return (
         <div
             onClick={() => navigate(`/cards/${group.id}`)}
-            className="group relative flex flex-col bg-white/70 backdrop-blur-xl rounded-3xl border border-white/50 p-6 shadow-sm hover:shadow-2xl hover:bg-white/90 hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group flex flex-col bg-white border border-slate-200 shadow-sm rounded-xl hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer overflow-hidden h-full"
         >
-            {/* Decorative Gradient Blob */}
-            <div className="absolute -top-20 -right-20 w-40 h-40 bg-gradient-to-br from-primary-400/20 to-purple-400/20 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-500" />
-
-            <div className="flex items-start justify-between mb-5 relative z-10">
-                <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100 group-hover:scale-110 transition-transform duration-300">
-                    <Plane className="h-6 w-6 text-primary-600" />
+            {/* Header Section */}
+            <div className="p-5 pb-4">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="p-2.5 bg-indigo-50 rounded-lg border border-indigo-100 group-hover:bg-indigo-100 transition-colors">
+                        <Plane className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    {statusLabel && (
+                        <span className={`px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide rounded-full border ${statusColor}`}>
+                            {statusLabel}
+                        </span>
+                    )}
                 </div>
-                {statusLabel && (
-                    <span className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full border ${statusColor}`}>
-                        {statusLabel}
-                    </span>
-                )}
-            </div>
 
-            <div className="mb-4 relative z-10">
-                <h3 className="font-bold text-gray-900 text-xl leading-tight mb-2 group-hover:text-primary-700 transition-colors line-clamp-2">
+                <h3 className="font-semibold text-slate-900 text-lg leading-tight mb-3 group-hover:text-indigo-600 transition-colors line-clamp-2 min-h-[3.5rem]">
                     {group.titulo}
                 </h3>
-                {group.origem && (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{group.origem}</span>
-                    </div>
-                )}
+
+                <div className="space-y-2">
+                    {group.origem && (
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                            <span className="truncate">
+                                {group.origem}
+                                {(group.produto_data as any)?.destinos?.length > 0
+                                    ? ` → ${(group.produto_data as any).destinos[0]}`
+                                    : ''}
+                            </span>
+                        </div>
+                    )}
+
+                    {(startDate || endDate) && (
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                            <span>{startDate || '?'} - {endDate || '?'}</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="mt-auto pt-5 border-t border-gray-100/50 flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>{new Date(group.created_at || '').toLocaleDateString()}</span>
+            {/* Divider */}
+            <div className="h-px bg-slate-100 w-full" />
+
+            {/* Footer / Occupancy Section */}
+            <div className="p-5 pt-4 mt-auto bg-slate-50/50">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                        <Users className="h-3.5 w-3.5" />
+                        <span>Ocupação</span>
                     </div>
+                    <span className="text-xs font-semibold text-slate-700">
+                        {pax} <span className="text-slate-400 font-normal">/ {capacity || '∞'}</span>
+                    </span>
                 </div>
 
-                <div className="flex items-center gap-2 text-primary-600 font-medium text-sm opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                    <span>Ver Detalhes</span>
-                    <ArrowRight className="h-4 w-4" />
+                {/* Progress Bar */}
+                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mb-4">
+                    <div
+                        className={`h-full rounded-full transition-all duration-500 ${occupancyRate >= 100 ? 'bg-red-500' :
+                            occupancyRate >= 80 ? 'bg-amber-500' :
+                                'bg-indigo-500'
+                            }`}
+                        style={{ width: `${Math.min(occupancyRate, 100)}%` }}
+                    />
+                </div>
+
+                <div className="flex items-center justify-end">
+                    <div className="flex items-center gap-1 text-indigo-600 font-medium text-sm opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200">
+                        <span>Gerenciar Grupo</span>
+                        <ArrowRight className="h-4 w-4" />
+                    </div>
                 </div>
             </div>
         </div>

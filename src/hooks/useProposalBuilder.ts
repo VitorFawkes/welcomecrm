@@ -12,6 +12,7 @@ import type {
     ProposalItemType,
 } from '@/types/proposals'
 import { SECTION_TYPE_CONFIG } from '@/types/proposals'
+import type { LibrarySearchResult } from '@/hooks/useLibrary'
 
 // ============================================
 // Builder Store State
@@ -42,6 +43,7 @@ interface ProposalBuilderState {
 
     // Item actions
     addItem: (sectionId: string, type: ProposalItemType, title: string) => void
+    addItemFromLibrary: (sectionId: string, libraryItem: LibrarySearchResult) => void
     removeItem: (itemId: string) => void
     updateItem: (itemId: string, updates: Partial<ProposalItem>) => void
     reorderItems: (sectionId: string, orderedIds: string[]) => void
@@ -173,6 +175,51 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             description: null,
             rich_content: {},
             base_price: 0,
+            ordem: 0,
+            is_optional: false,
+            is_default_selected: true,
+            created_at: new Date().toISOString(),
+            options: [],
+        }
+
+        set({
+            sections: sections.map(s => {
+                if (s.id === sectionId) {
+                    const items = [...s.items, { ...newItem, ordem: s.items.length }]
+                    return { ...s, items }
+                }
+                return s
+            }),
+            isDirty: true,
+            selectedItemId: newItem.id,
+        })
+    },
+
+    addItemFromLibrary: (sectionId, libraryItem) => {
+        const { sections } = get()
+
+        // Map library category to proposal item type
+        // proposal_item_type enum: hotel, flight, transfer, experience, service, insurance, fee, custom
+        const categoryToItemType: Record<string, ProposalItemType> = {
+            hotel: 'hotel',
+            experience: 'experience',
+            transfer: 'transfer',
+            flight: 'flight',
+            service: 'service',
+            text_block: 'custom',
+            custom: 'custom',
+        }
+
+        const itemType = categoryToItemType[libraryItem.category] || 'custom'
+
+        const newItem: ProposalItemWithOptions = {
+            id: crypto.randomUUID(),
+            section_id: sectionId,
+            item_type: itemType,
+            title: libraryItem.name,
+            description: null, // Library items don't have description field
+            rich_content: (libraryItem.content || {}) as any,
+            base_price: libraryItem.base_price || 0,
             ordem: 0,
             is_optional: false,
             is_default_selected: true,
@@ -393,7 +440,7 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
                 .eq('id', proposal.id)
 
             set({
-                version: newVersion,
+                version: newVersion as any,
                 isDirty: false,
                 isSaving: false,
                 lastSavedAt: new Date(),
@@ -426,6 +473,6 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
 
         set({ proposal: { ...proposal, status: 'sent' } })
 
-        return data.public_token!
+        return (data as any).public_token!
     },
 }))

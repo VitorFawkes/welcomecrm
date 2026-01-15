@@ -65,7 +65,7 @@ export function useProposals(filters?: ProposalFilters) {
 
             // Apply status filter
             if (filters?.status) {
-                query = query.eq('status', filters.status)
+                query = query.eq('status', filters.status as any)
             }
 
             // Apply creator filter (for admin filtering by consultant)
@@ -119,7 +119,7 @@ export function useProposalStats() {
             }
 
             data.forEach(p => {
-                const status = p.status as keyof Omit<ProposalStats, 'total' | 'conversionRate'>
+                const status = (p as any).status as keyof Omit<ProposalStats, 'total' | 'conversionRate'>
                 if (status in stats) {
                     stats[status]++
                 }

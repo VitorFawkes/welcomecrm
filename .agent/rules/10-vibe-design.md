@@ -6,7 +6,7 @@ globs: **/*.tsx
 # 🎨 Vibe Design System (Atomic & Premium)
 ## 1. Aesthetic Principles (Glassmorphism)
 -   **Style:** Glassmorphism, TailwindCSS.
--   **Backgrounds:** Use `bg-white/10` + `backdrop-blur-md` for depth.
+-   **Backgrounds:** Use `bg-white` + `border-slate-200` + `shadow-sm` for depth.
 -   **Layout:** Use `dvh` for mobile heights. `overflow: hidden` on body.
 -   **Motion:** All interactions must have smooth transitions (`duration-200`).
 ## 2. Inputs & Forms (Premium Standard)

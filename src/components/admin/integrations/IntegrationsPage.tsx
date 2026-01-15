@@ -7,10 +7,13 @@ import { IntegrationLogs } from './IntegrationLogs';
 import { IntegrationImport } from './IntegrationImport';
 import { IntegrationSettings } from './IntegrationSettings';
 import { IntegrationMapping } from './IntegrationMapping';
+import { OutboundStageMappingTab } from './OutboundStageMappingTab';
+import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
+import { PhaseInstanceMappingTab } from './PhaseInstanceMappingTab';
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/Button';
-import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch } from 'lucide-react';
+import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch, ArrowUpRight, Link2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export function IntegrationsPage() {
@@ -47,26 +50,38 @@ export function IntegrationsPage() {
                 </div>
 
                 <Tabs defaultValue="inbox" className="space-y-6">
-                    <TabsList>
+                    <TabsList className="flex-wrap">
                         <TabsTrigger value="inbox" className="gap-2">
                             <Inbox className="w-4 h-4" />
-                            Inbox (Entrada)
+                            Entrada
                         </TabsTrigger>
                         <TabsTrigger value="outbox" className="gap-2">
                             <Send className="w-4 h-4" />
-                            Outbox (Saída)
+                            Saída
                         </TabsTrigger>
                         <TabsTrigger value="mapping" className="gap-2">
                             <GitBranch className="w-4 h-4" />
                             Mapeamento
                         </TabsTrigger>
+                        <TabsTrigger value="outbound-stages" className="gap-2">
+                            <ArrowUpRight className="w-4 h-4" />
+                            Saída: Etapas
+                        </TabsTrigger>
+                        <TabsTrigger value="outbound-fields" className="gap-2">
+                            <ArrowUpRight className="w-4 h-4" />
+                            Saída: Campos
+                        </TabsTrigger>
+                        <TabsTrigger value="whatsapp" className="gap-2">
+                            <Link2 className="w-4 h-4" />
+                            WhatsApp
+                        </TabsTrigger>
                         <TabsTrigger value="import" className="gap-2">
                             <Upload className="w-4 h-4" />
-                            Importar / Replay
+                            Importar
                         </TabsTrigger>
                         <TabsTrigger value="settings" className="gap-2">
                             <Settings className="w-4 h-4" />
-                            Configurações
+                            Config
                         </TabsTrigger>
                     </TabsList>
 
@@ -80,6 +95,18 @@ export function IntegrationsPage() {
 
                     <TabsContent value="mapping">
                         <IntegrationMapping integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
+                    </TabsContent>
+
+                    <TabsContent value="outbound-stages">
+                        <OutboundStageMappingTab integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
+                    </TabsContent>
+
+                    <TabsContent value="outbound-fields">
+                        <OutboundFieldMappingTab integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
+                    </TabsContent>
+
+                    <TabsContent value="whatsapp">
+                        <PhaseInstanceMappingTab />
                     </TabsContent>
 
                     <TabsContent value="import">

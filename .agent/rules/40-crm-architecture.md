@@ -24,4 +24,5 @@ The CRM is alive. Actions must ripple through the system.
 ## 4. The "Vibe" Consistency (Design Inheritance)
 -   **Layout:** All pages must extend `DashboardLayout`.
 -   **Components:** Use `DataTable` for lists, `SmartForm` for inputs.
--   **Visuals:** Inherit the Glassmorphism tokens (`bg-white/5`, `border-white/10`).
+-   **Visuals:** Use Elite Light Mode tokens (`bg-white`, `border-slate-200`, `shadow-sm`).
+-   **Exception:** Glassmorphism is ONLY allowed inside `ThemeBoundary mode="dark"` (e.g., Sidebar).

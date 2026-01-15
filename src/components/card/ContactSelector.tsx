@@ -158,7 +158,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
             // But wait, the mutationFn argument is just the ID.
             // We need to find the contact in the 'contacts' list to get the name.
             const contact = contacts?.find(c => c.id === contactId)
-            onContactAdded(contactId, contact)
+            onContactAdded(contactId, contact ? { ...contact, nome: contact.nome || 'Sem Nome' } : undefined)
             onClose()
         },
         onError: (err: any) => {
@@ -223,10 +223,10 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-medium group-hover:bg-indigo-100 transition-colors">
-                                                    {contact.nome.charAt(0).toUpperCase()}
+                                                    {(contact.nome || 'S').charAt(0).toUpperCase()}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-medium text-gray-900 truncate">{contact.nome}</p>
+                                                    <p className="font-medium text-gray-900 truncate">{contact.nome || 'Sem Nome'}</p>
                                                     <p className="text-xs text-gray-500 truncate">{contact.email || 'Sem email'}</p>
                                                 </div>
                                             </div>

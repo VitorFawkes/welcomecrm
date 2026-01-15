@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
+import { useSaveToLibrary, type LibraryCategory } from '@/hooks/useLibrary'
 import { ITEM_TYPE_CONFIG } from '@/types/proposals'
 import type { ProposalItemWithOptions } from '@/types/proposals'
+import { toast } from 'sonner'
 import {
     MoreVertical,
     Pencil,
@@ -9,12 +11,14 @@ import {
     Copy,
     Check,
     X,
+    Library,
 } from 'lucide-react'
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import * as LucideIcons from 'lucide-react'
 
@@ -24,6 +28,7 @@ interface ItemCardProps {
 
 export function ItemCard({ item }: ItemCardProps) {
     const { updateItem, removeItem, selectItem, selectedItemId } = useProposalBuilder()
+    const saveToLibrary = useSaveToLibrary()
     const [isEditing, setIsEditing] = useState(false)
     const [editTitle, setEditTitle] = useState(item.title)
 
@@ -52,6 +57,35 @@ export function ItemCard({ item }: ItemCardProps) {
             style: 'currency',
             currency: 'BRL',
         }).format(Number(value) || 0)
+
+    const handleSaveToLibrary = async () => {
+        // Map item_type to library category
+        const categoryMap: Record<string, LibraryCategory> = {
+            hotel: 'hotel',
+            flight: 'flight',
+            transfer: 'transfer',
+            experience: 'experience',
+            service: 'service',
+            insurance: 'service',
+            fee: 'service',
+            custom: 'custom',
+        }
+
+        try {
+            await saveToLibrary.mutateAsync({
+                name: item.title,
+                category: categoryMap[item.item_type] || 'custom',
+                content: {
+                    description: item.description || '',
+                    ...((item.rich_content as Record<string, unknown>) || {}),
+                },
+                basePrice: Number(item.base_price) || 0,
+            })
+            toast.success('Item salvo na biblioteca!')
+        } catch {
+            toast.error('Erro ao salvar na biblioteca')
+        }
+    }
 
     return (
         <div
@@ -117,7 +151,7 @@ export function ItemCard({ item }: ItemCardProps) {
             {/* Price */}
             <div className="text-right flex-shrink-0">
                 <p className="font-semibold text-sm text-slate-900">
-                    {formatPrice(item.base_price)}
+                    {formatPrice(item.base_price || 0)}
                 </p>
             </div>
 
@@ -140,6 +174,15 @@ export function ItemCard({ item }: ItemCardProps) {
                         <Copy className="h-4 w-4 mr-2" />
                         Duplicar
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={handleSaveToLibrary}
+                        disabled={saveToLibrary.isPending}
+                    >
+                        <Library className="h-4 w-4 mr-2" />
+                        {saveToLibrary.isPending ? 'Salvando...' : 'Salvar na Biblioteca'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleDelete} className="text-red-600">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Remover

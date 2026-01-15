@@ -28,8 +28,8 @@ interface Platform {
     provider: 'chatpro' | 'echo';
     dashboard_url_template: string | null;
     is_active: boolean;
-    last_event_at: string | null;
-    config: Record<string, unknown>;
+    last_event_at?: string | null;
+    config?: Record<string, unknown>;
 }
 
 interface EventStats {

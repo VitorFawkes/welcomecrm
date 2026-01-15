@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
@@ -428,6 +428,42 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
             return data?.raw_payload;
         }
     });
+
+    // ⚡ Realtime subscription: Auto-refresh when new webhook data arrives
+    useEffect(() => {
+        const channel = supabase
+            .channel(`whatsapp-events-${platformId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'whatsapp_raw_events',
+                    filter: `platform_id=eq.${platformId}`
+                },
+                () => {
+                    // When a new event arrives, invalidate the query to refetch
+                    queryClient.invalidateQueries({ queryKey: ['whatsapp-sample-event', platformId] });
+                    toast.info('🔄 Novo payload recebido!', {
+                        description: 'Os dados foram atualizados automaticamente.'
+                    });
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Realtime conectado para whatsapp_raw_events');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ Erro no canal Realtime whatsapp_raw_events');
+                    toast.error('Erro na conexão Realtime. Tente recarregar a página.');
+                } else if (status === 'TIMED_OUT') {
+                    console.error('⚠️ Timeout no canal Realtime whatsapp_raw_events');
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [platformId, queryClient]);
 
     // Get mapping for a field (considering pending changes)
     const getMappingForField = (fieldValue: string) => {

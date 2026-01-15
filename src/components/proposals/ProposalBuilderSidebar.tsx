@@ -1,18 +1,28 @@
+import { useState } from 'react'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
+import { LibrarySearch } from '@/components/proposals/LibrarySearch'
 import { Input } from '@/components/ui/Input'
 import {
     Calendar,
     Users,
     Calculator,
+    Settings,
+    Library,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { Proposal } from '@/types/proposals'
+import type { LibrarySearchResult } from '@/hooks/useLibrary'
+import { toast } from 'sonner'
 
 interface ProposalBuilderSidebarProps {
     proposal: Proposal
 }
 
+type SidebarTab = 'config' | 'library'
+
 export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps) {
-    const { version, sections } = useProposalBuilder()
+    const [activeTab, setActiveTab] = useState<SidebarTab>('config')
+    const { version, sections, addItemFromLibrary, selectedSectionId } = useProposalBuilder()
 
     // Calculate totals
     const calculateTotals = () => {
@@ -43,6 +53,95 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
             currency: 'BRL',
         }).format(value)
 
+    const handleSelectLibraryItem = (item: LibrarySearchResult) => {
+        if (!selectedSectionId) {
+            toast.warning('Selecione uma seção primeiro', {
+                description: 'Clique em uma seção para adicionar o item da biblioteca.'
+            })
+            return
+        }
+
+        addItemFromLibrary(selectedSectionId, item)
+        toast.success('Item adicionado!', {
+            description: `"${item.name}" foi adicionado à seção.`
+        })
+    }
+
+    return (
+        <div className="flex flex-col h-full">
+            {/* Tab Buttons */}
+            <div className="flex border-b border-slate-200">
+                <button
+                    onClick={() => setActiveTab('config')}
+                    className={cn(
+                        'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors',
+                        activeTab === 'config'
+                            ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    )}
+                >
+                    <Settings className="h-4 w-4" />
+                    Configurações
+                </button>
+                <button
+                    onClick={() => setActiveTab('library')}
+                    className={cn(
+                        'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors',
+                        activeTab === 'library'
+                            ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    )}
+                >
+                    <Library className="h-4 w-4" />
+                    Biblioteca
+                </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto">
+                {activeTab === 'config' ? (
+                    <ConfigTab
+                        proposal={proposal}
+                        version={version}
+                        sections={sections}
+                        baseTotal={baseTotal}
+                        optionalTotal={optionalTotal}
+                        grandTotal={grandTotal}
+                        formatCurrency={formatCurrency}
+                    />
+                ) : (
+                    <LibraryTab
+                        onSelectItem={handleSelectLibraryItem}
+                        hasSelectedSection={!!selectedSectionId}
+                    />
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ============================================
+// Config Tab (original content)
+// ============================================
+interface ConfigTabProps {
+    proposal: Proposal
+    version: any
+    sections: any[]
+    baseTotal: number
+    optionalTotal: number
+    grandTotal: number
+    formatCurrency: (value: number) => string
+}
+
+function ConfigTab({
+    proposal,
+    version,
+    sections,
+    baseTotal,
+    optionalTotal,
+    grandTotal,
+    formatCurrency,
+}: ConfigTabProps) {
     return (
         <div className="p-4 space-y-6">
             {/* General Config */}
@@ -132,6 +231,32 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
                     </div>
                 </div>
             </section>
+        </div>
+    )
+}
+
+// ============================================
+// Library Tab
+// ============================================
+interface LibraryTabProps {
+    onSelectItem: (item: LibrarySearchResult) => void
+    hasSelectedSection: boolean
+}
+
+function LibraryTab({ onSelectItem, hasSelectedSection }: LibraryTabProps) {
+    return (
+        <div className="p-4">
+            {!hasSelectedSection && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">
+                        <strong>Dica:</strong> Selecione uma seção no editor para adicionar itens da biblioteca.
+                    </p>
+                </div>
+            )}
+            <LibrarySearch
+                onSelectItem={onSelectItem}
+                className="h-full"
+            />
         </div>
     )
 }

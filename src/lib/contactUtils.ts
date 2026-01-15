@@ -1,8 +1,6 @@
 import type { Database } from '../database.types'
 
-type Contato = Database['public']['Tables']['contatos']['Row'] & {
-    tipo_pessoa?: 'adulto' | 'crianca'
-}
+type Contato = Database['public']['Tables']['contatos']['Row']
 
 export function calculateAge(birthDate: string | null | undefined): number | null {
     if (!birthDate) return null
@@ -27,16 +25,16 @@ export function getTipoPessoa(birthDate: string | null | undefined): 'adulto' | 
 }
 
 export function formatContactName(contact: Contato): string {
-    return contact.nome
+    return contact.nome || ''
 }
 
 export function getContactSummary(contacts: Contato[]): { adults: number, children: number } {
     return contacts.reduce(
         (acc, contact) => {
-            if (contact.tipo_pessoa === 'adulto') {
-                acc.adults++
-            } else {
+            if (contact.tipo_pessoa === 'crianca') {
                 acc.children++
+            } else {
+                acc.adults++
             }
             return acc
         },

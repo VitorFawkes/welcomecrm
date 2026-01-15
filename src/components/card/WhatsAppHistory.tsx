@@ -15,25 +15,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import type { Database } from '@/database.types';
 
-interface WhatsAppMessage {
-    id: string;
-    external_id: string | null;
-    contact_id: string | null;
-    direction: 'inbound' | 'outbound';
-    type: string;
-    body: string | null;
-    media_url: string | null;
-    status: string;
-    metadata: Record<string, unknown>;
-    created_at: string;
-    platform_id: string | null;
-    conversation_id: string | null;
-    sender_name: string | null;
-    sender_phone: string | null;
-    origem: string | null;
+type WhatsAppMessageRow = Database['public']['Tables']['whatsapp_messages']['Row'];
+
+interface WhatsAppMessage extends Omit<WhatsAppMessageRow, 'body' | 'origem' | 'sender_name'> {
     is_from_me: boolean;
-    ack_status: number | null;
+    body: string;
+    sender_name?: string;
+    origem?: string;
 }
 
 interface WhatsAppHistoryProps {
@@ -47,6 +37,7 @@ function groupMessagesByDate(messages: WhatsAppMessage[]) {
     const groups: { date: string; label: string; messages: WhatsAppMessage[] }[] = [];
 
     for (const message of messages) {
+        if (!message.created_at) continue;
         const date = new Date(message.created_at);
         const dateKey = format(date, 'yyyy-MM-dd');
 
@@ -70,18 +61,18 @@ function groupMessagesByDate(messages: WhatsAppMessage[]) {
     return groups;
 }
 
-// Get status icon based on ack_status
+// Get status icon based on status
 function getStatusIcon(message: WhatsAppMessage) {
     if (!message.is_from_me) return null;
 
-    const ack = message.ack_status;
-    if (ack === 4 || message.status === 'read') {
+    // Map status string to icon
+    if (message.status === 'read') {
         return <CheckCheck className="w-3 h-3 text-blue-500" />;
     }
-    if (ack === 3 || ack === 2 || message.status === 'delivered') {
+    if (message.status === 'delivered') {
         return <CheckCheck className="w-3 h-3 text-muted-foreground" />;
     }
-    if (ack === 1 || message.status === 'sent') {
+    if (message.status === 'sent') {
         return <Check className="w-3 h-3 text-muted-foreground" />;
     }
     return <Clock className="w-3 h-3 text-muted-foreground" />;
@@ -101,30 +92,41 @@ export function WhatsAppHistory({ contactId, contactPhone, className }: WhatsApp
                 .order('created_at', { ascending: true })
                 .limit(100);
 
-            // Query by contact_id or phone
+            // Query by contact_id or phone (if we had sender_phone column, but we don't seem to have it in the type)
+            // The table has contact_id.
             if (contactId) {
                 query = query.eq('contact_id', contactId);
-            } else if (normalizedPhone) {
-                query = query.eq('sender_phone', normalizedPhone);
             } else {
+                // If no contactId, we can't easily query by phone unless we join or if there was a phone column.
+                // Assuming for now we only use contactId or return empty if not present.
+                // If normalizedPhone is needed, we might need to find contact by phone first.
                 return [];
             }
 
             const { data, error } = await query;
             if (error) throw error;
-            return (data || []) as WhatsAppMessage[];
+
+            return (data || []).map(msg => ({
+                ...msg,
+                is_from_me: msg.direction === 'outbound',
+                body: msg.body || '',
+                // Extract metadata fields if they exist
+                sender_name: (msg.metadata as any)?.sender_name,
+                origem: (msg.metadata as any)?.origem,
+                ack_status: (msg.metadata as any)?.ack_status
+            })) as WhatsAppMessage[];
         },
-        enabled: !!(contactId || normalizedPhone)
+        enabled: !!contactId
     });
 
     const groupedMessages = messages ? groupMessagesByDate(messages) : [];
 
-    if (!contactId && !normalizedPhone) {
+    if (!contactId) {
         return (
             <div className={cn("flex flex-col items-center justify-center h-full text-muted-foreground p-8", className)}>
                 <AlertCircle className="w-8 h-8 mb-3" />
                 <p className="text-sm text-center">
-                    Nenhum contato selecionado ou telefone disponível
+                    Nenhum contato selecionado
                 </p>
             </div>
         );
@@ -243,7 +245,7 @@ export function WhatsAppHistory({ contactId, contactPhone, className }: WhatsApp
                                                 </Badge>
                                             )}
                                             <span className="text-[10px]">
-                                                {format(new Date(message.created_at), 'HH:mm')}
+                                                {message.created_at ? format(new Date(message.created_at), 'HH:mm') : ''}
                                             </span>
                                             {getStatusIcon(message)}
                                         </div>

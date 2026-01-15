@@ -204,7 +204,7 @@ export default function PhaseColumn({
 
             {/* Stages List */}
             <div className="flex-1 p-2 overflow-y-auto min-h-[100px]">
-                <SortableContext items={stages.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={stages.map(s => String(s.id))} strategy={verticalListSortingStrategy}>
                     <div className="flex flex-col gap-2">
                         {stages.map(stage => (
                             <StageCard

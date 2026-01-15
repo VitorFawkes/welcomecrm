@@ -18,7 +18,7 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
         sections.forEach(section => {
             section.items.forEach(item => {
                 if (item.is_optional) {
-                    initial[item.id] = { selected: item.is_default_selected }
+                    initial[item.id] = { selected: item.is_default_selected || false }
                 } else {
                     initial[item.id] = { selected: true }
                 }

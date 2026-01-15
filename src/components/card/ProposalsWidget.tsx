@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { toast } from 'sonner'
 
 interface ProposalsWidgetProps {
     cardId: string
@@ -41,9 +42,15 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
                 cardId,
                 title: 'Nova Proposta',
             })
+            toast.success('Proposta criada!', {
+                description: 'Redirecionando para o editor...',
+            })
             navigate(`/proposals/${proposal.id}/edit`)
         } catch (error) {
             console.error('Error creating proposal:', error)
+            toast.error('Erro ao criar proposta', {
+                description: 'Tente novamente ou contate o suporte.',
+            })
         } finally {
             setIsCreating(false)
         }

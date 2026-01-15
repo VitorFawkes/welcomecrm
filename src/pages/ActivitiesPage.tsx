@@ -29,7 +29,7 @@ export default function ActivitiesPage() {
 
     const userOptions = [
         { value: 'all', label: 'Todos os usuários' },
-        ...(users?.map((u: { id: string, nome: string | null, email: string | null }) => ({ value: u.id, label: u.nome || u.email || 'Sem nome' })) || [])
+        ...((users as any[] || []).map((u: any) => ({ value: u.id, label: u.nome || u.email || 'Sem nome' })))
     ]
 
 

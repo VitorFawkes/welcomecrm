@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Filter } from 'lucide-react'
+import { Search, Plus, Filter, FileText, Library, Layout } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useProposals, useProposalStats, type ProposalFilters } from '@/hooks/useProposals'
@@ -8,10 +8,15 @@ import { ProposalStatsBar } from '@/components/proposals/ProposalStatsBar'
 import { ProposalGrid } from '@/components/proposals/ProposalGrid'
 import { ProposalFilterDrawer } from '@/components/proposals/ProposalFilterDrawer'
 import { ProposalActiveFilters } from '@/components/proposals/ProposalActiveFilters'
+import { LibraryManager } from '@/components/proposals/LibraryManager'
 import type { ProposalStatus } from '@/types/proposals'
+import { cn } from '@/lib/utils'
+
+type TabType = 'proposals' | 'library' | 'templates'
 
 export default function ProposalsPage() {
     const navigate = useNavigate()
+    const [activeTab, setActiveTab] = useState<TabType>('proposals')
     const [filters, setFilters] = useState<ProposalFilters>({})
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
 
@@ -22,6 +27,12 @@ export default function ProposalsPage() {
         setFilters(prev => ({ ...prev, status }))
     }
 
+    const tabs = [
+        { id: 'proposals' as TabType, label: 'Propostas', icon: FileText, count: stats?.total },
+        { id: 'library' as TabType, label: 'Biblioteca', icon: Library },
+        { id: 'templates' as TabType, label: 'Templates', icon: Layout },
+    ]
+
     return (
         <ErrorBoundary>
             <div className="flex h-full flex-col relative overflow-hidden bg-gray-50/50">
@@ -30,66 +41,124 @@ export default function ProposalsPage() {
                     <header className="flex items-center justify-between mb-6">
                         <div>
                             <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">Propostas</h1>
-                            <p className="mt-1 text-sm text-gray-500">Gerencie e acompanhe todas as suas propostas comerciais.</p>
+                            <p className="mt-1 text-sm text-gray-500">Gerencie propostas, biblioteca de itens e templates.</p>
                         </div>
                         <div className="flex items-center space-x-4">
-                            <Button
-                                onClick={() => navigate('/pipeline')}
-                                className="bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20"
-                            >
-                                <Plus className="h-5 w-5 mr-2" />
-                                Nova Proposta
-                            </Button>
+                            {activeTab === 'proposals' && (
+                                <Button
+                                    onClick={() => navigate('/pipeline')}
+                                    title="Propostas são criadas a partir de um Card no Funil"
+                                    className="bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20"
+                                >
+                                    <Plus className="h-5 w-5 mr-2" />
+                                    Nova Proposta
+                                </Button>
+                            )}
                         </div>
                     </header>
 
-                    {/* Stats Bar */}
-                    <div className="mb-6">
-                        <ProposalStatsBar
-                            total={stats?.total || 0}
-                            sent={stats?.sent || 0}
-                            accepted={stats?.accepted || 0}
-                            conversionRate={stats?.conversionRate || 0}
-                            onStatusClick={handleStatusFilter}
-                            activeStatus={filters.status || null}
-                        />
+                    {/* Tabs */}
+                    <div className="flex items-center gap-1 mb-6 bg-slate-100 rounded-lg p-1 w-fit">
+                        {tabs.map(tab => {
+                            const Icon = tab.icon
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={cn(
+                                        'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200',
+                                        activeTab === tab.id
+                                            ? 'bg-white text-slate-900 shadow-sm'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                                    )}
+                                >
+                                    <Icon className="h-4 w-4" />
+                                    {tab.label}
+                                    {tab.count !== undefined && (
+                                        <span className={cn(
+                                            'text-xs px-1.5 py-0.5 rounded-full',
+                                            activeTab === tab.id
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : 'bg-slate-200 text-slate-600'
+                                        )}>
+                                            {tab.count}
+                                        </span>
+                                    )}
+                                </button>
+                            )
+                        })}
                     </div>
 
-                    <div className="flex items-center justify-between gap-4">
-                        {/* Search Input */}
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Buscar por título ou card..."
-                                className="w-full pl-10 h-10 rounded-lg border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white shadow-sm outline-none transition-all"
-                                value={filters.search || ''}
-                                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                            />
-                        </div>
+                    {/* Proposals Tab Controls */}
+                    {activeTab === 'proposals' && (
+                        <>
+                            {/* Stats Bar */}
+                            <div className="mb-6">
+                                <ProposalStatsBar
+                                    total={stats?.total || 0}
+                                    sent={stats?.sent || 0}
+                                    accepted={stats?.accepted || 0}
+                                    conversionRate={stats?.conversionRate || 0}
+                                    onStatusClick={handleStatusFilter}
+                                    activeStatus={filters.status || null}
+                                />
+                            </div>
 
-                        {/* Active Filters */}
-                        <div className="flex-1 px-4 min-w-0">
-                            <ProposalActiveFilters filters={filters} setFilters={setFilters} />
-                        </div>
+                            <div className="flex items-center justify-between gap-4">
+                                {/* Search Input */}
+                                <div className="relative flex-1 max-w-md">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por título ou card..."
+                                        className="w-full pl-10 h-10 rounded-lg border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white shadow-sm outline-none transition-all"
+                                        value={filters.search || ''}
+                                        onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                                    />
+                                </div>
 
-                        {/* Filter Button */}
-                        <button
-                            onClick={() => setIsFilterDrawerOpen(true)}
-                            className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
-                        >
-                            <Filter className="h-4 w-4 mr-2 text-gray-500" />
-                            Filtros
-                        </button>
-                    </div>
+                                {/* Active Filters */}
+                                <div className="flex-1 px-4 min-w-0">
+                                    <ProposalActiveFilters filters={filters} setFilters={setFilters} />
+                                </div>
+
+                                {/* Filter Button */}
+                                <button
+                                    onClick={() => setIsFilterDrawerOpen(true)}
+                                    className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
+                                >
+                                    <Filter className="h-4 w-4 mr-2 text-gray-500" />
+                                    Filtros
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Main Content */}
                 <div className="flex-1 min-h-0 relative px-8 pb-4 overflow-y-auto">
-                    <ProposalGrid
-                        proposals={proposals || []}
-                        loading={isLoading}
-                    />
+                    {activeTab === 'proposals' && (
+                        <ProposalGrid
+                            proposals={proposals || []}
+                            loading={isLoading}
+                        />
+                    )}
+
+                    {activeTab === 'library' && (
+                        <LibraryManager />
+                    )}
+
+                    {activeTab === 'templates' && (
+                        <div className="flex items-center justify-center h-full">
+                            <div className="text-center">
+                                <Layout className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                                <h3 className="text-lg font-medium text-slate-700 mb-2">Templates em Breve</h3>
+                                <p className="text-sm text-slate-500 max-w-sm">
+                                    Crie templates estruturais para acelerar a criação de novas propostas.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Filter Drawer */}

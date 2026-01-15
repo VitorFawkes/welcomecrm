@@ -50,7 +50,10 @@ export default function PessoasField({
 
             // Sync summary if we have contacts and we are in edit mode (onChange present)
             if (mappedContacts.length > 0 && onChange) {
-                const summary = getContactSummary(mappedContacts)
+                const summary = getContactSummary(mappedContacts.map(c => ({
+                    ...c,
+                    tipo_pessoa: (c.tipo_pessoa === 'adulto' || c.tipo_pessoa === 'crianca') ? c.tipo_pessoa : 'adulto'
+                })) as Parameters<typeof getContactSummary>[0])
                 const newPessoas: Pessoas = {
                     adultos: summary.adults,
                     criancas: summary.children,
@@ -173,10 +176,10 @@ export default function PessoasField({
                             <div key={contact.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md border text-sm">
                                 <div className="flex items-center gap-2">
                                     <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-medium">
-                                        {contact.nome.charAt(0).toUpperCase()}
+                                        {(contact.nome || 'S').charAt(0).toUpperCase()}
                                     </div>
                                     <div>
-                                        <p className="font-medium text-gray-900">{contact.nome}</p>
+                                        <p className="font-medium text-gray-900">{contact.nome || 'Sem Nome'}</p>
                                         <p className="text-xs text-gray-500">
                                             {contact.tipo_pessoa}
                                             {contact.data_nascimento && ` • ${calculateAge(contact.data_nascimento)} anos`}

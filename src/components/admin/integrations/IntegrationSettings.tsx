@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/Badge';
-import { AlertTriangle, Shield, Zap } from 'lucide-react';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { AlertTriangle, Shield, Zap, Key, Eye, EyeOff, Save, TestTube, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -15,28 +18,61 @@ interface Setting {
 
 export function IntegrationSettings() {
     const queryClient = useQueryClient();
+    const [showApiKey, setShowApiKey] = useState(false);
+    const [credentials, setCredentials] = useState({
+        apiUrl: '',
+        apiKey: ''
+    });
+    const [credentialsLoaded, setCredentialsLoaded] = useState(false);
 
     const { data: settings, isLoading } = useQuery({
         queryKey: ['integration-settings'],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('integration_settings')
-                .select('*')
-                .in('key', ['INBOUND_INGEST_ENABLED', 'SHADOW_MODE_ENABLED', 'WRITE_MODE_ENABLED']);
+                .select('*');
 
             if (error) throw error;
+
+            // Load credentials into state
+            const settingsMap = (data as Setting[]).reduce((acc, s) => {
+                acc[s.key] = s.value;
+                return acc;
+            }, {} as Record<string, string>);
+
+            if (!credentialsLoaded) {
+                setCredentials({
+                    apiUrl: settingsMap['ACTIVECAMPAIGN_API_URL'] || '',
+                    apiKey: settingsMap['ACTIVECAMPAIGN_API_KEY'] || ''
+                });
+                setCredentialsLoaded(true);
+            }
+
             return data as Setting[];
         }
     });
 
     const updateSetting = useMutation({
         mutationFn: async ({ key, value }: { key: string; value: string }) => {
-            const { error } = await supabase
+            // Try update first
+            const { data: existing } = await supabase
                 .from('integration_settings')
-                .update({ value })
-                .eq('key', key);
+                .select('key')
+                .eq('key', key)
+                .single();
 
-            if (error) throw error;
+            if (existing) {
+                const { error } = await supabase
+                    .from('integration_settings')
+                    .update({ value })
+                    .eq('key', key);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('integration_settings')
+                    .insert({ key, value, description: '' });
+                if (error) throw error;
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['integration-settings'] });
@@ -64,14 +100,109 @@ export function IntegrationSettings() {
         updateSetting.mutate({ key, value: String(!currentValue) });
     };
 
+    const saveCredentials = async () => {
+        try {
+            await updateSetting.mutateAsync({ key: 'ACTIVECAMPAIGN_API_URL', value: credentials.apiUrl });
+            await updateSetting.mutateAsync({ key: 'ACTIVECAMPAIGN_API_KEY', value: credentials.apiKey });
+            toast.success('Credenciais salvas com sucesso!');
+        } catch (error) {
+            // Error already handled in mutation
+        }
+    };
+
+    const testConnection = async () => {
+        if (!credentials.apiUrl || !credentials.apiKey) {
+            toast.error('Preencha a URL e API Key antes de testar');
+            return;
+        }
+
+        toast.info('Testando conexão...');
+
+        try {
+            // Call the sync-catalog edge function to test
+            const { error } = await supabase.functions.invoke('integration-sync-catalog', {
+                body: { test_only: true }
+            });
+
+            if (error) throw error;
+            toast.success('Conexão estabelecida com sucesso!');
+        } catch (error: any) {
+            toast.error('Falha na conexão: ' + (error.message || 'Erro desconhecido'));
+        }
+    };
+
     if (isLoading) return <div className="p-4 text-muted-foreground">Carregando configurações...</div>;
 
     const inboundEnabled = getSetting('INBOUND_INGEST_ENABLED');
     const shadowModeEnabled = getSetting('SHADOW_MODE_ENABLED');
     const writeModeEnabled = getSetting('WRITE_MODE_ENABLED');
+    const hasCredentials = credentials.apiUrl && credentials.apiKey;
 
     return (
         <div className="space-y-6 max-w-4xl">
+            {/* API Credentials */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Key className="w-5 h-5 text-orange-500" />
+                        Credenciais ActiveCampaign
+                    </CardTitle>
+                    <CardDescription>
+                        Configure a conexão com a API do ActiveCampaign.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">API URL</label>
+                        <Input
+                            value={credentials.apiUrl}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCredentials(prev => ({ ...prev, apiUrl: e.target.value }))}
+                            placeholder="https://sua-conta.api-us1.com"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Encontre em ActiveCampaign → Settings → Developer
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                            API Key
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={() => setShowApiKey(!showApiKey)}
+                            >
+                                {showApiKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </Button>
+                        </label>
+                        <Input
+                            type={showApiKey ? 'text' : 'password'}
+                            value={credentials.apiKey}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCredentials(prev => ({ ...prev, apiKey: e.target.value }))}
+                            placeholder="Sua API Key do ActiveCampaign"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                        <Button onClick={saveCredentials} disabled={updateSetting.isPending}>
+                            <Save className="w-4 h-4 mr-1" />
+                            Salvar
+                        </Button>
+                        <Button variant="outline" onClick={testConnection} disabled={!hasCredentials}>
+                            <TestTube className="w-4 h-4 mr-1" />
+                            Testar Conexão
+                        </Button>
+                        {hasCredentials && (
+                            <Badge variant="outline" className="text-green-600 border-green-200">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Configurado
+                            </Badge>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Inbound Control */}
             <Card>
                 <CardHeader>
@@ -143,3 +274,4 @@ export function IntegrationSettings() {
         </div>
     );
 }
+

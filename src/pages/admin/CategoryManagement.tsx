@@ -51,7 +51,7 @@ export default function CategoryManagement() {
             const counts: Record<string, number> = {};
 
             // Parallel queries for each category
-            await Promise.all(categories.map(async (cat) => {
+            await Promise.all((categories as any[]).map(async (cat: any) => {
                 if (cat.scope === 'change_request') {
                     const { count } = await supabase
                         .from('tarefas')
@@ -140,12 +140,12 @@ export default function CategoryManagement() {
 
     // Group categories by scope
     const getCategoriesByScope = (scope: string) => {
-        return categories?.filter(c => c.scope === scope) || [];
+        return ((categories || []) as any[]).filter((c: any) => c.scope === scope) || [];
     };
 
     // Find categories that don't match any known context (orphans)
     const knownScopes = CONTEXTS.map(c => c.id);
-    const orphanCategories = categories?.filter(c => !knownScopes.includes(c.scope)) || [];
+    const orphanCategories = ((categories || []) as any[]).filter((c: any) => !knownScopes.includes(c.scope)) || [];
 
     return (
         <div className="p-8 max-w-[1600px] mx-auto space-y-8">
@@ -164,7 +164,7 @@ export default function CategoryManagement() {
                         title={context.title}
                         description={context.description}
                         icon={context.icon}
-                        categories={(getCategoriesByScope(context.id) || []).map(c => ({ ...c, visible: c.visible ?? false }))}
+                        categories={(getCategoriesByScope(context.id) || []).map((c: any) => ({ ...c, visible: c.visible ?? false }))}
                         usageCounts={usageCounts || {}}
                         onAdd={async (label) => {
                             await createMutation.mutateAsync({ scope: context.id, label });
@@ -180,7 +180,7 @@ export default function CategoryManagement() {
                         title="Outros / Legado"
                         description="Categorias encontradas no sistema que não pertencem a um contexto ativo."
                         icon={<AlertCircle className="w-5 h-5 text-amber-500" />}
-                        categories={orphanCategories.map(c => ({ ...c, visible: c.visible ?? false }))}
+                        categories={orphanCategories.map((c: any) => ({ ...c, visible: c.visible ?? false }))}
                         usageCounts={usageCounts || {}}
                         onAdd={async (label) => {
                             // Default to 'other' scope for orphans

@@ -66,11 +66,11 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
                     <div className="flex items-start justify-between">
                         <div className="flex items-center gap-4">
                             <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-2xl font-bold">
-                                {person.nome.charAt(0).toUpperCase()}
+                                {(person.nome || 'S').charAt(0).toUpperCase()}
                             </div>
                             <div>
                                 <DrawerTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                    {person.nome}
+                                    {person.nome || 'Sem Nome'}
                                     {person.stats?.is_group_leader && (
                                         <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200">
                                             <Crown className="h-3 w-3 mr-1" />

@@ -190,11 +190,11 @@ export default function CreateChildCardModal({ isOpen, onClose, parentCardId, pa
                         if (contactId) {
                             // If contact object is passed directly
                             if (contact) {
-                                handleContactSelect(contactId, contact.nome)
+                                handleContactSelect(contactId, contact.nome || 'Sem Nome')
                             } else {
                                 // Fallback fetch
                                 supabase.from('contatos').select('nome').eq('id', contactId).single().then(({ data }) => {
-                                    if (data) handleContactSelect(contactId, data.nome)
+                                    if (data) handleContactSelect(contactId, data.nome || 'Sem Nome')
                                 })
                             }
                         }

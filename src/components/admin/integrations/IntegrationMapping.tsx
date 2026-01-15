@@ -36,7 +36,7 @@ interface RouterConfig {
 }
 
 interface StageMapping {
-    id: string;
+    id?: string;
     integration_id: string;
     pipeline_id: string;
     external_stage_id: string;
@@ -45,7 +45,7 @@ interface StageMapping {
 }
 
 interface UserMapping {
-    id: string;
+    id?: string;
     integration_id: string;
     external_user_id: string;
     internal_user_id: string;

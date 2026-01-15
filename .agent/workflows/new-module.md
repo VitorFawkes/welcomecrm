@@ -35,3 +35,8 @@ description: Standard Operating Procedure (SOP) for creating new CRM features.
 1.  **The "White Screen" Test:** Navigate to the new page. Refresh.
 2.  **The "Context" Test:** Open a Deal. Can I see the new data there?
 3.  **The "Safety" Test:** Can a user from another tenant see this data? (Verify RLS).
+4.  **UI Quality Gate:**
+    - [ ] No `bg-white/X` outside of `ThemeBoundary mode="dark"`
+    - [ ] No `text-white` without explicit dark container
+    - [ ] No native `<select>`, `<input>` (use `@/components/ui/*`)
+    - [ ] Text is readable on white background

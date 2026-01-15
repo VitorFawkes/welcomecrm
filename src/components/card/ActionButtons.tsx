@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Mail, X, Send } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Mail, X, Send, Loader2 } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-
-import ProposalBuilderModal from './ProposalBuilderModal'
+import { useCreateProposal } from '@/hooks/useProposal'
+import { toast } from 'sonner'
 
 interface ActionButtonsProps {
     card: {
@@ -15,9 +16,11 @@ interface ActionButtonsProps {
 }
 
 export default function ActionButtons({ card }: ActionButtonsProps) {
+    const navigate = useNavigate()
     const queryClient = useQueryClient()
     const [showEmailModal, setShowEmailModal] = useState(false)
-    const [showProposalModal, setShowProposalModal] = useState(false)
+    const [isCreatingProposal, setIsCreatingProposal] = useState(false)
+    const createProposal = useCreateProposal()
     const [emailData, setEmailData] = useState({
         to: '',
         subject: '',
@@ -78,15 +81,90 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
             return
         }
 
-        // Remove non-numeric characters
         const cleanNumber = contact.telefone.replace(/\D/g, '')
         const message = encodeURIComponent(`Olá! Sobre sua viagem: ${card.titulo}`)
 
-        // Optimistic UI: Log activity immediately
+        let targetUrl: string | null = null
+        let fallbackUsed = 'wa_me'
+        let platformName = 'WhatsApp'
+
+        try {
+            // 1. Get current card's phase
+            const currentPhaseId = card.pipeline_stage?.phase_id
+
+            if (currentPhaseId) {
+                // 2. Find mapped platform for this phase
+                const { data: mapping } = await (supabase
+                    .from('whatsapp_phase_instance_map' as never)
+                    .select('platform_id') as any)
+                    .eq('phase_id', currentPhaseId)
+                    .eq('is_active', true)
+                    .order('priority')
+                    .limit(1)
+                    .single()
+
+                if (mapping?.platform_id) {
+                    // 3. Get platform details
+                    const { data: platform } = await (supabase
+                        .from('whatsapp_platforms')
+                        .select('id, name, provider, dashboard_url_template, instance_id, capabilities') as any)
+                        .eq('id', mapping.platform_id)
+                        .eq('is_active', true)
+                        .single()
+
+                    if (platform) {
+                        platformName = platform.name
+                        const capabilities = platform.capabilities as { has_direct_link?: boolean } | null
+
+                        // 4. Try to find existing conversation for this contact
+                        const { data: conversation } = await (supabase
+                            .from('whatsapp_conversations' as never)
+                            .select('external_conversation_id') as any)
+                            .eq('contact_id', card.pessoa_principal_id)
+                            .eq('platform_id', platform.id)
+                            .single()
+
+                        // 5. Smart Fallback Chain
+                        if (capabilities?.has_direct_link && conversation?.external_conversation_id && platform.dashboard_url_template) {
+                            // TIER 1: Direct deep link to conversation
+                            targetUrl = platform.dashboard_url_template
+                                .replace('{conversation_id}', conversation.external_conversation_id)
+                                .replace('{instance_id}', platform.instance_id || '')
+                                .replace('{phone}', cleanNumber)
+                            fallbackUsed = 'deep_link'
+                        } else if (platform.dashboard_url_template && !platform.dashboard_url_template.includes('{')) {
+                            // TIER 2: Static dashboard URL (like Echo)
+                            targetUrl = platform.dashboard_url_template
+                            fallbackUsed = 'dashboard'
+                        } else if (platform.dashboard_url_template) {
+                            // TIER 3: Dashboard with placeholder info
+                            const baseUrl = platform.dashboard_url_template.split('{')[0]
+                            targetUrl = baseUrl
+                            fallbackUsed = 'dashboard_base'
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('WhatsApp platform lookup failed, using fallback:', err)
+        }
+
+        // TIER 4: Universal fallback to wa.me
+        if (!targetUrl) {
+            targetUrl = `https://wa.me/${cleanNumber}?text=${message}`
+            fallbackUsed = 'wa_me'
+        }
+
+        // Log activity with context
         logActivityMutation.mutate({
             tipo: 'whatsapp_sent',
-            descricao: 'WhatsApp enviado para o cliente',
-            metadata: { contact_id: card.pessoa_principal_id, phone: cleanNumber }
+            descricao: `WhatsApp via ${platformName}`,
+            metadata: {
+                contact_id: card.pessoa_principal_id,
+                phone: cleanNumber,
+                fallback_used: fallbackUsed,
+                platform: platformName
+            }
         })
 
         // Trigger Handshake (Sync) in background
@@ -94,8 +172,8 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
             syncWhatsAppMutation.mutate(card.pessoa_principal_id)
         }
 
-        // Open WhatsApp Web
-        window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank')
+        // Open the target URL
+        window.open(targetUrl, '_blank')
     }
 
     const handleEmailSend = () => {
@@ -141,14 +219,34 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                 </button>
 
                 <button
-                    onClick={() => setShowProposalModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm font-medium"
+                    onClick={async () => {
+                        setIsCreatingProposal(true)
+                        try {
+                            const { proposal } = await createProposal.mutateAsync({
+                                cardId: card.id,
+                                title: card.titulo || 'Nova Proposta',
+                            })
+                            toast.success('Proposta criada!', { description: 'Abrindo editor...' })
+                            navigate(`/proposals/${proposal.id}/edit`)
+                        } catch (error) {
+                            console.error('Error creating proposal:', error)
+                            toast.error('Erro ao criar proposta')
+                        } finally {
+                            setIsCreatingProposal(false)
+                        }
+                    }}
+                    disabled={isCreatingProposal}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm font-medium disabled:opacity-50"
                     title="Gerar Proposta"
                 >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Proposta
+                    {isCreatingProposal ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    )}
+                    {isCreatingProposal ? 'Criando...' : 'Proposta'}
                 </button>
             </div>
 
@@ -221,11 +319,6 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                 </div>
             )}
 
-            <ProposalBuilderModal
-                cardId={card.id!}
-                isOpen={showProposalModal}
-                onClose={() => setShowProposalModal(false)}
-            />
         </>
     )
 }
