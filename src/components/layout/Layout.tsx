@@ -3,6 +3,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import Sidebar from './Sidebar'
 import { ThemeBoundary } from "../ui/ThemeBoundary";
 import { useProposalNotifications } from '@/hooks/useProposalNotifications';
+import { GlobalSearchProvider } from '@/components/search/GlobalSearchProvider';
+import { GlobalSearchModal } from '@/components/search/GlobalSearchModal';
 
 
 export default function Layout() {
@@ -24,16 +26,20 @@ export default function Layout() {
     }
 
     return (
-        <div className="fixed inset-0 flex overflow-hidden">
-            <ThemeBoundary mode="dark" className="flex-shrink-0">
-                <Sidebar />
-            </ThemeBoundary>
+        <GlobalSearchProvider>
+            <div className="fixed inset-0 flex overflow-hidden">
+                <ThemeBoundary mode="dark" className="flex-shrink-0">
+                    <Sidebar />
+                </ThemeBoundary>
 
-            <ThemeBoundary mode="light" className="flex flex-1 flex-col overflow-hidden relative">
-                <main className="flex-1 relative flex flex-col overflow-hidden bg-surface-secondary">
-                    <Outlet />
-                </main>
-            </ThemeBoundary>
-        </div>
+                <ThemeBoundary mode="light" className="flex flex-1 flex-col overflow-hidden relative">
+                    <main className="flex-1 relative flex flex-col overflow-hidden bg-surface-secondary">
+                        <Outlet />
+                    </main>
+                </ThemeBoundary>
+            </div>
+            <GlobalSearchModal />
+        </GlobalSearchProvider>
     );
 }
+

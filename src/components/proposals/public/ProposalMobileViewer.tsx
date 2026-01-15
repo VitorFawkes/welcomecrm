@@ -3,6 +3,7 @@ import type { ProposalFull } from '@/types/proposals'
 import { CoverSection } from './CoverSection'
 import { ContentSection } from './ContentSection'
 import { StickyFooter } from './StickyFooter'
+import { MessageCircle } from 'lucide-react'
 
 interface ProposalMobileViewerProps {
     proposal: ProposalFull
@@ -99,6 +100,17 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                 total={total}
                 proposalId={proposal.id}
             />
+
+            {/* WhatsApp FAB */}
+            <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Olá! Estou vendo a proposta "${version?.title || 'Viagem'}" e tenho uma dúvida...`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="fixed bottom-28 right-4 z-40 w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95"
+                aria-label="Falar com a consultora no WhatsApp"
+            >
+                <MessageCircle className="h-6 w-6" />
+            </a>
         </div>
     )
 }
