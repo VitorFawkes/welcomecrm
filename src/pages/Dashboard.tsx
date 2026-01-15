@@ -2,6 +2,7 @@ import { useState } from 'react'
 import StatsCards from '../components/dashboard/StatsCards'
 import FunnelChart from '../components/dashboard/FunnelChart'
 import RecentActivity from '../components/dashboard/RecentActivity'
+import { ProposalAnalyticsWidget } from '../components/proposals/ProposalAnalyticsWidget'
 import type { Database } from '../database.types'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
@@ -35,6 +36,10 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <FunnelChart productFilter={productFilter} />
+                <ProposalAnalyticsWidget />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
                 <RecentActivity />
             </div>
         </div>

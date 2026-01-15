@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
 import { LibrarySearch } from '@/components/proposals/LibrarySearch'
 import { VersionHistory } from '@/components/proposals/VersionHistory'
+import { AIImageExtractor } from '@/components/proposals/AIImageExtractor'
 import { Input } from '@/components/ui/Input'
 import {
     Calendar,
@@ -10,17 +11,19 @@ import {
     Settings,
     Library,
     History,
+    Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Proposal } from '@/types/proposals'
 import type { LibrarySearchResult } from '@/hooks/useLibrary'
+import type { ExtractedItem } from '@/hooks/useAIExtract'
 import { toast } from 'sonner'
 
 interface ProposalBuilderSidebarProps {
     proposal: Proposal
 }
 
-type SidebarTab = 'config' | 'library' | 'history'
+type SidebarTab = 'config' | 'library' | 'history' | 'ai'
 
 export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps) {
     const [activeTab, setActiveTab] = useState<SidebarTab>('config')
@@ -69,6 +72,34 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
         })
     }
 
+    const handleAIExtract = (items: ExtractedItem[]) => {
+        if (!selectedSectionId) {
+            toast.warning('Selecione uma seção primeiro', {
+                description: 'Clique em uma seção para adicionar os itens extraídos.'
+            })
+            return
+        }
+
+        items.forEach(item => {
+            const libraryFormat = {
+                id: crypto.randomUUID(),
+                name: item.title,
+                category: item.category || 'custom',
+                base_price: item.price || 0,
+                currency: item.currency || 'BRL',
+                content: {
+                    description: item.description || '',
+                    location: item.location,
+                    dates: item.dates,
+                },
+            } as unknown as LibrarySearchResult
+            addItemFromLibrary(selectedSectionId, libraryFormat)
+        })
+
+        toast.success(`${items.length} item(s) adicionado(s)!`)
+        setActiveTab('config')
+    }
+
     return (
         <div className="flex flex-col h-full">
             {/* Tab Buttons */}
@@ -109,6 +140,18 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
                     <History className="h-4 w-4" />
                     Versões
                 </button>
+                <button
+                    onClick={() => setActiveTab('ai')}
+                    className={cn(
+                        'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors',
+                        activeTab === 'ai'
+                            ? 'text-pink-600 border-b-2 border-pink-600 bg-pink-50/50'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    )}
+                >
+                    <Sparkles className="h-4 w-4" />
+                    IA
+                </button>
             </div>
 
             {/* Tab Content */}
@@ -128,11 +171,18 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
                         onSelectItem={handleSelectLibraryItem}
                         hasSelectedSection={!!selectedSectionId}
                     />
-                ) : (
+                ) : activeTab === 'history' ? (
                     <VersionHistory
                         proposalId={proposal.id}
                         currentVersionId={proposal.active_version_id}
                     />
+                ) : (
+                    <div className="p-4">
+                        <AIImageExtractor
+                            onExtractComplete={handleAIExtract}
+                            onCancel={() => setActiveTab('config')}
+                        />
+                    </div>
                 )}
             </div>
         </div>

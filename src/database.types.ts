@@ -1230,6 +1230,7 @@ export type Database = {
           internal_field: string
           internal_field_label: string | null
           is_active: boolean | null
+          section: string | null
           sync_always: boolean | null
           sync_on_phases: string[] | null
           transform_type: string | null
@@ -1244,6 +1245,7 @@ export type Database = {
           internal_field: string
           internal_field_label?: string | null
           is_active?: boolean | null
+          section?: string | null
           sync_always?: boolean | null
           sync_on_phases?: string[] | null
           transform_type?: string | null
@@ -1258,6 +1260,7 @@ export type Database = {
           internal_field?: string
           internal_field_label?: string | null
           is_active?: boolean | null
+          section?: string | null
           sync_always?: boolean | null
           sync_on_phases?: string[] | null
           transform_type?: string | null
@@ -2540,6 +2543,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      proposal_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_global: boolean | null
+          metadata: Json | null
+          name: string
+          sections: Json
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_global?: boolean | null
+          metadata?: Json | null
+          name: string
+          sections?: Json
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_global?: boolean | null
+          metadata?: Json | null
+          name?: string
+          sections?: Json
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: []
       }
       proposal_versions: {
         Row: {
@@ -4087,7 +4132,9 @@ export type Database = {
         Args: { p_card_id: string; p_nova_etapa_id: string }
         Returns: boolean
       }
+      process_all_pending_whatsapp_events: { Args: never; Returns: Json }
       process_task_queue: { Args: never; Returns: number }
+      process_whatsapp_raw_event: { Args: { event_id: string }; Returns: Json }
       search_proposal_library: {
         Args: {
           category_filter?: string

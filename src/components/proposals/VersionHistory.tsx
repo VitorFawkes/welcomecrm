@@ -7,7 +7,6 @@ import {
     History,
     ChevronRight,
     Clock,
-    User,
     CheckCircle,
     FileText,
     ArrowLeft,
@@ -79,9 +78,10 @@ export function VersionHistory({ proposalId, currentVersionId, onClose }: Versio
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {versions.map((version, index) => {
+                        {versions.map((version) => {
                             const isCurrent = version.id === currentVersionId
-                            const statusConfig = VERSION_STATUS_CONFIG[version.status] || VERSION_STATUS_CONFIG.draft
+                            const versionStatus = (version as any).status || 'draft'
+                            const statusConfig = VERSION_STATUS_CONFIG[versionStatus] || VERSION_STATUS_CONFIG.draft
 
                             return (
                                 <button
@@ -156,7 +156,8 @@ interface VersionDetailProps {
 }
 
 function VersionDetail({ version, isCurrent, onBack }: VersionDetailProps) {
-    const statusConfig = VERSION_STATUS_CONFIG[version.status] || VERSION_STATUS_CONFIG.draft
+    const versionStatus = (version as any).status || 'draft'
+    const statusConfig = VERSION_STATUS_CONFIG[versionStatus] || VERSION_STATUS_CONFIG.draft
 
     return (
         <div className="h-full flex flex-col">

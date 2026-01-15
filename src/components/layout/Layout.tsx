@@ -2,10 +2,14 @@ import { Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import Sidebar from './Sidebar'
 import { ThemeBoundary } from "../ui/ThemeBoundary";
+import { useProposalNotifications } from '@/hooks/useProposalNotifications';
 
 
 export default function Layout() {
     const { session, loading } = useAuth()
+
+    // Enable real-time proposal notifications
+    useProposalNotifications()
 
     if (loading) {
         return (
