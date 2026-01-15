@@ -11,6 +11,7 @@ import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
 import { ACFieldManager } from './ACFieldManager';
 import { PhaseInstanceMappingTab } from './PhaseInstanceMappingTab';
+import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/Button';
@@ -49,6 +50,9 @@ export function IntegrationsPage() {
                         <p className="text-muted-foreground text-sm">Gerencie a sincronização bidirecional do Pipeline 6.</p>
                     </div>
                 </div>
+
+                {/* Status Dashboard */}
+                <IntegrationStatusDashboard />
 
                 <Tabs defaultValue="inbox" className="space-y-6">
                     <TabsList className="flex-wrap">

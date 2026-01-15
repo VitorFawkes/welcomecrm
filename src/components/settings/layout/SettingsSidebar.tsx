@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
     User,
-
     Database,
     Kanban,
     LayoutList,
@@ -13,11 +12,27 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { Badge } from '@/components/ui/Badge';
 
 export default function SettingsSidebar() {
     const { } = useAuth();
     // TODO: Check if user is admin properly.
     const isAdmin = true;
+
+    // Fetch blocked integration events count
+    const { data: blockedCount = 0 } = useQuery({
+        queryKey: ['integration-blocked-count'],
+        queryFn: async () => {
+            const { count } = await supabase
+                .from('integration_events')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'blocked');
+            return count || 0;
+        },
+        refetchInterval: 60000 // Refresh every minute
+    });
 
     return (
         <aside className="w-64 flex flex-col h-full border-r border-border bg-background">
@@ -148,7 +163,12 @@ export default function SettingsSidebar() {
                                 {({ isActive }) => (
                                     <>
                                         <Webhook className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
-                                        Integrações
+                                        <span className="flex-1">Integrações</span>
+                                        {blockedCount > 0 && (
+                                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center">
+                                                {blockedCount > 99 ? '99+' : blockedCount}
+                                            </Badge>
+                                        )}
                                     </>
                                 )}
                             </NavLink>

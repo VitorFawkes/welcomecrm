@@ -61,6 +61,7 @@ const STATUS_CONFIG: Record<string, { icon: React.ElementType; label: string; co
 
 export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLogsProps) {
     const [selectedEvent, setSelectedEvent] = useState<IntegrationEvent | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const tableName = mode === 'inbox' ? 'integration_events' : 'integration_outbox';
     const queryClient = useQueryClient();
 
@@ -106,6 +107,58 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
 
     const handleIgnore = (id: string) => {
         updateStatusMutation.mutate({ id, status: 'ignored' });
+    };
+
+    // Bulk actions
+    const bulkUpdateMutation = useMutation({
+        mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+            const { error } = await supabase
+                .from(tableName as any)
+                .update({ status, processing_log: null, error_log: null })
+                .in('id', ids);
+            if (error) throw error;
+        },
+        onSuccess: (_, { ids, status }) => {
+            queryClient.invalidateQueries({ queryKey: ['integration-logs'] });
+            queryClient.invalidateQueries({ queryKey: ['integration-blocked-count'] });
+            queryClient.invalidateQueries({ queryKey: ['integration-stats'] });
+            toast.success(`${ids.length} evento(s) ${status === 'ignored' ? 'ignorados' : 'reenfileirados'}`);
+            setSelectedIds(new Set());
+        },
+        onError: (error) => {
+            toast.error('Erro: ' + error.message);
+        }
+    });
+
+    const handleBulkIgnore = () => {
+        if (selectedIds.size === 0) return;
+        bulkUpdateMutation.mutate({ ids: Array.from(selectedIds), status: 'ignored' });
+    };
+
+    const handleBulkReprocess = () => {
+        if (selectedIds.size === 0) return;
+        bulkUpdateMutation.mutate({ ids: Array.from(selectedIds), status: 'pending' });
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (!events) return;
+        if (selectedIds.size === events.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(events.map(e => e.id)));
+        }
     };
 
     const { data: events, isLoading, refetch, isFetching } = useQuery({
@@ -244,6 +297,34 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                     )}
                 </div>
 
+                {/* Bulk Actions Toolbar */}
+                {selectedIds.size > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-primary/5 border-b">
+                        <span className="text-sm font-medium">
+                            {selectedIds.size} selecionado(s)
+                        </span>
+                        <div className="flex gap-2 ml-auto">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleBulkIgnore}
+                                disabled={bulkUpdateMutation.isPending}
+                            >
+                                <Ban className="w-4 h-4 mr-1" />
+                                Ignorar
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleBulkReprocess}
+                                disabled={bulkUpdateMutation.isPending}
+                            >
+                                <RotateCcw className="w-4 h-4 mr-1" />
+                                Reprocessar
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                 {events && events.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
                         <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -254,6 +335,14 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50 text-muted-foreground">
                                 <tr>
+                                    <th className="p-3 w-10">
+                                        <input
+                                            type="checkbox"
+                                            checked={events && events.length > 0 && selectedIds.size === events.length}
+                                            onChange={toggleSelectAll}
+                                            className="w-4 h-4 rounded border-gray-300"
+                                        />
+                                    </th>
                                     <th className="text-left p-3 font-medium">Status</th>
                                     <th className="text-left p-3 font-medium">Entidade</th>
                                     <th className="text-left p-3 font-medium">Stage Info (AC &rarr; Welcome)</th>
@@ -323,7 +412,18 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                                     }
 
                                     return (
-                                        <tr key={event.id} className="hover:bg-muted/50 transition-colors">
+                                        <tr key={event.id} className={cn(
+                                            "hover:bg-muted/50 transition-colors",
+                                            selectedIds.has(event.id) && "bg-primary/5"
+                                        )}>
+                                            <td className="p-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(event.id)}
+                                                    onChange={() => toggleSelect(event.id)}
+                                                    className="w-4 h-4 rounded border-gray-300"
+                                                />
+                                            </td>
                                             <td className="p-3">
                                                 <Badge variant="outline" className={cn("gap-1", config.color, config.bg)}>
                                                     <Icon className="w-3 h-3" />
