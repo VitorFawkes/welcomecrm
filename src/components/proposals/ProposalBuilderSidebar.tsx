@@ -4,6 +4,7 @@ import { LibrarySearch } from '@/components/proposals/LibrarySearch'
 import { VersionHistory } from '@/components/proposals/VersionHistory'
 import { AIImageExtractor } from '@/components/proposals/AIImageExtractor'
 import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/textarea'
 import {
     Calendar,
     Users,
@@ -27,7 +28,7 @@ type SidebarTab = 'config' | 'library' | 'history' | 'ai'
 
 export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps) {
     const [activeTab, setActiveTab] = useState<SidebarTab>('config')
-    const { version, sections, addItemFromLibrary, selectedSectionId } = useProposalBuilder()
+    const { version, sections, addItemFromLibrary, selectedSectionId, welcomeMessage, updateWelcomeMessage } = useProposalBuilder()
 
     // Calculate totals
     const calculateTotals = () => {
@@ -165,6 +166,8 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
                         optionalTotal={optionalTotal}
                         grandTotal={grandTotal}
                         formatCurrency={formatCurrency}
+                        welcomeMessage={welcomeMessage}
+                        onUpdateWelcomeMessage={updateWelcomeMessage}
                     />
                 ) : activeTab === 'library' ? (
                     <LibraryTab
@@ -200,6 +203,8 @@ interface ConfigTabProps {
     optionalTotal: number
     grandTotal: number
     formatCurrency: (value: number) => string
+    welcomeMessage: string
+    onUpdateWelcomeMessage: (message: string) => void
 }
 
 function ConfigTab({
@@ -210,6 +215,8 @@ function ConfigTab({
     optionalTotal,
     grandTotal,
     formatCurrency,
+    welcomeMessage,
+    onUpdateWelcomeMessage,
 }: ConfigTabProps) {
     return (
         <div className="p-4 space-y-6">
@@ -244,6 +251,23 @@ function ConfigTab({
                         />
                     </div>
                 </div>
+            </section>
+
+            {/* Welcome Message */}
+            <section>
+                <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+                    Mensagem de Boas-vindas
+                </h3>
+                <p className="text-xs text-slate-400 mb-2">
+                    Mensagem personalizada que o cliente verá antes da proposta
+                </p>
+                <Textarea
+                    value={welcomeMessage}
+                    onChange={(e) => onUpdateWelcomeMessage(e.target.value)}
+                    placeholder="Olá! Preparei esta proposta especialmente para você..."
+                    className="text-sm min-h-[80px] resize-none"
+                    rows={3}
+                />
             </section>
 
             {/* Travelers */}

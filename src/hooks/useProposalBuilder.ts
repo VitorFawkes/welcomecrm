@@ -22,6 +22,7 @@ interface ProposalBuilderState {
     proposal: Proposal | null
     version: ProposalVersion | null
     sections: ProposalSectionWithItems[]
+    welcomeMessage: string
 
     // UI state
     isDirty: boolean
@@ -34,6 +35,7 @@ interface ProposalBuilderState {
     initialize: (proposal: Proposal, version: ProposalVersion, sections: ProposalSectionWithItems[]) => void
     reset: () => void
     updateTitle: (title: string) => void
+    updateWelcomeMessage: (message: string) => void
 
     // Section actions
     addSection: (type: ProposalSectionType, title?: string) => void
@@ -68,6 +70,7 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
     proposal: null,
     version: null,
     sections: [],
+    welcomeMessage: '',
     isDirty: false,
     isSaving: false,
     lastSavedAt: null,
@@ -92,6 +95,7 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             proposal: null,
             version: null,
             sections: [],
+            welcomeMessage: '',
             isDirty: false,
             isSaving: false,
             lastSavedAt: null,
@@ -105,6 +109,13 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
         if (!version) return
         set({
             version: { ...version, title },
+            isDirty: true,
+        })
+    },
+
+    updateWelcomeMessage: (message: string) => {
+        set({
+            welcomeMessage: message,
             isDirty: true,
         })
     },
