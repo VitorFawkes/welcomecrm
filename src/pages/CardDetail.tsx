@@ -69,6 +69,22 @@ export default function CardDetail() {
 
     return (
         <div className="h-full bg-gray-50 flex flex-col overflow-hidden">
+            {/* Breadcrumb */}
+            <div className="flex-none bg-white border-b border-slate-200 px-6 py-2">
+                <nav className="flex items-center gap-2 text-sm">
+                    <button
+                        onClick={() => navigate('/pipeline')}
+                        className="text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                        Pipeline
+                    </button>
+                    <span className="text-slate-300">/</span>
+                    <span className="text-slate-900 font-medium truncate max-w-[200px]">
+                        {card.titulo || 'Viagem'}
+                    </span>
+                </nav>
+            </div>
+
             {/* Sticky Header */}
             <div className="sticky top-0 z-10 bg-white shadow-md">
                 <CardHeader card={card} />

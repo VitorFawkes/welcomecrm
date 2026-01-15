@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { PROPOSAL_STATUS_CONFIG } from '@/types/proposals'
 import type { Proposal, ProposalStatus } from '@/types/proposals'
+import { toast } from 'sonner'
 
 interface ProposalBuilderHeaderProps {
     proposal: Proposal
@@ -76,9 +77,16 @@ export function ProposalBuilderHeader({ proposal }: ProposalBuilderHeaderProps) 
             const token = await publish()
             const url = `${window.location.origin}/p/${token}`
             await navigator.clipboard.writeText(url)
-            alert('Link copiado para a área de transferência!')
+            toast.success('Proposta publicada!', {
+                description: 'Link copiado para a área de transferência',
+                action: {
+                    label: 'Copiar novamente',
+                    onClick: () => navigator.clipboard.writeText(url),
+                },
+            })
         } catch (error) {
             console.error('Error publishing:', error)
+            toast.error('Erro ao publicar proposta')
         } finally {
             setIsPublishing(false)
         }

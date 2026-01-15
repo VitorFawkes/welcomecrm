@@ -173,6 +173,12 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
 
                                         {/* Meta */}
                                         <div className="flex items-center gap-2 mt-1">
+                                            {/* Viewed indicator */}
+                                            {proposal.status === 'viewed' && (
+                                                <span className="flex items-center gap-1 text-purple-600" title="Cliente visualizou">
+                                                    <Eye className="h-3.5 w-3.5 animate-pulse" />
+                                                </span>
+                                            )}
                                             <span
                                                 className={`text-xs px-1.5 py-0.5 rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}
                                             >
