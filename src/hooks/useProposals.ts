@@ -56,11 +56,10 @@ export function useProposals(filters?: ProposalFilters) {
             let query = supabase
                 .from('proposals')
                 .select(`
-          *,
-          active_version:proposal_versions!fk_proposals_active_version(id, title, version_number),
-          card:cards!proposals_card_id_fkey(id, titulo, pessoa_principal_id),
-          creator:profiles!proposals_created_by_fkey(id, email, nome)
-        `)
+                    *,
+                    active_version:proposal_versions!fk_proposals_active_version(id, title, version_number),
+                    card:cards!proposals_card_id_fkey(id, titulo, pessoa_principal_id)
+                `)
                 .order('created_at', { ascending: false })
 
             // Apply status filter

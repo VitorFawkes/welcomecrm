@@ -36,6 +36,7 @@ interface ProposalBuilderState {
     reset: () => void
     updateTitle: (title: string) => void
     updateWelcomeMessage: (message: string) => void
+    updateProposal: (updates: Partial<Proposal>) => void
 
     // Section actions
     addSection: (type: ProposalSectionType, title?: string) => void
@@ -109,6 +110,15 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
         if (!version) return
         set({
             version: { ...version, title },
+            isDirty: true,
+        })
+    },
+
+    updateProposal: (updates: Partial<Proposal>) => {
+        const { proposal } = get()
+        if (!proposal) return
+        set({
+            proposal: { ...proposal, ...updates },
             isDirty: true,
         })
     },
@@ -454,10 +464,13 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
                 }
             }
 
-            // Update proposal active version
+            // Update proposal active version and other fields
             await supabase
                 .from('proposals')
-                .update({ active_version_id: newVersion.id })
+                .update({
+                    active_version_id: newVersion.id,
+                    expires_at: proposal.expires_at, // Persist expiration date
+                })
                 .eq('id', proposal.id)
 
             set({

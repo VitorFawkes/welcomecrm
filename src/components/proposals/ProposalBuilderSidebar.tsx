@@ -28,7 +28,7 @@ type SidebarTab = 'config' | 'library' | 'history' | 'ai'
 
 export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps) {
     const [activeTab, setActiveTab] = useState<SidebarTab>('config')
-    const { version, sections, addItemFromLibrary, selectedSectionId, welcomeMessage, updateWelcomeMessage } = useProposalBuilder()
+    const { version, sections, addItemFromLibrary, selectedSectionId, welcomeMessage, updateWelcomeMessage, updateProposal } = useProposalBuilder()
 
     // Calculate totals
     const calculateTotals = () => {
@@ -168,6 +168,7 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
                         formatCurrency={formatCurrency}
                         welcomeMessage={welcomeMessage}
                         onUpdateWelcomeMessage={updateWelcomeMessage}
+                        onUpdateProposal={updateProposal}
                     />
                 ) : activeTab === 'library' ? (
                     <LibraryTab
@@ -205,6 +206,7 @@ interface ConfigTabProps {
     formatCurrency: (value: number) => string
     welcomeMessage: string
     onUpdateWelcomeMessage: (message: string) => void
+    onUpdateProposal: (updates: Partial<Proposal>) => void
 }
 
 function ConfigTab({
@@ -217,7 +219,19 @@ function ConfigTab({
     formatCurrency,
     welcomeMessage,
     onUpdateWelcomeMessage,
+    onUpdateProposal,
 }: ConfigTabProps) {
+    const [localDate, setLocalDate] = useState(
+        proposal.expires_at
+            ? new Date(proposal.expires_at).toISOString().split('T')[0]
+            : ''
+    )
+
+    // Sync local state when prop changes (only if valid and different, to allow external updates)
+    // But be careful not to overwrite typing. 
+    // Actually, simply relying on key-based reset or just initializing is safer if we don't expect real-time external collab updates on this exact field while typing.
+    // For now, let's trust the prop as source of truth only on mount or if it changes significantly.
+
     return (
         <div className="p-4 space-y-6">
             {/* General Config */}
@@ -239,15 +253,42 @@ function ConfigTab({
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium text-slate-700 mb-1 block flex items-center gap-1">
+                        <label
+                            htmlFor="proposal-expires-at"
+                            className="text-sm font-medium text-slate-700 mb-1 block flex items-center gap-1 cursor-pointer"
+                        >
                             <Calendar className="h-3.5 w-3.5" />
                             Válida até
                         </label>
                         <Input
+                            id="proposal-expires-at"
                             type="date"
-                            value={proposal.expires_at ? new Date(proposal.expires_at).toISOString().split('T')[0] : ''}
+                            max="9999-12-31"
+                            value={localDate}
+                            onChange={(e) => {
+                                const val = e.target.value
+                                // If value is valid, check year length
+                                if (val) {
+                                    const year = val.split('-')[0]
+                                    if (year && year.length > 4) return
+                                }
+                                setLocalDate(val)
+                            }}
+                            onBlur={() => {
+                                // Only update if valid date or empty
+                                if (!localDate) {
+                                    onUpdateProposal({ expires_at: null })
+                                    return
+                                }
+                                // Basic validation: Ensure it's a real date string
+                                const dateObj = new Date(localDate)
+                                if (!isNaN(dateObj.getTime())) {
+                                    // Double check year ranges to be safe
+                                    if (dateObj.getFullYear() > 9999) return
+                                    onUpdateProposal({ expires_at: dateObj.toISOString() })
+                                }
+                            }}
                             className="h-9 text-sm"
-                            readOnly
                         />
                     </div>
                 </div>
