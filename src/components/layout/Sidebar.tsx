@@ -26,7 +26,7 @@ export default function Sidebar() {
     return (
         <aside
             className={cn(
-                "flex h-screen flex-col bg-primary-dark text-white shadow-lg transition-all duration-300 ease-in-out overflow-hidden",
+                "flex h-screen flex-col bg-primary-dark text-white shadow-lg transition-all duration-300 ease-in-out",
                 isExpanded ? "w-64" : "w-16"
             )}
             onMouseEnter={() => setIsExpanded(true)}
