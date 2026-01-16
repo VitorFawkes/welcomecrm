@@ -27,10 +27,10 @@ export default function KanbanCollapsedPhase({
                 onDragOver?.()
             }}
             className={cn(
-                "group relative flex h-full w-48 flex-col items-center justify-end pb-24", // Increased width to w-48 to match parent
+                "group relative flex w-48 flex-col items-center justify-end pb-24", // Increased width to w-48 to match parent
                 "cursor-pointer transition-all duration-300 ease-in-out",
                 "bg-gray-50 border border-gray-200 shadow-sm hover:shadow-md hover:bg-white", // Solid background
-                "rounded-xl border-t-4",
+                "rounded-xl border-t-4 max-h-[calc(100vh-14rem)]",
                 borderClass
             )}
             style={style}

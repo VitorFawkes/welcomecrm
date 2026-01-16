@@ -1,5 +1,5 @@
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import {
     DndContext,
@@ -67,6 +67,22 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             },
         })
     )
+
+
+
+    // Actually, just [] is fine as ref persists, but we need to make sure container exists.
+    // The previous logic had a check `if (!container) return`. If container mounts LATER (after loading), this effect won't run again with [].
+    // We should probably rely on a callback ref or just ensure it runs when loading finishes.
+    // However, for now, let's just move it up. The early return `if (!stages)` prevents the component from rendering the DIV with the ref. 
+    // Wait. If we return early, the DIV with `ref={scrollContainerRef}` is NOT rendered.
+    // So `scrollContainerRef.current` will be null.
+    // If we run this effect at the top, `scrollContainerRef.current` will be null on first run if loading.
+    // And since it has [] deps, it WON'T run again when loading finishes and the div renders.
+    // This is TRICKY. 
+    // We need to trigger this effect when the ref becomes available OR when loading finishes.
+    // Let's add `cards` or `stages` to dependency array so it retries attaching listeners when data loads.
+
+    // Revised replacement content with dependencies:
 
     const { data: stages } = useQuery({
         queryKey: ['stages', productFilter],
@@ -272,6 +288,55 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         requiredRole?: string
     } | null>(null)
 
+    // Edge Scrolling Logic
+    useEffect(() => {
+        const container = scrollContainerRef.current
+        if (!container) return
+
+        let animationFrameId: number
+        let scrollSpeed = 0
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const { left, right } = container.getBoundingClientRect()
+            const x = e.clientX
+
+            const threshold = 150
+            const maxSpeed = 20
+
+            if (x < left + threshold) {
+                const intensity = Math.max(0, 1 - (x - left) / threshold)
+                scrollSpeed = -maxSpeed * intensity
+            } else if (x > right - threshold) {
+                const intensity = Math.max(0, 1 - (right - x) / threshold)
+                scrollSpeed = maxSpeed * intensity
+            } else {
+                scrollSpeed = 0
+            }
+        }
+
+        const scroll = () => {
+            if (scrollSpeed !== 0 && container) {
+                container.scrollLeft += scrollSpeed
+            }
+            animationFrameId = requestAnimationFrame(scroll)
+        }
+
+        const handleMouseLeave = () => {
+            scrollSpeed = 0
+        }
+
+        container.addEventListener('mousemove', handleMouseMove)
+        container.addEventListener('mouseleave', handleMouseLeave)
+
+        scroll()
+
+        return () => {
+            container.removeEventListener('mousemove', handleMouseMove)
+            container.removeEventListener('mouseleave', handleMouseLeave)
+            cancelAnimationFrame(animationFrameId)
+        }
+    }, [cards, stages]) // Added deps so it runs after loading finishes and valid ref exists
+
     const handleDragStart = (event: DragStartEvent) => {
         if (event.active.data.current) {
             setActiveCard(event.active.data.current as Card)
@@ -419,13 +484,18 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const totalPipelineValue = cards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
     const totalCards = cards.length
 
+
+
     return (
         <div className={cn("flex flex-col h-full relative", className)}>
             {/* Kanban Columns */}
-            <div ref={scrollContainerRef} className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
+            <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-x-auto overflow-y-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+            >
                 <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                    <div className="h-full flex gap-4 w-max min-w-full px-4"> {/* Changed to w-max min-w-full to allow left alignment but scroll if needed */}
-                        <div className="flex gap-6 h-full">
+                    <div className="flex gap-4 w-max min-w-full px-4 items-start pt-2">
+                        <div className="flex gap-6 items-start">
                             {cards.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center w-[calc(100vw-20rem)] py-20 bg-white/5 rounded-xl border border-dashed border-gray-300">
                                     <div className="p-4 bg-gray-100 rounded-full mb-4">
@@ -522,8 +592,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 </DndContext>
             </div>
 
-            {/* Sticky Footer - Premium Redesign */}
-            <div className="fixed bottom-0 right-0 left-64 h-20 bg-white/95 backdrop-blur-2xl border-t border-primary/10 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] flex items-center justify-between px-8 z-50">
+            {/* Footer - Part of flex layout, not fixed */}
+            <div className="flex-shrink-0 h-16 bg-white/95 backdrop-blur-2xl border-t border-primary/10 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] flex items-center justify-between px-6 z-50">
                 <div className="flex items-center gap-8">
                     <div className="flex flex-col">
                         <span className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-1">Total Pipeline</span>
