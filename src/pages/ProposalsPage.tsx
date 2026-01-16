@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Filter, FileText, Library, Layout } from 'lucide-react'
+import { Search, Plus, Filter, FileText, Library, Layout, RotateCcw, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useProposals, useProposalStats, type ProposalFilters } from '@/hooks/useProposals'
@@ -9,6 +9,12 @@ import { ProposalGrid } from '@/components/proposals/ProposalGrid'
 import { ProposalFilterDrawer } from '@/components/proposals/ProposalFilterDrawer'
 import { ProposalActiveFilters } from '@/components/proposals/ProposalActiveFilters'
 import { LibraryManager } from '@/components/proposals/LibraryManager'
+import { TemplateManager } from '@/components/proposals/TemplateManager'
+import { seedProposals } from '@/utils/seedProposals'
+import { seedLibraryItems } from '@/utils/seedLibraryItems'
+import { seedTemplates } from '@/utils/seedTemplates'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import type { ProposalStatus } from '@/types/proposals'
 import { cn } from '@/lib/utils'
 
@@ -19,9 +25,26 @@ export default function ProposalsPage() {
     const [activeTab, setActiveTab] = useState<TabType>('proposals')
     const [filters, setFilters] = useState<ProposalFilters>({})
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+    const [isSeeding, setIsSeeding] = useState(false)
+    const queryClient = useQueryClient()
 
     const { data: proposals, isLoading } = useProposals(filters)
     const { data: stats } = useProposalStats()
+
+    const handleSeedAll = async () => {
+        setIsSeeding(true)
+        try {
+            await seedTemplates()
+            await seedLibraryItems()
+            await seedProposals()
+            queryClient.invalidateQueries({ queryKey: ['proposals'] })
+            queryClient.invalidateQueries({ queryKey: ['proposal-templates'] })
+            queryClient.invalidateQueries({ queryKey: ['library'] })
+            toast.success('Dados de exemplo carregados!')
+        } finally {
+            setIsSeeding(false)
+        }
+    }
 
     const handleStatusFilter = (status: ProposalStatus | null) => {
         setFilters(prev => ({ ...prev, status }))
@@ -43,7 +66,20 @@ export default function ProposalsPage() {
                             <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">Propostas</h1>
                             <p className="mt-1 text-sm text-gray-500">Gerencie propostas, biblioteca de itens e templates.</p>
                         </div>
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-3">
+                            <Button
+                                variant="outline"
+                                onClick={handleSeedAll}
+                                disabled={isSeeding}
+                                title="Carregar propostas, templates e biblioteca de exemplo"
+                            >
+                                {isSeeding ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <RotateCcw className="h-4 w-4 mr-2" />
+                                )}
+                                Carregar Exemplos
+                            </Button>
                             {activeTab === 'proposals' && (
                                 <Button
                                     onClick={() => navigate('/pipeline')}
@@ -149,14 +185,8 @@ export default function ProposalsPage() {
                     )}
 
                     {activeTab === 'templates' && (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="text-center">
-                                <Layout className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-slate-700 mb-2">Templates em Breve</h3>
-                                <p className="text-sm text-slate-500 max-w-sm">
-                                    Crie templates estruturais para acelerar a criação de novas propostas.
-                                </p>
-                            </div>
+                        <div className="py-6">
+                            <TemplateManager />
                         </div>
                     )}
                 </div>

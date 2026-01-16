@@ -63,6 +63,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
     const queryClient = useQueryClient();
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['trip_info', 'observacoes_criticas']));
     const [syncingAC, setSyncingAC] = useState(false);
+    const [showOnlyUnmapped, setShowOnlyUnmapped] = useState(false);
 
     // 1. Fetch system_fields (SINGLE SOURCE OF TRUTH for CRM fields)
     const { data: systemFields = [], isLoading: loadingFields } = useQuery({
@@ -277,7 +278,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
             </Card>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
                 <div className="bg-muted/50 rounded-lg p-4 text-center">
                     <div className="text-2xl font-bold">{systemFields.length}</div>
                     <div className="text-xs text-muted-foreground">Campos CRM</div>
@@ -286,17 +287,57 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                     <div className="text-2xl font-bold">{externalFields.length}</div>
                     <div className="text-xs text-muted-foreground">Campos AC</div>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-4 text-center">
+                <button
+                    className={cn(
+                        "rounded-lg p-4 text-center transition-all border-2",
+                        !showOnlyUnmapped
+                            ? "bg-green-500/10 border-green-500"
+                            : "bg-muted/50 border-transparent hover:border-green-300"
+                    )}
+                    onClick={() => setShowOnlyUnmapped(false)}
+                >
                     <div className="text-2xl font-bold text-green-600">{existingMappings.length}</div>
-                    <div className="text-xs text-muted-foreground">Mapeados</div>
-                </div>
+                    <div className="text-xs text-green-600 font-medium">✓ Mapeados</div>
+                </button>
+                <button
+                    className={cn(
+                        "rounded-lg p-4 text-center transition-all border-2",
+                        showOnlyUnmapped
+                            ? "bg-orange-500/10 border-orange-500"
+                            : "bg-muted/50 border-transparent hover:border-orange-300"
+                    )}
+                    onClick={() => setShowOnlyUnmapped(true)}
+                >
+                    <div className="text-2xl font-bold text-orange-600">
+                        {systemFields.length - existingMappings.length}
+                    </div>
+                    <div className="text-xs text-orange-600 font-medium">⚠ Não Mapeados</div>
+                </button>
             </div>
+
+            {/* Filter indicator */}
+            {showOnlyUnmapped && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700">
+                    <span>Mostrando apenas campos <strong>não mapeados</strong></span>
+                    <Button variant="ghost" size="sm" onClick={() => setShowOnlyUnmapped(false)}>
+                        Mostrar todos
+                    </Button>
+                </div>
+            )}
 
             {/* Sections */}
             {sections.map(section => {
-                const fields = fieldsBySection[section];
+                const allFieldsInSection = fieldsBySection[section];
+                // Apply filter: if showOnlyUnmapped, only show fields without mapping
+                const fields = showOnlyUnmapped
+                    ? allFieldsInSection.filter(f => !mappingByField[f.key])
+                    : allFieldsInSection;
+
+                // Skip section if no fields match filter
+                if (fields.length === 0) return null;
+
                 const isExpanded = expandedSections.has(section);
-                const mappedCount = fields.filter(f => mappingByField[f.key]).length;
+                const mappedCount = allFieldsInSection.filter(f => mappingByField[f.key]).length;
 
                 return (
                     <Card key={section} className="overflow-hidden">

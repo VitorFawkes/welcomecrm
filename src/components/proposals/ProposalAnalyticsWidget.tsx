@@ -71,7 +71,7 @@ export function ProposalAnalyticsWidget() {
             proposals?.forEach((p: any) => {
                 const status = p.status as keyof typeof stats
                 if (status in stats && typeof stats[status] === 'number') {
-                    (stats[status] as number)++
+                    stats[status] = (stats[status] as number) + 1
                 }
 
                 if (['sent', 'viewed', 'in_progress'].includes(p.status)) {

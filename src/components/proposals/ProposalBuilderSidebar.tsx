@@ -60,14 +60,25 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
         }).format(value)
 
     const handleSelectLibraryItem = (item: LibrarySearchResult) => {
-        if (!selectedSectionId) {
-            toast.warning('Selecione uma seção primeiro', {
-                description: 'Clique em uma seção para adicionar o item da biblioteca.'
-            })
-            return
+        let targetSectionId = selectedSectionId
+
+        // Auto-select: use selected section, or last section, or create "Outros"
+        if (!targetSectionId) {
+            if (sections.length > 0) {
+                // Use the last section automatically
+                targetSectionId = sections[sections.length - 1].id
+                toast.info('Item adicionado à última seção', {
+                    description: 'Selecione uma seção para escolher onde adicionar.'
+                })
+            } else {
+                toast.warning('Crie uma seção primeiro', {
+                    description: 'Use os templates de início rápido ou adicione uma seção manualmente.'
+                })
+                return
+            }
         }
 
-        addItemFromLibrary(selectedSectionId, item)
+        addItemFromLibrary(targetSectionId, item)
         toast.success('Item adicionado!', {
             description: `"${item.name}" foi adicionado à seção.`
         })

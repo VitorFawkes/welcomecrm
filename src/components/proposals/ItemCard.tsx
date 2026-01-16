@@ -27,7 +27,7 @@ interface ItemCardProps {
 }
 
 export function ItemCard({ item }: ItemCardProps) {
-    const { updateItem, removeItem, selectItem, selectedItemId } = useProposalBuilder()
+    const { updateItem, removeItem, duplicateItem, selectItem, selectedItemId } = useProposalBuilder()
     const saveToLibrary = useSaveToLibrary()
     const [isEditing, setIsEditing] = useState(false)
     const [editTitle, setEditTitle] = useState(item.title)
@@ -170,7 +170,10 @@ export function ItemCard({ item }: ItemCardProps) {
                         <Pencil className="h-4 w-4 mr-2" />
                         Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                        duplicateItem(item.id)
+                        toast.success('Item duplicado!')
+                    }}>
                         <Copy className="h-4 w-4 mr-2" />
                         Duplicar
                     </DropdownMenuItem>

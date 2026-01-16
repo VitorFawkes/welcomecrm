@@ -6,6 +6,7 @@ import {
     type LibraryCategory,
     type LibraryItem
 } from '@/hooks/useLibrary'
+import { seedLibraryItems } from '@/utils/seedLibraryItems'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { LibraryItemForm } from '@/components/proposals/LibraryItemForm'
@@ -17,6 +18,7 @@ import {
     Trash2,
     Loader2,
     Package,
+    RotateCcw,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -26,12 +28,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 export function LibraryManager() {
     const [search, setSearch] = useState('')
     const [selectedCategory, setSelectedCategory] = useState<LibraryCategory | 'all'>('all')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [editingItem, setEditingItem] = useState<LibraryItem | null>(null)
+    const [isSeeding, setIsSeeding] = useState(false)
+    const queryClient = useQueryClient()
 
     const { data: items = [], isLoading } = useMyLibraryItems(
         selectedCategory === 'all' ? undefined : selectedCategory
@@ -125,9 +130,25 @@ export function LibraryManager() {
                     <Package className="h-12 w-12 mb-4 text-slate-300" />
                     <p className="text-lg font-medium text-slate-900">Nenhum item encontrado</p>
                     <p className="text-sm mb-4">Crie itens reutilizáveis para suas propostas.</p>
-                    <Button variant="outline" onClick={() => setIsCreateModalOpen(true)}>
-                        Criar Primeiro Item
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <Button variant="outline" onClick={() => setIsCreateModalOpen(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Criar Primeiro Item
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={async () => {
+                                setIsSeeding(true)
+                                await seedLibraryItems()
+                                queryClient.invalidateQueries({ queryKey: ['library'] })
+                                setIsSeeding(false)
+                            }}
+                            disabled={isSeeding}
+                        >
+                            {isSeeding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                            Carregar Exemplos
+                        </Button>
+                    </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">

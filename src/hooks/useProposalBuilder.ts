@@ -47,6 +47,7 @@ interface ProposalBuilderState {
     // Item actions
     addItem: (sectionId: string, type: ProposalItemType, title: string) => void
     addItemFromLibrary: (sectionId: string, libraryItem: LibrarySearchResult) => void
+    duplicateItem: (itemId: string) => void
     removeItem: (itemId: string) => void
     updateItem: (itemId: string, updates: Partial<ProposalItem>) => void
     reorderItems: (sectionId: string, orderedIds: string[]) => void
@@ -270,6 +271,55 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             })),
             isDirty: true,
             selectedItemId: null,
+        })
+    },
+
+    duplicateItem: (itemId) => {
+        const { sections } = get()
+
+        // Find the item and its section
+        let foundSection: ProposalSectionWithItems | null = null
+        let foundItem: ProposalItemWithOptions | null = null
+
+        for (const section of sections) {
+            const item = section.items.find(i => i.id === itemId)
+            if (item) {
+                foundSection = section
+                foundItem = item
+                break
+            }
+        }
+
+        if (!foundSection || !foundItem) return
+
+        // Create duplicate with new ID
+        const duplicatedItem: ProposalItemWithOptions = {
+            ...foundItem,
+            id: crypto.randomUUID(),
+            title: `${foundItem.title} (Cópia)`,
+            created_at: new Date().toISOString(),
+            options: foundItem.options.map(opt => ({
+                ...opt,
+                id: crypto.randomUUID(),
+            })),
+        }
+
+        set({
+            sections: sections.map(s => {
+                if (s.id === foundSection!.id) {
+                    const itemIndex = s.items.findIndex(i => i.id === itemId)
+                    const newItems = [...s.items]
+                    newItems.splice(itemIndex + 1, 0, { ...duplicatedItem, ordem: itemIndex + 1 })
+                    // Reorder remaining items
+                    return {
+                        ...s,
+                        items: newItems.map((item, idx) => ({ ...item, ordem: idx }))
+                    }
+                }
+                return s
+            }),
+            isDirty: true,
+            selectedItemId: duplicatedItem.id,
         })
     },
 

@@ -96,3 +96,118 @@ export function getFieldRegistry(produto: 'TRIPS' | 'WEDDING' | 'CORP'): Record<
             return TRIPS_FIELD_REGISTRY
     }
 }
+
+// ============================================
+// Proposal Auto-Fill from Card Data
+// ============================================
+
+interface DestinationData {
+    nome?: string
+    pais?: string
+}
+
+interface PessoasData {
+    adultos?: number
+    criancas?: number
+    bebes?: number
+}
+
+interface EpocaViagemData {
+    inicio?: string
+    fim?: string
+    flexivel?: boolean
+}
+
+export interface CardProposalDefaults {
+    // For proposal cover/header
+    destination: string | null
+    destinationCountry: string | null
+    travelDates: { start: string | null; end: string | null; flexible: boolean } | null
+    pax: { adults: number; children: number; infants: number } | null
+    tripMotivo: string | null
+
+    // Computed
+    totalPax: number
+    formattedDates: string | null
+}
+
+/**
+ * Extracts proposal defaults from a card's produto_data.
+ * Uses the modular fieldRegistry pattern - reads from JSONB, never hardcoded columns.
+ * 
+ * @param card - The card object with produto and produto_data
+ * @returns CardProposalDefaults object with extracted values
+ */
+export function getCardDefaults(card: {
+    produto?: string | null
+    produto_data?: Record<string, unknown> | null
+}): CardProposalDefaults {
+    const defaults: CardProposalDefaults = {
+        destination: null,
+        destinationCountry: null,
+        travelDates: null,
+        pax: null,
+        tripMotivo: null,
+        totalPax: 0,
+        formattedDates: null
+    }
+
+    if (!card.produto_data) return defaults
+
+    const data = card.produto_data as Record<string, unknown>
+    const produto = (card.produto || 'TRIPS') as 'TRIPS' | 'WEDDING' | 'CORP'
+    const registry = getFieldRegistry(produto)
+
+    // Extract DESTINOS if field exists in registry
+    if (registry.destinos && data.destinos) {
+        const destinos = data.destinos as DestinationData[]
+        if (Array.isArray(destinos) && destinos.length > 0) {
+            const first = destinos[0]
+            defaults.destination = first.nome || null
+            defaults.destinationCountry = first.pais || null
+        }
+    }
+
+    // Extract EPOCA_VIAGEM if field exists in registry
+    if (registry.epoca_viagem && data.epoca_viagem) {
+        const epoca = data.epoca_viagem as EpocaViagemData
+        defaults.travelDates = {
+            start: epoca.inicio || null,
+            end: epoca.fim || null,
+            flexible: epoca.flexivel || false
+        }
+
+        // Format dates for display
+        if (epoca.inicio && epoca.fim) {
+            try {
+                const start = new Date(epoca.inicio)
+                const end = new Date(epoca.fim)
+                const formatter = new Intl.DateTimeFormat('pt-BR', {
+                    day: '2-digit',
+                    month: 'short'
+                })
+                defaults.formattedDates = `${formatter.format(start)} - ${formatter.format(end)}`
+            } catch {
+                // If date parsing fails, leave as null
+            }
+        }
+    }
+
+    // Extract PESSOAS if field exists in registry
+    if (registry.pessoas && data.pessoas) {
+        const pessoas = data.pessoas as PessoasData
+        defaults.pax = {
+            adults: pessoas.adultos || 0,
+            children: pessoas.criancas || 0,
+            infants: pessoas.bebes || 0
+        }
+        defaults.totalPax = (pessoas.adultos || 0) + (pessoas.criancas || 0)
+    }
+
+    // Extract MOTIVO if field exists in registry
+    if (registry.motivo && data.motivo) {
+        defaults.tripMotivo = data.motivo as string
+    }
+
+    return defaults
+}

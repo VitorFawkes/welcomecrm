@@ -14,6 +14,9 @@ import {
     Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { seedTemplates } from '@/utils/seedTemplates'
+import { useQueryClient } from '@tanstack/react-query'
+import { templateKeys } from '@/hooks/useProposalTemplates'
 
 interface TemplateSelectorProps {
     onSelect: (template: ProposalTemplate | null) => void
@@ -31,10 +34,19 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 export function TemplateSelector({ onSelect, onCancel }: TemplateSelectorProps) {
     const { data: templates = [], isLoading } = useProposalTemplates()
     const [selectedId, setSelectedId] = useState<string | null>(null)
+    const [isSeeding, setIsSeeding] = useState(false)
+    const queryClient = useQueryClient()
 
     const handleConfirm = () => {
         const selected = templates.find(t => t.id === selectedId)
         onSelect(selected || null)
+    }
+
+    const handleSeed = async () => {
+        setIsSeeding(true)
+        await seedTemplates()
+        await queryClient.invalidateQueries({ queryKey: templateKeys.lists() })
+        setIsSeeding(false)
     }
 
     if (isLoading) {
@@ -149,6 +161,19 @@ export function TemplateSelector({ onSelect, onCancel }: TemplateSelectorProps) 
                     Continuar
                 </Button>
             </div>
+
+            {/* Seed Button (only if few templates) */}
+            {templates.length < 5 && (
+                <div className="text-center pt-2">
+                    <button
+                        onClick={handleSeed}
+                        disabled={isSeeding}
+                        className="text-xs text-slate-400 hover:text-blue-600 underline transition-colors"
+                    >
+                        {isSeeding ? 'Gerando...' : 'Restaurar Templates Padrão'}
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
