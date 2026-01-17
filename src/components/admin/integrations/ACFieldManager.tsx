@@ -41,7 +41,7 @@ export function ACFieldManager({ integrationId }: ACFieldManagerProps) {
     const [syncingAC, setSyncingAC] = useState(false);
     const [showBulkAdd, setShowBulkAdd] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterPipeline, setFilterPipeline] = useState<string>('');
+    const [filterSection, setFilterSection] = useState<string>('');
     const [savingBulk, setSavingBulk] = useState(false);
 
     // Multi-row manual entry state
@@ -228,24 +228,30 @@ export function ACFieldManager({ integrationId }: ACFieldManagerProps) {
         onError: (e) => toast.error(`Erro: ${e.message}`)
     });
 
+    // Get unique sections from fields
+    const availableSections = [...new Set(acFields.map(f => (f.metadata as any)?.section || 'Sem Seção'))].sort();
+
     // Filter fields
     const filteredFields = acFields.filter(field => {
         const matchesSearch = !searchTerm ||
             field.external_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            field.external_id?.toLowerCase().includes(searchTerm.toLowerCase());
+            field.external_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            ((field.metadata as any)?.perstag || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesPipeline = !filterPipeline ||
-            field.parent_external_id === filterPipeline ||
-            (field.metadata as any)?.pipeline_id === filterPipeline;
+        const fieldSection = (field.metadata as any)?.section || 'Sem Seção';
+        const matchesSection = !filterSection || fieldSection === filterSection;
 
-        return matchesSearch && matchesPipeline;
+        return matchesSearch && matchesSection;
     });
 
-    // Get pipeline name helper
-    const getPipelineName = (pipelineId: string | null) => {
-        if (!pipelineId) return 'Global';
-        const pipeline = acPipelines.find(p => p.external_id === pipelineId);
-        return pipeline?.external_name || pipelineId;
+    // Get section name helper
+    const getSection = (field: ACField) => {
+        return (field.metadata as any)?.section || 'Sem Seção';
+    };
+
+    // Get perstag helper
+    const getPerstag = (field: ACField) => {
+        return (field.metadata as any)?.perstag || '-';
     };
 
     // Count valid rows
@@ -427,16 +433,16 @@ export function ACFieldManager({ integrationId }: ACFieldManagerProps) {
                         </div>
                         <div className="w-64">
                             <Select
-                                value={filterPipeline}
-                                onChange={setFilterPipeline}
+                                value={filterSection}
+                                onChange={setFilterSection}
                                 options={[
-                                    { value: '', label: 'Todos os Pipelines' },
-                                    ...acPipelines.map(p => ({
-                                        value: p.external_id,
-                                        label: p.external_name
+                                    { value: '', label: 'Todas as Seções' },
+                                    ...availableSections.map(s => ({
+                                        value: s,
+                                        label: s
                                     }))
                                 ]}
-                                placeholder="Filtrar por pipeline..."
+                                placeholder="Filtrar por seção..."
                             />
                         </div>
                     </div>
@@ -487,7 +493,7 @@ export function ACFieldManager({ integrationId }: ACFieldManagerProps) {
                                             PERSTAG
                                         </th>
                                         <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">
-                                            Pipeline
+                                            Seção
                                         </th>
                                         <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">
                                             Origem
@@ -499,7 +505,6 @@ export function ACFieldManager({ integrationId }: ACFieldManagerProps) {
                                     {filteredFields.map(field => {
                                         const metadata = field.metadata as any;
                                         const isManual = metadata?.source === 'manual';
-                                        const pipelineId = field.parent_external_id || metadata?.pipeline_id;
 
                                         return (
                                             <tr key={field.id} className="hover:bg-muted/30 transition-colors">
@@ -515,12 +520,12 @@ export function ACFieldManager({ integrationId }: ACFieldManagerProps) {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className="text-xs text-muted-foreground">
-                                                        {metadata?.perstag || '-'}
+                                                        {getPerstag(field)}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <Badge variant="outline" className="text-xs">
-                                                        {getPipelineName(pipelineId)}
+                                                        {getSection(field)}
                                                     </Badge>
                                                 </td>
                                                 <td className="px-4 py-3">

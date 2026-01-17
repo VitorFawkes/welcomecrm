@@ -150,6 +150,37 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         return count;
     }, [stageConfigs]);
 
+    // Group external fields by section for dropdown display
+    const groupedExternalFieldOptions = useMemo(() => {
+        // Group fields by section
+        const bySection: Record<string, { value: string; label: string }[]> = {};
+        externalFields.forEach(ef => {
+            const section = (ef.metadata as any)?.section || 'Outros';
+            if (!bySection[section]) bySection[section] = [];
+            bySection[section].push({
+                value: ef.external_id,
+                label: ef.external_name || ef.external_id
+            });
+        });
+
+        // Sort sections and flatten with section headers
+        const sortedSections = Object.keys(bySection).sort();
+        const options: { value: string; label: string; disabled?: boolean }[] = [
+            { value: '', label: 'Não mapeado' }
+        ];
+
+        sortedSections.forEach(section => {
+            // Add section header (disabled, acts as label)
+            options.push({ value: `__section__${section}`, label: `── ${section} ──`, disabled: true });
+            // Add fields in this section
+            bySection[section].sort((a, b) => a.label.localeCompare(b.label)).forEach(f => {
+                options.push(f);
+            });
+        });
+
+        return options;
+    }, [externalFields]);
+
     // Upsert mapping mutation
     const upsertMapping = useMutation({
         mutationFn: async ({ fieldKey, externalFieldId, section }: { fieldKey: string; externalFieldId: string | null; section: string }) => {
@@ -415,13 +446,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                                                                     externalFieldId: val || null,
                                                                     section: section
                                                                 })}
-                                                                options={[
-                                                                    { value: '', label: 'Não mapeado' },
-                                                                    ...externalFields.map(ef => ({
-                                                                        value: ef.external_id,
-                                                                        label: ef.external_name || ef.external_id
-                                                                    }))
-                                                                ]}
+                                                                options={groupedExternalFieldOptions}
                                                                 placeholder="Selecione..."
                                                                 className="w-full"
                                                             />

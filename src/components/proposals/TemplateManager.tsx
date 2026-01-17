@@ -162,18 +162,34 @@ export function TemplateManager() {
                                 <div className="absolute top-3 right-3 z-10">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button className="p-1.5 rounded-lg bg-white/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-slate-100 transition-all shadow-sm">
+                                            <button
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="p-1.5 rounded-lg bg-white/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-slate-100 transition-all shadow-sm"
+                                            >
                                                 <MoreVertical className="h-4 w-4 text-slate-600" />
                                             </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => handleDuplicate(template)}>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation()
+                                                setSelectedTemplate(template)
+                                            }}>
+                                                <Eye className="h-4 w-4 mr-2" />
+                                                Ver Detalhes
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleDuplicate(template)
+                                            }}>
                                                 <Copy className="h-4 w-4 mr-2" />
                                                 Duplicar
                                             </DropdownMenuItem>
                                             {!template.is_global && (
                                                 <DropdownMenuItem
-                                                    onClick={() => handleDelete(template)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleDelete(template)
+                                                    }}
                                                     className="text-red-600"
                                                 >
                                                     <Trash2 className="h-4 w-4 mr-2" />
@@ -226,9 +242,15 @@ export function TemplateManager() {
             {/* Help Text */}
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                 <p className="text-sm text-slate-600">
-                    <strong>💡 Dica:</strong> Para usar um template, abra um Card no Pipeline, clique em "Nova Proposta" e escolha o template desejado.
+                    <strong>💡 Dica:</strong> Clique em um template para ver os detalhes. Para usar, abra um Card no Pipeline e clique em "Nova Proposta".
                 </p>
             </div>
+
+            {/* Preview Modal */}
+            <TemplatePreviewModal
+                template={selectedTemplate}
+                onClose={() => setSelectedTemplate(null)}
+            />
         </div>
     )
 }

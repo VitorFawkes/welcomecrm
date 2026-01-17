@@ -9,7 +9,7 @@ import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
 import People from './pages/People'
 import GroupsPage from './pages/GroupsPage'
-import ProposalBuilder from './pages/ProposalBuilder'
+import ProposalBuilderElite from './pages/ProposalBuilderElite'
 import ProposalsPage from './pages/ProposalsPage'
 import ProposalView from './pages/public/ProposalView'
 import ProposalReview from './pages/public/ProposalReview'
@@ -58,7 +58,7 @@ function App() {
                   <Route path="/cards/:id" element={<CardDetail />} />
                   <Route path="/people" element={<People />} />
                   <Route path="/proposals" element={<ProposalsPage />} />
-                  <Route path="/proposals/:id/edit" element={<ProposalBuilder />} />
+                  <Route path="/proposals/:id/edit" element={<ProposalBuilderElite />} />
 
                   <Route path="/admin" element={<Navigate to="/settings/system/governance" replace />} />
 

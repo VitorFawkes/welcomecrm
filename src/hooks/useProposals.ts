@@ -53,6 +53,10 @@ export function useProposals(filters?: ProposalFilters) {
     return useQuery({
         queryKey: proposalsListKeys.filtered(filters || {}),
         queryFn: async () => {
+            // CRITICAL FIX: Only use FK hint where necessary
+            // - active_version needs hint because there are 2 FKs to proposal_versions
+            // - card and creator DO NOT need hints (single FK each) 
+            // - Using non-existent FK names causes Supabase to silently fail!
             let query = supabase
                 .from('proposals')
                 .select(`
@@ -65,7 +69,9 @@ export function useProposals(filters?: ProposalFilters) {
           created_by,
           card_id,
           active_version_id,
-          active_version:proposal_versions(id, title, version_number),
+          public_token,
+          expires_at,
+          active_version:proposal_versions!fk_proposals_active_version(id, title, version_number),
           card:cards(id, titulo, pessoa_principal_id),
           creator:profiles(id, email, nome)
         `)
@@ -83,6 +89,13 @@ export function useProposals(filters?: ProposalFilters) {
             }
 
             const { data, error } = await query
+
+            console.log('[useProposals] Query result:', {
+                dataCount: data?.length,
+                error,
+                filters,
+                firstItem: data?.[0]
+            })
 
             if (error) throw error
 

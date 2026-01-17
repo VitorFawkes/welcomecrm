@@ -7,21 +7,31 @@ import { toast } from 'sonner'
  */
 export async function seedProposals() {
     try {
-        const { data: { user } } = await supabase.auth.getUser()
+        console.log('[seedProposals] Starting...')
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        console.log('[seedProposals] Auth result:', { userId: user?.id, authError })
+
         if (!user) throw new Error('Usuário não autenticado')
 
         // Get existing cards to link proposals
-        const { data: cards } = await supabase
+        const { data: cards, error: cardsError } = await supabase
             .from('cards')
             .select('id, titulo')
             .limit(5)
+
+        console.log('[seedProposals] Cards query:', {
+            count: cards?.length,
+            cardsError,
+            cards: cards?.map(c => ({ id: c.id, titulo: c.titulo }))
+        })
 
         if (!cards || cards.length === 0) {
             toast.warning('Crie alguns cards no Pipeline antes de gerar propostas de exemplo')
             return false
         }
 
-        console.log('Starting proposals seed...')
+        console.log('[seedProposals] Processing demo proposals...')
         let created = 0
 
         const demoProposals = [

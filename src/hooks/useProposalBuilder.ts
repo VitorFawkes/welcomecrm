@@ -35,6 +35,9 @@ interface ProposalBuilderState {
     initialize: (proposal: Proposal, version: ProposalVersion, sections: ProposalSectionWithItems[]) => void
     reset: () => void
     updateTitle: (title: string) => void
+    updateSubtitle: (subtitle: string) => void
+    updateCoverImage: (url: string | null) => void
+    updateNarrative: (narrative: string) => void
     updateWelcomeMessage: (message: string) => void
 
     // Section actions
@@ -110,6 +113,45 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
         if (!version) return
         set({
             version: { ...version, title },
+            isDirty: true,
+        })
+    },
+
+    updateSubtitle: (subtitle: string) => {
+        const { version } = get()
+        if (!version) return
+        const currentMetadata = (version.metadata as Record<string, unknown>) || {}
+        set({
+            version: {
+                ...version,
+                metadata: { ...currentMetadata, subtitle }
+            },
+            isDirty: true,
+        })
+    },
+
+    updateCoverImage: (url: string | null) => {
+        const { version } = get()
+        if (!version) return
+        const currentMetadata = (version.metadata as Record<string, unknown>) || {}
+        set({
+            version: {
+                ...version,
+                metadata: { ...currentMetadata, cover_image_url: url }
+            },
+            isDirty: true,
+        })
+    },
+
+    updateNarrative: (narrative: string) => {
+        const { version } = get()
+        if (!version) return
+        const currentMetadata = (version.metadata as Record<string, unknown>) || {}
+        set({
+            version: {
+                ...version,
+                metadata: { ...currentMetadata, narrative }
+            },
             isDirty: true,
         })
     },

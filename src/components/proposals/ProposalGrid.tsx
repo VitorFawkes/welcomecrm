@@ -14,9 +14,11 @@ import {
 interface ProposalGridProps {
     proposals: ProposalWithRelations[]
     loading: boolean
+    hasFilters?: boolean
+    onClearFilters?: () => void
 }
 
-export function ProposalGrid({ proposals, loading }: ProposalGridProps) {
+export function ProposalGrid({ proposals, loading, hasFilters, onClearFilters }: ProposalGridProps) {
     const navigate = useNavigate()
 
     if (loading) {
@@ -34,11 +36,21 @@ export function ProposalGrid({ proposals, loading }: ProposalGridProps) {
                     <FileText className="h-8 w-8 text-slate-400" />
                 </div>
                 <h3 className="text-lg font-medium text-slate-900 mb-2">
-                    Nenhuma proposta encontrada
+                    {hasFilters ? 'Nenhuma proposta com esse filtro' : 'Nenhuma proposta encontrada'}
                 </h3>
-                <p className="text-sm text-slate-500 text-center max-w-sm">
-                    Crie sua primeira proposta a partir de um Card no Funil.
+                <p className="text-sm text-slate-500 text-center max-w-sm mb-4">
+                    {hasFilters
+                        ? 'Tente remover os filtros ou clique no botão abaixo para ver todas as propostas.'
+                        : 'Clique em "Carregar Exemplos" no topo da página para criar propostas de demonstração.'}
                 </p>
+                {hasFilters && onClearFilters && (
+                    <button
+                        onClick={onClearFilters}
+                        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium"
+                    >
+                        Limpar Filtros
+                    </button>
+                )}
             </div>
         )
     }
@@ -61,7 +73,8 @@ export function ProposalGrid({ proposals, loading }: ProposalGridProps) {
                 return (
                     <div
                         key={proposal.id}
-                        className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+                        onClick={() => navigate(`/proposals/${proposal.id}/edit`)}
+                        className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 overflow-hidden cursor-pointer"
                     >
                         <div className="p-4 flex items-start gap-4">
                             {/* Icon */}

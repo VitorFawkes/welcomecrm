@@ -1,8 +1,6 @@
-import { useState } from 'react'
 import { X, Eye, FileText, ChevronRight, Heart, Sparkles, Map, Palmtree, Plane, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { ProposalTemplate } from '@/hooks/useProposalTemplates'
-import { cn } from '@/lib/utils'
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {

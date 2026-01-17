@@ -33,14 +33,29 @@ export default function ProposalsPage() {
 
     const handleSeedAll = async () => {
         setIsSeeding(true)
+        console.log('[ProposalsPage] Starting seed all...')
+
         try {
+            console.log('[Seed] Step 1: Templates...')
             await seedTemplates()
+
+            console.log('[Seed] Step 2: Library Items...')
             await seedLibraryItems()
+
+            console.log('[Seed] Step 3: Proposals...')
             await seedProposals()
+
+            console.log('[Seed] Step 4: Invalidating queries...')
             queryClient.invalidateQueries({ queryKey: ['proposals'] })
             queryClient.invalidateQueries({ queryKey: ['proposal-templates'] })
             queryClient.invalidateQueries({ queryKey: ['library'] })
+            queryClient.invalidateQueries({ queryKey: ['proposals', 'stats'] })
+
+            console.log('[Seed] Complete!')
             toast.success('Dados de exemplo carregados!')
+        } catch (error) {
+            console.error('[Seed] Error:', error)
+            toast.error('Erro ao carregar dados de exemplo')
         } finally {
             setIsSeeding(false)
         }
@@ -177,6 +192,8 @@ export default function ProposalsPage() {
                         <ProposalGrid
                             proposals={proposals || []}
                             loading={isLoading}
+                            hasFilters={!!(filters.status || filters.search || filters.createdBy)}
+                            onClearFilters={() => setFilters({})}
                         />
                     )}
 
