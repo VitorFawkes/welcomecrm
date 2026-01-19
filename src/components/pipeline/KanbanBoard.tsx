@@ -27,6 +27,8 @@ import { usePipelineFilters, type ViewMode, type SubView, type FilterState } fro
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { useHorizontalScroll } from '../../hooks/useHorizontalScroll'
+import { ScrollArrows } from '../ui/ScrollArrows'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -486,12 +488,33 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
 
 
+    // Elite horizontal scroll with Shift+Wheel, Drag-to-Pan, and arrow indicators
+    const {
+        isDragging,
+        showLeftArrow,
+        showRightArrow,
+        scrollLeft: scrollLeftFn,
+        scrollRight: scrollRightFn,
+    } = useHorizontalScroll(scrollContainerRef)
+
     return (
         <div className={cn("flex flex-col h-full relative", className)}>
+            {/* Scroll Arrows - Elite UX */}
+            <ScrollArrows
+                showLeft={showLeftArrow}
+                showRight={showRightArrow}
+                onScrollLeft={scrollLeftFn}
+                onScrollRight={scrollRightFn}
+            />
+
             {/* Kanban Columns */}
             <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-x-auto overflow-y-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+                className={cn(
+                    "flex-1 overflow-x-auto overflow-y-hidden min-h-0",
+                    "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']",
+                    isDragging && "cursor-grabbing"
+                )}
             >
                 <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                     <div className="flex gap-4 w-max min-w-full px-4 items-stretch pt-2 h-full">
