@@ -494,8 +494,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 className="flex-1 overflow-x-auto overflow-y-hidden min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
             >
                 <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                    <div className="flex gap-4 w-max min-w-full px-4 items-start pt-2">
-                        <div className="flex gap-6 items-start">
+                    <div className="flex gap-4 w-max min-w-full px-4 items-stretch pt-2 h-full">
+                        <div className="flex gap-6 items-stretch h-full">
                             {cards.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center w-[calc(100vw-20rem)] py-20 bg-white/5 rounded-xl border border-dashed border-gray-300">
                                     <div className="p-4 bg-gray-100 rounded-full mb-4">

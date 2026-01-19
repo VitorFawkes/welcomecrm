@@ -29,7 +29,7 @@ export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnP
         <div
             className={cn(
                 "flex w-80 min-w-[20rem] shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-white",
-                "border-t-4 max-h-[calc(100vh-14rem)]",
+                "border-t-4 h-full",
                 borderClass
             )}
             style={style}
