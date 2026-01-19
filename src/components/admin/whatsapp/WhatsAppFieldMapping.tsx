@@ -34,7 +34,9 @@ import {
     Sparkles,
     X,
     Search,
-    Save
+    Save,
+    Trash2,
+    Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -66,8 +68,29 @@ interface WhatsAppFieldMappingProps {
     platformId: string;
 }
 
+// Custom field from database
+interface CustomField {
+    id: string;
+    platform_id: string;
+    field_key: string;
+    field_label: string;
+    field_group: string;
+    is_active: boolean;
+}
+
+// Field definition type (both static and custom)
+interface InternalFieldDefinition {
+    value: string;
+    label: string;
+    group: string;
+    icon: React.ComponentType<{ className?: string }>;
+    required?: boolean;
+    isCustom?: boolean;
+    customFieldId?: string;
+}
+
 // Internal CRM fields with Lucide icons
-const INTERNAL_FIELDS = [
+const INTERNAL_FIELDS: InternalFieldDefinition[] = [
     { value: 'sender_phone', label: 'Telefone do Remetente', group: 'Contato', icon: Phone, required: true },
     { value: 'sender_name', label: 'Nome do Remetente', group: 'Contato', icon: User },
     { value: 'body', label: 'Conteúdo da Mensagem', group: 'Mensagem', icon: MessageSquare, required: true },
@@ -81,6 +104,7 @@ const INTERNAL_FIELDS = [
     { value: 'created_at', label: 'Data/Hora', group: 'Mensagem', icon: Clock },
     { value: 'ack_status', label: 'Status de Confirmação', group: 'Status', icon: Check },
     { value: 'origem', label: 'Origem (sdr-trips, etc)', group: 'Metadata', icon: Tag },
+    { value: 'produto', label: 'Produto (trips, weddings, etc)', group: 'Metadata', icon: Package },
     { value: 'media_url', label: 'URL da Mídia', group: 'Mídia', icon: FileText },
     { value: 'file_type', label: 'Tipo de Arquivo', group: 'Mídia', icon: FileText },
 ];
@@ -135,12 +159,14 @@ function DroppableCrmField({
     mapping,
     pendingChange,
     onRemove,
+    onDeleteCustom,
     isOver
 }: {
-    field: typeof INTERNAL_FIELDS[0];
+    field: InternalFieldDefinition;
     mapping?: FieldMapping;
     pendingChange?: PendingChange;
     onRemove: () => void;
+    onDeleteCustom?: () => void;
     isOver: boolean;
 }) {
     const Icon = field.icon;
@@ -197,6 +223,21 @@ function DroppableCrmField({
 
                 {isRemoving && (
                     <Badge variant="destructive" className="text-[10px]">- Remover</Badge>
+                )}
+
+                {field.isCustom && onDeleteCustom && (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteCustom();
+                        }}
+                        title="Excluir campo customizado"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                 )}
             </div>
 
@@ -261,12 +302,14 @@ function CrmFieldDropZone({
     field,
     mapping,
     pendingChange,
-    onRemove
+    onRemove,
+    onDeleteCustom
 }: {
-    field: typeof INTERNAL_FIELDS[0];
+    field: InternalFieldDefinition;
     mapping?: FieldMapping;
     pendingChange?: PendingChange;
     onRemove: () => void;
+    onDeleteCustom?: () => void;
 }) {
     const { setNodeRef, isOver } = useDroppable({
         id: `crm-${field.value}`,
@@ -280,6 +323,7 @@ function CrmFieldDropZone({
                 mapping={mapping}
                 pendingChange={pendingChange}
                 onRemove={onRemove}
+                onDeleteCustom={onDeleteCustom}
                 isOver={isOver}
             />
         </div>
@@ -412,6 +456,21 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
         }
     });
 
+    // Fetch custom fields from DB
+    const { data: customFieldsFromDb } = useQuery({
+        queryKey: ['whatsapp-custom-fields', platformId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('whatsapp_custom_fields')
+                .select('*')
+                .eq('platform_id', platformId)
+                .eq('is_active', true)
+                .order('field_label');
+            if (error) throw error;
+            return data as CustomField[];
+        }
+    });
+
     // History State
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
@@ -493,20 +552,34 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
     // Check if there are unsaved changes
     const hasUnsavedChanges = pendingChanges.length > 0;
 
+    // Combine static fields with custom fields from DB
+    const allFields = useMemo(() => {
+        const customFields = (customFieldsFromDb || []).map(cf => ({
+            value: cf.field_key,
+            label: cf.field_label,
+            group: cf.field_group,
+            icon: Tag,
+            required: false,
+            isCustom: true,
+            customFieldId: cf.id
+        }));
+        return [...INTERNAL_FIELDS, ...customFields];
+    }, [customFieldsFromDb]);
+
     // Filter CRM fields based on search
     const filteredFields = useMemo(() => {
-        if (!crmSearch) return INTERNAL_FIELDS;
+        if (!crmSearch) return allFields;
         const term = crmSearch.toLowerCase();
-        return INTERNAL_FIELDS.filter(f =>
+        return allFields.filter(f =>
             f.label.toLowerCase().includes(term) ||
             f.value.toLowerCase().includes(term) ||
             f.group.toLowerCase().includes(term)
         );
-    }, [crmSearch]);
+    }, [crmSearch, allFields]);
 
     // Group fields by group
     const groupedFields = useMemo(() => {
-        const groups: Record<string, typeof INTERNAL_FIELDS> = {};
+        const groups: Record<string, InternalFieldDefinition[]> = {};
         for (const field of filteredFields) {
             if (!groups[field.group]) groups[field.group] = [];
             groups[field.group].push(field);
@@ -616,22 +689,49 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
         toast.info('Alterações descartadas');
     };
 
-    // Add custom field
-    const handleAddCustomField = () => {
+    // Add custom field (persist to DB)
+    const handleAddCustomField = async () => {
         if (!customFieldName.trim()) return;
 
-        const newField = {
-            value: customFieldName.toLowerCase().replace(/\s+/g, '_'),
-            label: customFieldName,
-            group: 'Customizado',
-            icon: Tag,
-            required: false
-        };
+        const fieldKey = customFieldName.toLowerCase().replace(/\s+/g, '_');
 
-        INTERNAL_FIELDS.push(newField);
-        setCustomFieldName('');
-        setShowCustomField(false);
-        toast.success(`Campo "${newField.label}" adicionado!`);
+        try {
+            const { error } = await supabase
+                .from('whatsapp_custom_fields')
+                .insert({
+                    platform_id: platformId,
+                    field_key: fieldKey,
+                    field_label: customFieldName.trim(),
+                    field_group: 'Customizado',
+                    is_active: true
+                });
+
+            if (error) throw error;
+
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-custom-fields', platformId] });
+            setCustomFieldName('');
+            setShowCustomField(false);
+            toast.success(`Campo "${customFieldName}" adicionado!`);
+        } catch (error: any) {
+            toast.error(`Erro ao adicionar campo: ${error.message}`);
+        }
+    };
+
+    // Delete custom field
+    const handleDeleteCustomField = async (customFieldId: string, fieldLabel: string) => {
+        try {
+            const { error } = await supabase
+                .from('whatsapp_custom_fields')
+                .delete()
+                .eq('id', customFieldId);
+
+            if (error) throw error;
+
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-custom-fields', platformId] });
+            toast.success(`Campo "${fieldLabel}" removido!`);
+        } catch (error: any) {
+            toast.error(`Erro ao remover campo: ${error.message}`);
+        }
     };
 
     return (
@@ -738,6 +838,7 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
                                                                 const mapping = getMappingForField(field.value);
                                                                 handleRemove(field.value, mapping?.id);
                                                             }}
+                                                            onDeleteCustom={field.isCustom && field.customFieldId ? () => handleDeleteCustomField(field.customFieldId!, field.label) : undefined}
                                                         />
                                                     ))}
                                                 </div>
