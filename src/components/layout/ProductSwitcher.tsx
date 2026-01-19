@@ -18,7 +18,11 @@ const products: { value: Product; label: string; icon: any; color: string }[] = 
     { value: 'CORP', label: 'Welcome Corp', icon: Building2, color: 'text-purple-500' },
 ]
 
-export function ProductSwitcher() {
+interface ProductSwitcherProps {
+    isCollapsed?: boolean
+}
+
+export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
     const { currentProduct, setProduct } = useProductContext()
     const [open, setOpen] = useState(false)
 
@@ -30,13 +34,25 @@ export function ProductSwitcher() {
                 <button
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full flex items-center justify-between rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/20 transition-colors border border-white/10"
+                    title={isCollapsed ? selectedProduct.label : undefined}
+                    className={cn(
+                        "flex items-center rounded-lg bg-white/10 text-sm font-medium text-white hover:bg-white/20 transition-colors border border-white/10 h-10",
+                        isCollapsed
+                            ? "w-10 justify-center"
+                            : "w-full justify-between px-3"
+                    )}
                 >
-                    <div className="flex items-center gap-2">
-                        <selectedProduct.icon className={cn("h-4 w-4", selectedProduct.color)} />
-                        <span>{selectedProduct.label}</span>
-                    </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    {isCollapsed ? (
+                        <selectedProduct.icon className={cn("h-5 w-5", selectedProduct.color)} />
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
+                                <selectedProduct.icon className={cn("h-4 w-4 flex-shrink-0", selectedProduct.color)} />
+                                <span className="truncate">{selectedProduct.label}</span>
+                            </div>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </>
+                    )}
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[200px] p-0">

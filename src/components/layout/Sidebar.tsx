@@ -45,12 +45,12 @@ export default function Sidebar() {
                 </span>
             </div>
 
-            {/* Global Product Switcher - Only show when expanded */}
+            {/* Global Product Switcher - Always visible, adapts to collapsed state */}
             <div className={cn(
-                "px-3 mb-2 transition-opacity duration-200",
-                isExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
+                "mb-2 transition-all duration-200",
+                isExpanded ? "px-3" : "px-3 flex justify-center"
             )}>
-                <ProductSwitcher />
+                <ProductSwitcher isCollapsed={!isExpanded} />
             </div>
 
             <nav className="flex-1 space-y-1 px-2 py-4">
