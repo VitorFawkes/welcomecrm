@@ -53,9 +53,9 @@ export function ProposalPricingSidebar({ proposal, isPreview = false }: Proposal
         let totalFromItems = 0
         sections.forEach(section => {
             (section.items || []).forEach(item => {
-                // Try to get price from item metadata
-                const itemMeta = (item.metadata as Record<string, unknown>) || {}
-                const price = itemMeta.price as number | undefined
+                // Try to get price from item rich_content
+                const itemContent = (item.rich_content as Record<string, unknown>) || {}
+                const price = itemContent.price as number | undefined
                 if (price) {
                     totalFromItems += price
                 }

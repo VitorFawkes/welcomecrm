@@ -1,4 +1,4 @@
-import { Users, DollarSign, Plane, Crown } from 'lucide-react'
+import { User, DollarSign, Plane, Crown } from 'lucide-react'
 
 interface PeopleStatsBarProps {
     totalPeople: number
@@ -12,11 +12,11 @@ export default function PeopleStatsBar({ totalPeople, totalSpend = 0, totalTrips
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center justify-between">
                 <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total de Pessoas</p>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total de Contatos</p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">{totalPeople}</p>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                    <Users className="h-5 w-5" />
+                    <User className="h-5 w-5" />
                 </div>
             </div>
 

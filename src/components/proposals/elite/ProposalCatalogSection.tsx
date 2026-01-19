@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Search, Check, Loader2, type LucideIcon } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Search, Loader2, type LucideIcon } from 'lucide-react'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
 import { useLibrarySearch, type LibraryCategory, type LibrarySearchResult } from '@/hooks/useLibrary'
 import { Button } from '@/components/ui/Button'
@@ -52,10 +52,8 @@ export function ProposalCatalogSection({
         isActive // Only fetch when section is active
     )
 
-    // Get current proposal items count
-    const proposalItemCount = sections
-        .flatMap(s => s.items || [])
-        .length
+    // Note: proposalItemCount could be used for badge display if needed
+    // const proposalItemCount = sections.flatMap(s => s.items || []).length
 
     // Color configurations
     const colorConfig: Record<string, { bg: string; text: string; border: string; light: string }> = {
@@ -83,7 +81,7 @@ export function ProposalCatalogSection({
         }
 
         addItemFromLibrary(sectionId, item)
-        toast.success(`${item.title || 'Item'} adicionado!`)
+        toast.success(`${item.name || 'Item'} adicionado!`)
     }
 
     return (
@@ -167,22 +165,15 @@ export function ProposalCatalogSection({
                                             className="group relative bg-white rounded-lg border border-slate-200 p-3 hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer"
                                             onClick={() => handleAddItem(item)}
                                         >
-                                            {item.image_url && (
-                                                <img
-                                                    src={item.image_url}
-                                                    alt={item.title}
-                                                    className="w-full h-20 object-cover rounded-md mb-2"
-                                                />
-                                            )}
                                             <h5 className="font-medium text-sm text-slate-900 truncate">
-                                                {item.title}
+                                                {item.name}
                                             </h5>
                                             <p className="text-xs text-slate-500 line-clamp-1">
-                                                {item.subtitle || item.description || 'Sem descrição'}
+                                                {item.destination || 'Sem descrição'}
                                             </p>
-                                            {item.price && (
+                                            {item.base_price && Number(item.base_price) > 0 && (
                                                 <p className="text-sm font-semibold text-slate-900 mt-1">
-                                                    R$ {Number(item.price).toLocaleString('pt-BR')}/pp
+                                                    R$ {Number(item.base_price).toLocaleString('pt-BR')}/pp
                                                 </p>
                                             )}
 

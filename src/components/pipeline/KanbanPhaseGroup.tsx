@@ -49,7 +49,7 @@ export default function KanbanPhaseGroup({
 
     return (
         <div className={cn(
-            "relative flex h-full shrink-0 flex-col rounded-2xl transition-all duration-300",
+            "relative flex shrink-0 flex-col rounded-2xl transition-all duration-300",
             isCollapsed ? "w-48 bg-gray-50 border border-gray-200 py-2" : "bg-gray-100 p-2" // Changed collapsed styles
         )}>
             {/* Header - Always Visible */}
@@ -80,7 +80,7 @@ export default function KanbanPhaseGroup({
 
             {/* Content Container */}
             <div className={cn(
-                "flex h-full flex-1 min-h-0",
+                "flex items-start",
                 isCollapsed ? "justify-center" : "gap-4"
             )}>
                 {isCollapsed ? (

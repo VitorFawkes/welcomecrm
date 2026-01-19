@@ -42,7 +42,7 @@ export default function People() {
                 <div className="flex-shrink-0 pt-6 pb-4 px-8 bg-white/50 backdrop-blur-sm border-b border-gray-200/50 z-10">
                     <header className="flex items-center justify-between mb-6">
                         <div>
-                            <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">Pessoas</h1>
+                            <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">Contatos</h1>
                             <p className="mt-1 text-sm text-gray-500">Gerencie seus contatos e visualize inteligência de dados.</p>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -51,7 +51,7 @@ export default function People() {
                                 className="bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20"
                             >
                                 <Plus className="h-5 w-5 mr-2" />
-                                Nova Pessoa
+                                Novo Contato
                             </Button>
                         </div>
                     </header>
@@ -123,7 +123,7 @@ export default function People() {
                     <DrawerContent className="max-w-2xl">
                         <DrawerHeader className="border-b border-gray-100 pb-4">
                             <DrawerTitle className="text-2xl font-bold text-gray-900">
-                                Nova Pessoa
+                                Novo Contato
                             </DrawerTitle>
                         </DrawerHeader>
                         <div className="p-6">

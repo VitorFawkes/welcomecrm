@@ -33,7 +33,7 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
         return (
             <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                 <User className="h-12 w-12 mb-4 text-gray-300" />
-                <p className="text-lg font-medium">Nenhuma pessoa encontrada</p>
+                <p className="text-lg font-medium">Nenhum contato encontrado</p>
                 <p className="text-sm">Tente ajustar seus filtros de busca</p>
             </div>
         )
@@ -49,7 +49,7 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
                             onClick={() => handleSort('nome')}
                         >
                             <div className="flex items-center gap-2">
-                                Pessoa
+                                Nome
                                 <ArrowUpDown className={`h-3 w-3 ${sort.column === 'nome' ? (sort.direction === 'asc' ? 'text-indigo-600' : 'text-indigo-600 rotate-180') : 'text-gray-300'}`} />
                             </div>
                         </th>

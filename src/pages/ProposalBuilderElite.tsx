@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useProposal } from '@/hooks/useProposal'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
@@ -12,16 +12,13 @@ import { Button } from '@/components/ui/Button'
 import {
     Loader2,
     ArrowLeft,
-    Eye,
-    Share2,
-    Save,
     Plane,
     Hotel,
     Sparkles,
     Car
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useEffect } from 'react'
+
 
 /**
  * Elite Proposal Builder - Traviata-inspired visual editor
@@ -41,7 +38,7 @@ export default function ProposalBuilderElite() {
     const isPreview = searchParams.get('preview') === 'true'
 
     const { data: proposal, isLoading, error } = useProposal(id!)
-    const { initialize, reset, version, isDirty, isSaving } = useProposalBuilder()
+    const { initialize, reset, isDirty, isSaving } = useProposalBuilder()
 
     // Current active catalog for adding items
     const [activeCatalog, setActiveCatalog] = useState<'flights' | 'hotels' | 'experiences' | 'transfers' | null>(null)

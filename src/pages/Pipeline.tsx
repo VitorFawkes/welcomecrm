@@ -52,22 +52,16 @@ export default function Pipeline() {
             {/* Main Container: Uses h-full to fill the Layout shell */}
             <div className="flex h-full flex-col relative overflow-hidden bg-gray-50/50">
 
-                {/* Header Section: Fixed height, shared padding with Board */}
-                <div className="flex-shrink-0 pt-6 pb-4 px-8 bg-white/50 backdrop-blur-sm border-b border-gray-200/50 z-10">
-                    <header className="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">Pipeline</h1>
-                            <p className="mt-1 text-sm text-gray-500">Gerencie suas oportunidades e acompanhe o progresso.</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="text-right">
-                                <p className="text-sm font-medium text-gray-900">Vitor Gambetti</p>
-                                <p className="text-xs text-gray-500">Admin</p>
-                            </div>
+                {/* Header Section: Compact single row */}
+                <div className="flex-shrink-0 py-3 px-6 bg-white/50 backdrop-blur-sm border-b border-gray-200/50 z-10">
+                    <header className="flex items-center justify-between gap-4 mb-3">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Pipeline</h1>
+                            <span className="text-sm text-gray-400 hidden md:inline">Gerencie suas oportunidades</span>
                         </div>
                     </header>
 
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-4 flex-wrap">
                                 {/* View Switcher (Persona Based) */}

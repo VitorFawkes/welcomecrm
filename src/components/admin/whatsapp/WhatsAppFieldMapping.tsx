@@ -384,7 +384,6 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
     const [activeData, setActiveData] = useState<{ path: string; value: string } | null>(null);
     const [customFieldName, setCustomFieldName] = useState('');
     const [showCustomField, setShowCustomField] = useState(false);
-    const [jsonExpanded, setJsonExpanded] = useState(true);
 
     // Search states
     const [crmSearch, setCrmSearch] = useState('');
@@ -413,21 +412,37 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
         }
     });
 
-    // Fetch sample event for JSON preview
-    const { data: sampleEvent } = useQuery({
-        queryKey: ['whatsapp-sample-event', platformId],
+    // History State
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+    // Fetch recent events (History)
+    const { data: recentEvents } = useQuery({
+        queryKey: ['whatsapp-recent-events', platformId],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('whatsapp_raw_events')
-                .select('raw_payload')
+                .select('id, event_type, created_at, raw_payload')
                 .eq('platform_id', platformId)
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-            if (error) return null;
-            return data?.raw_payload;
+                .limit(20);
+
+            if (error) throw error;
+            return data;
         }
     });
+
+    // Auto-select latest event on load
+    useEffect(() => {
+        if (recentEvents && recentEvents.length > 0 && !selectedEventId) {
+            setSelectedEventId(recentEvents[0].id);
+        }
+    }, [recentEvents, selectedEventId]);
+
+    // Get currently selected event payload
+    const activeEvent = useMemo(() => {
+        if (!recentEvents) return null;
+        return recentEvents.find(e => e.id === selectedEventId) || recentEvents[0];
+    }, [recentEvents, selectedEventId]);
 
     // ⚡ Realtime subscription: Auto-refresh when new webhook data arrives
     useEffect(() => {
@@ -443,9 +458,9 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
                 },
                 () => {
                     // When a new event arrives, invalidate the query to refetch
-                    queryClient.invalidateQueries({ queryKey: ['whatsapp-sample-event', platformId] });
+                    queryClient.invalidateQueries({ queryKey: ['whatsapp-recent-events', platformId] });
                     toast.info('🔄 Novo payload recebido!', {
-                        description: 'Os dados foram atualizados automaticamente.'
+                        description: 'O histórico foi atualizado.'
                     });
                 }
             )
@@ -766,46 +781,64 @@ export function WhatsAppFieldMapping({ platformId }: WhatsAppFieldMappingProps) 
                     {/* Right: JSON Preview (Draggable) */}
                     <Card>
                         <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-3">
                                 <div>
                                     <CardTitle className="text-base">Payload JSON</CardTitle>
                                     <CardDescription>
                                         Arraste os campos para mapear
                                     </CardDescription>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setJsonExpanded(!jsonExpanded)}
-                                >
-                                    {jsonExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                </Button>
-                            </div>
-                            {/* Search JSON Fields */}
-                            <div className="relative mt-3">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Buscar no JSON..."
-                                    value={jsonSearch}
-                                    onChange={(e) => setJsonSearch(e.target.value)}
-                                    className="pl-9 h-9"
-                                />
+
+                                {/* History Selector */}
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <select
+                                            className="w-full h-9 pl-3 pr-8 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                            value={selectedEventId || ''}
+                                            onChange={(e) => setSelectedEventId(e.target.value)}
+                                            disabled={!recentEvents?.length}
+                                        >
+                                            {recentEvents?.map((event) => (
+                                                <option key={event.id} value={event.id}>
+                                                    {event.event_type || 'Desconhecido'} - {event.created_at ? new Date(event.created_at).toLocaleTimeString() : 'N/A'}
+                                                </option>
+                                            ))}
+                                            {!recentEvents?.length && <option>Nenhum evento recente</option>}
+                                        </select>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => queryClient.invalidateQueries({ queryKey: ['whatsapp-recent-events', platformId] })}
+                                        title="Atualizar lista"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                    </Button>
+                                </div>
+
+                                {/* Search JSON Fields */}
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Buscar no JSON..."
+                                        value={jsonSearch}
+                                        onChange={(e) => setJsonSearch(e.target.value)}
+                                        className="pl-9 h-9"
+                                    />
+                                </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            {jsonExpanded && (
-                                <ScrollArea className="h-[550px] px-6 pb-6">
-                                    {sampleEvent ? (
-                                        <JsonTree data={sampleEvent} path="" level={0} searchTerm={jsonSearch} />
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                                            <AlertCircle className="w-8 h-8 mb-2" />
-                                            <p className="text-sm">Nenhum evento recebido ainda</p>
-                                            <p className="text-xs">Envie uma mensagem via WhatsApp para ver o payload</p>
-                                        </div>
-                                    )}
-                                </ScrollArea>
-                            )}
+                            <ScrollArea className="h-[550px] px-6 pb-6">
+                                {activeEvent?.raw_payload ? (
+                                    <JsonTree data={activeEvent.raw_payload} path="" level={0} searchTerm={jsonSearch} />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                                        <AlertCircle className="w-8 h-8 mb-2" />
+                                        <p>Nenhum payload selecionado</p>
+                                    </div>
+                                )}
+                            </ScrollArea>
                         </CardContent>
                     </Card>
                 </div>

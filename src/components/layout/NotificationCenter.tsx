@@ -65,7 +65,7 @@ export default function NotificationCenter({ triggerClassName }: { triggerClassN
                         className="fixed inset-0 z-40"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-80 z-50 rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 animate-in fade-in-0 zoom-in-95 duration-100">
+                    <div className="absolute left-0 bottom-full mb-2 w-80 z-50 rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 animate-in fade-in-0 zoom-in-95 duration-100">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                             <h3 className="text-sm font-semibold text-gray-900">Notificações</h3>
                             {unreadCount > 0 && (
