@@ -74,6 +74,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
         ]
       }
       activity_categories: {
@@ -294,11 +301,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "card_owner_history_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
             foreignKeyName: "card_owner_history_transferred_by_fkey"
             columns: ["transferred_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_owner_history_transferred_by_fkey"
+            columns: ["transferred_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
           },
         ]
       }
@@ -946,6 +967,66 @@ export type Database = {
           id?: string
           name?: string
           slug?: string
+        }
+        Relationships: []
+      }
+      destinations: {
+        Row: {
+          avg_budget_per_person: number | null
+          avg_trip_duration: number | null
+          continent: string | null
+          country: string
+          cover_image_url: string | null
+          created_at: string | null
+          currency: string | null
+          gallery_urls: string[] | null
+          id: string
+          language: string | null
+          name: string
+          popular_months: number[] | null
+          region: string | null
+          thumbnail_url: string | null
+          timezone: string | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          avg_budget_per_person?: number | null
+          avg_trip_duration?: number | null
+          continent?: string | null
+          country: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          currency?: string | null
+          gallery_urls?: string[] | null
+          id?: string
+          language?: string | null
+          name: string
+          popular_months?: number[] | null
+          region?: string | null
+          thumbnail_url?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          avg_budget_per_person?: number | null
+          avg_trip_duration?: number | null
+          continent?: string | null
+          country?: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          currency?: string | null
+          gallery_urls?: string[] | null
+          id?: string
+          language?: string | null
+          name?: string
+          popular_months?: number[] | null
+          region?: string | null
+          thumbnail_url?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
         }
         Relationships: []
       }
@@ -1656,6 +1737,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "integration_user_map_internal_user_id_fkey"
+            columns: ["internal_user_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
         ]
       }
       integrations: {
@@ -1735,6 +1823,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
           },
           {
             foreignKeyName: "invitations_team_id_fkey"
@@ -2030,6 +2125,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pipeline_card_settings_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
         ]
       }
       pipeline_config: {
@@ -2293,30 +2395,49 @@ export type Database = {
       }
       proposal_client_selections: {
         Row: {
+          flight_id: string | null
           id: string
           item_id: string
           option_id: string | null
           proposal_id: string
           selected: boolean
+          selected_at: string | null
+          selection_metadata: Json | null
+          selection_type: string | null
           updated_at: string | null
         }
         Insert: {
+          flight_id?: string | null
           id?: string
           item_id: string
           option_id?: string | null
           proposal_id: string
           selected?: boolean
+          selected_at?: string | null
+          selection_metadata?: Json | null
+          selection_type?: string | null
           updated_at?: string | null
         }
         Update: {
+          flight_id?: string | null
           id?: string
           item_id?: string
           option_id?: string | null
           proposal_id?: string
           selected?: boolean
+          selected_at?: string | null
+          selection_metadata?: Json | null
+          selection_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proposal_client_selections_flight_id_fkey"
+            columns: ["flight_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_flights"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proposal_client_selections_item_id_fkey"
             columns: ["item_id"]
@@ -2345,37 +2466,183 @@ export type Database = {
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["proposal_id"]
           },
+          {
+            foreignKeyName: "proposal_client_selections_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposal_analytics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_comments: {
+        Row: {
+          author_id: string | null
+          author_name: string
+          author_type: string
+          content: string
+          created_at: string | null
+          id: string
+          is_resolved: boolean | null
+          parent_id: string | null
+          proposal_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          section_id: string | null
+          updated_at: string | null
+          visibility: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_name: string
+          author_type: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          parent_id?: string | null
+          proposal_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section_id?: string | null
+          updated_at?: string | null
+          visibility?: string
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string
+          author_type?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          parent_id?: string | null
+          proposal_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section_id?: string | null
+          updated_at?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_comments_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_comments_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_comments_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposal_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_comments_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_comments_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "proposal_comments_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_sections"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proposal_events: {
         Row: {
           client_ip: string | null
           created_at: string | null
+          device_type: string | null
+          duration_seconds: number | null
           event_type: string
+          flight_id: string | null
           id: string
+          item_id: string | null
           payload: Json | null
           proposal_id: string
+          referrer: string | null
+          scroll_depth: number | null
+          section_id: string | null
           user_agent: string | null
+          viewport_width: number | null
         }
         Insert: {
           client_ip?: string | null
           created_at?: string | null
+          device_type?: string | null
+          duration_seconds?: number | null
           event_type: string
+          flight_id?: string | null
           id?: string
+          item_id?: string | null
           payload?: Json | null
           proposal_id: string
+          referrer?: string | null
+          scroll_depth?: number | null
+          section_id?: string | null
           user_agent?: string | null
+          viewport_width?: number | null
         }
         Update: {
           client_ip?: string | null
           created_at?: string | null
+          device_type?: string | null
+          duration_seconds?: number | null
           event_type?: string
+          flight_id?: string | null
           id?: string
+          item_id?: string | null
           payload?: Json | null
           proposal_id?: string
+          referrer?: string | null
+          scroll_depth?: number | null
+          section_id?: string | null
           user_agent?: string | null
+          viewport_width?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proposal_events_flight_id_fkey"
+            columns: ["flight_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_flights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_events_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proposal_events_proposal_id_fkey"
             columns: ["proposal_id"]
@@ -2390,6 +2657,154 @@ export type Database = {
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["proposal_id"]
           },
+          {
+            foreignKeyName: "proposal_events_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposal_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_events_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_flights: {
+        Row: {
+          airline_code: string | null
+          airline_logo_url: string | null
+          airline_name: string | null
+          arrival_datetime: string | null
+          baggage_included: string | null
+          cabin_class: string | null
+          created_at: string | null
+          currency: string | null
+          departure_datetime: string | null
+          destination_airport: string
+          destination_city: string | null
+          duration_minutes: number | null
+          extracted_from_image: boolean | null
+          extraction_confidence: number | null
+          flight_number: string | null
+          id: string
+          is_recommended: boolean | null
+          is_selected: boolean | null
+          layover_details: Json | null
+          option_group: string | null
+          ordem: number | null
+          origin_airport: string
+          origin_city: string | null
+          price_per_person: number | null
+          price_total: number | null
+          proposal_id: string
+          raw_extracted_text: string | null
+          section_id: string | null
+          segment_order: number | null
+          stops: number | null
+          trip_leg: string
+          updated_at: string | null
+        }
+        Insert: {
+          airline_code?: string | null
+          airline_logo_url?: string | null
+          airline_name?: string | null
+          arrival_datetime?: string | null
+          baggage_included?: string | null
+          cabin_class?: string | null
+          created_at?: string | null
+          currency?: string | null
+          departure_datetime?: string | null
+          destination_airport: string
+          destination_city?: string | null
+          duration_minutes?: number | null
+          extracted_from_image?: boolean | null
+          extraction_confidence?: number | null
+          flight_number?: string | null
+          id?: string
+          is_recommended?: boolean | null
+          is_selected?: boolean | null
+          layover_details?: Json | null
+          option_group?: string | null
+          ordem?: number | null
+          origin_airport: string
+          origin_city?: string | null
+          price_per_person?: number | null
+          price_total?: number | null
+          proposal_id: string
+          raw_extracted_text?: string | null
+          section_id?: string | null
+          segment_order?: number | null
+          stops?: number | null
+          trip_leg: string
+          updated_at?: string | null
+        }
+        Update: {
+          airline_code?: string | null
+          airline_logo_url?: string | null
+          airline_name?: string | null
+          arrival_datetime?: string | null
+          baggage_included?: string | null
+          cabin_class?: string | null
+          created_at?: string | null
+          currency?: string | null
+          departure_datetime?: string | null
+          destination_airport?: string
+          destination_city?: string | null
+          duration_minutes?: number | null
+          extracted_from_image?: boolean | null
+          extraction_confidence?: number | null
+          flight_number?: string | null
+          id?: string
+          is_recommended?: boolean | null
+          is_selected?: boolean | null
+          layover_details?: Json | null
+          option_group?: string | null
+          ordem?: number | null
+          origin_airport?: string
+          origin_city?: string | null
+          price_per_person?: number | null
+          price_total?: number | null
+          proposal_id?: string
+          raw_extracted_text?: string | null
+          section_id?: string | null
+          segment_order?: number | null
+          stops?: number | null
+          trip_leg?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_flights_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_flights_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_flights_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposal_analytics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_flights_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_sections"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proposal_items: {
@@ -2398,6 +2813,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          image_url: string | null
           is_default_selected: boolean
           is_optional: boolean
           item_type: Database["public"]["Enums"]["proposal_item_type"]
@@ -2411,6 +2827,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           is_default_selected?: boolean
           is_optional?: boolean
           item_type: Database["public"]["Enums"]["proposal_item_type"]
@@ -2424,6 +2841,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           is_default_selected?: boolean
           is_optional?: boolean
           item_type?: Database["public"]["Enums"]["proposal_item_type"]
@@ -2444,53 +2862,89 @@ export type Database = {
       }
       proposal_library: {
         Row: {
+          amenities: string[] | null
           base_price: number | null
+          cancellation_policy: string | null
           category: string
+          check_in_time: string | null
+          check_out_time: string | null
           content: Json
           created_at: string | null
           created_by: string
           currency: string | null
           destination: string | null
+          gallery_urls: string[] | null
           id: string
           is_shared: boolean
+          last_used_at: string | null
+          location_city: string | null
+          location_country: string | null
           name: string
           name_search: string | null
+          ownership_type: string | null
+          saved_from_proposal_id: string | null
+          star_rating: number | null
           supplier: string | null
           tags: string[] | null
+          thumbnail_url: string | null
           updated_at: string | null
           usage_count: number
         }
         Insert: {
+          amenities?: string[] | null
           base_price?: number | null
+          cancellation_policy?: string | null
           category: string
+          check_in_time?: string | null
+          check_out_time?: string | null
           content?: Json
           created_at?: string | null
           created_by: string
           currency?: string | null
           destination?: string | null
+          gallery_urls?: string[] | null
           id?: string
           is_shared?: boolean
+          last_used_at?: string | null
+          location_city?: string | null
+          location_country?: string | null
           name: string
           name_search?: string | null
+          ownership_type?: string | null
+          saved_from_proposal_id?: string | null
+          star_rating?: number | null
           supplier?: string | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           usage_count?: number
         }
         Update: {
+          amenities?: string[] | null
           base_price?: number | null
+          cancellation_policy?: string | null
           category?: string
+          check_in_time?: string | null
+          check_out_time?: string | null
           content?: Json
           created_at?: string | null
           created_by?: string
           currency?: string | null
           destination?: string | null
+          gallery_urls?: string[] | null
           id?: string
           is_shared?: boolean
+          last_used_at?: string | null
+          location_city?: string | null
+          location_country?: string | null
           name?: string
           name_search?: string | null
+          ownership_type?: string | null
+          saved_from_proposal_id?: string | null
+          star_rating?: number | null
           supplier?: string | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           usage_count?: number
         }
@@ -2500,6 +2954,34 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_library_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "proposal_library_saved_from_proposal_id_fkey"
+            columns: ["saved_from_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_library_saved_from_proposal_id_fkey"
+            columns: ["saved_from_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["proposal_id"]
+          },
+          {
+            foreignKeyName: "proposal_library_saved_from_proposal_id_fkey"
+            columns: ["saved_from_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposal_analytics"
             referencedColumns: ["id"]
           },
         ]
@@ -2594,6 +3076,7 @@ export type Database = {
           icon: string | null
           id: string
           is_global: boolean | null
+          last_used_at: string | null
           metadata: Json | null
           name: string
           sections: Json
@@ -2607,6 +3090,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_global?: boolean | null
+          last_used_at?: string | null
           metadata?: Json | null
           name: string
           sections?: Json
@@ -2620,6 +3104,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_global?: boolean | null
+          last_used_at?: string | null
           metadata?: Json | null
           name?: string
           sections?: Json
@@ -2668,6 +3153,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proposal_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
             foreignKeyName: "proposal_versions_proposal_id_fkey"
             columns: ["proposal_id"]
             isOneToOne: false
@@ -2681,6 +3173,13 @@ export type Database = {
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["proposal_id"]
           },
+          {
+            foreignKeyName: "proposal_versions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "v_proposal_analytics"
+            referencedColumns: ["id"]
+          },
         ]
       }
       proposals: {
@@ -2688,7 +3187,9 @@ export type Database = {
           accepted_at: string | null
           accepted_version_id: string | null
           active_version_id: string | null
-          card_id: string
+          card_data_imported: boolean | null
+          card_id: string | null
+          card_linked_at: string | null
           content: Json | null
           created_at: string | null
           created_by: string | null
@@ -2704,7 +3205,9 @@ export type Database = {
           accepted_at?: string | null
           accepted_version_id?: string | null
           active_version_id?: string | null
-          card_id: string
+          card_data_imported?: boolean | null
+          card_id?: string | null
+          card_linked_at?: string | null
           content?: Json | null
           created_at?: string | null
           created_by?: string | null
@@ -2720,7 +3223,9 @@ export type Database = {
           accepted_at?: string | null
           accepted_version_id?: string | null
           active_version_id?: string | null
-          card_id?: string
+          card_data_imported?: boolean | null
+          card_id?: string | null
+          card_linked_at?: string | null
           content?: Json | null
           created_at?: string | null
           created_by?: string | null
@@ -2890,6 +3395,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reunioes_sdr_responsavel_id_fkey"
+            columns: ["sdr_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
         ]
       }
       reunioes_backup_20251223: {
@@ -3048,6 +3560,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_fields_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
           },
         ]
       }
@@ -3419,6 +3938,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
         ]
       }
       teams: {
@@ -3450,6 +3976,75 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "departments"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      text_blocks: {
+        Row: {
+          category: string
+          content: string
+          content_html: string | null
+          created_at: string | null
+          created_by: string | null
+          destination_tags: string[] | null
+          id: string
+          is_default: boolean | null
+          last_used_at: string | null
+          name: string
+          ownership_type: string | null
+          trip_types: string[] | null
+          updated_at: string | null
+          usage_count: number | null
+          variables: string[] | null
+        }
+        Insert: {
+          category: string
+          content: string
+          content_html?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          destination_tags?: string[] | null
+          id?: string
+          is_default?: boolean | null
+          last_used_at?: string | null
+          name: string
+          ownership_type?: string | null
+          trip_types?: string[] | null
+          updated_at?: string | null
+          usage_count?: number | null
+          variables?: string[] | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          content_html?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          destination_tags?: string[] | null
+          id?: string
+          is_default?: boolean | null
+          last_used_at?: string | null
+          name?: string
+          ownership_type?: string | null
+          trip_types?: string[] | null
+          updated_at?: string | null
+          usage_count?: number | null
+          variables?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "text_blocks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "text_blocks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
           },
         ]
       }
@@ -3528,6 +4123,47 @@ export type Database = {
           },
         ]
       }
+      whatsapp_custom_fields: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          field_group: string | null
+          field_key: string
+          field_label: string
+          id: string
+          is_active: boolean | null
+          platform_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          field_group?: string | null
+          field_key: string
+          field_label: string
+          id?: string
+          is_active?: boolean | null
+          platform_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          field_group?: string | null
+          field_key?: string
+          field_label?: string
+          id?: string
+          is_active?: boolean | null
+          platform_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_custom_fields_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_field_mappings: {
         Row: {
           created_at: string | null
@@ -3589,6 +4225,7 @@ export type Database = {
           metadata: Json | null
           origem: string | null
           platform_id: string | null
+          produto: string | null
           raw_event_id: string | null
           sender_name: string | null
           sender_phone: string | null
@@ -3613,6 +4250,7 @@ export type Database = {
           metadata?: Json | null
           origem?: string | null
           platform_id?: string | null
+          produto?: string | null
           raw_event_id?: string | null
           sender_name?: string | null
           sender_phone?: string | null
@@ -3637,6 +4275,7 @@ export type Database = {
           metadata?: Json | null
           origem?: string | null
           platform_id?: string | null
+          produto?: string | null
           raw_event_id?: string | null
           sender_name?: string | null
           sender_phone?: string | null
@@ -3905,6 +4544,39 @@ export type Database = {
             referencedColumns: ["card_id"]
           },
         ]
+      }
+      v_proposal_analytics: {
+        Row: {
+          alert_status: string | null
+          card_title: string | null
+          consultant_name: string | null
+          created_at: string | null
+          created_by: string | null
+          data_viagem_fim: string | null
+          data_viagem_inicio: string | null
+          hours_since_created: number | null
+          hours_to_accept: number | null
+          id: string | null
+          max_scroll_depth: number | null
+          proposal_title: string | null
+          status: string | null
+          total_time_seconds: number | null
+          unique_view_days: number | null
+          view_count: number | null
+        }
+        Relationships: []
+      }
+      v_team_proposal_performance: {
+        Row: {
+          accepted_proposals: number | null
+          avg_hours_to_accept: number | null
+          consultant_id: string | null
+          consultant_name: string | null
+          conversion_rate: number | null
+          sent_proposals: number | null
+          total_proposals: number | null
+        }
+        Relationships: []
       }
       view_agenda: {
         Row: {
