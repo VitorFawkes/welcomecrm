@@ -501,121 +501,124 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
 
     return (
-        <div className={cn("flex flex-col h-full relative", className)}>
-            {/* Scroll Arrows - Elite UX */}
-            <ScrollArrows
-                showLeft={showLeftArrow}
-                showRight={showRightArrow}
-                onScrollLeft={scrollLeftFn}
-                onScrollRight={scrollRightFn}
-            />
+        <div className={cn("flex flex-col h-full", className)}>
+            {/* Scroll Area with Arrows */}
+            <div className="flex-1 relative min-h-0">
+                {/* Scroll Arrows - Elite UX */}
+                <ScrollArrows
+                    showLeft={showLeftArrow}
+                    showRight={showRightArrow}
+                    onScrollLeft={scrollLeftFn}
+                    onScrollRight={scrollRightFn}
+                />
 
-            {/* Kanban Columns */}
-            <div
-                ref={scrollContainerRef}
-                className={cn(
-                    "flex-1 overflow-x-auto overflow-y-hidden min-h-0",
-                    "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']",
-                    isDragging && "cursor-grabbing"
-                )}
-            >
-                <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                    <div className="flex gap-4 w-max min-w-full px-4 items-stretch pt-2 h-full">
-                        <div className="flex gap-6 items-stretch h-full">
-                            {cards.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center w-[calc(100vw-20rem)] py-20 bg-white/5 rounded-xl border border-dashed border-gray-300">
-                                    <div className="p-4 bg-gray-100 rounded-full mb-4">
-                                        <Users className="h-8 w-8 text-gray-400" />
+                {/* Kanban Columns */}
+                <div
+                    ref={scrollContainerRef}
+                    className={cn(
+                        "h-full overflow-x-auto overflow-y-hidden",
+                        "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']",
+                        isDragging && "cursor-grabbing"
+                    )}
+                >
+                    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                        <div className="flex gap-4 w-max min-w-full px-4 items-stretch pt-2 h-full">
+                            <div className="flex gap-6 items-stretch h-full">
+                                {cards.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center w-[calc(100vw-20rem)] py-20 bg-white/5 rounded-xl border border-dashed border-gray-300">
+                                        <div className="p-4 bg-gray-100 rounded-full mb-4">
+                                            <Users className="h-8 w-8 text-gray-400" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-gray-900">Nenhum card encontrado</h3>
+                                        <p className="text-gray-500 max-w-xs text-center mt-2">
+                                            Tente ajustar os filtros de Grupos, Vinculadas ou Avulsas para ver mais resultados.
+                                        </p>
                                     </div>
-                                    <h3 className="text-lg font-semibold text-gray-900">Nenhum card encontrado</h3>
-                                    <p className="text-gray-500 max-w-xs text-center mt-2">
-                                        Tente ajustar os filtros de Grupos, Vinculadas ou Avulsas para ver mais resultados.
-                                    </p>
-                                </div>
-                            ) : displayPhases.map((phase) => {
-                                // Filter stages that belong to this phase
-                                // We support both phase_id (new) and fase name match (legacy migration)
-                                const phaseStages = stages.filter(s =>
-                                    s.phase_id === phase.id ||
-                                    (!s.phase_id && s.fase === phase.name)
-                                )
+                                ) : displayPhases.map((phase) => {
+                                    // Filter stages that belong to this phase
+                                    // We support both phase_id (new) and fase name match (legacy migration)
+                                    const phaseStages = stages.filter(s =>
+                                        s.phase_id === phase.id ||
+                                        (!s.phase_id && s.fase === phase.name)
+                                    )
 
-                                // If no stages for this phase, skip rendering it (optional, but cleaner)
-                                if (phaseStages.length === 0) return null
+                                    // If no stages for this phase, skip rendering it (optional, but cleaner)
+                                    if (phaseStages.length === 0) return null
 
-                                const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
-                                const totalCount = phaseCards.length
-                                const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
+                                    const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
+                                    const totalCount = phaseCards.length
+                                    const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
 
-                                return (
-                                    <KanbanPhaseGroup
-                                        key={phase.id}
-                                        phaseName={phase.name}
-                                        isCollapsed={collapsedPhases.includes(phase.name)}
-                                        onToggle={() => togglePhase(phase.name)}
-                                        totalCount={totalCount}
-                                        totalValue={totalValue}
-                                        phaseColor={phase.color}
-                                        stages={phaseStages}
-                                        cards={phaseCards}
-                                    >
-                                        {phaseStages.map((stage) => (
-                                            <KanbanColumn
-                                                key={stage.id}
-                                                stage={stage}
-                                                cards={cards.filter(c => c.pipeline_stage_id === stage.id)}
-                                                phaseColor={phase.color}
-                                            />
-                                        ))}
-                                    </KanbanPhaseGroup>
-                                )
-                            })}
+                                    return (
+                                        <KanbanPhaseGroup
+                                            key={phase.id}
+                                            phaseName={phase.name}
+                                            isCollapsed={collapsedPhases.includes(phase.name)}
+                                            onToggle={() => togglePhase(phase.name)}
+                                            totalCount={totalCount}
+                                            totalValue={totalValue}
+                                            phaseColor={phase.color}
+                                            stages={phaseStages}
+                                            cards={phaseCards}
+                                        >
+                                            {phaseStages.map((stage) => (
+                                                <KanbanColumn
+                                                    key={stage.id}
+                                                    stage={stage}
+                                                    cards={cards.filter(c => c.pipeline_stage_id === stage.id)}
+                                                    phaseColor={phase.color}
+                                                />
+                                            ))}
+                                        </KanbanPhaseGroup>
+                                    )
+                                })}
+                            </div>
+                            <DragOverlay
+                                dropAnimation={{
+                                    duration: 0,
+                                    easing: 'ease',
+                                }}
+                            >
+                                {activeCard ? (
+                                    <div className="rotate-3 scale-105 cursor-grabbing opacity-80">
+                                        <KanbanCard card={activeCard} />
+                                    </div>
+                                ) : null}
+                            </DragOverlay>
+
+                            {pendingMove && (
+                                <>
+                                    <StageChangeModal
+                                        isOpen={stageChangeModalOpen}
+                                        onClose={() => {
+                                            setStageChangeModalOpen(false)
+                                            setPendingMove(null)
+                                            setActiveCard(null)
+                                        }}
+                                        onConfirm={handleConfirmStageChange}
+                                        currentOwnerId={pendingMove.currentOwnerId || ''}
+                                        sdrName={pendingMove.sdrName}
+                                        targetStageName={pendingMove.targetStageName}
+                                        requiredRole={pendingMove.requiredRole}
+                                    />
+
+                                    <QualityGateModal
+                                        isOpen={qualityGateModalOpen}
+                                        onClose={() => {
+                                            setQualityGateModalOpen(false)
+                                            setPendingMove(null)
+                                            setActiveCard(null)
+                                        }}
+                                        onConfirm={handleConfirmQualityGate}
+                                        cardId={pendingMove.cardId}
+                                        targetStageName={pendingMove.targetStageName}
+                                        missingFields={pendingMove.missingFields || []}
+                                    />
+                                </>
+                            )}
                         </div>
-                        <DragOverlay
-                            dropAnimation={{
-                                duration: 0,
-                                easing: 'ease',
-                            }}
-                        >
-                            {activeCard ? (
-                                <div className="rotate-3 scale-105 cursor-grabbing opacity-80">
-                                    <KanbanCard card={activeCard} />
-                                </div>
-                            ) : null}
-                        </DragOverlay>
-
-                        {pendingMove && (
-                            <>
-                                <StageChangeModal
-                                    isOpen={stageChangeModalOpen}
-                                    onClose={() => {
-                                        setStageChangeModalOpen(false)
-                                        setPendingMove(null)
-                                        setActiveCard(null)
-                                    }}
-                                    onConfirm={handleConfirmStageChange}
-                                    currentOwnerId={pendingMove.currentOwnerId || ''}
-                                    sdrName={pendingMove.sdrName}
-                                    targetStageName={pendingMove.targetStageName}
-                                    requiredRole={pendingMove.requiredRole}
-                                />
-
-                                <QualityGateModal
-                                    isOpen={qualityGateModalOpen}
-                                    onClose={() => {
-                                        setQualityGateModalOpen(false)
-                                        setPendingMove(null)
-                                        setActiveCard(null)
-                                    }}
-                                    onConfirm={handleConfirmQualityGate}
-                                    cardId={pendingMove.cardId}
-                                    targetStageName={pendingMove.targetStageName}
-                                    missingFields={pendingMove.missingFields || []}
-                                />
-                            </>
-                        )}
-                    </div>
-                </DndContext>
+                    </DndContext>
+                </div>
             </div>
 
             {/* Footer - Part of flex layout, not fixed */}
@@ -675,3 +678,4 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         </div>
     )
 }
+
