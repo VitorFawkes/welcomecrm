@@ -51,6 +51,16 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
 
+    // Elite horizontal scroll with Shift+Wheel, Drag-to-Pan, and arrow indicators
+    // Must be called before any conditional returns to respect React hooks rules
+    const {
+        isDragging,
+        showLeftArrow,
+        showRightArrow,
+        scrollLeft: scrollLeftFn,
+        scrollRight: scrollRightFn,
+    } = useHorizontalScroll(scrollContainerRef)
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -488,14 +498,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
 
 
-    // Elite horizontal scroll with Shift+Wheel, Drag-to-Pan, and arrow indicators
-    const {
-        isDragging,
-        showLeftArrow,
-        showRightArrow,
-        scrollLeft: scrollLeftFn,
-        scrollRight: scrollRightFn,
-    } = useHorizontalScroll(scrollContainerRef)
+
 
     return (
         <div className={cn("flex flex-col h-full relative", className)}>
