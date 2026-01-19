@@ -173,19 +173,41 @@ export function useHorizontalScroll(
         const container = containerRef.current
         if (!container || !enableArrows) return
 
-        // Initial check
-        updateArrowVisibility()
+        // Initial check with delay to ensure content is rendered
+        const initialCheck = () => {
+            updateArrowVisibility()
+        }
+
+        // Immediate check
+        initialCheck()
+
+        // Delayed checks for async content loading
+        const timeout1 = setTimeout(initialCheck, 100)
+        const timeout2 = setTimeout(initialCheck, 500)
+        const timeout3 = setTimeout(initialCheck, 1000)
 
         // Listen to scroll events
         container.addEventListener('scroll', updateArrowVisibility)
 
-        // Also observe resize
-        const resizeObserver = new ResizeObserver(updateArrowVisibility)
+        // Observe resize
+        const resizeObserver = new ResizeObserver(initialCheck)
         resizeObserver.observe(container)
 
+        // Observe DOM mutations (content changes)
+        const mutationObserver = new MutationObserver(initialCheck)
+        mutationObserver.observe(container, {
+            childList: true,
+            subtree: true,
+            attributes: false
+        })
+
         return () => {
+            clearTimeout(timeout1)
+            clearTimeout(timeout2)
+            clearTimeout(timeout3)
             container.removeEventListener('scroll', updateArrowVisibility)
             resizeObserver.disconnect()
+            mutationObserver.disconnect()
         }
     }, [containerRef, enableArrows, updateArrowVisibility])
 
