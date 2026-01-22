@@ -72,15 +72,24 @@ export function AIImageExtractor({ onExtractComplete, onCancel }: AIImageExtract
 
             setResult(extractResult)
 
-            if (extractResult.success && extractResult.items.length > 0) {
+            if (extractResult.success && extractResult.items?.length > 0) {
                 // Select all items by default
                 setSelectedItems(new Set(extractResult.items.map((_, i) => i)))
                 toast.success(`${extractResult.items.length} item(s) encontrado(s)!`, { id: 'ai-extract' })
             } else {
-                toast.warning('Nenhum item identificado', {
-                    id: 'ai-extract',
-                    description: 'A IA não conseguiu extrair itens desta imagem.',
-                })
+                if (extractResult.error) {
+                    console.error('[AI Extract] Error:', extractResult.error, extractResult.details)
+                    toast.error(`Erro: ${extractResult.error}`, {
+                        id: 'ai-extract',
+                        description: extractResult.details ? String(extractResult.details).slice(0, 100) : 'Verifique o console para mais detalhes.',
+                        duration: 5000,
+                    })
+                } else {
+                    toast.warning('Nenhum item identificado', {
+                        id: 'ai-extract',
+                        description: 'A IA não conseguiu extrair itens desta imagem.',
+                    })
+                }
             }
         } catch (error) {
             toast.error('Erro ao processar imagem', { id: 'ai-extract' })

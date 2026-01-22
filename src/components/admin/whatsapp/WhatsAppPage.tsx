@@ -10,7 +10,8 @@ import {
     Inbox,
     GitBranch,
     RefreshCw,
-    AlertCircle
+    AlertCircle,
+    Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { WhatsAppPayloadExplorer } from './WhatsAppPayloadExplorer';
 import { WhatsAppFieldMapping } from './WhatsAppFieldMapping';
+import { WhatsAppGovernanceTab } from './WhatsAppGovernanceTab';
 
 interface Platform {
     id: string;
@@ -161,6 +163,10 @@ export function WhatsAppPage() {
                             <Settings className="w-4 h-4" />
                             Configurações
                         </TabsTrigger>
+                        <TabsTrigger value="governance" className="gap-2">
+                            <Shield className="w-4 h-4" />
+                            Governança
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="explorer">
@@ -240,6 +246,10 @@ export function WhatsAppPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                    </TabsContent>
+
+                    <TabsContent value="governance">
+                        <WhatsAppGovernanceTab />
                     </TabsContent>
                 </Tabs>
             </div>

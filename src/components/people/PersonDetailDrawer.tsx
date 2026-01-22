@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '../ui/drawer'
+import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle, DrawerClose } from '../ui/drawer'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
 import { Badge } from '../ui/Badge'
 import ContactForm from '../card/ContactForm'
@@ -17,11 +17,11 @@ type Card = Database['public']['Tables']['cards']['Row']
 interface PersonDetailDrawerProps {
     person: Person | null
     onClose: () => void
+    onRefresh?: () => void
 }
 
-export default function PersonDetailDrawer({ person, onClose }: PersonDetailDrawerProps) {
+export default function PersonDetailDrawer({ person, onClose, onRefresh }: PersonDetailDrawerProps) {
     const [activeTab, setActiveTab] = useState('info')
-    const queryClient = useQueryClient()
 
     // Fetch Trips
     const { data: trips, isLoading: loadingTrips } = useQuery({
@@ -53,8 +53,8 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
     })
 
     const handleSaveContact = async () => {
-        // Invalidate queries to refresh grid
-        queryClient.invalidateQueries({ queryKey: ['people-intelligence'] })
+        // Refresh parent data after save
+        if (onRefresh) onRefresh()
         onClose()
     }
 
@@ -123,7 +123,7 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
                     </div>
                 </DrawerHeader>
 
-                <div className="p-6 overflow-y-auto h-full">
+                <DrawerBody>
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="w-full justify-start mb-6 bg-gray-100/50 p-1">
                             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
@@ -136,6 +136,7 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
 
                         <TabsContent value="info" className="mt-0">
                             <ContactForm
+                                key={person.id}
                                 contact={person}
                                 onSave={handleSaveContact}
                                 onCancel={onClose}
@@ -200,7 +201,7 @@ export default function PersonDetailDrawer({ person, onClose }: PersonDetailDraw
                             )}
                         </TabsContent>
                     </Tabs>
-                </div>
+                </DrawerBody>
             </DrawerContent>
         </Drawer >
     )

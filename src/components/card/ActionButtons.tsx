@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mail, X, Send, Loader2 } from 'lucide-react'
+import { Mail, X, Send, Loader2, Trash2 } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useCreateProposal } from '@/hooks/useProposal'
+import { useDeleteCard } from '@/hooks/useDeleteCard'
+import DeleteCardModal from './DeleteCardModal'
 import { toast } from 'sonner'
 
 interface ActionButtonsProps {
@@ -25,6 +27,11 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         to: '',
         subject: '',
         body: ''
+    })
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+
+    const { softDelete, isDeleting } = useDeleteCard({
+        onSuccess: () => navigate('/pipeline')
     })
 
     const logActivityMutation = useMutation({
@@ -248,6 +255,15 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                     )}
                     {isCreatingProposal ? 'Criando...' : 'Proposta'}
                 </button>
+
+                <button
+                    onClick={() => setShowDeleteModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 transition-colors text-sm font-medium"
+                    title="Arquivar Viagem"
+                >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir
+                </button>
             </div>
 
             {/* Email Modal */}
@@ -319,6 +335,13 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                 </div>
             )}
 
+            <DeleteCardModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={() => softDelete(card.id)}
+                isLoading={isDeleting}
+                cardTitle={card.titulo || undefined}
+            />
         </>
     )
 }

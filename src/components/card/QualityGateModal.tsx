@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -13,6 +13,7 @@ interface QualityGateModalProps {
     cardId: string
     targetStageName: string
     missingFields: { key: string, label: string }[]
+    initialData?: Record<string, any>  // Card data for pre-filling
 }
 
 export default function QualityGateModal({
@@ -21,11 +22,45 @@ export default function QualityGateModal({
     onConfirm,
     cardId,
     targetStageName,
-    missingFields
+    missingFields,
+    initialData
 }: QualityGateModalProps) {
     const [values, setValues] = useState<Record<string, any>>({})
     const [isSaving, setIsSaving] = useState(false)
     const queryClient = useQueryClient()
+
+    // Pre-fill values from initialData (card data) when modal opens
+    useEffect(() => {
+        if (!isOpen) {
+            setValues({}) // Reset when closed
+            return
+        }
+
+        const prefill: Record<string, any> = {}
+
+        missingFields.forEach(field => {
+            // Check root level first
+            if (initialData?.[field.key] !== undefined && initialData[field.key] !== null && initialData[field.key] !== '') {
+                prefill[field.key] = initialData[field.key]
+            }
+            // Then check produto_data (Waterfall Pattern)
+            else if (initialData?.produto_data && typeof initialData.produto_data === 'object') {
+                const produtoData = initialData.produto_data as Record<string, any>
+                if (produtoData[field.key] !== undefined && produtoData[field.key] !== null && produtoData[field.key] !== '') {
+                    prefill[field.key] = produtoData[field.key]
+                }
+            }
+            // Then check briefing_inicial (SDR data)
+            else if (initialData?.briefing_inicial && typeof initialData.briefing_inicial === 'object') {
+                const briefingData = initialData.briefing_inicial as Record<string, any>
+                if (briefingData[field.key] !== undefined && briefingData[field.key] !== null && briefingData[field.key] !== '') {
+                    prefill[field.key] = briefingData[field.key]
+                }
+            }
+        })
+
+        setValues(prefill)
+    }, [isOpen, initialData, missingFields])
 
     const handleChange = (key: string, value: any) => {
         setValues(prev => ({ ...prev, [key]: value }))

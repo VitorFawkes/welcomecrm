@@ -6,6 +6,53 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-integration-id",
 };
 
+/**
+ * Extract metadata from ActiveCampaign webhook payload.
+ * Maps AC payload structure to our normalized entity_type, event_type, and external_id.
+ */
+function parseACPayload(payload: Record<string, unknown>): {
+    entity_type: string | null;
+    event_type: string | null;
+    external_id: string | null;
+} {
+    const type = payload.type as string | undefined;
+
+    // Classify entity type from payload structure and type
+    let entity_type: string | null = null;
+
+    if (payload['deal[id]'] || payload.deal_id) {
+        // Deal-related events
+        if (type?.startsWith('deal_task') || type?.startsWith('deal_note')) {
+            entity_type = 'dealActivity';
+        } else {
+            entity_type = 'deal';
+        }
+    } else if (payload['contact[id]'] || payload.contact_id) {
+        // Contact-related events
+        entity_type = 'contact';
+    } else if (type?.includes('automation')) {
+        entity_type = 'contactAutomation';
+    } else if (type === 'sent' || type?.includes('campaign')) {
+        entity_type = 'campaign';
+    }
+
+    // Event type directly from AC payload's type field
+    const event_type = type || null;
+
+    // External ID for the primary entity
+    const rawExternalId =
+        payload['deal[id]'] ||
+        payload.deal_id ||
+        payload['contact[id]'] ||
+        payload.contact_id ||
+        payload.id ||
+        null;
+
+    const external_id = rawExternalId ? String(rawExternalId) : null;
+
+    return { entity_type, event_type, external_id };
+}
+
 serve(async (req) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
@@ -41,6 +88,26 @@ serve(async (req) => {
             });
         }
 
+        // Check global inbound pause setting - use maybeSingle to avoid throwing if setting doesn't exist
+        const { data: inboundSetting } = await supabaseClient
+            .from("integration_settings")
+            .select("value")
+            .eq("key", "INBOUND_INGEST_ENABLED")
+            .maybeSingle();
+
+        // Only pause if the setting is EXPLICITLY set to 'false'
+        // If the setting doesn't exist, is null, or has any other value, allow the webhook
+        const settingValue = inboundSetting?.value;
+        console.log(`INBOUND_INGEST_ENABLED = ${settingValue || 'not set (allowing)'}`);
+
+        if (settingValue === 'false') {
+            console.log("Webhook paused globally via INBOUND_INGEST_ENABLED=false");
+            return new Response(JSON.stringify({ message: "Webhook paused" }), {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
         if (!integration.is_active) {
             return new Response(JSON.stringify({ error: "Integration is inactive" }), {
                 status: 403,
@@ -48,7 +115,18 @@ serve(async (req) => {
             });
         }
 
-        const payload = await req.json();
+        // Parse payload - AC sends as application/x-www-form-urlencoded
+        const contentType = req.headers.get("content-type") || "";
+        let payload: Record<string, unknown>;
+
+        if (contentType.includes("application/json")) {
+            payload = await req.json();
+        } else {
+            // Form-urlencoded (default for ActiveCampaign)
+            const formData = await req.text();
+            payload = Object.fromEntries(new URLSearchParams(formData));
+        }
+
         const headers = Object.fromEntries(req.headers.entries());
 
         // 2. Validate HMAC (if configured)
@@ -74,13 +152,19 @@ serve(async (req) => {
             }
         }
 
-        // 4. Enqueue Event
+        // 4. Extract metadata from AC payload
+        const { entity_type, event_type, external_id } = parseACPayload(payload);
+
+        // 5. Enqueue Event
         const { error: insertError } = await supabaseClient
             .from("integration_events")
             .insert({
                 integration_id: integrationId,
                 payload: payload,
                 status: "pending",
+                entity_type,
+                event_type,
+                external_id,
                 idempotency_key: idempotencyKey ? String(idempotencyKey) : null,
                 logs: [{ step: "ingest", timestamp: new Date().toISOString(), message: "Webhook received" }]
             });

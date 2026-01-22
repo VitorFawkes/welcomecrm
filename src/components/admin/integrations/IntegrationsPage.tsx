@@ -9,6 +9,7 @@ import { IntegrationSettings } from './IntegrationSettings';
 import { IntegrationMapping } from './IntegrationMapping';
 import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
+import { InboundFieldMappingTab } from './InboundFieldMappingTab';
 import { ACFieldManager } from './ACFieldManager';
 import { PhaseInstanceMappingTab } from './PhaseInstanceMappingTab';
 import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
@@ -72,6 +73,10 @@ export function IntegrationsPage() {
                             <ArrowUpRight className="w-4 h-4" />
                             Saída: Etapas
                         </TabsTrigger>
+                        <TabsTrigger value="inbound-fields" className="gap-2">
+                            <Inbox className="w-4 h-4" />
+                            Entrada: Campos
+                        </TabsTrigger>
                         <TabsTrigger value="outbound-fields" className="gap-2">
                             <ArrowUpRight className="w-4 h-4" />
                             Saída: Campos
@@ -112,6 +117,10 @@ export function IntegrationsPage() {
 
                     <TabsContent value="outbound-fields">
                         <OutboundFieldMappingTab integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
+                    </TabsContent>
+
+                    <TabsContent value="inbound-fields">
+                        <InboundFieldMappingTab integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
                     </TabsContent>
 
                     <TabsContent value="ac-fields">

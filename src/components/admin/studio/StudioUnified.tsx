@@ -17,8 +17,8 @@ type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'] & {
 }
 type StageFieldConfig = Database['public']['Tables']['stage_field_config']['Row']
 
-import { SECTIONS } from '../../../constants/admin'
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases'
+import { useSections } from '../../../hooks/useSections'
 import { Input } from '../../ui/Input'
 import {
     DropdownMenu,
@@ -45,17 +45,22 @@ export default function StudioUnified() {
     const [editingField, setEditingField] = useState<SystemField | null>(null)
     const [viewMode, setViewMode] = useState<'matrix' | 'macro'>('macro')
 
-    // New Field State
+    // --- Data Fetching ---
+    // Fetch sections FIRST (needed for default values below)
+    const { data: sectionsData = [], isLoading: loadingSections } = useSections()
+    const governableSections = sectionsData.filter(s => s.is_governable)
+    const defaultSection = sectionsData[0]?.key || 'trip_info'
+
+    // New Field State (uses defaultSection from above)
     const [newField, setNewField] = useState<Partial<SystemField>>({
         key: '',
         label: '',
         type: 'text',
-        section: 'trip_info',
+        section: 'trip_info', // Will be updated via useEffect when sections load
         active: true,
         is_system: false
     })
 
-    // --- Data Fetching ---
     const { data: stages } = useQuery({
         queryKey: ['pipeline-stages-unified'],
         queryFn: async () => {
@@ -114,7 +119,7 @@ export default function StudioUnified() {
                 key,
                 label: field.label,
                 type: field.type,
-                section: field.section || 'trip_info',
+                section: field.section || defaultSection,
                 active: field.active ?? true,
                 is_system: field.is_system ?? false,
                 options: field.options
@@ -127,7 +132,7 @@ export default function StudioUnified() {
             queryClient.invalidateQueries({ queryKey: ['system-fields-unified'] })
             queryClient.invalidateQueries({ queryKey: ['system-fields-config'] }) // Sync with useFieldConfig
             setIsAdding(false)
-            setNewField({ key: '', label: '', type: 'text', section: 'trip_info', active: true, is_system: false })
+            setNewField({ key: '', label: '', type: 'text', section: defaultSection, active: true, is_system: false })
         },
         onError: (err) => alert(`Erro ao criar campo: ${err.message}`)
     })
@@ -323,7 +328,35 @@ export default function StudioUnified() {
         }, {} as Record<string, SystemField[]>)
     }, [fields])
 
-    if (loadingFields) return <div className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600" /></div>
+    // DEFINITIVE FIX: Sort stages by Phase order first, then by Stage ordem
+    // This ensures stages appear in Kanban order: SDR → PLANNER → PÓS-VENDA → RESOLUÇÃO
+    const sortedStages = useMemo(() => {
+        if (!stages || !phases.length) return []
+
+        // Create a map of phase order_index for O(1) lookup
+        const phaseOrderMap = new Map<string, number>()
+        phases.forEach((phase, index) => {
+            phaseOrderMap.set(phase.id, phase.order_index ?? index)
+            // Also map by name for legacy stages without phase_id
+            phaseOrderMap.set(phase.name, phase.order_index ?? index)
+        })
+
+        return [...stages].sort((a, b) => {
+            // Get phase order for each stage
+            const aPhaseOrder = phaseOrderMap.get(a.phase_id || '') ?? phaseOrderMap.get(a.fase || '') ?? 999
+            const bPhaseOrder = phaseOrderMap.get(b.phase_id || '') ?? phaseOrderMap.get(b.fase || '') ?? 999
+
+            // First compare by phase order
+            if (aPhaseOrder !== bPhaseOrder) {
+                return aPhaseOrder - bPhaseOrder
+            }
+
+            // Then by stage ordem within the phase
+            return (a.ordem || 0) - (b.ordem || 0)
+        })
+    }, [stages, phases])
+
+    if (loadingFields || loadingSections) return <div className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600" /></div>
 
     return (
         <div className="p-6">
@@ -465,7 +498,7 @@ export default function StudioUnified() {
                                     )
                                 })
                             ) : (
-                                stages?.map(stage => {
+                                sortedStages.map(stage => {
                                     const phase = phases.find(p => p.id === stage.phase_id) || phases.find(p => p.name === stage.fase)
                                     const styles = getPhaseStyles(phase?.color || 'bg-gray-500')
 
@@ -485,14 +518,13 @@ export default function StudioUnified() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                        {SECTIONS.map(section => {
-                            const sectionFields = fieldsBySection[section.value] || []
-                            if (sectionFields.length === 0) return null
+                        {governableSections.map(section => {
+                            const sectionFields = fieldsBySection[section.key] || []
 
                             return (
                                 <>
                                     {/* Section Header */}
-                                    <tr key={section.value} className="bg-muted/50">
+                                    <tr key={section.key} className="bg-muted/50">
                                         <td className="sticky left-0 z-10 bg-muted border-y border-border px-4 py-2">
                                             <div className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide", section.color)}>
                                                 {section.label}
@@ -500,6 +532,20 @@ export default function StudioUnified() {
                                         </td>
                                         <td colSpan={(viewMode === 'macro' ? phases.length : (stages?.length || 0))} className="border-y border-border"></td>
                                     </tr>
+
+                                    {/* Empty Section Message */}
+                                    {sectionFields.length === 0 && (
+                                        <tr key={`${section.key}-empty`} className="bg-muted/20">
+                                            <td colSpan={(viewMode === 'macro' ? phases.length : (stages?.length || 0)) + 1} className="px-4 py-3 text-center">
+                                                <span className="text-sm text-muted-foreground italic">
+                                                    Nenhum campo nesta seção. Adicione campos em{' '}
+                                                    <a href="/settings/customization/fields" className="text-primary hover:underline">
+                                                        Cadastro de Campos
+                                                    </a>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    )}
 
                                     {/* Field Rows */}
                                     {sectionFields.map(field => (
@@ -598,7 +644,7 @@ export default function StudioUnified() {
                                                     )
                                                 })
                                             ) : (
-                                                stages?.map(stage => {
+                                                sortedStages.map(stage => {
                                                     const config = getConfig(stage.id, field.key)
                                                     const isVisible = config?.is_visible ?? true
                                                     const isRequired = config?.is_required ?? false

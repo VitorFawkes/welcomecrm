@@ -1,149 +1,94 @@
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../../lib/supabase';
+import { useForm } from 'react-hook-form';
+import { useTeams, type CreateTeamData } from '../../../hooks/useTeams';
+import { useToast } from '../../../contexts/ToastContext';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Select } from '../../ui/Select';
-import { Label } from '../../ui/label';
-import { useToast } from '../../../contexts/ToastContext';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-    DialogTrigger,
-    DialogDescription
-} from '../../ui/dialog';
-import { Plus } from 'lucide-react';
-import type { Database } from '../../../database.types';
-
-type Department = Database['public']['Tables']['departments']['Row'];
+import { Textarea } from '../../ui/textarea';
+import { Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
 
 interface AddTeamModalProps {
-    departments: Department[];
+    isOpen: boolean;
+    onClose: () => void;
 }
 
-export function AddTeamModal({ departments }: AddTeamModalProps) {
+export function AddTeamModal({ isOpen, onClose }: AddTeamModalProps) {
+    const { createTeam } = useTeams();
     const { toast } = useToast();
-    const queryClient = useQueryClient();
-    const [isOpen, setIsOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateTeamData>();
 
-    const [formData, setFormData] = useState({
-        name: '',
-        department_id: '',
-        description: ''
-    });
-
-    const createTeamMutation = useMutation({
-        mutationFn: async (newTeam: any) => {
-            const { error } = await supabase
-                .from('teams')
-                .insert(newTeam);
-
-            if (error) throw error;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teams'] });
-            toast({
-                title: 'Time criado',
-                description: 'O time foi criado com sucesso.',
-                type: 'success'
-            });
-            setIsOpen(false);
-            setFormData({ name: '', department_id: '', description: '' });
-        },
-        onError: (error: any) => {
-            toast({
-                title: 'Erro ao criar time',
-                description: error.message || 'Ocorreu um erro ao criar o time.',
-                type: 'error'
-            });
-        }
-    });
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.name || !formData.department_id) {
-            toast({
-                title: 'Campos obrigatórios',
-                description: 'Por favor, preencha o nome e o departamento.',
-                type: 'error'
-            });
-            return;
-        }
-
-        setIsLoading(true);
+    const onSubmit = async (data: CreateTeamData) => {
         try {
-            await createTeamMutation.mutateAsync({
-                name: formData.name,
-                department_id: formData.department_id,
-                description: formData.description || null
-            });
-        } finally {
-            setIsLoading(false);
+            await createTeam.mutateAsync(data);
+            toast({ title: 'Sucesso', description: 'Time criado com sucesso!', type: 'success' });
+            reset();
+            onClose();
+        } catch (error) {
+            console.error('Error creating team:', error);
+            toast({ title: 'Erro', description: 'Erro ao criar time. Tente novamente.', type: 'error' });
         }
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <Button className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Novo Time
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Criar Novo Time</DialogTitle>
-                    <DialogDescription>
-                        Crie um novo time e associe-o a um departamento (Macro Área).
-                    </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-6 py-4">
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="team-name">Nome do Time</Label>
-                            <Input
-                                id="team-name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="Ex: Squad Alpha"
-                                required
-                            />
-                        </div>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Nome do Time</label>
+                        <Input
+                            {...register('name', { required: 'Nome é obrigatório' })}
+                            placeholder="Ex: Comercial, Marketing"
+                        />
+                        {errors.name && (
+                            <span className="text-xs text-red-500">{errors.name.message}</span>
+                        )}
+                    </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="department">Departamento (Macro Área)</Label>
-                            <Select
-                                value={formData.department_id}
-                                onChange={(value) => setFormData({ ...formData, department_id: value })}
-                                options={departments.map(d => ({ value: d.id, label: d.name }))}
-                                placeholder="Selecione um departamento..."
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Descrição</label>
+                        <Textarea
+                            {...register('description')}
+                            placeholder="Descrição das responsabilidades do time"
+                        />
+                    </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Descrição (Opcional)</Label>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Cor</label>
+                        <div className="flex gap-2">
                             <Input
-                                id="description"
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                placeholder="Breve descrição do propósito deste time"
+                                type="color"
+                                {...register('color')}
+                                className="w-12 h-10 p-1 cursor-pointer"
+                                defaultValue="#3b82f6"
+                            />
+                            <Input
+                                {...register('color')}
+                                placeholder="#000000"
+                                className="flex-1"
+                                defaultValue="#3b82f6"
                             />
                         </div>
                     </div>
 
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button type="button" variant="outline" onClick={onClose}>
                             Cancelar
                         </Button>
-                        <Button type="submit" disabled={isLoading}>
-                            {isLoading ? 'Criando...' : 'Criar Time'}
+                        <Button type="submit" disabled={createTeam.isPending}>
+                            {createTeam.isPending ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Criando...
+                                </>
+                            ) : (
+                                'Criar Time'
+                            )}
                         </Button>
-                    </DialogFooter>
+                    </div>
                 </form>
             </DialogContent>
         </Dialog>

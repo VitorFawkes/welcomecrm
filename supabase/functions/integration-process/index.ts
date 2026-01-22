@@ -29,30 +29,46 @@ Deno.serve(async (req) => {
             return error;
         }
 
-        // Parse body to get integration_id if provided
-        let body = {};
+        // Parse body
+        let body: Record<string, any> = {};
         try {
             body = await req.json();
-        } catch (e) {
+        } catch (_e) {
             // Body might be empty
         }
-        const { integration_id } = body;
+        const { integration_id, event_ids } = body;
 
-        // 1. Fetch Pending Events
-        // Limit to 50 to avoid timeouts
+        // 0. Fetch Settings
+        const { data: settings } = await supabase
+            .from('integration_settings')
+            .select('key, value')
+            .in('key', ['SHADOW_MODE_ENABLED', 'WRITE_MODE_ENABLED', 'ALLOWED_EVENT_TYPES']);
+
+        const shadowModeSetting = settings?.find(s => s.key === 'SHADOW_MODE_ENABLED')?.value === 'true';
+        const writeModeSetting = settings?.find(s => s.key === 'WRITE_MODE_ENABLED')?.value === 'true';
+        const allowedEventTypesSetting = settings?.find(s => s.key === 'ALLOWED_EVENT_TYPES')?.value;
+        const allowedEventTypes = allowedEventTypesSetting ? allowedEventTypesSetting.split(',').map((t: string) => t.trim()) : ['deal_add', 'deal_update', 'deal_state'];
+        const isShadowMode = shadowModeSetting || !writeModeSetting;
+
+        // 1. Fetch Events to Process
         let query = supabase
             .from('integration_events')
             .select('*')
-            .eq('status', 'pending')
             .order('created_at', { ascending: true })
             .limit(50);
+
+        // If specific event IDs provided, fetch those (any status); otherwise fetch pending
+        if (event_ids && Array.isArray(event_ids) && event_ids.length > 0) {
+            query = query.in('id', event_ids);
+        } else {
+            query = query.eq('status', 'pending');
+        }
 
         if (integration_id) {
             query = query.eq('integration_id', integration_id);
         }
 
         const { data: events, error: fetchError } = await query;
-
         if (fetchError) throw fetchError
 
         const stats = {
@@ -63,399 +79,393 @@ Deno.serve(async (req) => {
             processed_shadow: 0,
             ignored: 0,
             errors: 0,
-            filters_used: { status: 'pending', integration_id }
+            mode: isShadowMode ? 'SHADOW' : 'WRITE'
         };
 
         if (!events || events.length === 0) {
-            return new Response(JSON.stringify({
-                message: 'No pending events found',
-                stats
-            }), {
+            return new Response(JSON.stringify({ message: 'No pending events found', stats }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200
             })
         }
 
-        // 1.5 Auto-Detect Entities (Pipelines, Stages, Users, Fields)
-        // We do this BEFORE fetching catalog so we can use the detected names immediately if needed.
-        const detectedUpserts = [];
-        const seenKeys = new Set();
+        // 2. Load Metadata (Pipelines, Stages, Maps)
+        const { data: stageMappings } = await supabase.from('integration_stage_map').select('*');
+        const { data: userMappings } = await supabase.from('integration_user_map').select('*');
+        const { data: fieldMappings } = await supabase.from('integration_field_map').select('*');
+        const { data: systemFields } = await supabase.from('system_fields').select('key, type, section');
 
-        for (const event of events) {
-            const p = event.payload || {};
-            const intId = event.integration_id;
-            if (!intId) continue;
+        // Load Topology
+        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome');
+        const { data: pipelines } = await supabase.from('pipelines').select('id, nome, produto');
 
-            // Pipeline
-            const pipeId = p.pipeline || p.pipeline_id;
-            if (pipeId) {
-                const key = `pipeline:${intId}:${pipeId}`;
-                if (!seenKeys.has(key)) {
-                    seenKeys.add(key);
-                    detectedUpserts.push({
-                        integration_id: intId,
-                        entity_type: 'pipeline',
-                        external_id: pipeId,
-                        external_name: p.pipeline_title || `Pipeline ${pipeId}`,
-                        parent_external_id: '',
-                        metadata: { source: 'detected' },
-                        updated_at: new Date().toISOString()
-                    });
+        // Helper: Parse flattened AC fields (deal[fields][109][value] -> { 109: "value" })
+        const parseCustomFields = (payload: Record<string, any>) => {
+            const fields: Record<string, any> = {};
+
+            Object.keys(payload).forEach(key => {
+                const match = key.match(/^deal\[fields\]\[(\d+)\]\[value\]$/);
+                if (match) {
+                    const fieldId = match[1];
+                    fields[fieldId] = payload[key];
                 }
-            }
+            });
+            return fields;
+        };
 
-            // Stage
-            const stageId = p.stage || p.stage_id || p.d_stageid;
-            if (stageId && pipeId) {
-                const key = `stage:${intId}:${pipeId}:${stageId}`;
-                if (!seenKeys.has(key)) {
-                    seenKeys.add(key);
-                    detectedUpserts.push({
-                        integration_id: intId,
-                        entity_type: 'stage',
-                        external_id: stageId,
-                        parent_external_id: pipeId,
-                        external_name: p.stage_title || `Stage ${stageId}`,
-                        metadata: { source: 'detected' },
-                        updated_at: new Date().toISOString()
-                    });
-                }
-            }
+        // Helper: Resolve Topology
+        const resolveTopology = (stageId: string) => {
+            const stage = pipelineStages?.find(s => s.id === stageId);
+            if (!stage) return null;
 
-            // User
-            const ownerId = p.owner || p.owner_id;
-            if (ownerId) {
-                const key = `user:${intId}:${ownerId}`;
-                if (!seenKeys.has(key)) {
-                    seenKeys.add(key);
-                    detectedUpserts.push({
-                        integration_id: intId,
-                        entity_type: 'user',
-                        external_id: ownerId,
-                        external_name: p.owner_name || (p.owner_firstname ? `${p.owner_firstname} ${p.owner_lastname}` : `User ${ownerId}`),
-                        parent_external_id: '',
-                        metadata: { source: 'detected' },
-                        updated_at: new Date().toISOString()
-                    });
-                }
-            }
+            const pipeline = pipelines?.find(p => p.id === stage.pipeline_id);
+            if (!pipeline) return null;
 
-            // Fields (custom_field_data)
-            if (p.custom_field_data) {
-                for (const fieldId of Object.keys(p.custom_field_data)) {
-                    const key = `field:${intId}:${fieldId}`;
-                    if (!seenKeys.has(key)) {
-                        seenKeys.add(key);
-                        detectedUpserts.push({
-                            integration_id: intId,
-                            entity_type: 'field',
-                            external_id: fieldId,
-                            external_name: `Field ${fieldId}`, // We don't get names here usually
-                            parent_external_id: '',
-                            metadata: { source: 'detected' },
-                            updated_at: new Date().toISOString()
-                        });
-                    }
-                }
-            }
-        }
+            return {
+                pipelineId: pipeline.id,
+                pipelineName: pipeline.nome,
+                produto: pipeline.produto,
+                stageName: stage.nome
+            };
+        };
 
-        if (detectedUpserts.length > 0) {
-            // Use ignoreDuplicates: true to avoid overwriting manual entries
-            await supabase
-                .from('integration_catalog')
-                .upsert(detectedUpserts, {
-                    onConflict: 'integration_id,entity_type,external_id,parent_external_id',
-                    ignoreDuplicates: true
-                });
-        }
-
-        // 2. Fetch Mappings & Config & Catalog
-        const { data: stageMappings } = await supabase.from('integration_stage_map').select('*')
-        const { data: userMappings } = await supabase.from('integration_user_map').select('*')
-
-        // Fetch Catalog (AC Names)
-        const { data: catalogPipelines } = await supabase
-            .from('integration_catalog')
-            .select('external_id, external_name')
-            .eq('entity_type', 'pipeline');
-
-        const { data: catalogStages } = await supabase
-            .from('integration_catalog')
-            .select('external_id, external_name, parent_external_id')
-            .eq('entity_type', 'stage');
-
-        const { data: catalogUsers } = await supabase
-            .from('integration_catalog')
-            .select('external_id, external_name')
-            .eq('entity_type', 'user');
-
-        const { data: catalogFields } = await supabase
-            .from('integration_catalog')
-            .select('external_id, external_name')
-            .eq('entity_type', 'field');
-
-        // Fetch Welcome Stages (Internal Names)
-        const { data: welcomeStages } = await supabase
-            .from('pipeline_stages')
-            .select('id, nome');
-
-        // Helper to get names
-        const getACPipelineName = (id: string) => {
-            const p = catalogPipelines?.find(x => x.external_id === id);
-            return p?.external_name || `Pipeline ${id}`;
-        }
-
-        const getACStageName = (id: string, pipelineId: string) => {
-            const stage = catalogStages?.find(s => s.external_id === id && s.parent_external_id === pipelineId);
-            return stage?.external_name || '(nome desconhecido)';
-        }
-
-        const getACUserName = (id: string) => {
-            const user = catalogUsers?.find(u => u.external_id === id);
-            return user?.external_name || `User ${id}`;
-        }
-
-        const getACFieldName = (id: string) => {
-            const field = catalogFields?.find(f => f.external_id === id);
-            return field?.external_name || `Field ${id}`;
-        }
-
-        const getWelcomeStageName = (id: string) => {
-            const stage = welcomeStages?.find(s => s.id === id);
-            return stage?.nome || '(nome desconhecido)';
-        }
+        // Helper: Map Status
+        const mapStatus = (acStatus: string | number) => {
+            const s = String(acStatus);
+            if (s === '1') return 'ganho';
+            if (s === '2') return 'perdido';
+            return 'aberto';
+        };
 
         // 3. Process Events
-        const results = []
+        const results: any[] = [];
 
         for (const event of events) {
             stats.eligible++;
-            let status = 'processed_shadow'
-            let log = ''
-            const payload = event.payload || {}
-            const entity = event.entity_type
-            const importMode = payload.import_mode || 'replay' // Default to replay
+            let log = '';
 
-            // Normalize Pipeline
-            let pipelineId = payload.pipeline || payload.pipeline_id
-            const pipelineName = getACPipelineName(pipelineId);
+            try {
+                const payload = event.payload || {};
+                const entity = event.entity_type;
+                const importMode = payload.import_mode || 'replay';
 
-            // Check if we need to process this entity
-            if (entity === 'deal' || entity === 'dealActivity') {
-                // Check Allowlist (Pipeline 6 & 8)
-                if (pipelineId !== '6' && pipelineId !== '8') {
-                    status = 'ignored'
-                    log = `Ignored: Pipeline ${pipelineId} not in allowlist (6, 8)`
-                    stats.ignored++;
+                // ═══════════════════════════════════════════════════════════════════
+                // CONTACT EVENT HANDLER
+                // ═══════════════════════════════════════════════════════════════════
+                if (entity === 'contact') {
+                    const acContactId = payload['contact[id]'] || payload.contact_id || payload.id;
+                    const firstName = payload['contact[first_name]'] || payload.first_name || '';
+                    const lastName = payload['contact[last_name]'] || payload.last_name || '';
+                    const email = payload['contact[email]'] || payload.email;
+                    const phone = payload['contact[phone]'] || payload.phone;
 
-                    const error = await updateEventStatus(event.id, status, log);
-                    if (error) {
-                        stats.errors++;
-                        results.push({ id: event.id, status: 'failed', error: error.message });
+                    // Use separate fields for nome and sobrenome
+                    const nome = firstName.trim() || 'Sem Nome';
+                    const sobrenome = lastName.trim() || null;
+
+                    if (!acContactId) {
+                        stats.ignored++;
+                        await updateEventStatus(event.id, 'ignored', 'Contact event missing contact ID');
+                        continue;
+                    }
+
+                    if (!isShadowMode) {
+                        // Try to find existing contact by external_id OR email
+                        let existingContact = null;
+
+                        const { data: byExternalId } = await supabase
+                            .from('contatos')
+                            .select('id')
+                            .eq('external_id', String(acContactId))
+                            .eq('external_source', 'active_campaign')
+                            .single();
+
+                        if (byExternalId) {
+                            existingContact = byExternalId;
+                        } else if (email) {
+                            const { data: byEmail } = await supabase
+                                .from('contatos')
+                                .select('id')
+                                .eq('email', email)
+                                .single();
+                            existingContact = byEmail;
+                        }
+
+                        if (existingContact) {
+                            const updatePayload: Record<string, any> = {
+                                external_id: String(acContactId),
+                                external_source: 'active_campaign',
+                                updated_at: new Date().toISOString()
+                            };
+                            if (nome !== 'Sem Nome') updatePayload.nome = nome;
+                            if (sobrenome) updatePayload.sobrenome = sobrenome;
+                            if (phone) updatePayload.telefone = phone;
+
+                            const { error: uErr } = await supabase
+                                .from('contatos')
+                                .update(updatePayload)
+                                .eq('id', existingContact.id);
+
+                            if (uErr) throw new Error(`Contact Update Error: ${uErr.message}`);
+                            log = `Updated Contact ${existingContact.id} (AC ID: ${acContactId})`;
+                        } else {
+                            // Create new contact with AC external_id
+                            const { error: cErr } = await supabase
+                                .from('contatos')
+                                .insert({
+                                    nome: nome,
+                                    sobrenome: sobrenome,
+                                    email: email,
+                                    telefone: phone,
+                                    external_id: String(acContactId),
+                                    external_source: 'active_campaign',
+                                    tags: ['active_campaign'],
+                                    tipo_pessoa: 'adulto'
+                                });
+
+                            if (cErr) throw new Error(`Contact Create Error: ${cErr.message}`);
+                            log = `Created Contact (AC ID: ${acContactId})`;
+                        }
+
+                        await updateEventStatus(event.id, 'processed', log);
+                        stats.updated++;
+                        results.push({ id: event.id, status: 'processed', log });
                     } else {
-                        results.push({ id: event.id, status, log });
+                        log = `[SHADOW] Would upsert Contact (AC ID: ${acContactId})`;
+                        await updateEventStatus(event.id, 'processed_shadow', log);
+                        stats.processed_shadow++;
+                        results.push({ id: event.id, status: 'processed_shadow', log });
                     }
                     continue;
                 }
 
-                // Check Mappings
-                const stageId = payload.stage || payload.stage_id
-                const ownerId = payload.owner || payload.owner_id
-
-                const acStageName = getACStageName(stageId, pipelineId);
-                const acUserName = getACUserName(ownerId);
-
-                // MODE SPECIFIC LOGIC
-                // REPLAY MODE: Strict Snapshot & Mapping
-                const hasSnapshot = payload.deal_state || (entity === 'deal');
-                const isStageChange = payload.change_type === 'd_stageid' || entity === 'deal'; // 'deal' implies initial state
-                const isCustomField = payload.change_type === 'custom_field_data';
-
-                // 3. Stage Mapping Check (Granular Safe-by-Default)
-                // Only block if the event DEFINES or CHANGES the stage (deal_state snapshot or d_stageid)
-                // custom_field_data should NOT be blocked by missing stage map
-                const isStageDefiningEvent =
-                    (event.event_type === 'deal_state' && payload.stage) ||
-                    (event.event_type === 'd_stageid') ||
-                    (entity === 'deal'); // deal entity always defines stage
-
-                let targetStageId = null;
-                if (isStageDefiningEvent) {
-                    const stageMap = stageMappings?.find(m =>
-                        m.integration_id === event.integration_id &&
-                        m.pipeline_id === pipelineId &&
-                        m.external_stage_id === (payload.stage || payload.d_stageid || payload.stage_id)
-                    );
-
-                    if (!stageMap) {
-                        const stageName = catalogStages?.find(s => s.external_id === (payload.stage || payload.d_stageid || payload.stage_id))?.external_name || (payload.stage || payload.d_stageid || payload.stage_id);
-
-                        // BLOCK: Missing Stage Map for stage-defining event
-                        const msg = `Unmapped Stage: ${stageName} (ID: ${payload.stage || payload.d_stageid || payload.stage_id}) in Pipeline ${pipelineName}`;
-                        const error = await updateEventStatus(event.id, 'blocked', msg);
-                        if (error) {
-                            stats.errors++;
-                            results.push({ id: event.id, status: 'failed', error: error.message });
-                        } else {
-                            stats.blocked++;
-                            results.push({ id: event.id, status: 'blocked', log: msg });
-                        }
-                        continue;
-                    }
-                    targetStageId = stageMap.internal_stage_id;
-                } else if (event.event_type === 'custom_field_data') {
-                    // For custom fields, we don't enforce stage mapping
-                    // We might try to find it for logging, but don't block
+                // Only process deals and dealActivity
+                if (entity !== 'deal' && entity !== 'dealActivity') {
+                    stats.ignored++;
+                    await updateEventStatus(event.id, 'ignored', `Ignored: Entity ${entity}`);
+                    continue;
                 }
 
-                // 4. Owner Mapping Check (Warning in Shadow Mode)
-                let targetOwnerId = null;
-                if (ownerId) {
-                    const userMap = userMappings?.find(m =>
-                        m.integration_id === event.integration_id &&
-                        m.external_user_id === ownerId
-                    );
+                // Only process allowed event types
+                if (!allowedEventTypes.includes(event.event_type)) {
+                    stats.ignored++;
+                    await updateEventStatus(event.id, 'ignored', `Ignored: Event type ${event.event_type} not allowed`);
+                    continue;
+                }
 
-                    if (userMap) {
-                        targetOwnerId = userMap.internal_user_id;
+                // 3.1 Resolve Target Stage
+                // Support both flat format (stage, pipeline) and bracket format (deal[stageid], deal[pipelineid])
+                const acStageId = payload.stage || payload.stage_id || payload.d_stageid || payload['deal[stageid]'];
+                const acPipelineId = payload.pipeline || payload.pipeline_id || payload['deal[pipelineid]'];
+
+                let targetStageId: string | null = null;
+
+                const map = stageMappings?.find(m =>
+                    m.integration_id === event.integration_id &&
+                    m.external_stage_id === acStageId &&
+                    m.pipeline_id === acPipelineId
+                );
+
+                if (map) {
+                    targetStageId = map.internal_stage_id;
+                } else if (importMode === 'new_lead' && payload.default_stage_id) {
+                    targetStageId = payload.default_stage_id;
+                }
+
+                const isMoveEvent = event.event_type === 'deal_add' || event.event_type === 'deal_update' || event.event_type === 'deal_state';
+
+                if (isMoveEvent && !targetStageId) {
+                    throw new Error(`Unmapped Stage: AC Stage ${acStageId} (Pipeline ${acPipelineId})`);
+                }
+
+                // 3.2 Resolve Topology
+                let topology: { pipelineId: string; pipelineName: string; produto: string; stageName: string } | null = null;
+                if (targetStageId) {
+                    topology = resolveTopology(targetStageId);
+                    if (!topology) {
+                        throw new Error(`Topology Error: Could not resolve Pipeline/Product for Stage ${targetStageId}`);
+                    }
+                }
+
+                // 3.3 Resolve Owner
+                // Support both flat format (owner) and bracket format (deal[owner])
+                const acOwnerId = payload.owner || payload.owner_id || payload['deal[owner]'];
+                let targetOwnerId: string | null = null;
+                if (acOwnerId) {
+                    const uMap = userMappings?.find(m => m.external_user_id === acOwnerId && m.integration_id === event.integration_id);
+                    if (uMap) targetOwnerId = uMap.internal_user_id;
+                }
+
+                // 3.4 Parse Custom Fields & Map Data
+                const acFields = parseCustomFields(payload);
+                const marketingData: Record<string, any> = {
+                    active_campaign_id: payload.id || payload['deal[id]'],
+                    source: 'active_campaign',
+                    raw_fields: acFields,
+                    unmapped_fields: {}
+                };
+
+                // Dynamic Field Mapping
+                Object.entries(acFields).forEach(([fieldId, value]) => {
+                    const fieldMap = fieldMappings?.find(m => m.external_field_id === fieldId && m.integration_id === event.integration_id);
+
+                    if (fieldMap) {
+                        marketingData[fieldMap.local_field_key] = value;
                     } else {
-                        const ownerName = catalogUsers?.find(u => u.external_id === ownerId)?.external_name || ownerId;
-                        const msg = `Unmapped Owner: ${ownerName} (ID: ${ownerId})`;
+                        marketingData.unmapped_fields[fieldId] = value;
+                    }
+                });
 
-                        // Check if we are in Shadow Mode (assuming true for now as per task)
-                        const isShadowMode = true;
+                // Special Case: Epoca Viagem (109 = Start, 101 = End)
+                const dateStart = acFields['109'];
+                const dateEnd = acFields['101'];
 
-                        if (isShadowMode) {
-                            console.warn(`[SHADOW] ${msg} - Would block in Write Mode`);
-                            log += (log ? '; ' : '') + msg;
-                        } else {
-                            // In Write Mode, block creation/assignment if owner is missing
-                            if (event.event_type === 'deal_add' || event.event_type === 'deal_owner_update') {
-                                const error = await updateEventStatus(event.id, 'blocked', msg);
-                                if (error) {
-                                    stats.errors++;
-                                    results.push({ id: event.id, status: 'failed', error: error.message });
-                                } else {
-                                    stats.blocked++;
-                                    results.push({ id: event.id, status: 'blocked', log: msg });
-                                }
-                                continue;
+                if (dateStart || dateEnd) {
+                    marketingData.epoca_viagem = {
+                        from: dateStart || null,
+                        to: dateEnd || null
+                    };
+                }
+
+                // 3.5 Prepare DB Payload
+                const dealId = payload.id || payload['deal[id]'] || payload.deal_id;
+                const title = payload.title || payload['deal[title]'] || 'Sem Título';
+                const value = parseFloat(payload.value || payload['deal[value]'] || '0');
+                const status = mapStatus(payload.status || payload['deal[status]']);
+
+                const contactEmail = payload.contact_email || payload['deal[contact_email]'] || payload.email;
+                // Build contact name from first_name + last_name - keep separate
+                const acFirstName = payload['contact[first_name]'] || payload.contact_first_name || '';
+                const acLastName = payload['contact[last_name]'] || payload.contact_last_name || '';
+                const contactNome = acFirstName.trim() || payload.contact_name || payload['deal[contact_name]'] || 'Sem Nome';
+                const contactSobrenome = acLastName.trim() || null;
+                const contactPhone = payload.contact_phone || payload['deal[contact_phone]'] || payload.phone;
+                const acContactId = payload['deal[contactid]'] || payload.contactid || payload.contact_id;
+
+                if (!isShadowMode) {
+                    // UPSERT CONTACT
+                    let contactId: string | null = null;
+                    if (contactEmail) {
+                        const { data: existingContact } = await supabase
+                            .from('contatos')
+                            .select('id')
+                            .eq('email', contactEmail)
+                            .single();
+
+                        if (existingContact) {
+                            contactId = existingContact.id;
+                            // Update external_id if missing (linking existing contact to AC)
+                            if (acContactId) {
+                                await supabase
+                                    .from('contatos')
+                                    .update({
+                                        external_id: String(acContactId),
+                                        external_source: 'active_campaign'
+                                    })
+                                    .eq('id', contactId)
+                                    .is('external_id', null);
                             }
+                        } else {
+                            const { data: newContact, error: cErr } = await supabase
+                                .from('contatos')
+                                .insert({
+                                    nome: contactNome,
+                                    sobrenome: contactSobrenome,
+                                    email: contactEmail,
+                                    telefone: contactPhone,
+                                    external_id: acContactId ? String(acContactId) : null,
+                                    external_source: acContactId ? 'active_campaign' : null,
+                                    tags: ['active_campaign'],
+                                    tipo_pessoa: 'adulto'
+                                })
+                                .select('id')
+                                .single();
+                            if (cErr) throw new Error(`Contact Create Error: ${cErr.message}`);
+                            contactId = newContact.id;
                         }
                     }
-                }
 
-                if (importMode === 'replay') {
-                    // REPLAY MODE: Strict Snapshot & Mapping
-                    if (!hasSnapshot && !isCustomField) {
-                        const msg = `Blocked (Replay): Missing Snapshot (deal_state or entity=deal). dealActivity cannot define initial stage.`;
-                        const error = await updateEventStatus(event.id, 'blocked', msg);
-                        if (error) {
-                            stats.errors++;
-                            results.push({ id: event.id, status: 'failed', error: error.message });
-                        } else {
-                            stats.blocked++;
-                            results.push({ id: event.id, status: 'blocked', log: msg });
-                        }
-                        continue;
-                    } else if (isStageDefiningEvent && targetStageId === null) {
-                        // Should have been caught above, but double check
-                        const msg = `Blocked (Replay): Missing mapping for Stage ID ${stageId}`;
-                        const error = await updateEventStatus(event.id, 'blocked', msg);
-                        if (error) {
-                            stats.errors++;
-                            results.push({ id: event.id, status: 'failed', error: error.message });
-                        } else {
-                            stats.blocked++;
-                            results.push({ id: event.id, status: 'blocked', log: msg });
-                        }
-                        continue;
+                    // UPSERT CARD
+                    const { data: existingCard } = await supabase
+                        .from('cards')
+                        .select('id')
+                        .eq('external_id', dealId)
+                        .eq('external_source', 'active_campaign')
+                        .single();
+
+                    const cardPayload: Record<string, any> = {
+                        titulo: title,
+                        valor_estimado: value,
+                        status_comercial: status,
+                        marketing_data: marketingData,
+                        updated_at: new Date().toISOString()
+                    };
+
+                    if (targetStageId && topology) {
+                        cardPayload.pipeline_stage_id = targetStageId;
+                        cardPayload.pipeline_id = topology.pipelineId;
+                        cardPayload.produto = topology.produto;
+                    }
+
+                    if (targetOwnerId) {
+                        cardPayload.dono_atual_id = targetOwnerId;
+                    }
+
+                    if (existingCard) {
+                        const { error: uErr } = await supabase
+                            .from('cards')
+                            .update(cardPayload)
+                            .eq('id', existingCard.id);
+
+                        if (uErr) throw new Error(`Card Update Error: ${uErr.message}`);
+                        log = `Updated Card ${existingCard.id} (Pipeline: ${topology?.pipelineName})`;
+
                     } else {
-                        // All good -> Shadow Mode
-                        const internalStage = targetStageId || '?'
-                        const internalUser = targetOwnerId || '?'
+                        if (!topology) throw new Error("Cannot create card: Missing Topology (Stage/Pipeline/Product)");
 
-                        // ENHANCED LOGGING
-                        let mappingLog = '';
-                        if (targetStageId) {
-                            const welcomeStageName = getWelcomeStageName(targetStageId);
-                            mappingLog = `[MAPPING] AC(p:${pipelineId}, s:${stageId} "${acStageName}") -> Welcome(s:${internalStage} "${welcomeStageName}")`;
-                        } else {
-                            mappingLog = `[MAPPING] No Stage Map (Allowed for ${payload.change_type})`;
-                        }
+                        cardPayload.external_id = dealId;
+                        cardPayload.external_source = 'active_campaign';
+                        cardPayload.origem = 'active_campaign';
+                        cardPayload.pessoa_principal_id = contactId;
+                        cardPayload.created_at = new Date().toISOString();
 
-                        log = `[IMPORT] mode=${importMode} target_stage=${internalStage} owner=${internalUser}. ${mappingLog}`;
+                        const { error: iErr } = await supabase
+                            .from('cards')
+                            .insert(cardPayload);
 
-                        // Update status to processed_shadow
-                        const error = await updateEventStatus(event.id, 'processed_shadow', log);
-                        if (error) {
-                            stats.errors++;
-                            results.push({ id: event.id, status: 'failed', error: error.message });
-                        } else {
-                            stats.processed_shadow++;
-                            results.push({ id: event.id, status: 'processed_shadow', log });
-                        }
+                        if (iErr) throw new Error(`Card Create Error: ${iErr.message}`);
+                        log = `Created Card (Pipeline: ${topology.pipelineName})`;
                     }
+
+                    await updateEventStatus(event.id, 'processed', log);
+                    stats.updated++;
+                    results.push({ id: event.id, status: 'processed', log });
+
                 } else {
-                    // NEW LEAD MODE
-                    const defaultStageId = payload.default_stage_id;
-                    let internalStage = targetStageId || defaultStageId;
-
-                    if (!internalStage) {
-                        const msg = `Blocked (New Lead): No target stage determined (Default Stage not set, and no mapping for original stage ${stageId} "${acStageName}")`;
-                        const error = await updateEventStatus(event.id, 'blocked', msg);
-                        if (error) {
-                            stats.errors++;
-                            results.push({ id: event.id, status: 'failed', error: error.message });
-                        } else {
-                            stats.blocked++;
-                            results.push({ id: event.id, status: 'blocked', log: msg });
-                        }
-                        continue;
-                    } else {
-                        const internalUser = targetOwnerId || '?'
-                        const welcomeStageName = getWelcomeStageName(internalStage);
-
-                        // ENHANCED LOGGING
-                        const mappingLog = `[MAPPING] AC(p:${pipelineId}, s:${stageId} "${acStageName}") -> Welcome(s:${internalStage} "${welcomeStageName}")`;
-                        log = `[IMPORT] mode=${importMode} target_stage=${internalStage} owner=${internalUser}. ${mappingLog}. WOULD CREATE (New Lead): Deal ${event.external_id} -> Owner ${internalUser} (${acUserName})`
-                        const error = await updateEventStatus(event.id, 'processed_shadow', log);
-                        if (error) {
-                            stats.errors++;
-                            results.push({ id: event.id, status: 'failed', error: error.message });
-                        } else {
-                            stats.processed_shadow++;
-                            results.push({ id: event.id, status: 'processed_shadow', log });
-                        }
-                    }
+                    log = `[SHADOW] Would ${targetStageId ? 'Upsert Card' : 'Process Event'} - Pipeline: ${topology?.pipelineName || 'N/A'}`;
+                    await updateEventStatus(event.id, 'processed_shadow', log);
+                    stats.processed_shadow++;
+                    results.push({ id: event.id, status: 'processed_shadow', log });
                 }
-            } else {
-                // Non-P0 entities
-                status = 'ignored'
-                log = `Ignored: Entity type '${entity}' is not P0 (deal/dealActivity)`
-                stats.ignored++;
 
-                const error = await updateEventStatus(event.id, status, log);
-                if (error) {
-                    stats.errors++;
-                    results.push({ id: event.id, status: 'failed', error: error.message });
-                } else {
-                    results.push({ id: event.id, status, log });
-                }
+            } catch (err: any) {
+                console.error(`Event ${event.id} failed:`, err);
+                await updateEventStatus(event.id, 'failed', err.message);
+                stats.errors++;
+                results.push({ id: event.id, status: 'failed', error: err.message });
             }
         }
 
         return new Response(JSON.stringify({
-            message: `Processed ${stats.updated + stats.processed_shadow} events (Scanned: ${stats.scanned})`,
+            message: `Processed ${stats.updated + stats.processed_shadow} events`,
             stats,
             results
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
-        })
+        });
 
-    } catch (err) {
+    } catch (err: any) {
         return new Response(JSON.stringify({ error: err.message }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500

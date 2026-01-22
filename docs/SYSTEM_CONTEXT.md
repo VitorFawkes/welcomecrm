@@ -94,6 +94,29 @@
 - **Rule:** Most tables allow `SELECT/INSERT/UPDATE` for `authenticated` role.
 - **Sensitive Data:** `profiles` table controls access levels (admin, gestor, sdr).
 
+## 5.1. Field Governance System (Jan 2025)
+
+### Architecture
+- **Tables:** `system_fields`, `stage_field_config`.
+- **Separation of Concerns:**
+    - **Cadastro de Campos** (`/settings/system/fields`): CRUD of all system fields (type, section, active status).
+    - **Governança de Dados** (`/settings/system/governance`): Visibility/required rules per stage (only for governable sections).
+
+### Sections
+- **Governable (Dynamic Rules):** `trip_info`, `observacoes_criticas`.
+- **Global (Always Visible):** `people`, `payment`, `system`.
+
+### Key Files
+- `src/constants/admin.ts`: `SECTIONS`, `GOVERNABLE_SECTIONS`, `FIELD_TYPES`.
+- `src/components/admin/FieldManager.tsx`: Admin UI for field CRUD.
+- `src/components/admin/studio/StudioUnified.tsx`: Governance matrix.
+- `src/hooks/useFieldConfig.ts`: Returns visible/required fields per stage.
+
+### Rules
+1. **Default Visibility:** Fields without explicit `stage_field_config` are visible by default.
+2. **No Hardcoded Fields:** Use `useFieldConfig()` hook for all field rendering.
+3. **Phase Filter:** Only applies to `GOVERNABLE_SECTIONS` in integrations mapping.
+
 ## 6. User Management & Auth (Invite System)
 - **Philosophy:** "Invite Only". Public registration is DISABLED.
 - **Core Table:** `invitations` (email, role, token, expires_at).
@@ -106,6 +129,40 @@
 - **Security:**
     -   `check_invite_whitelist`: BLOCKS any signup where email is not in `invitations` or token is expired.
     -   `invitations` RLS: Only Admins can SELECT/INSERT/DELETE.
+
+## 6.1. Roles & Teams (RBAC - Jan 2025)
+
+### Architecture
+The system separates **Access Control** (what you can do) from **Organizational Assignment** (who you work with).
+
+- **Roles (Access Control):**
+    - **Table:** `roles` (id, name, display_name, description, permissions, is_system, color)
+    - **Relationship:** `profiles.role_id` -> `roles.id`
+    - **Default Roles:** `admin`, `manager`, `member`, `viewer`
+    - **Hook:** `useRoles()` for CRUD and `useRoleOptions()` for Selects
+    
+- **Teams (Organizational):**
+    - **Table:** `teams` (id, name, department_id, leader_id, is_active, color)
+    - **Hierarchy:** `departments` -> `teams` -> `profiles`
+    - **Relationship:** `profiles.team_id` -> `teams.id`
+    - **Hook:** `useTeams()` for CRUD and `useTeamOptions()` for Selects
+
+### Key Functions
+- `is_admin()`: Checks if user has admin role or is_admin flag
+- `has_role(role_name)`: Checks if user has specific role
+- `is_manager_or_admin()`: Checks if user has manager or admin access
+
+### Key Files
+- `src/hooks/useRoles.ts`: Role CRUD operations
+- `src/hooks/useTeams.ts`: Team CRUD operations
+- `src/components/admin/roles/RoleManagement.tsx`: Admin UI for role management
+- `src/components/admin/users/EditUserModal.tsx`: Separate sections for Role and Team
+
+### Rules
+1. **Roles = Access:** Role determines what a user can do (permissions).
+2. **Teams = Organization:** Team determines who the user works with.
+3. **Dynamic Roles:** Use `useRoles()` hook, NOT hardcoded constants.
+4. **Legacy Compatibility:** `profiles.role` (enum) still exists for backward compat; prefer `role_id`.
 
 ## 7. Known "Gotchas"
 - **Ghost Contacts:** `view_cards_acoes` has `pessoa_nome`. Always prefer this over fetching `contatos` again to avoid sync issues.

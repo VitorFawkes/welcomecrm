@@ -1,0 +1,83 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
+
+export interface User {
+    id: string;
+    email: string;
+    nome: string;
+    avatar_url?: string | null;
+    active: boolean;
+    role?: string;
+    role_id?: string;
+    team_id?: string | null;
+    department_id?: string | null;
+    created_at: string;
+    teams?: {
+        id: string;
+        name: string;
+    } | null;
+}
+
+export function useUsers() {
+    const queryClient = useQueryClient();
+
+    const usersQuery = useQuery({
+        queryKey: ['users'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select(`
+                    *,
+                    teams:teams!profiles_team_id_fkey (
+                        id,
+                        name
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data as User[];
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+
+    const toggleUserStatus = useMutation({
+        mutationFn: async ({ userId, currentStatus }: { userId: string; currentStatus: boolean }) => {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ active: !currentStatus })
+                .eq('id', userId);
+
+            if (error) throw error;
+            return { userId, newStatus: !currentStatus };
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        },
+    });
+
+    const deleteUser = useMutation({
+        mutationFn: async (userId: string) => {
+            const { error } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('id', userId);
+
+            if (error) throw error;
+            return userId;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        },
+    });
+
+    return {
+        users: usersQuery.data || [],
+        isLoading: usersQuery.isLoading,
+        isError: usersQuery.isError,
+        error: usersQuery.error,
+        refetch: usersQuery.refetch,
+        toggleUserStatus,
+        deleteUser,
+    };
+}

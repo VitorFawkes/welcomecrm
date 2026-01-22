@@ -257,7 +257,9 @@ export function useUpdateProposalStatus() {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: proposalKeys.detail(data.id) })
-            queryClient.invalidateQueries({ queryKey: proposalKeys.listByCard(data.card_id) })
+            if (data.card_id) {
+                queryClient.invalidateQueries({ queryKey: proposalKeys.listByCard(data.card_id) })
+            }
         },
     })
 }
@@ -291,7 +293,9 @@ export function useDeleteProposal() {
             return proposal
         },
         onSuccess: (proposal) => {
-            queryClient.invalidateQueries({ queryKey: proposalKeys.listByCard(proposal.card_id) })
+            if (proposal.card_id) {
+                queryClient.invalidateQueries({ queryKey: proposalKeys.listByCard(proposal.card_id) })
+            }
         },
     })
 }

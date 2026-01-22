@@ -93,17 +93,50 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
         }
 
         items.forEach(item => {
+            // Map segments from AI extraction for flights
+            const details = item.details || {}
+            const segments = details.segments as Array<Record<string, unknown>> || []
+
+            // Build rich_content with segments for flights
+            const richContent: Record<string, unknown> = {
+                description: item.description || '',
+                location: item.location,
+                dates: item.dates,
+            }
+
+            // If this is a flight with segments, add them to rich_content
+            if (item.category === 'flight' && segments.length > 0) {
+                richContent.segments = segments.map((seg, idx) => ({
+                    id: `seg-${Date.now()}-${idx}`,
+                    segment_order: seg.segment_order || idx + 1,
+                    airline_code: seg.airline_code || '',
+                    airline_name: seg.airline_name || '',
+                    flight_number: seg.flight_number || '',
+                    departure_date: seg.departure_date || '',
+                    departure_time: seg.departure_time || '',
+                    departure_airport: seg.departure_airport || '',
+                    departure_city: seg.departure_city || '',
+                    arrival_date: seg.arrival_date || '',
+                    arrival_time: seg.arrival_time || '',
+                    arrival_airport: seg.arrival_airport || '',
+                    arrival_city: seg.arrival_city || '',
+                    cabin_class: seg.cabin_class || 'Economy',
+                    baggage_included: seg.baggage_included || '',
+                }))
+            }
+
+            // Add company_name if present
+            if ((item as unknown as Record<string, unknown>).company_name) {
+                richContent.company_name = (item as unknown as Record<string, unknown>).company_name
+            }
+
             const libraryFormat = {
                 id: crypto.randomUUID(),
                 name: item.title,
                 category: item.category || 'custom',
                 base_price: item.price || 0,
                 currency: item.currency || 'BRL',
-                content: {
-                    description: item.description || '',
-                    location: item.location,
-                    dates: item.dates,
-                },
+                content: richContent,
             } as unknown as LibrarySearchResult
             addItemFromLibrary(selectedSectionId, libraryFormat)
         })
@@ -111,6 +144,7 @@ export function ProposalBuilderSidebar({ proposal }: ProposalBuilderSidebarProps
         toast.success(`${items.length} item(s) adicionado(s)!`)
         setActiveTab('config')
     }
+
 
     return (
         <div className="flex flex-col h-full">

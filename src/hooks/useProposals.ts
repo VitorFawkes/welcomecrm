@@ -53,64 +53,80 @@ export function useProposals(filters?: ProposalFilters) {
     return useQuery({
         queryKey: proposalsListKeys.filtered(filters || {}),
         queryFn: async () => {
-            // CRITICAL FIX: Only use FK hint where necessary
-            // - active_version needs hint because there are 2 FKs to proposal_versions
-            // - card and creator DO NOT need hints (single FK each) 
-            // - Using non-existent FK names causes Supabase to silently fail!
+            console.log('[useProposals] Starting query...')
+
+            // Step 1: Fetch base proposals
             let query = supabase
                 .from('proposals')
-                .select(`
-          id,
-          status,
-          created_at,
-          updated_at,
-          valid_until,
-          view_count,
-          created_by,
-          card_id,
-          active_version_id,
-          public_token,
-          expires_at,
-          active_version:proposal_versions!fk_proposals_active_version(id, title, version_number),
-          card:cards(id, titulo, pessoa_principal_id),
-          creator:profiles(id, email, nome)
-        `)
+                .select('*')
                 .order('created_at', { ascending: false })
                 .limit(100)
 
-            // Apply status filter
             if (filters?.status) {
-                query = query.eq('status', filters.status as any)
+                query = query.eq('status', filters.status as string)
             }
-
-            // Apply creator filter (for admin filtering by consultant)
             if (filters?.createdBy) {
                 query = query.eq('created_by', filters.createdBy)
             }
 
-            const { data, error } = await query
+            const { data: proposals, error: proposalsError } = await query
 
-            console.log('[useProposals] Query result:', {
-                dataCount: data?.length,
-                error,
-                filters,
-                firstItem: data?.[0]
+            console.log('[useProposals] Step 1 - Proposals:', {
+                count: proposals?.length,
+                error: proposalsError
             })
 
-            if (error) throw error
+            if (proposalsError) throw proposalsError
+            if (!proposals || proposals.length === 0) return []
 
-            // Client-side search filter (for title)
-            let result = data as unknown as ProposalWithRelations[]
+            // Step 2: Fetch related data in parallel
+            const versionIds = proposals.map(p => p.active_version_id).filter((id): id is string => id != null)
+            const cardIds = proposals.map(p => p.card_id).filter((id): id is string => id != null)
+            const creatorIds = proposals.map(p => p.created_by).filter((id): id is string => id != null)
 
+            const [versionsRes, cardsRes, creatorsRes] = await Promise.all([
+                versionIds.length > 0
+                    ? supabase.from('proposal_versions').select('id, title, version_number').in('id', versionIds)
+                    : { data: [], error: null },
+                cardIds.length > 0
+                    ? supabase.from('cards').select('id, titulo, pessoa_principal_id').in('id', cardIds)
+                    : { data: [], error: null },
+                creatorIds.length > 0
+                    ? supabase.from('profiles').select('id, email, nome').in('id', creatorIds)
+                    : { data: [], error: null }
+            ])
+
+            console.log('[useProposals] Step 2 - Related data:', {
+                versions: versionsRes.data?.length,
+                cards: cardsRes.data?.length,
+                creators: creatorsRes.data?.length
+            })
+
+            // Create lookup maps
+            const versionsMap = new Map((versionsRes.data || []).map(v => [v.id, v]))
+            const cardsMap = new Map((cardsRes.data || []).map(c => [c.id, c]))
+            const creatorsMap = new Map((creatorsRes.data || []).map(p => [p.id, p]))
+
+            // Step 3: Merge data
+            const result: ProposalWithRelations[] = proposals.map(p => ({
+                ...p,
+                active_version: p.active_version_id ? versionsMap.get(p.active_version_id) || null : null,
+                card: p.card_id ? cardsMap.get(p.card_id) || null : null,
+                creator: p.created_by ? creatorsMap.get(p.created_by) || null : null,
+            }))
+
+            // Step 4: Client-side search filter
+            let filteredResult = result
             if (filters?.search) {
                 const searchLower = filters.search.toLowerCase()
-                result = result.filter(p =>
+                filteredResult = result.filter(p =>
                     p.active_version?.title?.toLowerCase().includes(searchLower) ||
                     p.card?.titulo?.toLowerCase().includes(searchLower)
                 )
             }
 
-            return result
+            console.log('[useProposals] Final result:', filteredResult.length)
+            return filteredResult
         },
     })
 }

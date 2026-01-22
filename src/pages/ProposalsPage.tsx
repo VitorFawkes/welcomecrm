@@ -28,8 +28,18 @@ export default function ProposalsPage() {
     const [isSeeding, setIsSeeding] = useState(false)
     const queryClient = useQueryClient()
 
-    const { data: proposals, isLoading } = useProposals(filters)
+    const { data: proposals, isLoading, error, isError } = useProposals(filters)
     const { data: stats } = useProposalStats()
+
+    // DEBUG: Log what we're getting from the hook
+    console.log('[ProposalsPage] Hook state:', {
+        proposals,
+        proposalsLength: proposals?.length,
+        isLoading,
+        isError,
+        error: error?.message,
+        stats
+    })
 
     const handleSeedAll = async () => {
         setIsSeeding(true)

@@ -46,7 +46,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const queryClient = useQueryClient()
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
-    const { validateMove } = useQualityGate()
+    const { validateMoveSync } = useQualityGate()
     const { session } = useAuth() // Need auth to know who "ME" is
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
@@ -367,7 +367,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
             if (stageId !== currentStageId) {
                 // 1. Check Quality Gate (Mandatory Fields)
-                const validation = validateMove(card, stageId)
+                const validation = validateMoveSync(card, stageId)
                 if (!validation.valid) {
                     setPendingMove({
                         cardId,
@@ -613,6 +613,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                         cardId={pendingMove.cardId}
                                         targetStageName={pendingMove.targetStageName}
                                         missingFields={pendingMove.missingFields || []}
+                                        initialData={cards?.find(c => c.id === pendingMove.cardId) as any}
                                     />
                                 </>
                             )}

@@ -10,6 +10,7 @@ import CardDetail from './pages/CardDetail'
 import People from './pages/People'
 import GroupsPage from './pages/GroupsPage'
 import ProposalBuilderElite from './pages/ProposalBuilderElite'
+import ProposalBuilderV4 from './pages/ProposalBuilderV4'
 import ProposalsPage from './pages/ProposalsPage'
 import ProposalView from './pages/public/ProposalView'
 import ProposalReview from './pages/public/ProposalReview'
@@ -18,15 +19,19 @@ import ProposalConfirmed from './pages/public/ProposalConfirmed'
 import SettingsPage from './pages/SettingsPage'
 import ProfileSettings from './components/settings/profile/ProfileSettings'
 
-// Admin Components for Settings Routes
 import StudioUnified from './components/admin/studio/StudioUnified'
+import SectionManager from './components/admin/studio/SectionManager'
+import FieldManager from './components/admin/FieldManager'
 import PipelineStudio from './pages/admin/PipelineStudio'
 import UserManagement from './pages/admin/UserManagement'
 import CategoryManagement from './pages/admin/CategoryManagement'
 import CRMHealth from './pages/admin/CRMHealth'
+import Lixeira from './pages/admin/Lixeira'
 import { IntegrationsPage } from './components/admin/integrations/IntegrationsPage'
 import { WhatsAppPage } from './components/admin/whatsapp/WhatsAppPage'
 import KanbanCardSettings from './components/admin/KanbanCardSettings'
+import ActionRequirementsTab from './components/admin/studio/ActionRequirementsTab'
+import AutomationRulesPage from './components/admin/automation/AutomationRulesPage'
 import { ToastProvider } from './contexts/ToastContext'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Toaster } from 'sonner'
@@ -58,7 +63,8 @@ function App() {
                   <Route path="/cards/:id" element={<CardDetail />} />
                   <Route path="/people" element={<People />} />
                   <Route path="/proposals" element={<ProposalsPage />} />
-                  <Route path="/proposals/:id/edit" element={<ProposalBuilderElite />} />
+                  <Route path="/proposals/:id/edit" element={<ProposalBuilderV4 />} />
+                  <Route path="/proposals/:id/legacy" element={<ProposalBuilderElite />} />
 
                   <Route path="/admin" element={<Navigate to="/settings/system/governance" replace />} />
 
@@ -67,19 +73,57 @@ function App() {
                     <Route index element={<Navigate to="/settings/profile" replace />} />
                     <Route path="profile" element={<ProfileSettings />} />
 
-                    {/* Workspace Settings Placeholders */}
+                    {/* Workspace Settings */}
                     <Route path="workspace/general" element={<div className="p-4">Configurações Gerais do Espaço de Trabalho (Em Breve)</div>} />
-                    <Route path="workspace/members" element={<div className="p-4">Gerenciamento de Membros (Em Breve)</div>} />
+                    <Route path="workspace/whatsapp" element={<WhatsAppPage />} />
 
-                    {/* System Settings (Admin) */}
-                    <Route path="system/governance" element={<StudioUnified />} />
-                    <Route path="system/pipeline" element={<PipelineStudio />} />
-                    <Route path="system/kanban-cards" element={<KanbanCardSettings />} />
-                    <Route path="system/categories" element={<CategoryManagement />} />
-                    <Route path="system/integrations" element={<IntegrationsPage />} />
-                    <Route path="system/whatsapp" element={<WhatsAppPage />} />
-                    <Route path="system/users" element={<UserManagement />} />
-                    <Route path="system/health" element={<CRMHealth />} />
+                    {/* ═══════════════════════════════════════════════════════════
+                        CUSTOMIZATION: Data Rules & Requirements
+                    ═══════════════════════════════════════════════════════════ */}
+                    <Route path="customization/fields" element={<FieldManager />} />
+                    <Route path="customization/sections" element={<SectionManager />} />
+                    <Route path="customization/data-rules" element={<StudioUnified />} />
+                    <Route path="customization/action-requirements" element={<ActionRequirementsTab />} />
+                    <Route path="customization/automations" element={<AutomationRulesPage />} />
+                    <Route path="customization/categories" element={<CategoryManagement />} />
+
+                    {/* ═══════════════════════════════════════════════════════════
+                        PIPELINE: Funnel Structure
+                    ═══════════════════════════════════════════════════════════ */}
+                    <Route path="pipeline/structure" element={<PipelineStudio />} />
+                    <Route path="pipeline/card-display" element={<KanbanCardSettings />} />
+
+                    {/* ═══════════════════════════════════════════════════════════
+                        INTEGRATIONS: External Connections
+                    ═══════════════════════════════════════════════════════════ */}
+                    <Route path="integrations" element={<IntegrationsPage />} />
+
+                    {/* ═══════════════════════════════════════════════════════════
+                        TEAM: Users, Roles, Teams
+                    ═══════════════════════════════════════════════════════════ */}
+                    <Route path="team/members" element={<UserManagement />} />
+
+                    {/* ═══════════════════════════════════════════════════════════
+                        OPERATIONS: Maintenance & Health
+                    ═══════════════════════════════════════════════════════════ */}
+                    <Route path="operations/health" element={<CRMHealth />} />
+                    <Route path="operations/trash" element={<Lixeira />} />
+
+                    {/* ═══════════════════════════════════════════════════════════
+                        BACKWARDS COMPATIBILITY REDIRECTS
+                        Old URLs → New URLs (Remove after 30 days)
+                    ═══════════════════════════════════════════════════════════ */}
+                    <Route path="system/fields" element={<Navigate to="/settings/customization/fields" replace />} />
+                    <Route path="system/governance" element={<Navigate to="/settings/customization/data-rules" replace />} />
+                    <Route path="system/pipeline" element={<Navigate to="/settings/pipeline/structure" replace />} />
+                    <Route path="system/kanban-cards" element={<Navigate to="/settings/pipeline/card-display" replace />} />
+                    <Route path="system/categories" element={<Navigate to="/settings/customization/categories" replace />} />
+                    <Route path="system/integrations" element={<Navigate to="/settings/integrations" replace />} />
+                    <Route path="system/whatsapp" element={<Navigate to="/settings/workspace/whatsapp" replace />} />
+                    <Route path="system/users" element={<Navigate to="/settings/team/members" replace />} />
+                    <Route path="system/health" element={<Navigate to="/settings/operations/health" replace />} />
+                    <Route path="system/trash" element={<Navigate to="/settings/operations/trash" replace />} />
+                    <Route path="workspace/members" element={<Navigate to="/settings/team/members" replace />} />
                   </Route>
                 </Route>
               </Routes>

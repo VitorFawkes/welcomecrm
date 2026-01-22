@@ -42,6 +42,7 @@ interface ProposalBuilderState {
 
     // Section actions
     addSection: (type: ProposalSectionType, title?: string) => void
+    insertSectionAt: (index: number, type: ProposalSectionType, title?: string) => void
     removeSection: (sectionId: string) => void
     updateSection: (sectionId: string, updates: Partial<ProposalSection>) => void
     reorderSections: (orderedIds: string[]) => void
@@ -189,6 +190,36 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
         })
     },
 
+    insertSectionAt: (index, type, title) => {
+        const { sections } = get()
+        const config = SECTION_TYPE_CONFIG[type]
+
+        const newSection: ProposalSectionWithItems = {
+            id: crypto.randomUUID(),
+            version_id: get().version?.id || '',
+            section_type: type,
+            title: title || config.defaultTitle,
+            ordem: index,
+            config: {},
+            visible: true,
+            created_at: new Date().toISOString(),
+            items: [],
+        }
+
+        // Insert at specific index and reorder
+        const newSections = [...sections]
+        newSections.splice(index, 0, newSection)
+
+        // Update ordem for all sections
+        const reordered = newSections.map((s, i) => ({ ...s, ordem: i }))
+
+        set({
+            sections: reordered,
+            isDirty: true,
+            selectedSectionId: newSection.id,
+        })
+    },
+
     removeSection: (sectionId) => {
         const { sections } = get()
         set({
@@ -237,6 +268,7 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             item_type: type,
             title,
             description: null,
+            image_url: null,
             rich_content: {},
             base_price: 0,
             ordem: 0,
@@ -281,7 +313,8 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             section_id: sectionId,
             item_type: itemType,
             title: libraryItem.name,
-            description: null, // Library items don't have description field
+            description: null,
+            image_url: null,
             rich_content: (libraryItem.content || {}) as any,
             base_price: libraryItem.base_price || 0,
             ordem: 0,

@@ -3,13 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Eye, RotateCcw, Ban, Play } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, Eye, RotateCcw, Ban, Play, Search, Download } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 
 // --- Drawer Component ---
 import {
@@ -62,14 +64,46 @@ const STATUS_CONFIG: Record<string, { icon: React.ElementType; label: string; co
 export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLogsProps) {
     const [selectedEvent, setSelectedEvent] = useState<IntegrationEvent | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [eventTypeFilter, setEventTypeFilter] = useState<string>('all');
+    const [searchId, setSearchId] = useState<string>('');
+    const [limit, setLimit] = useState<number>(50);
     const tableName = mode === 'inbox' ? 'integration_events' : 'integration_outbox';
     const queryClient = useQueryClient();
 
+    const STATUS_FILTER_OPTIONS = [
+        { value: 'all', label: 'Todos os Status' },
+        { value: 'pending', label: 'Pendente' },
+        { value: 'processed', label: 'Processado' },
+        { value: 'processed_shadow', label: 'Shadow' },
+        { value: 'failed', label: 'Falhou' },
+        { value: 'blocked', label: 'Bloqueado' },
+        { value: 'ignored', label: 'Ignorado' },
+    ];
+
+    const EVENT_TYPE_OPTIONS = [
+        { value: 'all', label: 'Todos os Tipos' },
+        { value: 'deal_add', label: 'Deal Add' },
+        { value: 'deal_update', label: 'Deal Update' },
+        { value: 'deal_state', label: 'Deal State' },
+        { value: 'contact_tag_added', label: 'Tag Adicionada' },
+        { value: 'contact_tag_removed', label: 'Tag Removida' },
+        { value: 'deal_task_add', label: 'Task Add' },
+        { value: 'deal_task_complete', label: 'Task Complete' },
+        { value: 'deal_note_add', label: 'Note Add' },
+        { value: 'contact_automation_state', label: 'Automation' },
+    ];
+
     const updateStatusMutation = useMutation({
         mutationFn: async ({ id, status }: { id: string; status: string }) => {
+            const updateData: any = { status, processing_log: null };
+            if (tableName === 'integration_outbox') {
+                updateData.error_log = null;
+            }
+
             const { error } = await supabase
                 .from(tableName as any)
-                .update({ status, processing_log: null, error_log: null })
+                .update(updateData)
                 .eq('id', id);
 
             if (error) throw error;
@@ -101,6 +135,23 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
         }
     });
 
+    const syncDealsMutation = useMutation({
+        mutationFn: async () => {
+            const { data, error } = await supabase.functions.invoke('integration-sync-deals', {
+                body: { pipeline_id: '8', limit: 100 }
+            });
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['integration-logs'] });
+            toast.success(`Sincronizado! ${data.new_events_created} novos eventos criados.`);
+        },
+        onError: (error) => {
+            toast.error('Erro ao sincronizar: ' + error.message);
+        }
+    });
+
     const handleReprocess = (id: string) => {
         updateStatusMutation.mutate({ id, status: 'pending' });
     };
@@ -112,9 +163,14 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
     // Bulk actions
     const bulkUpdateMutation = useMutation({
         mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+            const updateData: any = { status, processing_log: null };
+            if (tableName === 'integration_outbox') {
+                updateData.error_log = null;
+            }
+
             const { error } = await supabase
                 .from(tableName as any)
-                .update({ status, processing_log: null, error_log: null })
+                .update(updateData)
                 .in('id', ids);
             if (error) throw error;
         },
@@ -140,6 +196,30 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
         bulkUpdateMutation.mutate({ ids: Array.from(selectedIds), status: 'pending' });
     };
 
+    // Process Selected Events
+    const processSelectedMutation = useMutation({
+        mutationFn: async (ids: string[]) => {
+            const { data, error } = await supabase.functions.invoke('integration-process', {
+                body: { event_ids: ids }
+            });
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['integration-logs'] });
+            toast.success(data.message || `${data.stats?.updated || 0} evento(s) processado(s)`);
+            setSelectedIds(new Set());
+        },
+        onError: (error) => {
+            toast.error('Erro ao processar: ' + error.message);
+        }
+    });
+
+    const handleProcessSelected = () => {
+        if (selectedIds.size === 0) return;
+        processSelectedMutation.mutate(Array.from(selectedIds));
+    };
+
     const toggleSelect = (id: string) => {
         setSelectedIds(prev => {
             const next = new Set(prev);
@@ -162,30 +242,35 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
     };
 
     const { data: events, isLoading, refetch, isFetching } = useQuery({
-        queryKey: ['integration-logs', mode, integrationId],
+        queryKey: ['integration-logs', mode, integrationId, statusFilter, eventTypeFilter, searchId, limit],
         queryFn: async () => {
             let query = supabase
                 .from(tableName as any)
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(50);
+                .limit(limit);
 
-            if (integrationId) {
-                // Only filter by integration_id if it exists in the table schema and is provided
-                // For system integrations (AC), we might filter by source/destination instead
-                // But for now, let's assume if integrationId is provided, we use it (legacy behavior)
-                // OR if it's AC, we might want to show all 'active_campaign' source events.
-                // For this refactor, let's keep it simple: if integrationId provided, try to filter.
-                // But AC events might not have integration_id.
-                // Let's skip integration_id filter for now if mode is 'inbox' and it's system integration.
-                // Actually, let's just fetch all for now to see the AC events.
+            // Apply status filter
+            if (statusFilter && statusFilter !== 'all') {
+                query = query.eq('status', statusFilter);
+            }
+
+            // Apply ID search (searches both UUID 'id' and AC 'external_id')
+            if (searchId.trim()) {
+                const term = searchId.trim();
+                query = query.or(`id.ilike.%${term}%,external_id.ilike.%${term}%`);
+            }
+
+            // Apply event_type filter
+            if (eventTypeFilter && eventTypeFilter !== 'all') {
+                query = query.eq('event_type', eventTypeFilter);
             }
 
             const { data, error } = await query;
             if (error) throw error;
             return data as unknown as IntegrationEvent[];
         },
-        refetchInterval: 5000,
+        refetchInterval: (statusFilter === 'pending' || statusFilter === 'all') ? 5000 : false,
     });
 
     // Fetch Catalog for Names (AC)
@@ -295,6 +380,71 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                             Processar Pendentes
                         </Button>
                     )}
+                    {mode === 'inbox' && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="ml-2"
+                            onClick={() => syncDealsMutation.mutate()}
+                            disabled={syncDealsMutation.isPending}
+                        >
+                            <Download className={cn("w-4 h-4 mr-2", syncDealsMutation.isPending && "animate-spin")} />
+                            Sincronizar do AC
+                        </Button>
+                    )}
+                </div>
+
+                {/* --- Filters Row --- */}
+                <div className="flex items-center gap-3 p-3 bg-muted/30 border-b">
+                    <div className="relative flex-1 max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar por ID..."
+                            value={searchId}
+                            onChange={(e) => setSearchId(e.target.value)}
+                            className="pl-9 h-8 text-xs"
+                        />
+                    </div>
+                    <Select
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        options={STATUS_FILTER_OPTIONS}
+                        placeholder="Status"
+                        className="w-40 h-8"
+                    />
+                    <Select
+                        value={eventTypeFilter}
+                        onChange={setEventTypeFilter}
+                        options={EVENT_TYPE_OPTIONS}
+                        placeholder="Tipo"
+                        className="w-44 h-8"
+                    />
+                    <div className="flex gap-1 ml-auto">
+                        <Button
+                            size="sm"
+                            variant={limit === 50 ? 'default' : 'outline'}
+                            className="text-xs h-7 px-2"
+                            onClick={() => setLimit(50)}
+                        >
+                            50
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={limit === 200 ? 'default' : 'outline'}
+                            className="text-xs h-7 px-2"
+                            onClick={() => setLimit(200)}
+                        >
+                            200
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={limit === 500 ? 'default' : 'outline'}
+                            className="text-xs h-7 px-2"
+                            onClick={() => setLimit(500)}
+                        >
+                            500
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Bulk Actions Toolbar */}
@@ -320,6 +470,16 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
                             >
                                 <RotateCcw className="w-4 h-4 mr-1" />
                                 Reprocessar
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="default"
+                                onClick={handleProcessSelected}
+                                disabled={processSelectedMutation.isPending}
+                                className="bg-green-600 hover:bg-green-700"
+                            >
+                                <Play className="w-4 h-4 mr-1" />
+                                Processar Selecionados
                             </Button>
                         </div>
                     </div>
@@ -358,8 +518,9 @@ export function IntegrationLogs({ integrationId, mode = 'inbox' }: IntegrationLo
 
                                     // Resolve Stage Info
                                     const payload = event.payload || {};
-                                    const acStageId = payload.stage || payload.stage_id;
-                                    const acPipelineId = payload.pipeline || payload.pipeline_id;
+                                    // Support both flat format and bracket format from AC webhooks
+                                    const acStageId = payload.stage || payload.stage_id || payload['deal[stageid]'];
+                                    const acPipelineId = payload.pipeline || payload.pipeline_id || payload['deal[pipelineid]'];
                                     const entity = event.entity_type;
                                     const changeType = payload.change_type;
 

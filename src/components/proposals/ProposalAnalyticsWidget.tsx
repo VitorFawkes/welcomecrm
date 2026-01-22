@@ -49,7 +49,7 @@ export function ProposalAnalyticsWidget() {
                     status,
                     total_value,
                     created_at,
-                    card:cards!card_id(titulo)
+                    card:cards!proposals_card_id_fkey(titulo)
                 `)
                 .order('created_at', { ascending: false })
 
@@ -105,8 +105,8 @@ export function ProposalAnalyticsWidget() {
                     status,
                     total_value,
                     created_at,
-                    card:cards!card_id(titulo),
-                    active_version:proposal_versions!active_version_id(title)
+                    card:cards!proposals_card_id_fkey(titulo),
+                    active_version:proposal_versions!fk_proposals_active_version(title)
                 `)
                 .in('status', ['sent', 'viewed', 'in_progress'])
                 .order('created_at', { ascending: false })

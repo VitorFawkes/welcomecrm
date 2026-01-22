@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, UserPlus, Loader2, AlertCircle } from 'lucide-react'
+import { Search, Plus, UserPlus, Loader2, AlertCircle, Calendar, Phone, Mail } from 'lucide-react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../../database.types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/Button'
+import { Input } from '../ui/Input'
+import { cn } from '../../lib/utils'
 
 interface ContactSelectorProps {
     cardId: string
@@ -23,7 +25,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         nome: '',
         email: '',
         telefone: '',
-        // whatsapp: '', // Removed from form, keeping state clean
+        data_nascimento: '',
         tipo_pessoa: 'adulto' as 'adulto' | 'crianca'
     })
 
@@ -38,10 +40,11 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         queryFn: async () => {
             if (!debouncedSearch) return []
 
-            const { data, error } = await (supabase.from('contatos') as any)
+            const { data, error } = await supabase
+                .from('contatos')
                 .select('*')
-                .ilike('nome', `%${debouncedSearch}%`)
-                .limit(5)
+                .or(`nome.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefone.ilike.%${debouncedSearch}%`)
+                .limit(8)
 
             if (error) throw error
             return data as Database['public']['Tables']['contatos']['Row'][]
@@ -53,34 +56,63 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
     const createContactMutation = useMutation({
         mutationFn: async () => {
             setError(null)
-            // Prepare payload, converting empty strings to null for optional fields
             const payload = {
                 nome: newContact.nome,
                 email: newContact.email.trim() || null,
                 telefone: newContact.telefone.trim() || null,
+                data_nascimento: newContact.data_nascimento || null,
                 tipo_pessoa: newContact.tipo_pessoa
             }
 
-            const { data, error } = await (supabase.from('contatos') as any)
+            const { data, error } = await supabase
+                .from('contatos')
                 .insert(payload)
                 .select()
                 .single()
 
             if (error) throw error
+
+            // Also insert into contato_meios for multi-contact support
+            const meiosToInsert = []
+            if (payload.telefone) {
+                meiosToInsert.push({
+                    contato_id: data.id,
+                    tipo: 'telefone',
+                    valor: payload.telefone,
+                    is_principal: true,
+                    origem: 'manual'
+                })
+            }
+            if (payload.email) {
+                meiosToInsert.push({
+                    contato_id: data.id,
+                    tipo: 'email',
+                    valor: payload.email,
+                    is_principal: true,
+                    origem: 'manual'
+                })
+            }
+
+            if (meiosToInsert.length > 0) {
+                await supabase.from('contato_meios').insert(meiosToInsert)
+            }
+
             return data
         },
         onSuccess: async (createdContact) => {
             try {
                 if (cardId && addToCard) {
-                    // Check if already linked to avoid duplicates
-                    const { data: existingLink } = await (supabase.from('cards_contatos') as any)
+                    // Check if already linked
+                    const { data: existingLink } = await supabase
+                        .from('cards_contatos')
                         .select('id')
                         .eq('card_id', cardId)
                         .eq('contato_id', createdContact.id)
                         .single()
 
                     if (!existingLink) {
-                        const { data: existing } = await (supabase.from('cards_contatos') as any)
+                        const { data: existing } = await supabase
+                            .from('cards_contatos')
                             .select('ordem')
                             .eq('card_id', cardId)
                             .order('ordem', { ascending: false })
@@ -88,23 +120,20 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
 
                         const nextOrder = (existing?.[0]?.ordem || 0) + 1
 
-                        const { error: linkError } = await (supabase.from('cards_contatos') as any)
-                            .insert({
-                                card_id: cardId,
-                                contato_id: createdContact.id,
-                                tipo_viajante: 'acompanhante',
-                                ordem: nextOrder
-                            })
-
-                        if (linkError) throw linkError
+                        await supabase.from('cards_contatos').insert({
+                            card_id: cardId,
+                            contato_id: createdContact.id,
+                            tipo_viajante: 'acompanhante',
+                            ordem: nextOrder
+                        })
                     }
                 }
 
                 onContactAdded(createdContact.id, createdContact)
-                onClose() // Close modal on success
+                onClose()
             } catch (err: any) {
                 console.error('Error linking contact:', err)
-                setError('Contato criado, mas houve um erro ao vincular: ' + err.message)
+                setError('Contato criado, mas houve erro ao vincular: ' + err.message)
             }
         },
         onError: (err: any) => {
@@ -119,8 +148,8 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
             setError(null)
             if (!cardId || !addToCard) return contactId
 
-            // Check if already linked
-            const { data: existingLink } = await (supabase.from('cards_contatos') as any)
+            const { data: existingLink } = await supabase
+                .from('cards_contatos')
                 .select('id')
                 .eq('card_id', cardId)
                 .eq('contato_id', contactId)
@@ -128,7 +157,8 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
 
             if (existingLink) return contactId
 
-            const { data: existing } = await (supabase.from('cards_contatos') as any)
+            const { data: existing } = await supabase
+                .from('cards_contatos')
                 .select('ordem')
                 .eq('card_id', cardId)
                 .order('ordem', { ascending: false })
@@ -136,29 +166,19 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
 
             const nextOrder = (existing?.[0]?.ordem || 0) + 1
 
-            const { error } = await (supabase.from('cards_contatos') as any)
-                .insert({
-                    card_id: cardId,
-                    contato_id: contactId,
-                    tipo_viajante: 'acompanhante',
-                    ordem: nextOrder
-                })
-                .select()
+            const { error } = await supabase.from('cards_contatos').insert({
+                card_id: cardId,
+                contato_id: contactId,
+                tipo_viajante: 'acompanhante',
+                ordem: nextOrder
+            })
 
-            if (error) {
-                if (error.code === '23505') return contactId
-                throw error
-            }
+            if (error && error.code !== '23505') throw error
             return contactId
         },
-        onSuccess: (contactId, _variables) => {
-            // We need the contact name for the callback. 
-            // Since we don't have it in the mutation result (it just returns ID), 
-            // we rely on the fact that we selected it from the list.
-            // But wait, the mutationFn argument is just the ID.
-            // We need to find the contact in the 'contacts' list to get the name.
+        onSuccess: (contactId) => {
             const contact = contacts?.find(c => c.id === contactId)
-            onContactAdded(contactId, contact ? { ...contact, nome: contact.nome || 'Sem Nome' } : undefined)
+            onContactAdded(contactId, contact ? { nome: contact.nome || 'Sem Nome' } : undefined)
             onClose()
         },
         onError: (err: any) => {
@@ -174,12 +194,18 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         createContactMutation.mutate()
     }
 
+    const resetForm = () => {
+        setShowCreateForm(false)
+        setNewContact({ nome: '', email: '', telefone: '', data_nascimento: '', tipo_pessoa: 'adulto' })
+        setError(null)
+    }
+
     return (
         <Dialog open={true} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden gap-0">
-                <div className="p-6 pb-4 border-b border-gray-100">
+            <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden gap-0">
+                <div className="p-6 pb-4 border-b border-slate-100">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-semibold text-gray-900">
+                        <DialogTitle className="text-xl font-semibold text-slate-900">
                             {showCreateForm ? 'Novo Contato' : 'Selecionar Contato'}
                         </DialogTitle>
                     </DialogHeader>
@@ -187,7 +213,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
 
                 <div className="p-6">
                     {error && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-md flex items-start gap-2 text-sm text-red-700">
+                        <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-sm text-red-700">
                             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                             <span>{error}</span>
                         </div>
@@ -195,21 +221,23 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
 
                     {!showCreateForm ? (
                         <div className="space-y-4">
+                            {/* Search */}
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                <input
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <Input
                                     type="text"
-                                    placeholder="Buscar por nome..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    placeholder="Buscar por nome, email ou telefone..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-10"
                                     autoFocus
                                 />
                             </div>
 
+                            {/* Results */}
                             <div className="min-h-[200px] max-h-[300px] overflow-y-auto -mx-2 px-2 space-y-1">
                                 {isLoading ? (
-                                    <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                                    <div className="flex flex-col items-center justify-center py-8 text-slate-400">
                                         <Loader2 className="h-6 w-6 animate-spin mb-2" />
                                         <span className="text-sm">Buscando contatos...</span>
                                     </div>
@@ -219,27 +247,40 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                             key={contact.id}
                                             onClick={() => addContactMutation.mutate(contact.id)}
                                             disabled={addContactMutation.isPending}
-                                            className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg group transition-colors text-left"
+                                            className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg group transition-colors text-left"
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-medium group-hover:bg-indigo-100 transition-colors">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-medium group-hover:bg-indigo-100 transition-colors flex-shrink-0">
                                                     {(contact.nome || 'S').charAt(0).toUpperCase()}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-medium text-gray-900 truncate">{contact.nome || 'Sem Nome'}</p>
-                                                    <p className="text-xs text-gray-500 truncate">{contact.email || 'Sem email'}</p>
+                                                    <p className="font-medium text-slate-900 truncate">{contact.nome || 'Sem Nome'}</p>
+                                                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                        {contact.telefone && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Phone className="h-3 w-3" />
+                                                                {contact.telefone}
+                                                            </span>
+                                                        )}
+                                                        {contact.email && (
+                                                            <span className="flex items-center gap-1 truncate">
+                                                                <Mail className="h-3 w-3" />
+                                                                {contact.email}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                             {addContactMutation.isPending ? (
-                                                <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                                                <Loader2 className="h-4 w-4 animate-spin text-indigo-600 flex-shrink-0" />
                                             ) : (
-                                                <Plus className="h-4 w-4 text-gray-400 group-hover:text-indigo-600" />
+                                                <Plus className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 flex-shrink-0" />
                                             )}
                                         </button>
                                     ))
                                 ) : debouncedSearch.length > 2 ? (
                                     <div className="text-center py-8">
-                                        <p className="text-sm text-gray-500 mb-3">Nenhum contato encontrado</p>
+                                        <p className="text-sm text-slate-500 mb-3">Nenhum contato encontrado</p>
                                         <Button
                                             onClick={() => {
                                                 setShowCreateForm(true)
@@ -253,14 +294,15 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                         </Button>
                                     </div>
                                 ) : (
-                                    <div className="text-center py-12 text-gray-400">
+                                    <div className="text-center py-12 text-slate-400">
                                         <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                         <p className="text-sm">Digite para buscar ou crie um novo contato</p>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="pt-4 border-t border-gray-100">
+                            {/* Create button */}
+                            <div className="pt-4 border-t border-slate-100">
                                 <Button
                                     onClick={() => setShowCreateForm(true)}
                                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
@@ -271,88 +313,151 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Nome Completo <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newContact.nome}
-                                    onChange={(e) => setNewContact({ ...newContact, nome: e.target.value })}
-                                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                    placeholder="Ex: João Silva"
-                                    autoFocus
-                                />
+                        <div className="space-y-5">
+                            {/* Progress Header */}
+                            <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+                                <div className="flex-1">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-xs font-medium text-indigo-700">
+                                            Criação Rápida
+                                        </span>
+                                        <span className="text-xs text-indigo-600 font-medium">
+                                            {[newContact.nome, newContact.telefone || newContact.email, newContact.data_nascimento].filter(Boolean).length}/3 campos
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 bg-indigo-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                                            style={{
+                                                width: `${([newContact.nome, newContact.telefone || newContact.email, newContact.data_nascimento].filter(Boolean).length / 3) * 100}%`
+                                            }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            {/* Essential: Name */}
+                            <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-4">
+                                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <div className="p-1.5 rounded-md bg-indigo-100 text-indigo-600">
+                                        <UserPlus className="h-3.5 w-3.5" />
+                                    </div>
+                                    Dados Essenciais
+                                </div>
+
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                                    <input
-                                        type="email"
-                                        value={newContact.email}
-                                        onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                        placeholder="joao@email.com"
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                        Nome Completo <span className="text-red-500">*</span>
+                                    </label>
+                                    <Input
+                                        type="text"
+                                        value={newContact.nome}
+                                        onChange={(e) => setNewContact({ ...newContact, nome: e.target.value })}
+                                        placeholder="Ex: João Silva"
+                                        autoFocus
+                                        className={cn(
+                                            newContact.nome && "border-green-300 bg-green-50/30"
+                                        )}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefone</label>
-                                    <input
-                                        type="tel"
-                                        value={newContact.telefone}
-                                        onChange={(e) => setNewContact({ ...newContact, telefone: e.target.value })}
-                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                        placeholder="(11) 99999-9999"
-                                    />
+
+                                {/* Phone + Email in same section */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                            <Phone className="inline h-3.5 w-3.5 mr-1 text-slate-500" />
+                                            Telefone
+                                        </label>
+                                        <Input
+                                            type="tel"
+                                            value={newContact.telefone}
+                                            onChange={(e) => setNewContact({ ...newContact, telefone: e.target.value })}
+                                            placeholder="(11) 99999-9999"
+                                            className={cn(
+                                                newContact.telefone && "border-green-300 bg-green-50/30"
+                                            )}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                            <Mail className="inline h-3.5 w-3.5 mr-1 text-slate-500" />
+                                            Email
+                                        </label>
+                                        <Input
+                                            type="email"
+                                            value={newContact.email}
+                                            onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                                            placeholder="email@exemplo.com"
+                                            className={cn(
+                                                newContact.email && "border-green-300 bg-green-50/30"
+                                            )}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de Pessoa</label>
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="tipo_pessoa"
-                                            value="adulto"
-                                            checked={newContact.tipo_pessoa === 'adulto'}
-                                            onChange={() => setNewContact({ ...newContact, tipo_pessoa: 'adulto' })}
-                                            className="text-indigo-600 focus:ring-indigo-500"
+                            {/* Optional: Birth Date + Type */}
+                            <div className="p-4 bg-slate-50/50 border border-slate-200 rounded-xl space-y-4">
+                                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                                    <div className="p-1.5 rounded-md bg-slate-200/50 text-slate-500">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                    </div>
+                                    Informações Adicionais
+                                    <span className="text-xs font-normal text-slate-400">(opcional)</span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                            Data de Nascimento
+                                        </label>
+                                        <Input
+                                            type="date"
+                                            value={newContact.data_nascimento}
+                                            onChange={(e) => setNewContact({ ...newContact, data_nascimento: e.target.value })}
+                                            className={cn(
+                                                newContact.data_nascimento && "border-green-300 bg-green-50/30"
+                                            )}
                                         />
-                                        <span className="text-sm text-gray-700">Adulto</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="tipo_pessoa"
-                                            value="crianca"
-                                            checked={newContact.tipo_pessoa === 'crianca'}
-                                            onChange={() => setNewContact({ ...newContact, tipo_pessoa: 'crianca' })}
-                                            className="text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm text-gray-700">Criança</span>
-                                    </label>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                            Tipo de Pessoa
+                                        </label>
+                                        <select
+                                            value={newContact.tipo_pessoa}
+                                            onChange={(e) => setNewContact({ ...newContact, tipo_pessoa: e.target.value as any })}
+                                            className="w-full h-11 px-4 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                                        >
+                                            <option value="adulto">Adulto</option>
+                                            <option value="crianca">Não Adulto</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 pt-4 mt-2 border-t border-gray-100">
+                            {/* Hint - more compact */}
+                            <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                <span className="text-amber-500">💡</span>
+                                <p className="text-xs text-amber-700">
+                                    Após criar, acesse o contato para adicionar endereço, documentos e mais.
+                                </p>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-3 pt-3 border-t border-slate-100">
                                 <Button
+                                    type="button"
                                     variant="outline"
-                                    onClick={() => {
-                                        setShowCreateForm(false)
-                                        setNewContact({ nome: '', email: '', telefone: '', tipo_pessoa: 'adulto' })
-                                        setError(null)
-                                    }}
+                                    onClick={resetForm}
                                     className="flex-1"
                                 >
                                     Voltar
                                 </Button>
                                 <Button
                                     onClick={handleCreateContact}
-                                    disabled={createContactMutation.isPending}
-                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    disabled={createContactMutation.isPending || !newContact.nome.trim()}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
                                 >
                                     {createContactMutation.isPending ? (
                                         <>
@@ -360,7 +465,10 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                             Salvando...
                                         </>
                                     ) : (
-                                        'Criar e Adicionar'
+                                        <>
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Criar e Adicionar
+                                        </>
                                     )}
                                 </Button>
                             </div>
@@ -371,4 +479,3 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         </Dialog>
     )
 }
-

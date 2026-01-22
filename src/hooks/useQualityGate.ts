@@ -1,12 +1,50 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 
+// Requirement types for validation
+type RequirementType = 'field' | 'proposal' | 'task'
 
+interface RequirementRule {
+    stage_id: string
+    requirement_type: RequirementType
+    field_key: string | null
+    label: string
+    is_blocking: boolean
+    proposal_min_status: string | null
+    task_tipo: string | null
+    task_require_completed: boolean
+}
 
+interface MissingField {
+    key: string
+    label: string
+    type: RequirementType
+}
+
+interface MissingProposal {
+    label: string
+    min_status: string
+}
+
+interface MissingTask {
+    label: string
+    task_tipo: string
+}
+
+interface ValidationResult {
+    valid: boolean
+    missingFields: MissingField[]
+    missingProposals: MissingProposal[]
+    missingTasks: MissingTask[]
+}
+
+// Proposal status hierarchy
+const PROPOSAL_STATUS_ORDER = ['draft', 'sent', 'viewed', 'in_progress', 'accepted']
 
 export function useQualityGate() {
+    // Fetch all required configurations
     const { data: rules } = useQuery({
-        queryKey: ['stage-field-config'],
+        queryKey: ['stage-field-config-all'],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('stage_field_config')
@@ -20,30 +58,35 @@ export function useQualityGate() {
 
             if (error) throw error
 
-            // Map to expected format
-            return data?.map((item: any) => ({
+            return data?.map((item: any): RequirementRule => ({
                 stage_id: item.stage_id,
+                requirement_type: item.requirement_type || 'field',
                 field_key: item.field_key,
-                label: item.system_fields?.label || item.field_key,
-                required: item.required
+                label: item.system_fields?.label || item.requirement_label || item.field_key || 'Requisito',
+                is_blocking: item.is_blocking ?? true,
+                proposal_min_status: item.proposal_min_status,
+                task_tipo: item.task_tipo,
+                task_require_completed: item.task_require_completed ?? true
             })) || []
         },
         staleTime: 1000 * 60 * 5 // 5 minutes
     })
 
-    const validateMove = (card: any, targetStageId: string) => {
-        if (!rules) return { valid: true, missingFields: [] }
+    const validateMove = async (card: any, targetStageId: string): Promise<ValidationResult> => {
+        if (!rules) return { valid: true, missingFields: [], missingProposals: [], missingTasks: [] }
 
-        const stageRules = rules.filter(r => r.stage_id === targetStageId)
-        const missingFields: { key: string, label: string }[] = []
+        const stageRules = rules.filter(r => r.stage_id === targetStageId && r.is_blocking)
 
-        for (const rule of stageRules) {
+        const missingFields: MissingField[] = []
+        const missingProposals: MissingProposal[] = []
+        const missingTasks: MissingTask[] = []
+
+        // --- Validate Field Requirements ---
+        const fieldRules = stageRules.filter(r => r.requirement_type === 'field')
+        for (const rule of fieldRules) {
+            if (!rule.field_key) continue
+
             const value = card[rule.field_key]
-
-            // Check if value is empty/null/undefined
-            // For arrays (like destinations), check length
-            // For objects (like budget), check if it has keys? Maybe just check if not null for now.
-
             let isValid = true
 
             if (value === null || value === undefined || value === '') {
@@ -54,15 +97,101 @@ export function useQualityGate() {
                 isValid = false
             }
 
-            // Special handling for nested fields if needed (e.g. produto_data->destinos)
-            // But currently the card object from Kanban might be flat or have produto_data.
-            // The AVAILABLE_FIELDS in the new Pipeline Studio have IDs like 'destinos', 'orcamento'.
-            // These are usually inside 'produto_data' in the DB, but maybe flattened in the view?
-            // Let's check view_cards_acoes definition again.
-            // 'destinos' comes from c.produto_data -> 'destinos'.
-            // 'orcamento' comes from c.produto_data -> 'orcamento'.
-            // So in the view, they are top-level columns.
-            // So checking card[rule.field_key] should work if card comes from the view.
+            if (!isValid) {
+                missingFields.push({
+                    key: rule.field_key,
+                    label: rule.label,
+                    type: 'field'
+                })
+            }
+        }
+
+        // --- Validate Proposal Requirements ---
+        const proposalRules = stageRules.filter(r => r.requirement_type === 'proposal')
+        if (proposalRules.length > 0) {
+            // Fetch proposals for this card
+            const { data: proposals } = await supabase
+                .from('proposals')
+                .select('id, status')
+                .eq('card_id', card.id)
+
+            for (const rule of proposalRules) {
+                if (!rule.proposal_min_status) continue
+
+                const minIndex = PROPOSAL_STATUS_ORDER.indexOf(rule.proposal_min_status)
+                const hasValidProposal = proposals?.some(p => {
+                    const proposalIndex = PROPOSAL_STATUS_ORDER.indexOf(p.status)
+                    return proposalIndex >= minIndex
+                })
+
+                if (!hasValidProposal) {
+                    missingProposals.push({
+                        label: rule.label,
+                        min_status: rule.proposal_min_status
+                    })
+                }
+            }
+        }
+
+        // --- Validate Task Requirements ---
+        const taskRules = stageRules.filter(r => r.requirement_type === 'task')
+        if (taskRules.length > 0) {
+            // Fetch tasks for this card
+            const { data: tasks } = await supabase
+                .from('tarefas')
+                .select('id, tipo, concluida')
+                .eq('card_id', card.id)
+
+            for (const rule of taskRules) {
+                if (!rule.task_tipo) continue
+
+                const hasValidTask = tasks?.some(t => {
+                    if (t.tipo !== rule.task_tipo) return false
+                    if (rule.task_require_completed && !t.concluida) return false
+                    return true
+                })
+
+                if (!hasValidTask) {
+                    missingTasks.push({
+                        label: rule.label,
+                        task_tipo: rule.task_tipo
+                    })
+                }
+            }
+        }
+
+        return {
+            valid: missingFields.length === 0 && missingProposals.length === 0 && missingTasks.length === 0,
+            missingFields,
+            missingProposals,
+            missingTasks
+        }
+    }
+
+    // Synchronous version for backward compatibility (fields only)
+    const validateMoveSync = (card: any, targetStageId: string): { valid: boolean, missingFields: { key: string, label: string }[] } => {
+        if (!rules) return { valid: true, missingFields: [] }
+
+        const stageRules = rules.filter(r =>
+            r.stage_id === targetStageId &&
+            r.is_blocking &&
+            r.requirement_type === 'field'
+        )
+        const missingFields: { key: string, label: string }[] = []
+
+        for (const rule of stageRules) {
+            if (!rule.field_key) continue
+
+            const value = card[rule.field_key]
+            let isValid = true
+
+            if (value === null || value === undefined || value === '') {
+                isValid = false
+            } else if (Array.isArray(value) && value.length === 0) {
+                isValid = false
+            } else if (typeof value === 'object' && Object.keys(value).length === 0) {
+                isValid = false
+            }
 
             if (!isValid) {
                 missingFields.push({ key: rule.field_key, label: rule.label })
@@ -75,5 +204,10 @@ export function useQualityGate() {
         }
     }
 
-    return { validateMove }
+    return {
+        validateMove,
+        validateMoveSync,
+        // Keep backward compat alias
+        validateMoveFields: validateMoveSync
+    }
 }

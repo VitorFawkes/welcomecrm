@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { ArrowUpRight, Check, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, Check, RefreshCw, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WelcomeStage {
@@ -21,6 +21,16 @@ interface WelcomeStage {
 }
 
 interface ExternalStage {
+    external_id: string;
+    external_name: string;
+    parent_external_id: string | null;
+    metadata: {
+        order?: number;
+        [key: string]: unknown;
+    } | null;
+}
+
+interface ExternalPipeline {
     external_id: string;
     external_name: string;
 }
@@ -41,6 +51,7 @@ interface OutboundStageMappingTabProps {
 export function OutboundStageMappingTab({ integrationId }: OutboundStageMappingTabProps) {
     const queryClient = useQueryClient();
     const [pendingChanges, setPendingChanges] = useState<Record<string, string>>({});
+    const [selectedPipelineFilter, setSelectedPipelineFilter] = useState<string>('');
 
     // Fetch Welcome stages
     const { data: welcomeStages, isLoading: stagesLoading } = useQuery({
@@ -59,17 +70,32 @@ export function OutboundStageMappingTab({ integrationId }: OutboundStageMappingT
         }
     });
 
-    // Fetch external stages from catalog
+    // Fetch external stages from catalog (with parent pipeline info and metadata for ordering)
     const { data: externalStages, isLoading: externalLoading } = useQuery({
         queryKey: ['external-stages-catalog', integrationId],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('integration_catalog')
-                .select('external_id, external_name')
+                .select('external_id, external_name, parent_external_id, metadata')
                 .eq('integration_id', integrationId)
                 .eq('entity_type', 'stage');
             if (error) throw error;
-            return data as ExternalStage[];
+            return (data || []) as ExternalStage[];
+        }
+    });
+
+    // Fetch AC pipelines for name lookup
+    const { data: acPipelines } = useQuery({
+        queryKey: ['ac-pipelines-catalog', integrationId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('integration_catalog')
+                .select('external_id, external_name')
+                .eq('integration_id', integrationId)
+                .eq('entity_type', 'pipeline')
+                .order('external_name');
+            if (error) throw error;
+            return (data || []) as ExternalPipeline[];
         }
     });
 
@@ -145,6 +171,40 @@ export function OutboundStageMappingTab({ integrationId }: OutboundStageMappingT
     const hasChanges = Object.keys(pendingChanges).length > 0;
     const isLoading = stagesLoading || externalLoading || mappingsLoading;
 
+    // Pipeline filter options
+    const pipelineOptions = useMemo(() => [
+        { value: '', label: '📁 Todos os Pipelines' },
+        ...(acPipelines || []).map(p => ({
+            value: p.external_id,
+            label: p.external_name
+        }))
+    ], [acPipelines]);
+
+    // Filter stages by selected pipeline, deduplicate, and sort by order
+    const filteredExternalStages = useMemo(() => {
+        let stages = externalStages || [];
+
+        // Filter by pipeline if selected
+        if (selectedPipelineFilter) {
+            stages = stages.filter(s => s.parent_external_id === selectedPipelineFilter);
+        }
+
+        // Deduplicate by external_id (same stage can appear multiple times)
+        const seen = new Set<string>();
+        const deduped = stages.filter(s => {
+            if (seen.has(s.external_id)) return false;
+            seen.add(s.external_id);
+            return true;
+        });
+
+        // Sort by metadata.order (AC pipeline order)
+        return deduped.sort((a, b) => {
+            const orderA = a.metadata?.order ?? 9999;
+            const orderB = b.metadata?.order ?? 9999;
+            return orderA - orderB;
+        });
+    }, [externalStages, selectedPipelineFilter]);
+
     // Group stages by phase
     const stagesByPhase = welcomeStages?.reduce((acc, stage) => {
         const phaseLabel = (stage.phase as any)?.label || 'Sem Fase';
@@ -196,6 +256,25 @@ export function OutboundStageMappingTab({ integrationId }: OutboundStageMappingT
                 </div>
             </CardHeader>
             <CardContent>
+                {/* Pipeline Filter */}
+                <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                    <div className="flex items-center gap-3">
+                        <Filter className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground">Filtrar por Pipeline AC:</span>
+                        <Select
+                            value={selectedPipelineFilter}
+                            onChange={setSelectedPipelineFilter}
+                            options={pipelineOptions}
+                            className="w-64"
+                        />
+                        {selectedPipelineFilter && (
+                            <Badge variant="outline" className="text-xs">
+                                {filteredExternalStages.length} etapas
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+
                 <div className="space-y-6">
                     {stagesByPhase && Object.entries(stagesByPhase).map(([phaseName, { color, stages }]) => (
                         <div key={phaseName} className="space-y-2">
@@ -247,7 +326,7 @@ export function OutboundStageMappingTab({ integrationId }: OutboundStageMappingT
                                                             onChange={(e) => handleExternalStageChange(stage.id, e.target.value)}
                                                         >
                                                             <option value="">Não sincronizar</option>
-                                                            {externalStages?.map((ext) => (
+                                                            {filteredExternalStages.map((ext) => (
                                                                 <option key={ext.external_id} value={ext.external_id}>
                                                                     {ext.external_name || ext.external_id}
                                                                 </option>

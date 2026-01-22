@@ -44,7 +44,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     // Stage selection
     const [showStageDropdown, setShowStageDropdown] = useState(false)
-    const { validateMove } = useQualityGate()
+    const { validateMoveSync } = useQualityGate()
     const [qualityGateModalOpen, setQualityGateModalOpen] = useState(false)
     const [stageChangeModalOpen, setStageChangeModalOpen] = useState(false)
     const [pendingStageChange, setPendingStageChange] = useState<{
@@ -248,7 +248,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     const handleStageSelect = (stageId: string, stageName: string, stageFase: string) => {
         // 1. Validate Move
-        const validation = validateMove(card, stageId)
+        const validation = validateMoveSync(card, stageId)
         if (!validation.valid) {
             setPendingStageChange({
                 stageId,
@@ -727,6 +727,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 onConfirm={handleConfirmQualityGate}
                 targetStageName={pendingStageChange?.targetStageName || ''}
                 cardId={card.id!}
+                initialData={card as any}
             />
 
             <StageChangeModal

@@ -12,56 +12,36 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { useToast } from '../../contexts/ToastContext';
-import { Loader2, Search, Edit2, Trash2, Shield, Users, FileText, Mail } from 'lucide-react';
+import { Loader2, Search, Edit2, Trash2, Shield, Users, FileText, Mail, Key, Briefcase } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { AddUserModal } from '../../components/admin/users/AddUserModal';
 import { EditUserModal } from '../../components/admin/users/EditUserModal';
 import InviteManager from '../../components/admin/users/InviteManager';
 import AuditLogViewer from '../../components/admin/audit/AuditLogViewer';
+import { RoleManagement } from '../../components/admin/roles/RoleManagement';
+import { TeamManagement } from '../../components/admin/teams/TeamManagement';
+import { useRoles } from '../../hooks/useRoles';
+import { useUsers } from '../../hooks/useUsers';
 
 export default function UserManagement() {
     const { profile } = useAuth();
     const { toast } = useToast();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [users, setUsers] = useState<any[]>([]);
+    const { users, isLoading: loading, refetch: refetchUsers, toggleUserStatus, deleteUser } = useUsers();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [teams, setTeams] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+    // Get roles for display
+    const { roles } = useRoles();
+
     useEffect(() => {
-        fetchUsers();
         fetchTeams();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const fetchUsers = async () => {
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select(`
-                    *,
-                    teams (
-                        id,
-                        name
-                    )
-                `)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setUsers(data || []);
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            toast({ title: 'Erro', description: 'Falha ao carregar usuários.', type: 'error' });
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const fetchTeams = async () => {
         try {
@@ -75,17 +55,7 @@ export default function UserManagement() {
 
     const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ active: !currentStatus })
-                .eq('id', userId);
-
-            if (error) throw error;
-
-            setUsers(users.map(u =>
-                u.id === userId ? { ...u, active: !currentStatus } : u
-            ));
-
+            await toggleUserStatus.mutateAsync({ userId, currentStatus });
             toast({ title: 'Sucesso', description: 'Status do usuário atualizado.', type: 'success' });
         } catch (error) {
             console.error('Error toggling status:', error);
@@ -93,10 +63,36 @@ export default function UserManagement() {
         }
     };
 
+    const handleDeleteUser = async (userId: string) => {
+        if (!confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) return;
+
+        try {
+            await deleteUser.mutateAsync(userId);
+            toast({ title: 'Sucesso', description: 'Usuário excluído com sucesso.', type: 'success' });
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            toast({ title: 'Erro', description: 'Falha ao excluir usuário.', type: 'error' });
+        }
+    };
+
     const filteredUsers = users.filter(user =>
         user.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Helper to get role display name
+    const getRoleDisplay = (user: any) => {
+        // First try new role_id
+        if (user.role_id) {
+            const role = roles.find(r => r.id === user.role_id);
+            if (role) return { name: role.display_name, color: role.color };
+        }
+        // Fallback to legacy role enum
+        if (user.role) {
+            return { name: user.role, color: 'bg-gray-100 text-gray-800' };
+        }
+        return { name: '-', color: 'bg-gray-100 text-gray-800' };
+    };
 
     if (!profile?.is_admin && profile?.role !== 'admin') {
         return (
@@ -114,14 +110,22 @@ export default function UserManagement() {
         <div className="space-y-8">
             <div>
                 <h2 className="text-2xl font-bold text-foreground">Gestão de Equipe</h2>
-                <p className="text-muted-foreground">Gerencie usuários, convites e auditoria.</p>
+                <p className="text-muted-foreground">Gerencie usuários, roles, convites e auditoria.</p>
             </div>
 
             <Tabs defaultValue="users" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 lg:w-[600px] mb-8">
+                <TabsList className="grid w-full grid-cols-5 lg:w-[800px] mb-8">
                     <TabsTrigger value="users" className="gap-2">
                         <Users className="w-4 h-4" />
-                        Usuários Ativos
+                        Usuários
+                    </TabsTrigger>
+                    <TabsTrigger value="roles" className="gap-2">
+                        <Key className="w-4 h-4" />
+                        Roles
+                    </TabsTrigger>
+                    <TabsTrigger value="teams" className="gap-2">
+                        <Briefcase className="w-4 h-4" />
+                        Times
                     </TabsTrigger>
                     <TabsTrigger value="invites" className="gap-2">
                         <Mail className="w-4 h-4" />
@@ -144,7 +148,7 @@ export default function UserManagement() {
                                 className="pl-9"
                             />
                         </div>
-                        <AddUserModal teams={teams} onSuccess={fetchUsers} />
+                        <AddUserModal teams={teams} onSuccess={refetchUsers} />
                     </div>
 
                     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
@@ -181,9 +185,14 @@ export default function UserManagement() {
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="secondary" className="capitalize">
-                                                    {user.role}
-                                                </Badge>
+                                                {(() => {
+                                                    const roleInfo = getRoleDisplay(user);
+                                                    return (
+                                                        <Badge className={roleInfo.color}>
+                                                            {roleInfo.name}
+                                                        </Badge>
+                                                    );
+                                                })()}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {user.teams?.name || '-'}
@@ -212,9 +221,19 @@ export default function UserManagement() {
                                                         variant="ghost"
                                                         size="icon"
                                                         onClick={() => handleToggleStatus(user.id, user.active)}
-                                                        className={user.active ? 'text-destructive hover:text-destructive/90 hover:bg-destructive/10' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}
+                                                        className={user.active ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'}
+                                                        title={user.active ? 'Desativar Usuário' : 'Ativar Usuário'}
                                                     >
-                                                        {user.active ? <Trash2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                                                        {user.active ? <Shield className="w-4 h-4" /> : <Shield className="w-4 h-4 fill-current" />}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                                                        title="Excluir Usuário"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </div>
                                             </TableCell>
@@ -224,6 +243,14 @@ export default function UserManagement() {
                             </TableBody>
                         </Table>
                     </div>
+                </TabsContent>
+
+                <TabsContent value="roles" className="animate-in fade-in-50 duration-500">
+                    <RoleManagement />
+                </TabsContent>
+
+                <TabsContent value="teams" className="animate-in fade-in-50 duration-500">
+                    <TeamManagement />
                 </TabsContent>
 
                 <TabsContent value="invites" className="animate-in fade-in-50 duration-500">
@@ -240,7 +267,7 @@ export default function UserManagement() {
                 onClose={() => setIsEditModalOpen(false)}
                 user={selectedUser}
                 teams={teams}
-                onSuccess={fetchUsers}
+                onSuccess={refetchUsers}
             />
         </div>
     );

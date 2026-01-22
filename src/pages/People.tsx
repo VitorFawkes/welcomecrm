@@ -8,7 +8,7 @@ import { PeopleFilterDrawer } from '../components/people/PeopleFilterDrawer'
 import { PeopleActiveFilters } from '../components/people/PeopleActiveFilters'
 import PersonDetailDrawer from '../components/people/PersonDetailDrawer'
 import PeopleStatsBar from '../components/people/PeopleStatsBar'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '../components/ui/drawer'
+import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle } from '../components/ui/drawer'
 import ContactForm from '../components/card/ContactForm'
 
 export default function People() {
@@ -117,6 +117,7 @@ export default function People() {
                 <PersonDetailDrawer
                     person={selectedPerson}
                     onClose={() => setSelectedPerson(null)}
+                    onRefresh={refresh}
                 />
 
                 <Drawer open={isNewPersonDrawerOpen} onOpenChange={setIsNewPersonDrawerOpen}>
@@ -126,12 +127,12 @@ export default function People() {
                                 Novo Contato
                             </DrawerTitle>
                         </DrawerHeader>
-                        <div className="p-6">
+                        <DrawerBody>
                             <ContactForm
                                 onSave={handleCreateSuccess}
                                 onCancel={() => setIsNewPersonDrawerOpen(false)}
                             />
-                        </div>
+                        </DrawerBody>
                     </DrawerContent>
                 </Drawer>
             </div>

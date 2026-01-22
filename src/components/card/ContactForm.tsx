@@ -19,8 +19,9 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
     const [potentialGuardians, setPotentialGuardians] = useState<Contato[]>([])
 
     const [formData, setFormData] = useState<Partial<Contato>>({
-        nome: initialName,
-        tipo_pessoa: 'adulto',
+        nome: contact?.nome || initialName,
+        sobrenome: contact?.sobrenome || '',
+        tipo_pessoa: contact?.tipo_pessoa || 'adulto',
         ...contact
     })
 
@@ -60,15 +61,18 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
         setSaving(true)
 
         try {
+            // Build payload explicitly - do NOT spread formData as it may contain extra props (e.g., stats)
             const dataToSave = {
-                ...formData,
-                // Ensure empty strings are null for optional fields
+                nome: formData.nome || null,
+                sobrenome: formData.sobrenome || null,
+                tipo_pessoa: formData.tipo_pessoa || 'adulto',
                 email: formData.email || null,
                 telefone: formData.telefone || null,
                 cpf: formData.cpf || null,
                 passaporte: formData.passaporte || null,
                 data_nascimento: formData.data_nascimento || null,
-                responsavel_id: formData.tipo_pessoa === 'adulto' ? null : formData.responsavel_id
+                responsavel_id: formData.tipo_pessoa === 'adulto' ? null : formData.responsavel_id,
+                observacoes: formData.observacoes || null
             }
 
             let result
@@ -118,13 +122,22 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Nome *</label>
                     <input
                         type="text"
                         required
                         value={formData.nome || ''}
                         onChange={e => setFormData({ ...formData, nome: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Sobrenome</label>
+                    <input
+                        type="text"
+                        value={formData.sobrenome || ''}
+                        onChange={e => setFormData({ ...formData, sobrenome: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
                     />
                 </div>

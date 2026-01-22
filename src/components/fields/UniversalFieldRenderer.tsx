@@ -170,6 +170,38 @@ export default function UniversalFieldRenderer({
 
     // --- EDIT MODE ---
     if (mode === 'edit') {
+        // Special case: destinos field uses comma-separated text input
+        if (field.key === 'destinos') {
+            const destinos = Array.isArray(value) ? value : []
+            const textValue = destinos.join(', ')
+
+            return (
+                <div className="space-y-3">
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <MapPin className="h-4 w-4 text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            defaultValue={textValue}
+                            onBlur={(e) => {
+                                const newDestinos = e.target.value
+                                    .split(',')
+                                    .map((s: string) => s.trim())
+                                    .filter((s: string) => s.length > 0)
+                                onChange?.(newDestinos)
+                            }}
+                            placeholder="Ex: Paris, Londres, Roma"
+                            className="block w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50/50 focus:bg-white transition-colors"
+                        />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                        Separe os destinos por vírgula para identificá-los individualmente.
+                    </p>
+                </div>
+            )
+        }
+
         switch (field.type) {
             case 'textarea':
                 return (
@@ -178,7 +210,6 @@ export default function UniversalFieldRenderer({
                         onChange={(e) => onChange?.(e.target.value)}
                         className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-gray-50/50 focus:bg-white min-h-[120px]"
                         placeholder={field.label || ''}
-                        autoFocus
                     />
                 )
             case 'select':
@@ -187,7 +218,6 @@ export default function UniversalFieldRenderer({
                         value={value || ''}
                         onChange={(e) => onChange?.(e.target.value)}
                         className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                        autoFocus
                     >
                         <option value="">Selecione...</option>
                         {options.map((opt: any, idx: number) => {
@@ -316,7 +346,6 @@ export default function UniversalFieldRenderer({
                         value={value || ''}
                         onChange={(e) => onChange?.(e.target.value)}
                         className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
-                        autoFocus
                     />
                 )
             case 'date_range':
@@ -354,7 +383,6 @@ export default function UniversalFieldRenderer({
                                 onChange={(e) => onChange?.(parseFloat(e.target.value) || 0)}
                                 className="w-full pl-12 pr-4 py-3 text-lg font-semibold text-gray-900 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
                                 placeholder="0,00"
-                                autoFocus
                             />
                         </div>
                     </div>
@@ -380,7 +408,6 @@ export default function UniversalFieldRenderer({
                         }}
                         className="w-full px-3 py-2.5 text-sm font-mono border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-gray-50/50 focus:bg-white min-h-[120px]"
                         placeholder="{}"
-                        autoFocus
                     />
                 )
             default: // text, number
@@ -391,7 +418,6 @@ export default function UniversalFieldRenderer({
                         onChange={(e) => onChange?.(e.target.value)}
                         className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow"
                         placeholder={field.label || ''}
-                        autoFocus
                     />
                 )
         }

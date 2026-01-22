@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Users, Loader2, Edit2, Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
+import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle } from '../ui/drawer'
 import { Button } from '../ui/Button'
+import ContactForm from './ContactForm'
 import type { Database } from '../../database.types'
 
 type Contato = Database['public']['Tables']['contatos']['Row']
@@ -95,6 +97,7 @@ export default function CardTravelers({ card, embedded = false }: CardTravelersP
     })
 
     const [travelerToDelete, setTravelerToDelete] = useState<string | null>(null)
+    const [contactToEdit, setContactToEdit] = useState<Contato | null>(null)
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
@@ -137,7 +140,7 @@ export default function CardTravelers({ card, embedded = false }: CardTravelersP
                         key={id}
                         contact={contato}
                         tipo_viajante={tipo_viajante}
-                        onEdit={() => { }}
+                        onEdit={(c) => setContactToEdit(c)}
                         onDelete={() => handleDelete(id)}
                     />
                 ))}
@@ -178,6 +181,28 @@ export default function CardTravelers({ card, embedded = false }: CardTravelersP
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                {/* Edit Contact Drawer */}
+                <Drawer open={!!contactToEdit} onOpenChange={(open) => !open && setContactToEdit(null)}>
+                    <DrawerContent className="max-h-[90vh]">
+                        <DrawerHeader>
+                            <DrawerTitle>Editar Contato</DrawerTitle>
+                        </DrawerHeader>
+                        <DrawerBody>
+                            {contactToEdit && (
+                                <ContactForm
+                                    key={contactToEdit.id}
+                                    contact={contactToEdit}
+                                    onSave={() => {
+                                        queryClient.invalidateQueries({ queryKey: ['card-contacts', card.id] })
+                                        setContactToEdit(null)
+                                    }}
+                                    onCancel={() => setContactToEdit(null)}
+                                />
+                            )}
+                        </DrawerBody>
+                    </DrawerContent>
+                </Drawer>
             </div>
         )
 

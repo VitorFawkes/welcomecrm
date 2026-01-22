@@ -36,7 +36,8 @@ import {
     Search,
     Save,
     Trash2,
-    Package
+    Package,
+    Building
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -45,6 +46,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+    TooltipProvider,
+} from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
 
 interface FieldMapping {
     id: string;
@@ -84,6 +92,7 @@ interface InternalFieldDefinition {
     label: string;
     group: string;
     icon: React.ComponentType<{ className?: string }>;
+    description?: string;
     required?: boolean;
     isCustom?: boolean;
     customFieldId?: string;
@@ -91,22 +100,37 @@ interface InternalFieldDefinition {
 
 // Internal CRM fields with Lucide icons
 const INTERNAL_FIELDS: InternalFieldDefinition[] = [
-    { value: 'sender_phone', label: 'Telefone do Remetente', group: 'Contato', icon: Phone, required: true },
-    { value: 'sender_name', label: 'Nome do Remetente', group: 'Contato', icon: User },
-    { value: 'body', label: 'Conteúdo da Mensagem', group: 'Mensagem', icon: MessageSquare, required: true },
-    { value: 'external_id', label: 'ID Externo (WhatsApp)', group: 'Mensagem', icon: Hash, required: true },
-    { value: 'conversation_id', label: 'ID da Conversa', group: 'Mensagem', icon: Link2 },
-    { value: 'session_id', label: 'ID da Sessão', group: 'Mensagem', icon: Link2 },
-    { value: 'lead_id', label: 'ID do Lead (Externo)', group: 'Mensagem', icon: Tag },
-    { value: 'direction', label: 'Direção (in/out)', group: 'Mensagem', icon: Send },
-    { value: 'message_type', label: 'Tipo de Mensagem', group: 'Mensagem', icon: FileText },
-    { value: 'is_from_me', label: 'Enviada por Mim?', group: 'Mensagem', icon: Send },
-    { value: 'created_at', label: 'Data/Hora', group: 'Mensagem', icon: Clock },
-    { value: 'ack_status', label: 'Status de Confirmação', group: 'Status', icon: Check },
-    { value: 'origem', label: 'Origem (sdr-trips, etc)', group: 'Metadata', icon: Tag },
-    { value: 'produto', label: 'Produto (trips, weddings, etc)', group: 'Metadata', icon: Package },
-    { value: 'media_url', label: 'URL da Mídia', group: 'Mídia', icon: FileText },
-    { value: 'file_type', label: 'Tipo de Arquivo', group: 'Mídia', icon: FileText },
+    { value: 'sender_phone', label: 'Telefone do Remetente', group: 'Contato', icon: Phone, required: true, description: 'Telefone de quem enviou a mensagem' },
+    { value: 'sender_name', label: 'Nome do Remetente', group: 'Contato', icon: User, description: 'Nome de quem enviou (cliente ou agente)' },
+    { value: 'body', label: 'Conteúdo da Mensagem', group: 'Mensagem', icon: MessageSquare, required: true, description: 'Conteúdo/texto da mensagem' },
+    { value: 'external_id', label: 'ID Externo (WhatsApp)', group: 'Mensagem', icon: Hash, required: true, description: 'ID único da mensagem no WhatsApp (wamid.xxx)' },
+    { value: 'conversation_id', label: 'ID da Conversa', group: 'Mensagem', icon: Link2, description: 'Agrupa todas as msgs de um chat cliente↔Welcome' },
+    { value: 'session_id', label: 'ID da Sessão', group: 'Mensagem', icon: Link2, description: 'Período de interação contínua (legado ChatPro)' },
+    { value: 'lead_id', label: 'ID do Lead (Externo)', group: 'Mensagem', icon: Tag, description: 'ID do lead na plataforma Ecko' },
+    { value: 'direction', label: 'Direção (in/out)', group: 'Mensagem', icon: Send, description: 'inbound (cliente→Welcome) ou outbound (Welcome→cliente)' },
+    { value: 'message_type', label: 'Tipo de Mensagem', group: 'Mensagem', icon: FileText, description: 'Tipo: text, image, document, audio, video, etc' },
+    { value: 'is_from_me', label: 'Enviada por Mim?', group: 'Mensagem', icon: Send, description: 'true se a Welcome enviou' },
+    { value: 'created_at', label: 'Data/Hora', group: 'Mensagem', icon: Clock, description: 'Data/hora da mensagem' },
+    { value: 'ack_status', label: 'Status de Confirmação', group: 'Status', icon: Check, description: 'Status de entrega: sent, delivered, read, failed' },
+    { value: 'origem', label: 'Origem (sdr-trips, etc)', group: 'Metadata', icon: Tag, description: 'Contexto da linha: sdr-trips, planner-weddings' },
+    { value: 'produto', label: 'Produto (trips, weddings, etc)', group: 'Metadata', icon: Package, description: 'Produto: TRIPS, WEDDING, CORP' },
+    { value: 'media_url', label: 'URL da Mídia', group: 'Mídia', icon: FileText, description: 'URL de mídia (imagem, vídeo, documento)' },
+    { value: 'file_type', label: 'Tipo de Arquivo', group: 'Mídia', icon: FileText, description: 'Tipo MIME do arquivo' },
+    { value: 'sector', label: 'Setor (Welcome)', group: 'Metadata', icon: Tag, description: 'Setor da pessoa da Welcome que enviou/recebeu' },
+    { value: 'phone_number_id', label: 'ID da Linha', group: 'Metadata', icon: Hash, description: 'ID da linha no provedor (ex: Ecko phone_number_id)' },
+    { value: 'phone_number_label', label: 'Nome da Linha', group: 'Metadata', icon: Tag, description: 'Nome da linha (ex: Concierge Welcome)' },
+    { value: 'actor_type', label: 'Tipo de Ator', group: 'Metadata', icon: User, description: 'Tipo de ator: customer, agent, system' },
+    { value: 'conversation_status', label: 'Status da Conversa', group: 'Mensagem', icon: Check, description: 'Status da conversa: active, closed, etc' },
+    // NEW: Complete Ecko Fields (2026-01-20)
+    { value: 'agent_email', label: 'Email do Agente', group: 'Agente', icon: User, description: 'Email do agente Welcome que atendeu' },
+    { value: 'organization', label: 'Organização', group: 'Metadata', icon: Building, description: 'Organização no Ecko (ex: Welcome)' },
+    { value: 'organization_id', label: 'ID da Organização', group: 'Metadata', icon: Hash, description: 'ID da organização no Ecko' },
+    { value: 'whatsapp_message_id', label: 'ID WhatsApp (wamid)', group: 'Mensagem', icon: Hash, description: 'ID real do WhatsApp (wamid.xxx)' },
+    { value: 'is_read', label: 'Mensagem Lida?', group: 'Status', icon: Check, description: 'Se a mensagem foi lida pelo destinatário' },
+    { value: 'has_error', label: 'Tem Erro?', group: 'Status', icon: AlertCircle, description: 'Se houve erro no envio/recebimento' },
+    { value: 'error_message', label: 'Mensagem de Erro', group: 'Status', icon: AlertCircle, description: 'Descrição do erro, se houver' },
+    { value: 'contact_tags', label: 'Tags do Contato', group: 'Contato', icon: Tag, description: 'Tags do contato no Ecko (array JSON)' },
+    { value: 'assigned_to', label: 'Atribuído Para', group: 'Agente', icon: User, description: 'ID do agente atribuído à conversa' },
 ];
 
 const TRANSFORM_TYPES = [
@@ -204,9 +228,23 @@ function DroppableCrmField({
                         )} />
                     </div>
                     <div>
-                        <p className={cn("font-medium text-sm", isRemoving && "line-through text-slate-400")}>
-                            {field.label}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                            <p className={cn("font-medium text-sm", isRemoving && "line-through text-slate-400")}>
+                                {field.label}
+                            </p>
+                            {field.description && (
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-xs">
+                                            <p className="text-xs">{field.description}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            )}
+                        </div>
                         <p className="text-[10px] text-slate-500 font-mono">{field.value}</p>
                     </div>
                 </div>

@@ -5,6 +5,8 @@ import { useLibrarySearch, type LibraryCategory, type LibrarySearchResult } from
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { ItemCreatorDrawer } from '@/components/proposals/builder/ItemCreatorDrawer'
+import type { ProposalItemType } from '@/types/proposals'
 
 interface ProposalCatalogSectionProps {
     type: 'flights' | 'hotels' | 'experiences' | 'transfers'
@@ -44,6 +46,7 @@ export function ProposalCatalogSection({
 }: ProposalCatalogSectionProps) {
     const { sections, addItemFromLibrary } = useProposalBuilder()
     const [search, setSearch] = useState('')
+    const [isCreatorOpen, setIsCreatorOpen] = useState(false)
 
     // Get items from library
     const category = TYPE_TO_CATEGORY[type]
@@ -82,6 +85,34 @@ export function ProposalCatalogSection({
 
         addItemFromLibrary(sectionId, item)
         toast.success(`${item.name || 'Item'} adicionado!`)
+    }
+
+    // Get section ID for creating new items
+    const getTargetSectionId = () => {
+        let sectionId = sections.find(s =>
+            s.title?.toLowerCase().includes(type.slice(0, -1))
+        )?.id
+        if (!sectionId && sections.length > 0) {
+            sectionId = sections[0].id
+        }
+        return sectionId
+    }
+
+    // Map section type to item type
+    const TYPE_TO_ITEM_TYPE: Record<string, ProposalItemType> = {
+        flights: 'flight',
+        hotels: 'hotel',
+        experiences: 'experience',
+        transfers: 'transfer',
+    }
+
+    const handleOpenCreator = () => {
+        const sectionId = getTargetSectionId()
+        if (!sectionId) {
+            toast.error('Crie uma seção primeiro para adicionar itens')
+            return
+        }
+        setIsCreatorOpen(true)
     }
 
     return (
@@ -132,17 +163,28 @@ export function ProposalCatalogSection({
             {/* Expanded Content */}
             {isActive && (
                 <div className="border-t border-slate-100 p-4">
-                    {/* Search */}
+                    {/* Search and Create */}
                     {!isPreview && (
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={`Buscar ${label.toLowerCase()}...`}
-                                className="w-full h-10 pl-10 pr-4 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
-                            />
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder={`Buscar ${label.toLowerCase()}...`}
+                                    className="w-full h-10 pl-10 pr-4 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                                />
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleOpenCreator}
+                                className="h-10 px-3 whitespace-nowrap"
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                Criar
+                            </Button>
                         </div>
                     )}
 
@@ -195,7 +237,12 @@ export function ProposalCatalogSection({
                                             : 'Nenhum item encontrado na biblioteca'
                                         }
                                     </p>
-                                    <Button variant="outline" size="sm" className="mt-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-2"
+                                        onClick={handleOpenCreator}
+                                    >
                                         <Plus className="h-4 w-4 mr-1" />
                                         Criar Novo
                                     </Button>
@@ -205,6 +252,13 @@ export function ProposalCatalogSection({
                     )}
                 </div>
             )}
+            {/* Item Creator Drawer */}
+            <ItemCreatorDrawer
+                isOpen={isCreatorOpen}
+                onClose={() => setIsCreatorOpen(false)}
+                sectionId={getTargetSectionId() || ''}
+                itemType={TYPE_TO_ITEM_TYPE[type] || 'custom'}
+            />
         </div>
     )
 }

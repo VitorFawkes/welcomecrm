@@ -19,6 +19,8 @@ export interface ExtractionResult {
     rawText?: string
     confidence?: number
     suggestedCategory?: string
+    error?: string
+    details?: string
 }
 
 export function useAIExtractImage() {

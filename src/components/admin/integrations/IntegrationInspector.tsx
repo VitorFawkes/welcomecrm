@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Play } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Play, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/Badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
 
 interface IntegrationInspectorProps {
@@ -15,32 +17,59 @@ interface IntegrationInspectorProps {
 interface IntegrationEvent {
     id: string;
     integration_id: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying';
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'processed' | 'processed_shadow' | 'blocked' | 'ignored';
     created_at: string;
     payload: any;
     response: any;
     logs: any[];
     attempts: number;
+    processing_log?: string;
 }
+
+const STATUS_OPTIONS = [
+    { value: 'all', label: 'Todos os Status' },
+    { value: 'pending', label: 'Pendente' },
+    { value: 'processing', label: 'Processando' },
+    { value: 'processed', label: 'Processado' },
+    { value: 'processed_shadow', label: 'Shadow' },
+    { value: 'failed', label: 'Falhou' },
+    { value: 'blocked', label: 'Bloqueado' },
+    { value: 'ignored', label: 'Ignorado' },
+];
 
 export function IntegrationInspector({ integrationId }: IntegrationInspectorProps) {
     const queryClient = useQueryClient();
     const [selectedEvent, setSelectedEvent] = useState<IntegrationEvent | null>(null);
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [searchId, setSearchId] = useState<string>('');
+    const [limit, setLimit] = useState<number>(50);
 
-    const { data: events } = useQuery({
-        queryKey: ['integration_events', integrationId],
+    const { data: events, isLoading, refetch } = useQuery({
+        queryKey: ['integration_events', integrationId, statusFilter, searchId, limit],
         queryFn: async () => {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('integration_events' as any)
                 .select('*')
                 .eq('integration_id', integrationId)
                 .order('created_at', { ascending: false })
-                .limit(50);
+                .limit(limit);
+
+            // Apply status filter
+            if (statusFilter && statusFilter !== 'all') {
+                query = query.eq('status', statusFilter);
+            }
+
+            // Apply ID search (partial match)
+            if (searchId.trim()) {
+                query = query.ilike('id', `%${searchId.trim()}%`);
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
             return data as unknown as IntegrationEvent[];
         },
-        refetchInterval: 5000, // Live updates
+        refetchInterval: statusFilter === 'pending' || statusFilter === 'processing' ? 5000 : false,
     });
 
     const replayMutation = useMutation({
@@ -74,7 +103,53 @@ export function IntegrationInspector({ integrationId }: IntegrationInspectorProp
     return (
         <div className="grid grid-cols-3 gap-6 h-[600px]">
             <div className="col-span-1 border-r border-border pr-4 flex flex-col h-full">
-                <h3 className="text-sm font-medium text-muted-foreground mb-4">Histórico de Eventos</h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-muted-foreground">Histórico de Eventos</h3>
+                    <Button size="sm" variant="ghost" onClick={() => refetch()} disabled={isLoading}>
+                        <RotateCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                </div>
+                <div className="space-y-2 mb-4">
+                    <Input
+                        placeholder="Buscar por ID..."
+                        value={searchId}
+                        onChange={(e) => setSearchId(e.target.value)}
+                        className="h-8 text-xs"
+                    />
+                    <Select
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        options={STATUS_OPTIONS}
+                        placeholder="Status"
+                        className="h-8 text-xs"
+                    />
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            variant={limit === 50 ? 'default' : 'outline'}
+                            className="flex-1 text-xs h-7"
+                            onClick={() => setLimit(50)}
+                        >
+                            50
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={limit === 200 ? 'default' : 'outline'}
+                            className="flex-1 text-xs h-7"
+                            onClick={() => setLimit(200)}
+                        >
+                            200
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={limit === 500 ? 'default' : 'outline'}
+                            className="flex-1 text-xs h-7"
+                            onClick={() => setLimit(500)}
+                        >
+                            500
+                        </Button>
+                    </div>
+                </div>
                 <ScrollArea className="flex-1">
                     <div className="space-y-2">
                         {events?.map((event) => (

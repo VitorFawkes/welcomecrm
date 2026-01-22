@@ -19,7 +19,7 @@ const DrawerContent = React.forwardRef<
     <div
         ref={ref}
         className={cn(
-            "relative z-50 w-full max-w-md h-full border-l bg-white p-6 shadow-2xl duration-300 animate-in slide-in-from-right-full",
+            "relative z-50 w-full max-w-md h-full border-l bg-white shadow-2xl duration-300 animate-in slide-in-from-right-full flex flex-col overflow-hidden",
             className
         )}
         {...props}
@@ -35,7 +35,7 @@ const DrawerHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
     <div
         className={cn(
-            "flex flex-col space-y-1.5 text-left mb-6",
+            "flex-none flex flex-col space-y-1.5 text-left p-6 pb-4 border-b border-slate-100",
             className
         )}
         {...props}
@@ -49,13 +49,27 @@ const DrawerFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
     <div
         className={cn(
-            "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-auto pt-6 border-t border-gray-100",
+            "flex-none flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-4 border-t border-slate-100",
             className
         )}
         {...props}
     />
 )
 DrawerFooter.displayName = "DrawerFooter"
+
+const DrawerBody = ({
+    className,
+    ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+    <div
+        className={cn(
+            "flex-1 min-h-0 overflow-y-auto p-6",
+            className
+        )}
+        {...props}
+    />
+)
+DrawerBody.displayName = "DrawerBody"
 
 const DrawerTitle = React.forwardRef<
     HTMLParagraphElement,
@@ -86,6 +100,7 @@ export {
     Drawer,
     DrawerContent,
     DrawerHeader,
+    DrawerBody,
     DrawerFooter,
     DrawerTitle,
     DrawerClose

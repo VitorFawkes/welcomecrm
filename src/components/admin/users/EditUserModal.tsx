@@ -6,6 +6,7 @@ import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
+import { Shield, Users } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -13,31 +14,34 @@ import {
     DialogTitle,
     DialogFooter,
 } from '../../ui/dialog';
-import { ROLES } from '../../../constants/admin';
+import { useRoles } from '../../../hooks/useRoles';
+import { useTeamOptions } from '../../../hooks/useTeams';
 import type { Database } from '../../../database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type Team = Database['public']['Tables']['teams']['Row'];
 
 interface EditUserModalProps {
     user: Profile | null;
     isOpen: boolean;
     onClose: () => void;
-    teams: Team[];
+    teams?: any[]; // Legacy prop, now using useTeamOptions
     onSuccess?: () => void;
 }
 
-export function EditUserModal({ user, isOpen, onClose, teams, onSuccess }: EditUserModalProps) {
+export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModalProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isLoading, setIsLoading] = useState(false);
+
+    // Fetch roles and teams from database
+    const { roles, isLoading: rolesLoading } = useRoles();
+    const { options: teamOptions, isLoading: teamsLoading } = useTeamOptions(true);
 
     // Form State
     const [formData, setFormData] = useState({
         nome: '',
         email: '',
-        role: 'vendas',
-        produtos: [] as any[],
+        role_id: '',
         team_id: 'none'
     });
 
@@ -47,8 +51,7 @@ export function EditUserModal({ user, isOpen, onClose, teams, onSuccess }: EditU
             setFormData({
                 nome: user.nome || '',
                 email: user.email || '',
-                role: user.role || 'sdr',
-                produtos: (user as any).produtos || [],
+                role_id: (user as any).role_id || '',
                 team_id: (user as any).team_id || 'none'
             });
         }
@@ -90,11 +93,7 @@ export function EditUserModal({ user, isOpen, onClose, teams, onSuccess }: EditU
         try {
             await updateMutation.mutateAsync({
                 nome: formData.nome,
-                // Email is usually not editable directly in profiles without auth update,
-                // but for display name/role/team it's fine.
-                // We won't update email here to avoid auth sync issues for now.
-                // If email should be updated, it needs to be added to the mutationFn and formData.
-                role: formData.role,
+                role_id: formData.role_id || null,
                 team_id: formData.team_id === 'none' ? null : formData.team_id
             });
         } finally {
@@ -102,16 +101,21 @@ export function EditUserModal({ user, isOpen, onClose, teams, onSuccess }: EditU
         }
     };
 
+    const roleOptions = roles.map(r => ({
+        value: r.id,
+        label: r.display_name
+    }));
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[550px]">
                 <DialogHeader>
                     <DialogTitle>Editar Usuário</DialogTitle>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
+                    {/* Basic Info Section */}
                     <div className="space-y-4">
-                        {/* Name */}
                         <div className="space-y-2">
                             <Label htmlFor="edit-name">Nome Completo</Label>
                             <Input
@@ -123,7 +127,6 @@ export function EditUserModal({ user, isOpen, onClose, teams, onSuccess }: EditU
                             />
                         </div>
 
-                        {/* Email (Read Only) */}
                         <div className="space-y-2">
                             <Label htmlFor="edit-email">Email (Não editável)</Label>
                             <Input
@@ -133,30 +136,52 @@ export function EditUserModal({ user, isOpen, onClose, teams, onSuccess }: EditU
                                 className="bg-muted text-muted-foreground cursor-not-allowed"
                             />
                         </div>
+                    </div>
 
-                        {/* Role */}
-                        <div className="space-y-2">
-                            <Label htmlFor="edit-role">Função (Role)</Label>
-                            <Select
-                                value={formData.role}
-                                onChange={(value) => setFormData({ ...formData, role: value })}
-                                options={ROLES.map(r => ({ value: r.value, label: r.label }))}
-                            />
+                    {/* Divider */}
+                    <div className="border-t border-slate-200" />
+
+                    {/* Access Control Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <Shield className="w-4 h-4 text-primary" />
+                            Controle de Acesso
                         </div>
 
-                        {/* Team */}
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-role">Role (Nível de Acesso)</Label>
+                            <Select
+                                value={formData.role_id}
+                                onChange={(value) => setFormData({ ...formData, role_id: value })}
+                                options={roleOptions}
+                                disabled={rolesLoading}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Define o que o usuário pode fazer no sistema (permissões).
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="border-t border-slate-200" />
+
+                    {/* Team Assignment Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <Users className="w-4 h-4 text-primary" />
+                            Organização
+                        </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="edit-team">Time / Squad</Label>
                             <Select
                                 value={formData.team_id}
                                 onChange={(value) => setFormData({ ...formData, team_id: value })}
-                                options={[
-                                    { value: 'none', label: 'Sem Time Definido' },
-                                    ...teams.map(t => ({ value: t.id, label: t.name }))
-                                ]}
+                                options={teamOptions}
+                                disabled={teamsLoading}
                             />
-                            <p className="text-xs text-gray-500">
-                                O departamento será ajustado automaticamente com base no time.
+                            <p className="text-xs text-muted-foreground">
+                                Define a qual equipe o usuário pertence (organização).
                             </p>
                         </div>
                     </div>

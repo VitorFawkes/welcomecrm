@@ -6,12 +6,12 @@ import StageRequirements from '../components/card/StageRequirements'
 import CardTasks from '../components/card/CardTasks'
 import TripInformation from '../components/card/TripInformation'
 import ObservacoesEstruturadas from '../components/card/ObservacoesEstruturadas'
-import ObservacoesLivres from '../components/card/ObservacoesLivres'
+import { DynamicSectionsList } from '../components/card/DynamicSectionWidget'
+
 import ConversationHistory from '../components/card/ConversationHistory'
 import PessoasWidget from '../components/card/PessoasWidget'
 
 import ActivityFeed from '../components/card/ActivityFeed'
-import { ProposalsWidget } from '../components/card/ProposalsWidget'
 import { ParentLinkBanner } from '../components/cards/group/ParentLinkBanner'
 import GroupDetailLayout from '../components/cards/group/GroupDetailLayout'
 import { ArrowLeft } from 'lucide-react'
@@ -103,13 +103,17 @@ export default function CardDetail() {
                     {/* Tasks & Meetings (Unified) */}
                     <CardTasks cardId={card.id!} />
 
-                    {/* Notes & Observations */}
+                    {/* Notes & Observations (Informações Importantes) */}
                     <ObservacoesEstruturadas card={card} />
 
-                    {/* General Free-form Observations */}
-                    <ObservacoesLivres card={card} />
+                    {/* Dynamic Custom Sections (left_column) - Always above ConversationHistory */}
+                    <DynamicSectionsList
+                        card={card}
+                        position="left_column"
+                        excludeKeys={['observacoes_criticas', 'trip_info', 'people', 'payment', 'system']}
+                    />
 
-                    {/* Conversation History */}
+                    {/* Conversation History - Always Last */}
                     <ConversationHistory cardId={card.id!} contactId={card.pessoa_principal_id} />
                 </div>
 
@@ -121,8 +125,12 @@ export default function CardDetail() {
                     {/* 3. Trip Details */}
                     <TripInformation card={card} />
 
-                    {/* 4. Proposals */}
-                    <ProposalsWidget cardId={card.id!} />
+                    {/* Dynamic Custom Sections (right_column) - includes Proposals widget */}
+                    <DynamicSectionsList
+                        card={card}
+                        position="right_column"
+                        excludeKeys={['observacoes_criticas', 'trip_info', 'people', 'payment', 'system']}
+                    />
 
                     {/* Activity Feed (History) */}
                     <ActivityFeed cardId={card.id!} />

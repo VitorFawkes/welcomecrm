@@ -97,7 +97,9 @@ export default function PeopleGrid({ people, loading, sort, setSort, onPersonCli
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-gray-900">{person.nome || 'Sem Nome'}</span>
+                                            <span className="font-medium text-gray-900">
+                                                {[person.nome, person.sobrenome].filter(Boolean).join(' ') || 'Sem Nome'}
+                                            </span>
                                             {person.stats?.is_group_leader && (
                                                 <Crown className="h-3 w-3 text-amber-500 fill-amber-500" />
                                             )}

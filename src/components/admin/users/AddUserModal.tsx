@@ -7,7 +7,8 @@ import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
 import { Copy, Check, UserPlus, Link as LinkIcon, Loader2 } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext'; // Added useAuth
+import { useAuth } from '../../../contexts/AuthContext';
+import { useRoles } from '../../../hooks/useRoles';
 
 interface Team {
     id: string;
@@ -19,25 +20,14 @@ interface AddUserModalProps {
     onSuccess: () => void;
 }
 
-const ROLES = [
-    { value: 'admin', label: 'Administrador' },
-    { value: 'gestor', label: 'Gestor' },
-    { value: 'vendas', label: 'Vendas' },
-    { value: 'sdr', label: 'SDR' },
-    { value: 'pos_venda', label: 'Pós-Venda' },
-    { value: 'concierge', label: 'Concierge' },
-    { value: 'financeiro', label: 'Financeiro' }
-] as const;
-
-type UserRole = typeof ROLES[number]['value'];
-
 export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
-    const { user } = useAuth(); // Added useAuth hook
+    const { user } = useAuth();
     const { toast } = useToast();
+    const { roles, isLoading: rolesLoading } = useRoles();
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState<UserRole | ''>('');
+    const [inviteRole, setInviteRole] = useState('');
     const [inviteTeam, setInviteTeam] = useState('');
     const [generatedLink, setGeneratedLink] = useState('');
     const [copied, setCopied] = useState(false);
@@ -110,8 +100,9 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
                             <Label>Papel (Role)</Label>
                             <Select
                                 value={inviteRole}
-                                onChange={(val) => setInviteRole(val as UserRole)}
-                                options={ROLES.map(r => ({ value: r.value, label: r.label }))}
+                                onChange={(val) => setInviteRole(val)}
+                                options={roles.map(r => ({ value: r.name, label: r.display_name }))}
+                                disabled={rolesLoading}
                             />
                         </div>
                         <div className="space-y-2">

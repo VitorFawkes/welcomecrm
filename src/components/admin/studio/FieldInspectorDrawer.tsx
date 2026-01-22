@@ -8,7 +8,8 @@ import { Plus, Trash2, GripVertical, AlertCircle } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import type { Database } from '../../../database.types'
 import UniversalFieldRenderer from '../../fields/UniversalFieldRenderer'
-import { SECTIONS, FIELD_TYPES } from '../../../constants/admin'
+import { FIELD_TYPES } from '../../../constants/admin'
+import { useGovernableSections } from '../../../hooks/useSections'
 
 type SystemField = Database['public']['Tables']['system_fields']['Row']
 
@@ -35,6 +36,10 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
     const [options, setOptions] = useState<any[]>([])
     const [newOptionLabel, setNewOptionLabel] = useState('')
     const [optionError, setOptionError] = useState<string | null>(null)
+
+    // Fetch governable sections dynamically
+    const { data: governableSections = [] } = useGovernableSections()
+    const sectionOptions = governableSections.map(s => ({ value: s.key, label: s.label }))
 
     useEffect(() => {
         if (field) {
@@ -246,7 +251,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                     <Select
                                         value={formData.section || 'trip_info'}
                                         onChange={val => setFormData({ ...formData, section: val })}
-                                        options={SECTIONS.filter(s => ['trip_info', 'observacoes_criticas'].includes(s.value)) as any}
+                                        options={sectionOptions.length > 0 ? sectionOptions : [{ value: 'trip_info', label: 'Informações da Viagem' }]}
                                     />
                                 </div>
                             </div>

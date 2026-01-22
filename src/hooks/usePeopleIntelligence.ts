@@ -64,7 +64,7 @@ export function usePeopleIntelligence() {
             // Apply Filters
             if (filters.search) {
                 const term = `%${filters.search}%`
-                query = query.or(`nome.ilike.${term},email.ilike.${term},cpf.ilike.${term}`)
+                query = query.or(`nome.ilike.${term},sobrenome.ilike.${term},email.ilike.${term},cpf.ilike.${term}`)
             }
 
             if (filters.type !== 'all') {

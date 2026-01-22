@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { MapPin, Tag, X, Check, History, Globe, AlertTriangle, Eraser, Plane, FileCheck, ThumbsUp, Upload } from 'lucide-react'
+import { MapPin, Tag, X, Check, History, AlertTriangle, Eraser, Plane, FileCheck } from 'lucide-react'
 
 import { supabase } from '../../lib/supabase'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '../../lib/utils'
 import { useStageRequirements } from '../../hooks/useStageRequirements'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
-import MarketingView from './MarketingView'
-import { Button } from '../ui/Button'
+// Marketing is now a regular section rendered via DynamicSectionWidget in CardDetail
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { SystemPhase } from '../../types/pipeline'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
@@ -170,7 +169,7 @@ export default function TripInformation({ card }: TripInformationProps) {
     // Fix: Use useMemo and a stable empty object to prevent infinite loops
     const productData = useMemo(() => (card.produto_data as any) || EMPTY_OBJECT, [card.produto_data])
     const briefingData = useMemo(() => (card.briefing_inicial as any) || EMPTY_OBJECT, [card.briefing_inicial])
-    const marketingData = useMemo(() => (card.marketing_data as any) || EMPTY_OBJECT, [card.marketing_data])
+    // Marketing data is now accessed via DynamicSectionWidget from produto_data
 
     const [viewMode, setViewMode] = useState<ViewMode>(SystemPhase.SDR)
     const [editingField, setEditingField] = useState<string | null>(null)
@@ -180,7 +179,7 @@ export default function TripInformation({ card }: TripInformationProps) {
 
     const queryClient = useQueryClient()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { missingBlocking, missingFuture } = useStageRequirements(card as any)
+    const { missingBlocking } = useStageRequirements(card as any)
     const { getVisibleFields } = useFieldConfig()
     const { data: phases } = usePipelinePhases()
 
@@ -291,8 +290,21 @@ export default function TripInformation({ card }: TripInformationProps) {
     const getFieldStatus = (dataKey: string) => {
         if (viewMode !== SystemPhase.SDR && viewMode !== SystemPhase.PLANNER) return 'ok' // Only validate in early stages
         if (correctionMode) return 'ok'
-        if (missingBlocking.some(req => req.field_key === dataKey)) return 'blocking'
-        if (missingFuture.some(req => req.field_key === dataKey)) return 'attention'
+
+        // Only show visual indicator for BLOCKING requirements (current stage)
+        // Future requirements should not create visual noise
+        const isBlocking = missingBlocking.some(req => {
+            // Handle both legacy and new typed requirements
+            if ('field_key' in req) return req.field_key === dataKey
+            return false
+        })
+
+        if (isBlocking) return 'blocking'
+
+        // REMOVED: Future requirement visual indicator - creates UI noise
+        // Users should only see "Obrigatório" for fields that block the CURRENT stage
+        // if (missingFuture.some(req => req.field_key === dataKey)) return 'attention'
+
         return 'ok'
     }
 
@@ -327,8 +339,8 @@ export default function TripInformation({ card }: TripInformationProps) {
                 </div>
 
                 <div className="flex gap-6 overflow-x-auto pb-1 scrollbar-hide">
-                    {phases?.filter(p => p.active && p.name !== 'Marketing')
-                        .filter(p => p.visible_in_card !== false) // Respect visibility setting
+                    {phases?.filter(p => p.active)
+                        .filter(p => p.visible_in_card !== false) // Respect visibility setting from StudioStructure
                         .slice(0, 6) // Limit to 6 phases
                         .map(phase => {
                             const isActive = viewMode === phase.slug
@@ -365,22 +377,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                             )
                         })}
 
-                    {/* Fixed Marketing Button */}
-                    <button
-                        onClick={() => {
-                            setViewMode('marketing')
-                            setCorrectionMode(false)
-                        }}
-                        className={cn(
-                            "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
-                            viewMode === 'marketing'
-                                ? "border-pink-500 text-pink-600"
-                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                        )}
-                    >
-                        <Globe className="h-4 w-4" />
-                        Marketing
-                    </button>
+                    {/* Marketing is now a regular section rendered via DynamicSectionWidget */}
                 </div>
             </div>
 
@@ -390,13 +387,8 @@ export default function TripInformation({ card }: TripInformationProps) {
                 correctionMode && "bg-[#fffbf7]"
             )}>
 
-                {/* MARKETING VIEW */}
-                {viewMode === 'marketing' && (
-                    <MarketingView cardId={card.id!} initialData={marketingData} />
-                )}
-
                 {/* DYNAMIC WATERFALL VIEW (SDR, PLANNER, POS_VENDA, etc) */}
-                {(viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER || viewMode === SystemPhase.POS_VENDA || !['marketing'].includes(viewMode)) && (
+                {(viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER || viewMode === SystemPhase.POS_VENDA || phases?.some(p => p.slug === viewMode)) && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {visibleFields.length === 0 && (
                             <div className="col-span-full text-center py-8 text-gray-500 italic">
@@ -422,55 +414,9 @@ export default function TripInformation({ card }: TripInformationProps) {
                     </div>
                 )}
 
-                {/* POS-VENDA VIEW (Still Hardcoded for now as it has specific logic, but could be modularized later) */}
-                {viewMode === SystemPhase.POS_VENDA && (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Pre-Trip */}
-                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <Plane className="h-4 w-4" /> Pré-Embarque
-                                </h4>
-                                <div className="space-y-3">
-                                    {/* Placeholder for Post-Sales Fields - In a real implementation these would be dynamic fields */}
-                                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <span className="text-sm font-medium text-gray-700">Vouchers Enviados</span>
-                                        <Button variant="outline" size="sm" className="h-8 text-xs">
-                                            <Upload className="h-3 w-3 mr-1" /> Upload
-                                        </Button>
-                                    </div>
-                                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <span className="text-sm font-medium text-gray-700">Check-in Online</span>
-                                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Pendente</span>
-                                    </div>
-                                </div>
-                            </div>
+                {/* NOTE: POS_VENDA now uses the same modular logic as SDR/PLANNER via visibleFields */}
+                {/* The hardcoded POS_VENDA block has been removed to follow governance rules */}
 
-                            {/* Post-Trip */}
-                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <ThumbsUp className="h-4 w-4" /> Feedback & NPS
-                                </h4>
-                                <div className="space-y-3">
-                                    <div className="p-3 bg-gray-50 rounded-lg">
-                                        <label className="text-xs text-gray-500 block mb-1">NPS Score</label>
-                                        <div className="flex gap-1">
-                                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                                                <button key={n} className="w-6 h-6 rounded bg-white border border-gray-200 text-[10px] hover:bg-indigo-50 hover:border-indigo-200 transition-colors">
-                                                    {n}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="p-3 bg-gray-50 rounded-lg">
-                                        <label className="text-xs text-gray-500 block mb-1">Depoimento</label>
-                                        <textarea className="w-full text-sm bg-white border border-gray-200 rounded p-2 h-20 resize-none" placeholder="O que o cliente achou?" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* DYNAMIC PHASES VIEW (Generic Render) */}
                 {!['sdr', 'planner', 'pos_venda', 'marketing'].includes(viewMode) && (

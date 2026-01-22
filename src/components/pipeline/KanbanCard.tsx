@@ -1,11 +1,14 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Calendar, DollarSign, MapPin, Users, CheckSquare, AlertCircle, Clock, Link, Building } from 'lucide-react'
+import { Calendar, DollarSign, MapPin, Users, CheckSquare, AlertCircle, Clock, Link, Building, MoreVertical, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useDeleteCard } from '../../hooks/useDeleteCard'
+import DeleteCardModal from '../card/DeleteCardModal'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -29,9 +32,25 @@ export default function KanbanCard({ card }: KanbanCardProps) {
     }
 
     const handleClick = () => {
-        if (!isDragging) {
+        if (!isDragging && !showMenu) {
             navigate(`/cards/${card.id}`)
         }
+    }
+
+    // Delete card functionality
+    const [showMenu, setShowMenu] = useState(false)
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const { softDelete, isDeleting } = useDeleteCard()
+
+    const handleMenuClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        setShowMenu(!showMenu)
+    }
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        setShowMenu(false)
+        setShowDeleteModal(true)
     }
 
     // Fetch field settings for this phase (try phase_id first, fallback to fase)
@@ -406,6 +425,35 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 {card.prioridade === 'alta' && (
                     <div className="h-2 w-2 rounded-full bg-red-500 flex-shrink-0 mt-1.5" title="Prioridade Alta" />
                 )}
+
+                {/* Context Menu Button */}
+                <div className="relative">
+                    <button
+                        onClick={handleMenuClick}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 transition-all"
+                        title="Mais opções"
+                    >
+                        <MoreVertical className="h-4 w-4 text-gray-400" />
+                    </button>
+
+                    {showMenu && (
+                        <>
+                            <div
+                                className="fixed inset-0 z-40"
+                                onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+                            />
+                            <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                                <button
+                                    onClick={handleDeleteClick}
+                                    className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    Excluir
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* Group Parent Badge */}
@@ -464,6 +512,14 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     ) : null}
                 </div>
             </div>
+
+            <DeleteCardModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={() => softDelete(card.id!)}
+                isLoading={isDeleting}
+                cardTitle={card.titulo || undefined}
+            />
         </div>
     )
 }

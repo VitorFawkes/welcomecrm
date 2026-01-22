@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
 import { Check, RefreshCw, Settings, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSections, useSectionLabelsMap } from '@/hooks/useSections';
 
 interface SystemField {
     key: string;
@@ -24,6 +25,11 @@ interface ExternalField {
     metadata: Record<string, unknown>;
 }
 
+interface ACPipeline {
+    external_id: string;
+    external_name: string;
+}
+
 interface OutboundFieldMap {
     id: string;
     integration_id: string;
@@ -31,6 +37,7 @@ interface OutboundFieldMap {
     internal_field_label: string | null;
     external_field_id: string;
     external_field_name: string | null;
+    external_pipeline_id: string | null;
     sync_always: boolean;
     section?: string | null;
     is_active: boolean;
@@ -42,29 +49,37 @@ interface StageFieldConfig {
     is_visible: boolean;
 }
 
+interface PipelinePhase {
+    id: string;
+    name: string;
+    label: string;
+}
+
+interface PipelineStage {
+    id: string;
+    phase_id: string | null;
+    fase: string | null;
+}
+
 interface OutboundFieldMappingTabProps {
     integrationId: string;
 }
 
-// Section labels for display
-const SECTION_LABELS: Record<string, string> = {
-    trip_info: '✈️ Informações da Viagem',
-    people: '👥 Pessoas',
-    observacoes_criticas: '⚠️ Observações Críticas',
-    pos_venda: '📦 Pós-Venda',
-    marketing: '📊 Marketing',
-    financial: '💳 Financeiro',
-    system: '⚙️ Sistema',
-    header: '📋 Cabeçalho',
-    details: '📝 Detalhes',
-};
+// Section labels are now fetched dynamically from useSectionLabelsMap hook
 
 export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingTabProps) {
     const queryClient = useQueryClient();
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['trip_info', 'observacoes_criticas']));
     const [syncingAC, setSyncingAC] = useState(false);
+    const [selectedPipelineId, setSelectedPipelineId] = useState<string>('8');
+    const [selectedFase, setSelectedFase] = useState<string>(''); // Empty = show ALL fields
 
-    // 1. Fetch system_fields (SINGLE SOURCE OF TRUTH for CRM fields)
+    // Fetch sections dynamically (replaces hardcoded SECTION_LABELS and GOVERNABLE_SECTIONS)
+    const { data: sections = [], isLoading: loadingSections } = useSections();
+    const { data: sectionLabelsMap = {} } = useSectionLabelsMap();
+    const governableSectionKeys = sections.filter(s => s.is_governable).map(s => s.key);
+
+    // 1. Fetch system_fields
     const { data: systemFields = [], isLoading: loadingFields } = useQuery({
         queryKey: ['system-fields-for-mapping'],
         queryFn: async () => {
@@ -79,7 +94,22 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         }
     });
 
-    // 2. Fetch external AC fields from integration_catalog
+    // 2. Fetch AC pipelines
+    const { data: acPipelines = [] } = useQuery({
+        queryKey: ['ac-pipelines-catalog', integrationId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('integration_catalog')
+                .select('external_id, external_name')
+                .eq('integration_id', integrationId)
+                .eq('entity_type', 'pipeline')
+                .order('external_name');
+            if (error) throw error;
+            return data as ACPipeline[];
+        }
+    });
+
+    // 3. Fetch external AC fields
     const { data: externalFields = [], isLoading: loadingExternal } = useQuery({
         queryKey: ['ac-fields-catalog', integrationId],
         queryFn: async () => {
@@ -94,44 +124,125 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         }
     });
 
-    // 3. Fetch existing mappings
+    // 4. Fetch existing mappings
     const { data: existingMappings = [], isLoading: loadingMappings } = useQuery({
-        queryKey: ['outbound-field-mappings', integrationId],
+        queryKey: ['outbound-field-mappings', integrationId, selectedPipelineId],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('integration_outbound_field_map')
                 .select('*')
-                .eq('integration_id', integrationId);
+                .eq('integration_id', integrationId)
+                .eq('external_pipeline_id', selectedPipelineId);
             if (error) throw error;
-            return data as OutboundFieldMap[];
+            return (data || []) as unknown as OutboundFieldMap[];
         }
     });
 
-    // 4. Fetch stage visibility (to show which phases use each field)
+    // 5. Fetch stage_field_config (governance)
     const { data: stageConfigs = [] } = useQuery({
-        queryKey: ['stage-field-configs-visibility'],
+        queryKey: ['stage-field-configs-full'],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('stage_field_config')
-                .select('stage_id, field_key, is_visible')
-                .eq('is_visible', true);
+                .select('stage_id, field_key, is_visible');
             if (error) throw error;
             return data as StageFieldConfig[];
         }
     });
 
+    // 6. Fetch pipeline_phases
+    const { data: phases = [] } = useQuery({
+        queryKey: ['pipeline-phases-for-mapping'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('pipeline_phases')
+                .select('id, name, label')
+                .eq('active', true)
+                .order('order_index');
+            if (error) throw error;
+            return data as PipelinePhase[];
+        }
+    });
+
+    // 7. Fetch pipeline_stages
+    const { data: pipelineStages = [] } = useQuery({
+        queryKey: ['pipeline-stages-for-mapping'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('pipeline_stages')
+                .select('id, phase_id, fase');
+            if (error) throw error;
+            return data as PipelineStage[];
+        }
+    });
+
+    // Compute visible fields for the selected phase
+    // Logic: Match useFieldConfig behavior - default visible = true if no config exists
+    const visibleFieldsInPhase = useMemo(() => {
+        if (!selectedFase) return null; // null = show ALL
+
+        const phase = phases.find(p => p.name === selectedFase || p.label === selectedFase);
+        if (!phase) return [];
+
+        const stagesInPhase = pipelineStages.filter(s =>
+            s.phase_id === phase.id || (!s.phase_id && s.fase === phase.name)
+        );
+
+        if (stagesInPhase.length === 0) return [];
+
+        const stageIds = new Set(stagesInPhase.map(s => s.id));
+
+        // Build a map of field_key -> is_visible for this phase's stages
+        // If a field has is_visible = false in ANY stage, it's hidden
+        // If a field has is_visible = true in ANY stage, it's visible
+        // If a field has NO config for any stage, it's visible by default (useFieldConfig behavior)
+        const fieldVisibility = new Map<string, boolean>();
+
+        stageConfigs.forEach(config => {
+            if (!stageIds.has(config.stage_id)) return;
+
+            const currentValue = fieldVisibility.get(config.field_key);
+            // If already visible in another stage, keep it visible
+            if (currentValue === true) return;
+            // Otherwise, set to this config's value
+            fieldVisibility.set(config.field_key, config.is_visible);
+        });
+
+        // Now determine visible fields:
+        // - If field has explicit config -> use that value
+        // - If field has NO config -> default to visible (true)
+        return systemFields
+            .filter(field => {
+                const explicitVisibility = fieldVisibility.get(field.key);
+                // Default to true if no config exists (matches useFieldConfig)
+                return explicitVisibility !== false;
+            })
+            .map(field => field.key);
+    }, [selectedFase, phases, pipelineStages, stageConfigs, systemFields]);
+
     // Group fields by section
+    // IMPORTANT: Phase filter only applies to GOVERNABLE sections (trip_info, observacoes_criticas)
+    // Other sections (people, payment, system, etc.) always appear regardless of phase selection
     const fieldsBySection = useMemo(() => {
         const grouped: Record<string, SystemField[]> = {};
+
         systemFields.forEach(field => {
             const section = field.section || 'details';
+            const isGovernableSection = governableSectionKeys.includes(section);
+
+            // If phase selected AND this is a governable section, apply filter
+            if (visibleFieldsInPhase !== null && isGovernableSection) {
+                if (!visibleFieldsInPhase.includes(field.key)) return;
+            }
+
             if (!grouped[section]) grouped[section] = [];
             grouped[section].push(field);
         });
-        return grouped;
-    }, [systemFields]);
 
-    // Create lookup for existing mappings
+        return grouped;
+    }, [systemFields, visibleFieldsInPhase]);
+
+    // Lookup for existing mappings
     const mappingByField = useMemo(() => {
         const lookup: Record<string, OutboundFieldMap> = {};
         existingMappings.forEach(m => {
@@ -140,14 +251,16 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         return lookup;
     }, [existingMappings]);
 
-    // Count visible stages per field
-    const visibleStagesPerField = useMemo(() => {
-        const count: Record<string, number> = {};
-        stageConfigs.forEach(sc => {
-            count[sc.field_key] = (count[sc.field_key] || 0) + 1;
-        });
-        return count;
-    }, [stageConfigs]);
+    // AC field options for select
+    const acFieldOptions = useMemo(() => {
+        return [
+            { value: '', label: 'Não mapeado' },
+            ...externalFields.map(f => ({
+                value: f.external_id,
+                label: f.external_name || f.external_id
+            }))
+        ];
+    }, [externalFields]);
 
     // Upsert mapping mutation
     const upsertMapping = useMutation({
@@ -156,15 +269,14 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
             const externalMeta = externalFields.find(f => f.external_id === externalFieldId);
 
             if (!externalFieldId) {
-                // Remove mapping
                 const { error } = await supabase
                     .from('integration_outbound_field_map')
                     .delete()
                     .eq('integration_id', integrationId)
-                    .eq('internal_field', fieldKey);
+                    .eq('internal_field', fieldKey)
+                    .eq('external_pipeline_id', selectedPipelineId);
                 if (error) throw error;
             } else {
-                // Upsert mapping
                 const { error } = await supabase
                     .from('integration_outbound_field_map')
                     .upsert({
@@ -173,10 +285,11 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                         internal_field_label: fieldMeta?.label || null,
                         external_field_id: externalFieldId,
                         external_field_name: externalMeta?.external_name || null,
+                        external_pipeline_id: selectedPipelineId,
                         section: section,
                         sync_always: false,
                         is_active: true
-                    }, { onConflict: 'integration_id,internal_field' });
+                    }, { onConflict: 'integration_id,internal_field,external_pipeline_id' });
                 if (error) throw error;
             }
         },
@@ -186,7 +299,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         onError: (e) => toast.error(`Erro: ${e.message}`)
     });
 
-    // Toggle sync_always mutation
+    // Toggle sync_always
     const toggleSyncAlways = useMutation({
         mutationFn: async ({ id, syncAlways }: { id: string; syncAlways: boolean }) => {
             const { error } = await supabase
@@ -208,11 +321,11 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                 body: { integration_id: integrationId }
             });
             if (error) throw error;
-
             toast.success(`Sincronizado: ${data.fields_synced || 0} campos do ActiveCampaign`);
             queryClient.invalidateQueries({ queryKey: ['ac-fields-catalog'] });
-        } catch (e: any) {
-            toast.error(`Erro ao sincronizar: ${e.message}`);
+        } catch (e: unknown) {
+            const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
+            toast.error(`Erro ao sincronizar: ${errorMessage}`);
         } finally {
             setSyncingAC(false);
         }
@@ -230,17 +343,18 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         });
     };
 
-    const isLoading = loadingFields || loadingExternal || loadingMappings;
+    const isLoading = loadingFields || loadingExternal || loadingMappings || loadingSections;
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
         );
     }
 
-    const sections = Object.keys(fieldsBySection).sort();
+    const sectionKeys = Object.keys(fieldsBySection).sort();
+    const totalFieldsVisible = Object.values(fieldsBySection).flat().length;
 
     return (
         <div className="space-y-6">
@@ -251,35 +365,81 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                         <div>
                             <CardTitle className="flex items-center gap-2">
                                 <Settings className="w-5 h-5" />
-                                Mapeamento de Campos (Welcome → ActiveCampaign)
+                                Mapeamento de Campos (Welcome → AC)
                             </CardTitle>
                             <CardDescription>
                                 Configure quais campos do CRM sincronizam para o ActiveCampaign.
-                                Campos são agrupados por seção conforme configuração do sistema.
                             </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={handleSyncACFields}
-                                disabled={syncingAC}
-                            >
-                                {syncingAC ? (
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                ) : (
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                )}
-                                Sincronizar Campos AC
-                            </Button>
-                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={handleSyncACFields}
+                            disabled={syncingAC}
+                        >
+                            {syncingAC ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                            )}
+                            Sincronizar Campos AC
+                        </Button>
                     </div>
                 </CardHeader>
+            </Card>
+
+            {/* ONLY 2 FILTERS: Pipeline + Fase */}
+            <Card className="border-2 border-blue-200 bg-blue-50/30">
+                <CardContent className="py-4 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Pipeline AC Destino */}
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-semibold text-blue-700">
+                                🎯 Pipeline AC Destino
+                            </label>
+                            <Select
+                                value={selectedPipelineId}
+                                onChange={setSelectedPipelineId}
+                                options={acPipelines.map(p => ({
+                                    value: p.external_id,
+                                    label: p.external_name
+                                }))}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                Os mapeamentos serão salvos para este pipeline.
+                            </span>
+                        </div>
+
+                        {/* Fase Welcome */}
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-semibold text-amber-700">
+                                📋 Fase Welcome (Filtro)
+                            </label>
+                            <Select
+                                value={selectedFase}
+                                onChange={setSelectedFase}
+                                options={[
+                                    { value: '', label: '🔓 Todos os campos' },
+                                    ...phases.map(p => ({
+                                        value: p.name,
+                                        label: p.label
+                                    }))
+                                ]}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                {selectedFase
+                                    ? `Mostrando ${totalFieldsVisible} campos visíveis em ${selectedFase}`
+                                    : 'Mostrando todos os campos disponíveis'
+                                }
+                            </span>
+                        </div>
+                    </div>
+                </CardContent>
             </Card>
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
                 <div className="bg-muted/50 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold">{systemFields.length}</div>
+                    <div className="text-2xl font-bold">{totalFieldsVisible}</div>
                     <div className="text-xs text-muted-foreground">Campos CRM</div>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-4 text-center">
@@ -293,146 +453,132 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
             </div>
 
             {/* Sections */}
-            {sections.map(section => {
-                const fields = fieldsBySection[section];
-                const isExpanded = expandedSections.has(section);
-                const mappedCount = fields.filter(f => mappingByField[f.key]).length;
+            {sectionKeys.length === 0 ? (
+                <Card className="p-8 text-center text-muted-foreground">
+                    <p>Nenhum campo visível para esta fase.</p>
+                    <p className="text-sm mt-2">Selecione "Todos os campos" para ver todos os campos disponíveis.</p>
+                </Card>
+            ) : (
+                sectionKeys.map(section => {
+                    const fields = fieldsBySection[section];
+                    const isExpanded = expandedSections.has(section);
+                    const mappedCount = fields.filter(f => mappingByField[f.key]).length;
 
-                return (
-                    <Card key={section} className="overflow-hidden">
-                        <CardHeader
-                            className="cursor-pointer hover:bg-muted/30 transition-colors"
-                            onClick={() => toggleSection(section)}
-                        >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    {isExpanded ? (
-                                        <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                                    ) : (
-                                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                                    )}
-                                    <CardTitle className="text-base">
-                                        {SECTION_LABELS[section] || section}
-                                    </CardTitle>
-                                    <Badge variant="outline" className="text-xs">
-                                        {fields.length} campos
-                                    </Badge>
-                                    {mappedCount > 0 && (
-                                        <Badge variant="default" className="text-xs bg-green-600">
-                                            {mappedCount} mapeados
+                    return (
+                        <Card key={section} className="overflow-hidden">
+                            <CardHeader
+                                className="cursor-pointer hover:bg-muted/30 transition-colors"
+                                onClick={() => toggleSection(section)}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {isExpanded ? (
+                                            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                                        )}
+                                        <CardTitle className="text-base">
+                                            {sectionLabelsMap[section] || section}
+                                        </CardTitle>
+                                        <Badge variant="outline" className="text-xs">
+                                            {fields.length} campos
                                         </Badge>
-                                    )}
+                                        {mappedCount > 0 && (
+                                            <Badge variant="default" className="text-xs bg-green-600">
+                                                {mappedCount} mapeados
+                                            </Badge>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </CardHeader>
+                            </CardHeader>
 
-                        {isExpanded && (
-                            <CardContent className="pt-0">
-                                <div className="border rounded-lg overflow-hidden">
-                                    <table className="w-full">
-                                        <thead className="bg-muted/50">
-                                            <tr>
-                                                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-1/3">
-                                                    Campo CRM
-                                                </th>
-                                                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-1/3">
-                                                    → Campo ActiveCampaign
-                                                </th>
-                                                <th className="text-center px-4 py-2 text-xs font-medium text-muted-foreground w-20">
-                                                    Modo
-                                                </th>
-                                                <th className="text-center px-4 py-2 text-xs font-medium text-muted-foreground w-20">
-                                                    Fases
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {fields.map(field => {
-                                                const mapping = mappingByField[field.key];
-                                                const visibleStages = visibleStagesPerField[field.key] || 0;
+                            {isExpanded && (
+                                <CardContent className="pt-0">
+                                    <div className="border rounded-lg overflow-hidden">
+                                        <table className="w-full">
+                                            <thead className="bg-muted/50">
+                                                <tr>
+                                                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-1/3">
+                                                        Campo CRM
+                                                    </th>
+                                                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-1/3">
+                                                        → Campo ActiveCampaign
+                                                    </th>
+                                                    <th className="text-center px-4 py-2 text-xs font-medium text-muted-foreground w-24">
+                                                        Modo
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {fields.map(field => {
+                                                    const mapping = mappingByField[field.key];
 
-                                                return (
-                                                    <tr key={field.key} className={cn(
-                                                        "transition-colors",
-                                                        mapping && "bg-green-50/50"
-                                                    )}>
-                                                        <td className="px-4 py-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium">
-                                                                    {field.label}
-                                                                </span>
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    ({field.key})
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <Select
-                                                                value={mapping?.external_field_id || ''}
-                                                                onChange={(val) => upsertMapping.mutate({
-                                                                    fieldKey: field.key,
-                                                                    externalFieldId: val || null,
-                                                                    section: section
-                                                                })}
-                                                                options={[
-                                                                    { value: '', label: 'Não mapeado' },
-                                                                    ...externalFields.map(ef => ({
-                                                                        value: ef.external_id,
-                                                                        label: ef.external_name || ef.external_id
-                                                                    }))
-                                                                ]}
-                                                                placeholder="Selecione..."
-                                                                className="w-full"
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            {mapping ? (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className={cn(
-                                                                        "text-xs h-7",
-                                                                        mapping.sync_always
-                                                                            ? "text-green-600"
-                                                                            : "text-muted-foreground"
-                                                                    )}
-                                                                    onClick={() => toggleSyncAlways.mutate({
-                                                                        id: mapping.id,
-                                                                        syncAlways: !mapping.sync_always
+                                                    return (
+                                                        <tr key={field.key} className={cn(
+                                                            "transition-colors",
+                                                            mapping && "bg-green-50/50"
+                                                        )}>
+                                                            <td className="px-4 py-3">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-medium">
+                                                                        {field.label}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground font-mono">
+                                                                        {field.key}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <Select
+                                                                    value={mapping?.external_field_id || ''}
+                                                                    onChange={(val) => upsertMapping.mutate({
+                                                                        fieldKey: field.key,
+                                                                        externalFieldId: val || null,
+                                                                        section: section
                                                                     })}
-                                                                >
-                                                                    {mapping.sync_always ? (
-                                                                        <><Check className="w-3 h-3 mr-1" />Sempre</>
-                                                                    ) : (
-                                                                        'Na fase'
-                                                                    )}
-                                                                </Button>
-                                                            ) : (
-                                                                <span className="text-xs text-muted-foreground">-</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            {visibleStages > 0 ? (
-                                                                <Badge variant="outline" className="text-xs">
-                                                                    {visibleStages}
-                                                                </Badge>
-                                                            ) : (
-                                                                <Badge variant="secondary" className="text-xs opacity-50">
-                                                                    0
-                                                                </Badge>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        )}
-                    </Card>
-                );
-            })}
+                                                                    options={acFieldOptions}
+                                                                    placeholder="Selecione..."
+                                                                    className="w-full"
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                {mapping ? (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className={cn(
+                                                                            "text-xs h-7",
+                                                                            mapping.sync_always
+                                                                                ? "text-green-600"
+                                                                                : "text-muted-foreground"
+                                                                        )}
+                                                                        onClick={() => toggleSyncAlways.mutate({
+                                                                            id: mapping.id,
+                                                                            syncAlways: !mapping.sync_always
+                                                                        })}
+                                                                    >
+                                                                        {mapping.sync_always ? (
+                                                                            <><Check className="w-3 h-3 mr-1" />Sempre</>
+                                                                        ) : (
+                                                                            'Na fase'
+                                                                        )}
+                                                                    </Button>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground">-</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </CardContent>
+                            )}
+                        </Card>
+                    );
+                })
+            )}
 
             {/* Info */}
             <Card className="bg-blue-50/50 border-blue-200">
@@ -441,11 +587,10 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                         💡 Como funciona
                     </h4>
                     <ul className="text-xs text-blue-600/80 space-y-1">
-                        <li><strong>Campos CRM:</strong> Lidos automaticamente de <code>system_fields</code> - sempre atualizados</li>
-                        <li><strong>Campos AC:</strong> Sincronizados via botão ou automaticamente do ActiveCampaign</li>
-                        <li><strong>Modo "Na fase":</strong> Sincroniza apenas se o campo está visível na fase atual do card</li>
+                        <li><strong>Pipeline AC:</strong> Selecione o pipeline de destino no ActiveCampaign</li>
+                        <li><strong>Fase Welcome:</strong> Filtre para ver apenas campos visíveis em uma fase específica (ou veja todos)</li>
+                        <li><strong>Modo "Na fase":</strong> Sincroniza apenas quando o campo está visível na fase atual</li>
                         <li><strong>Modo "Sempre":</strong> Sincroniza independentemente da fase</li>
-                        <li><strong>Fases:</strong> Número de etapas onde o campo está visível</li>
                     </ul>
                 </CardContent>
             </Card>

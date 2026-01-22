@@ -79,8 +79,7 @@ export function ProposalPreview() {
                         ) : (
                             <div className="space-y-6">
                                 {sections.map((section) => {
-                                    const sectionType = (section as any).type as keyof typeof SECTION_TYPE_CONFIG
-                                    const config = sectionType ? SECTION_TYPE_CONFIG[sectionType] : null
+                                    const config = SECTION_TYPE_CONFIG[section.section_type]
                                     return (
                                         <div key={section.id} className="border border-slate-100 rounded-lg p-4">
                                             <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">

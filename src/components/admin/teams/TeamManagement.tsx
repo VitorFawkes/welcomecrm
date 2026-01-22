@@ -1,222 +1,180 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../../lib/supabase';
+import { useTeams } from '../../../hooks/useTeams';
 import { Button } from '../../ui/Button';
-import { Skeleton } from '../../ui/Skeleton';
+import { Input } from '../../ui/Input';
 import {
-    LayoutGrid,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from '../../ui/Table';
+import {
+    Loader2,
+    Plus,
+    Search,
+    Edit2,
+    Trash2,
     Users,
-    FolderTree,
-    Pencil,
-    ChevronRight,
-    ChevronDown
+    Briefcase,
+    UserPlus
 } from 'lucide-react';
+import { Badge } from '../../ui/Badge';
 import { AddTeamModal } from './AddTeamModal';
 import { EditTeamModal } from './EditTeamModal';
-import type { Database } from '../../../database.types';
-
-type Department = Database['public']['Tables']['departments']['Row'];
-type Team = Database['public']['Tables']['teams']['Row'];
-type Profile = Database['public']['Tables']['profiles']['Row'];
-
-interface TeamWithMembers extends Team {
-    members: Profile[];
-}
-
-interface DepartmentWithTeams extends Department {
-    teams: TeamWithMembers[];
-}
+import { TeamMembers } from './TeamMembers';
+import { useToast } from '../../../contexts/ToastContext';
 
 export function TeamManagement() {
-    const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
-    const [editingTeam, setEditingTeam] = useState<Team | null>(null);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const { teams, isLoading, deleteTeam } = useTeams();
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [editingTeam, setEditingTeam] = useState<any>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [managingMembersTeam, setManagingMembersTeam] = useState<any>(null);
+    const { toast } = useToast();
 
-    // Fetch Departments
-    const { data: departments, isLoading: isLoadingDepts } = useQuery({
-        queryKey: ['departments'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('departments')
-                .select('*')
-                .order('name');
-            if (error) throw error;
-            return data;
+    const filteredTeams = teams?.filter(team =>
+        team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        team.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Tem certeza que deseja excluir este time?')) return;
+        try {
+            await deleteTeam.mutateAsync(id);
+            toast({ title: 'Sucesso', description: 'Time excluído com sucesso.', type: 'success' });
+        } catch (error) {
+            console.error('Error deleting team:', error);
+            toast({ title: 'Erro', description: 'Erro ao excluir time.', type: 'error' });
         }
-    });
-
-    // Fetch Teams and Members
-    const { data: hierarchy, isLoading: isLoadingHierarchy } = useQuery({
-        queryKey: ['team-hierarchy'],
-        queryFn: async () => {
-            // 1. Get all teams
-            const { data: teams, error: teamsError } = await supabase
-                .from('teams')
-                .select('*')
-                .order('name');
-            if (teamsError) throw teamsError;
-
-            // 2. Get all profiles with team_id
-            const { data: profiles, error: profilesError } = await (supabase.from('profiles') as any)
-                .select('id, nome, email, role, team_id, active')
-                .not('team_id', 'is', null);
-            if (profilesError) throw profilesError;
-
-            // 3. Get all departments (already fetched but needed for structure)
-            const { data: depts, error: deptsError } = await supabase
-                .from('departments')
-                .select('*')
-                .order('name');
-            if (deptsError) throw deptsError;
-
-            // 4. Build Hierarchy
-            const hierarchy: DepartmentWithTeams[] = depts.map(dept => {
-                const deptTeams = teams
-                    .filter(t => t.department_id === dept.id)
-                    .map(team => ({
-                        ...team,
-                        members: profiles.filter((p: any) => p.team_id === team.id)
-                    }));
-
-                return {
-                    ...dept,
-                    teams: deptTeams
-                };
-            });
-
-            return hierarchy;
-        }
-    });
-
-    const toggleDept = (deptId: string) => {
-        const newExpanded = new Set(expandedDepts);
-        if (newExpanded.has(deptId)) {
-            newExpanded.delete(deptId);
-        } else {
-            newExpanded.add(deptId);
-        }
-        setExpandedDepts(newExpanded);
     };
-
-    const handleEditClick = (team: Team) => {
-        setEditingTeam(team);
-        setIsEditModalOpen(true);
-    };
-
-    if (isLoadingDepts || isLoadingHierarchy) {
-        return (
-            <div className="space-y-4">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
-            </div>
-        );
-    }
 
     return (
-        <div className="space-y-6">
-            {/* Header / Actions */}
-            <div className="flex justify-between items-center bg-card p-4 rounded-lg border border-border shadow-sm">
-                <div>
-                    <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
-                        <FolderTree className="w-5 h-5 text-primary" />
-                        Estrutura Organizacional
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                        Gerencie departamentos, times e alocação de pessoas.
-                    </p>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Buscar times..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="pl-9"
+                    />
                 </div>
-                <AddTeamModal departments={departments || []} />
+                <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Novo Time
+                </Button>
             </div>
 
-            {/* Hierarchy Tree */}
-            <div className="space-y-4">
-                {hierarchy?.map((dept) => (
-                    <div key={dept.id} className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-                        {/* Department Header */}
-                        <div
-                            className="flex items-center justify-between p-4 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => toggleDept(dept.id)}
-                        >
-                            <div className="flex items-center gap-3">
-                                {expandedDepts.has(dept.id) ? (
-                                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                                ) : (
-                                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                                )}
-                                <div className="flex items-center gap-2">
-                                    <LayoutGrid className="w-5 h-5 text-muted-foreground" />
-                                    <span className="font-semibold text-foreground">{dept.name}</span>
-                                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
-                                        {dept.teams.length} times
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Teams List */}
-                        {expandedDepts.has(dept.id) && (
-                            <div className="divide-y divide-border border-t border-border">
-                                {dept.teams.length === 0 ? (
-                                    <div className="p-8 text-center text-muted-foreground text-sm italic">
-                                        Nenhum time criado neste departamento.
-                                    </div>
-                                ) : (
-                                    dept.teams.map((team) => (
-                                        <div key={team.id} className="p-4 hover:bg-muted/30 transition-colors group">
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <Users className="w-4 h-4 text-primary" />
-                                                        <h4 className="font-medium text-foreground">{team.name}</h4>
-                                                    </div>
-                                                    {team.description && (
-                                                        <p className="text-sm text-muted-foreground mb-3">{team.description}</p>
-                                                    )}
-
-                                                    {/* Members Chips */}
-                                                    <div className="flex flex-wrap gap-2 mt-2">
-                                                        {team.members.length === 0 ? (
-                                                            <span className="text-xs text-muted-foreground italic">Sem membros</span>
-                                                        ) : (
-                                                            team.members.map(member => (
-                                                                <div key={member.id} className="flex items-center gap-1.5 bg-primary/10 text-primary px-2 py-1 rounded-md text-xs border border-primary/20">
-                                                                    <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold">
-                                                                        {member.nome?.charAt(0).toUpperCase()}
-                                                                    </div>
-                                                                    {member.nome}
-                                                                </div>
-                                                            ))
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleEditClick(team);
-                                                    }}
-                                                >
-                                                    <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                                                </Button>
+            <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Membros</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8">
+                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                                </TableCell>
+                            </TableRow>
+                        ) : filteredTeams?.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                    Nenhum time encontrado.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            filteredTeams?.map(team => (
+                                <TableRow key={team.id}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <div className={`p-2 rounded-lg ${team.color || 'bg-slate-100 text-slate-600'}`}>
+                                                <Briefcase className="w-4 h-4" />
                                             </div>
+                                            <span className="font-medium text-foreground">{team.name}</span>
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {team.description || '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1 text-muted-foreground">
+                                            <Users className="w-4 h-4" />
+                                            <span>{team.member_count || 0}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            className={team.is_active ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-slate-500/10 text-slate-600 border-slate-500/20'}
+                                        >
+                                            {team.is_active ? 'Ativo' : 'Inativo'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setManagingMembersTeam(team)}
+                                                className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                                title="Gerenciar Membros"
+                                            >
+                                                <UserPlus className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setEditingTeam(team)}
+                                                className="text-muted-foreground hover:text-foreground"
+                                                title="Editar Time"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleDelete(team.id)}
+                                                className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                                                disabled={(team.member_count ?? 0) > 0}
+                                                title={(team.member_count ?? 0) > 0 ? 'Não é possível excluir times com membros' : 'Excluir time'}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))
                         )}
-                    </div>
-                ))}
+                    </TableBody>
+                </Table>
             </div>
+
+            <AddTeamModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+            />
 
             <EditTeamModal
+                isOpen={!!editingTeam}
+                onClose={() => setEditingTeam(null)}
                 team={editingTeam}
-                isOpen={isEditModalOpen}
-                onClose={() => setIsEditModalOpen(false)}
-                departments={departments || []}
+            />
+
+            <TeamMembers
+                isOpen={!!managingMembersTeam}
+                onClose={() => setManagingMembersTeam(null)}
+                team={managingMembersTeam}
             />
         </div>
     );
