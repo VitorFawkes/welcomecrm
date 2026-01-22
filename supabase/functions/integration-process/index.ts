@@ -78,6 +78,7 @@ Deno.serve(async (req) => {
             blocked: 0,
             processed_shadow: 0,
             ignored: 0,
+            ignored_by_trigger: 0,
             errors: 0,
             mode: isShadowMode ? 'SHADOW' : 'WRITE'
         };
@@ -98,6 +99,12 @@ Deno.serve(async (req) => {
         // Load Topology
         const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome');
         const { data: pipelines } = await supabase.from('pipelines').select('id, nome, produto');
+
+        // Load Inbound Trigger Rules (for selective entity creation)
+        const { data: inboundTriggers } = await supabase
+            .from('integration_inbound_triggers')
+            .select('*')
+            .eq('is_active', true);
 
         // Helper: Parse flattened AC fields (deal[fields][109][value] -> { 109: "value" })
         const parseCustomFields = (payload: Record<string, any>) => {
@@ -137,6 +144,36 @@ Deno.serve(async (req) => {
             return 'aberto';
         };
 
+        // Helper: Check Inbound Trigger Rules
+        // Returns true if event should be processed, false if it should be ignored
+        const checkInboundTrigger = (integrationId: string, pipelineId: string, stageId: string, eventType: string, entityType: string): { allowed: boolean; reason: string } => {
+            // Get triggers for this integration
+            const triggers = inboundTriggers?.filter(t => t.integration_id === integrationId);
+
+            // BACKWARD COMPAT: If no triggers configured, allow all events
+            if (!triggers || triggers.length === 0) {
+                return { allowed: true, reason: 'No trigger rules configured (allowing all)' };
+            }
+
+            // Find matching trigger for this pipeline + stage
+            const matchingTrigger = triggers.find(t =>
+                t.external_pipeline_id === pipelineId &&
+                t.external_stage_id === stageId &&
+                t.entity_types.includes(entityType === 'deal' ? 'deal' : 'contact')
+            );
+
+            if (!matchingTrigger) {
+                return { allowed: false, reason: `No trigger for Pipeline ${pipelineId} + Stage ${stageId}` };
+            }
+
+            // Check action_type: 'create_only' only allows deal_add
+            if (matchingTrigger.action_type === 'create_only' && eventType !== 'deal_add') {
+                return { allowed: false, reason: `Trigger is create_only, but event is ${eventType}` };
+            }
+
+            return { allowed: true, reason: `Matched trigger: ${matchingTrigger.description || matchingTrigger.id}` };
+        };
+
         // 3. Process Events
         const results: any[] = [];
 
@@ -169,9 +206,37 @@ Deno.serve(async (req) => {
                         continue;
                     }
 
+                    // Parse contact custom fields (contact[fields][ID] -> { ID: value })
+                    const parseContactFields = (payload: Record<string, any>) => {
+                        const fields: Record<string, any> = {};
+                        Object.keys(payload).forEach(key => {
+                            const match = key.match(/^contact\[fields\]\[(\d+)\]$/);
+                            if (match) {
+                                fields[`contact[fields][${match[1]}]`] = payload[key];
+                            }
+                        });
+                        // Also add standard contact fields
+                        if (payload['contact[email]']) fields['contact[email]'] = payload['contact[email]'];
+                        if (payload['contact[phone]']) fields['contact[phone]'] = payload['contact[phone]'];
+                        if (payload['contact[first_name]']) fields['contact[first_name]'] = payload['contact[first_name]'];
+                        if (payload['contact[last_name]']) fields['contact[last_name]'] = payload['contact[last_name]'];
+                        if (payload['contact[tags]']) fields['contact[tags]'] = payload['contact[tags]'];
+                        return fields;
+                    };
+
+                    const contactFields = parseContactFields(payload);
+
+                    // Get contact field mappings for this integration (entity_type = 'contact')
+                    const contactFieldMappings = fieldMappings?.filter(m =>
+                        m.entity_type === 'contact' &&
+                        m.direction === 'inbound' &&
+                        m.integration_id === event.integration_id
+                    ) || [];
+
                     if (!isShadowMode) {
                         // Try to find existing contact by external_id OR email
                         let existingContact = null;
+                        let contactCrmId: string | null = null;
 
                         const { data: byExternalId } = await supabase
                             .from('contatos')
@@ -182,6 +247,7 @@ Deno.serve(async (req) => {
 
                         if (byExternalId) {
                             existingContact = byExternalId;
+                            contactCrmId = byExternalId.id;
                         } else if (email) {
                             const { data: byEmail } = await supabase
                                 .from('contatos')
@@ -189,6 +255,7 @@ Deno.serve(async (req) => {
                                 .eq('email', email)
                                 .single();
                             existingContact = byEmail;
+                            contactCrmId = byEmail?.id || null;
                         }
 
                         if (existingContact) {
@@ -210,7 +277,7 @@ Deno.serve(async (req) => {
                             log = `Updated Contact ${existingContact.id} (AC ID: ${acContactId})`;
                         } else {
                             // Create new contact with AC external_id
-                            const { error: cErr } = await supabase
+                            const { data: newContact, error: cErr } = await supabase
                                 .from('contatos')
                                 .insert({
                                     nome: nome,
@@ -221,10 +288,113 @@ Deno.serve(async (req) => {
                                     external_source: 'active_campaign',
                                     tags: ['active_campaign'],
                                     tipo_pessoa: 'adulto'
-                                });
+                                })
+                                .select('id')
+                                .single();
 
                             if (cErr) throw new Error(`Contact Create Error: ${cErr.message}`);
+                            contactCrmId = newContact.id;
+
+                            // Populate contato_meios for WhatsApp matching
+                            if (phone && newContact?.id) {
+                                const normalizedPhone = phone.replace(/\D/g, '');
+                                await supabase.from('contato_meios').upsert({
+                                    contato_id: newContact.id,
+                                    tipo: 'whatsapp',
+                                    valor: phone,
+                                    valor_normalizado: normalizedPhone,
+                                    is_principal: true,
+                                    origem: 'active_campaign'
+                                }, { onConflict: 'tipo,valor_normalizado', ignoreDuplicates: true });
+                            }
+
                             log = `Created Contact (AC ID: ${acContactId})`;
+                        }
+
+                        // ═══════════════════════════════════════════════════════════════════
+                        // APPLY CONTACT FIELD MAPPINGS TO CARDS
+                        // ═══════════════════════════════════════════════════════════════════
+                        if (contactCrmId && contactFieldMappings.length > 0) {
+                            // Find cards where this contact is the principal person
+                            const { data: linkedCards } = await supabase
+                                .from('cards')
+                                .select('id, marketing_data, briefing_inicial, produto_data')
+                                .eq('pessoa_principal_id', contactCrmId);
+
+                            if (linkedCards && linkedCards.length > 0) {
+                                for (const card of linkedCards) {
+                                    const cardUpdates: Record<string, any> = {};
+                                    let marketingData = card.marketing_data || {};
+                                    let briefingInicial = card.briefing_inicial || {};
+                                    let produtoData = card.produto_data || {};
+                                    let hasFieldUpdates = false;
+
+                                    // Apply each contact field mapping
+                                    for (const mapping of contactFieldMappings) {
+                                        const acValue = contactFields[mapping.external_field_id];
+                                        if (acValue === undefined || acValue === null || acValue === '') continue;
+
+                                        const localKey = mapping.local_field_key;
+
+                                        // Handle different target types
+                                        if (localKey.startsWith('card.')) {
+                                            // Direct card field (via system_fields / JSONB)
+                                            const fieldKey = localKey.replace('card.', '');
+
+                                            // Check if it's a JSONB target
+                                            if (fieldKey.startsWith('__briefing_inicial__.')) {
+                                                const jsonKey = fieldKey.replace('__briefing_inicial__.', '');
+                                                briefingInicial[jsonKey] = acValue;
+                                                hasFieldUpdates = true;
+                                            } else if (fieldKey.startsWith('__produto_data__.')) {
+                                                const jsonKey = fieldKey.replace('__produto_data__.', '');
+                                                produtoData[jsonKey] = acValue;
+                                                hasFieldUpdates = true;
+                                            } else if (fieldKey.startsWith('__marketing_data__.')) {
+                                                const jsonKey = fieldKey.replace('__marketing_data__.', '');
+                                                marketingData[jsonKey] = acValue;
+                                                hasFieldUpdates = true;
+                                            } else {
+                                                // Store in marketing_data with the field key
+                                                marketingData[fieldKey] = acValue;
+                                                hasFieldUpdates = true;
+                                            }
+                                        } else if (localKey.startsWith('contact.')) {
+                                            // Contact field - already handled above
+                                            continue;
+                                        } else if (localKey === '__briefing_inicial__') {
+                                            // Store entire value in briefing_inicial
+                                            briefingInicial[mapping.external_field_id] = acValue;
+                                            hasFieldUpdates = true;
+                                        } else if (localKey === '__produto_data__') {
+                                            produtoData[mapping.external_field_id] = acValue;
+                                            hasFieldUpdates = true;
+                                        } else if (localKey === '__marketing_data__') {
+                                            marketingData[mapping.external_field_id] = acValue;
+                                            hasFieldUpdates = true;
+                                        }
+                                    }
+
+                                    // Update card if we have field updates
+                                    if (hasFieldUpdates) {
+                                        cardUpdates.marketing_data = marketingData;
+                                        cardUpdates.briefing_inicial = briefingInicial;
+                                        cardUpdates.produto_data = produtoData;
+                                        cardUpdates.updated_at = new Date().toISOString();
+
+                                        const { error: cardUpdateErr } = await supabase
+                                            .from('cards')
+                                            .update(cardUpdates)
+                                            .eq('id', card.id);
+
+                                        if (cardUpdateErr) {
+                                            console.error(`Failed to update card ${card.id} with contact fields:`, cardUpdateErr);
+                                        } else {
+                                            log += ` | Updated Card ${card.id} with ${Object.keys(marketingData).length} mapped fields`;
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         await updateEventStatus(event.id, 'processed', log);
@@ -232,6 +402,9 @@ Deno.serve(async (req) => {
                         results.push({ id: event.id, status: 'processed', log });
                     } else {
                         log = `[SHADOW] Would upsert Contact (AC ID: ${acContactId})`;
+                        if (contactFieldMappings.length > 0) {
+                            log += ` and apply ${contactFieldMappings.length} field mappings to linked cards`;
+                        }
                         await updateEventStatus(event.id, 'processed_shadow', log);
                         stats.processed_shadow++;
                         results.push({ id: event.id, status: 'processed_shadow', log });
@@ -257,6 +430,22 @@ Deno.serve(async (req) => {
                 // Support both flat format (stage, pipeline) and bracket format (deal[stageid], deal[pipelineid])
                 const acStageId = payload.stage || payload.stage_id || payload.d_stageid || payload['deal[stageid]'];
                 const acPipelineId = payload.pipeline || payload.pipeline_id || payload['deal[pipelineid]'];
+
+                // 3.1.1 CHECK INBOUND TRIGGER RULES (selective entity creation)
+                const triggerCheck = checkInboundTrigger(
+                    event.integration_id,
+                    String(acPipelineId || ''),
+                    String(acStageId || ''),
+                    event.event_type,
+                    entity
+                );
+
+                if (!triggerCheck.allowed) {
+                    stats.ignored_by_trigger++;
+                    await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`);
+                    results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
+                    continue;
+                }
 
                 let targetStageId: string | null = null;
 
@@ -382,6 +571,19 @@ Deno.serve(async (req) => {
                                 .single();
                             if (cErr) throw new Error(`Contact Create Error: ${cErr.message}`);
                             contactId = newContact.id;
+
+                            // Populate contato_meios for WhatsApp matching
+                            if (contactPhone) {
+                                const normalizedPhone = contactPhone.replace(/\D/g, '');
+                                await supabase.from('contato_meios').upsert({
+                                    contato_id: contactId,
+                                    tipo: 'whatsapp',
+                                    valor: contactPhone,
+                                    valor_normalizado: normalizedPhone,
+                                    is_principal: true,
+                                    origem: 'active_campaign'
+                                }, { onConflict: 'tipo,valor_normalizado', ignoreDuplicates: true });
+                            }
                         }
                     }
 

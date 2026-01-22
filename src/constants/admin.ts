@@ -21,6 +21,7 @@ export const FIELD_TYPES = [
     { value: 'date', label: 'Data' },
     { value: 'date_range', label: 'Período de Data (Início e Fim)' },
     { value: 'currency', label: 'Moeda' },
+    { value: 'currency_range', label: 'Faixa de Valor (Range de Moeda)' },
     { value: 'select', label: 'Seleção Única' },
     { value: 'multiselect', label: 'Múltipla Seleção' },
     { value: 'checklist', label: 'Checklist (Lista de Marcação)' },

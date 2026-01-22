@@ -49,9 +49,10 @@ export default function DynamicSectionWidget({
 }: DynamicSectionWidgetProps) {
     const queryClient = useQueryClient()
 
-    // Data Sources - Marketing and governable fields are stored at TOP level of produto_data
-    // NOT nested under section key (e.g., produto_data.utm_source, NOT produto_data.marketing.utm_source)
+    // Data Sources - Unified data from both produto_data and marketing_data
+    // Priority: produto_data (manual edits) > marketing_data (integration data)
     const productData = useMemo(() => (card.produto_data as Record<string, any>) || {}, [card.produto_data])
+    const marketingData = useMemo(() => (card.marketing_data as Record<string, any>) || {}, [card.marketing_data])
 
     // State
     const [editedData, setEditedData] = useState<Record<string, any>>({})
@@ -71,15 +72,22 @@ export default function DynamicSectionWidget({
         return getVisibleFields(card.pipeline_stage_id, sectionKey)
     }, [card.pipeline_stage_id, sectionKey, getVisibleFields])
 
-    // Get current data for this section's fields from produto_data (TOP LEVEL)
-    // Each field's value lives at produto_data[field.key], NOT produto_data[section.key][field.key]
+    // Get current data for this section's fields from produto_data AND marketing_data
+    // Priority: produto_data (user edits) > marketing_data (from integrations)
     const sectionData = useMemo(() => {
         const data: Record<string, any> = {}
         fields.forEach(field => {
-            data[field.key] = productData[field.key]
+            // First check produto_data (user edits), then fall back to marketing_data
+            if (productData[field.key] !== undefined && productData[field.key] !== null && productData[field.key] !== '') {
+                data[field.key] = productData[field.key]
+            } else if (marketingData[field.key] !== undefined && marketingData[field.key] !== null) {
+                data[field.key] = marketingData[field.key]
+            } else {
+                data[field.key] = productData[field.key]
+            }
         })
         return data
-    }, [productData, fields])
+    }, [productData, marketingData, fields])
 
     // Sync local state when sectionData changes
     useEffect(() => {

@@ -33,35 +33,72 @@ const CONTACT_SECTION_LABELS: Record<string, string> = {
 // Standard fields: contact[field_name]
 // Custom fields: contact[fields][ID]
 const AC_CONTACT_FIELDS = [
-    // Standard AC Contact fields - these keys come directly in the payload
+    // ============================================
+    // STANDARD AC CONTACT FIELDS (from payload root)
+    // ============================================
+    { external_id: 'contact[id]', external_name: 'Contact ID (AC)', inferred_section: 'contact_standard' },
     { external_id: 'contact[first_name]', external_name: 'First Name', inferred_section: 'contact_standard' },
     { external_id: 'contact[last_name]', external_name: 'Last Name', inferred_section: 'contact_standard' },
     { external_id: 'contact[email]', external_name: 'Email', inferred_section: 'contact_standard' },
     { external_id: 'contact[phone]', external_name: 'Phone', inferred_section: 'contact_standard' },
     { external_id: 'contact[orgname]', external_name: 'Account (Organization)', inferred_section: 'contact_standard' },
+    { external_id: 'contact[tags]', external_name: 'Tags (AC)', inferred_section: 'contact_standard' },
+    { external_id: 'contact[ip]', external_name: 'IP Address', inferred_section: 'contact_tracking' },
 
-    // Custom AC Contact fields - format: contact[fields][ID]
-    // Example from user webhook: contact[fields][353] = wt_primeiro_contato
-    { external_id: 'contact[fields][353]', external_name: 'wt_primeiro_contato (ID 353)', inferred_section: 'contact_custom' },
-    { external_id: 'data_nascimento', external_name: 'Data de nascimento', inferred_section: 'contact_personal' },
-    { external_id: 'conversao_total', external_name: 'Conversão Total', inferred_section: 'contact_tracking' },
-    { external_id: 'ultima_conversao', external_name: 'Última conversão', inferred_section: 'contact_tracking' },
-    { external_id: 'cpf', external_name: 'CPF', inferred_section: 'contact_personal' },
-    { external_id: 'seu_cpf_cadastrado', external_name: 'Seu CPF cadastrado', inferred_section: 'contact_personal' },
-    { external_id: 'email_indicacao', external_name: 'E-mail da indicação', inferred_section: 'contact_marketing' },
-    { external_id: 'interesses', external_name: 'Interesses', inferred_section: 'contact_preferences' },
-    { external_id: 'mes_ideal_viagem', external_name: 'Qual é o mês ideal para a sua viagem?', inferred_section: 'contact_preferences' },
-    { external_id: 'mes_ideal_viagem_2', external_name: 'Qual seria o mês ideal para a sua viagem?', inferred_section: 'contact_preferences' },
-    { external_id: 'quem_vai_embarcar', external_name: 'Quem vai embarcar com você?', inferred_section: 'contact_preferences' },
-    { external_id: 'nome_convite', external_name: 'Nome do Convite', inferred_section: 'contact_personal' },
-    { external_id: 'whatsapp', external_name: 'WhatsApp', inferred_section: 'contact_standard' },
-    { external_id: 'repetir_data_final', external_name: 'Repetir Data final da ação em formato data (exemplo: 25/04/2025)', inferred_section: 'contact_marketing' },
-    { external_id: 'ny_o_que_atrai', external_name: 'NY - O que mais te atrai nessa experiência?', inferred_section: 'contact_preferences' },
-    { external_id: 'ny_experiencia_perfeita', external_name: 'NY - O que tornaria essa experiência perfeita para você?', inferred_section: 'contact_preferences' },
-    { external_id: 'repetir_data_iso', external_name: 'Repetir Data final da ação em formato ISO (exemplo: AAAA-MM-DD)', inferred_section: 'contact_marketing' },
-    { external_id: 'ny_quanto_investir', external_name: 'NY - Quanto você pretende investir', inferred_section: 'contact_preferences' },
-    { external_id: 'wwp_investimento_ideal', external_name: 'WWP - Qual seria o investimento de viagem ideal para o seu convidado?', inferred_section: 'contact_preferences' },
-    { external_id: 'dw_casar_civil', external_name: 'DW - Pretendem se casar no civil?', inferred_section: 'contact_preferences' },
+    // ============================================
+    // WT (TRIPS) CUSTOM FIELDS - IDs confirmados do payload
+    // ============================================
+    { external_id: 'contact[fields][306]', external_name: 'WT - E quem vai embarcar nessa viagem? (Família/Casal/etc)', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][309]', external_name: 'WT Qual é o investimento estimado por pessoa? (Até 20 mil, etc)', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][310]', external_name: 'Você já tem hospedagem contratada para essa viagem?', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][311]', external_name: 'O que você está buscando para essa viagem? (Viagem Personalizada, etc)', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][312]', external_name: 'Em quanto tempo você pretende fazer essa viagem? (3-6 meses)', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][69]', external_name: 'WT Mensagem (Sim/Não)', inferred_section: 'contact_preferences' },
+
+    // ============================================
+    // OTHER CUSTOM FIELDS FROM PAYLOAD
+    // ============================================
+    { external_id: 'contact[fields][40]', external_name: 'Campo Custom 40 (texto)', inferred_section: 'contact_custom' },
+    { external_id: 'contact[fields][42]', external_name: 'Campo Custom 42 (texto)', inferred_section: 'contact_custom' },
+    { external_id: 'contact[fields][56]', external_name: 'Data/Hora Conversão (timestamp ISO)', inferred_section: 'contact_tracking' },
+    { external_id: 'contact[fields][303]', external_name: 'WT - O que está buscando? (v1)', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][353]', external_name: 'wt_primeiro_contato', inferred_section: 'contact_custom' },
+    { external_id: 'contact[fields][40]', external_name: 'Campo Custom 40', inferred_section: 'contact_custom' },
+    { external_id: 'contact[fields][42]', external_name: 'Campo Custom 42', inferred_section: 'contact_custom' },
+
+    // ============================================
+    // MARKETING / UTM FIELDS - IDs CONFIRMADOS DO PAYLOAD
+    // ============================================
+    { external_id: 'contact[fields][46]', external_name: 'utm_source', inferred_section: 'contact_marketing' },
+    { external_id: 'contact[fields][47]', external_name: 'utm_medium', inferred_section: 'contact_marketing' },
+    { external_id: 'contact[fields][48]', external_name: 'utm_campaign', inferred_section: 'contact_marketing' },
+    { external_id: 'contact[fields][208]', external_name: 'utm_content', inferred_section: 'contact_marketing' },
+    { external_id: 'contact[fields][207]', external_name: 'utm_term', inferred_section: 'contact_marketing' },
+
+    // ============================================
+    // LOCALIZAÇÃO / ORIGEM - IDs CONFIRMADOS DO PAYLOAD
+    // ============================================
+    { external_id: 'contact[fields][17]', external_name: 'localização-cidade', inferred_section: 'contact_personal' },
+    { external_id: 'contact[fields][18]', external_name: 'localização - estado', inferred_section: 'contact_personal' },
+    { external_id: 'contact[fields][19]', external_name: 'data e hora da conversão', inferred_section: 'contact_tracking' },
+    { external_id: 'contact[fields][20]', external_name: 'nome do fluxo', inferred_section: 'contact_tracking' },
+    { external_id: 'contact[fields][21]', external_name: 'URL de referência', inferred_section: 'contact_tracking' },
+
+    // ============================================
+    // WEDDING / NY FIELDS (preserving existing)
+    // ============================================
+    { external_id: 'contact[fields][400]', external_name: 'NY - O que mais te atrai nessa experiência?', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][401]', external_name: 'NY - O que tornaria essa experiência perfeita?', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][402]', external_name: 'NY - Quanto você pretende investir', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][403]', external_name: 'WWP - Investimento ideal para convidado', inferred_section: 'contact_preferences' },
+    { external_id: 'contact[fields][404]', external_name: 'DW - Pretendem se casar no civil?', inferred_section: 'contact_preferences' },
+
+    // ============================================
+    // PERSONAL DATA FIELDS (common IDs - may need adjustment)
+    // ============================================
+    { external_id: 'contact[fields][500]', external_name: 'Data de nascimento', inferred_section: 'contact_personal' },
+    { external_id: 'contact[fields][501]', external_name: 'CPF', inferred_section: 'contact_personal' },
+    { external_id: 'contact[fields][502]', external_name: 'WhatsApp', inferred_section: 'contact_standard' },
 ];
 
 // AC Section labels based on AC structure
@@ -166,7 +203,7 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
     const [selectedEntityType, setSelectedEntityType] = useState<string>('deal');
     const [searchTerm, setSearchTerm] = useState('');
 
-    // 1. Fetch system_fields (CRM deal fields)
+    // 1. Fetch system_fields (CRM deal fields) - always load for cross-entity mapping
     const { data: systemFields = [], isLoading: loadingFields } = useQuery({
         queryKey: ['system-fields-for-inbound-mapping'],
         queryFn: async () => {
@@ -179,7 +216,7 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
             if (error) throw error;
             return data as SystemField[];
         },
-        enabled: selectedEntityType === 'deal'
+        // Always load - needed for cross-entity mapping (AC contact -> CRM card)
     });
 
     // Get CRM fields based on entity type
@@ -296,15 +333,40 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
         ];
 
         if (selectedEntityType === 'contact') {
-            // Contact fields
+            // ====== CONTACT FIELDS ======
+            options.push({ value: '__header_contact__', label: '═══ 👤 CAMPOS DE CONTATO ═══' });
+
             Object.entries(CONTACT_SECTION_LABELS).forEach(([sectionKey, sectionLabel]) => {
                 const sectionFields = CONTACT_FIELDS.filter(f => f.section === sectionKey);
                 if (sectionFields.length > 0) {
                     options.push({ value: `__section_${sectionKey}__`, label: `── ${sectionLabel} ──` });
                     sectionFields.forEach(f => {
-                        options.push({ value: f.key, label: `${f.label} (${f.key})` });
+                        options.push({ value: `contact.${f.key}`, label: `👤 ${f.label} (contato.${f.key})` });
                     });
                 }
+            });
+
+            // ====== DEAL/CARD FIELDS (from system_fields) ======
+            options.push({ value: '__header_deal__', label: '═══ 💼 CAMPOS DO CARD ═══' });
+
+            // Add JSONB storage options
+            options.push({ value: '__briefing_inicial__', label: '📝 briefing_inicial (JSONB SDR)' });
+            options.push({ value: '__produto_data__', label: '📦 produto_data (JSONB Planner)' });
+            options.push({ value: '__marketing_data__', label: '📊 marketing_data (JSONB Raw)' });
+
+            // Group system fields by section
+            const grouped: Record<string, SystemField[]> = {};
+            systemFields.forEach(f => {
+                const section = f.section || 'other';
+                if (!grouped[section]) grouped[section] = [];
+                grouped[section].push(f);
+            });
+
+            Object.entries(grouped).forEach(([section, fields]) => {
+                options.push({ value: `__section_deal_${section}__`, label: `── 💼 ${section} ──` });
+                fields.forEach(f => {
+                    options.push({ value: `card.${f.key}`, label: `💼 ${f.label} (card.${f.key})` });
+                });
             });
         } else {
             // Deal fields - group by section

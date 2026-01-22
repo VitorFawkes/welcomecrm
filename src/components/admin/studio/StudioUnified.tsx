@@ -573,17 +573,18 @@ export default function StudioUnified() {
                                                         >
                                                             <Edit2 className="w-3.5 h-3.5" />
                                                         </button>
-                                                        {!field.is_system && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (confirm('Tem certeza?')) deleteFieldMutation.mutate(field.key)
-                                                                }}
-                                                                className="p-1.5 text-muted-foreground hover:text-destructive rounded hover:bg-muted"
-                                                                title="Excluir Campo"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
+                                                        <button
+                                                            onClick={() => {
+                                                                const msg = field.is_system
+                                                                    ? 'Este é um campo de sistema. Tem certeza que deseja excluir?'
+                                                                    : 'Tem certeza?'
+                                                                if (confirm(msg)) deleteFieldMutation.mutate(field.key)
+                                                            }}
+                                                            className="p-1.5 text-muted-foreground hover:text-destructive rounded hover:bg-muted"
+                                                            title="Excluir Campo"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </td>

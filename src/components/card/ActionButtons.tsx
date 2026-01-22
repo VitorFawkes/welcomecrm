@@ -96,58 +96,63 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         let platformName = 'WhatsApp'
 
         try {
-            // 1. Get current card's phase
-            const currentPhaseId = card.pipeline_stage?.phase_id
-
-            if (currentPhaseId) {
-                // 2. Find mapped platform for this phase
-                const { data: mapping } = await (supabase
-                    .from('whatsapp_phase_instance_map' as never)
-                    .select('platform_id') as any)
-                    .eq('phase_id', currentPhaseId)
-                    .eq('is_active', true)
-                    .order('priority')
+            // PRIORITY 1: Check if contact has an existing conversation with URL
+            if (card.pessoa_principal_id) {
+                const { data: conversation } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('external_conversation_id, external_conversation_url, platform_id')
+                    .eq('contact_id', card.pessoa_principal_id)
+                    .order('last_message_at', { ascending: false })
                     .limit(1)
                     .single()
 
-                if (mapping?.platform_id) {
-                    // 3. Get platform details
-                    const { data: platform } = await (supabase
+                if (conversation?.external_conversation_url) {
+                    // Direct URL available - use it!
+                    targetUrl = conversation.external_conversation_url
+                    fallbackUsed = 'deep_link'
+                    platformName = 'Echo'
+                } else if (conversation?.external_conversation_id) {
+                    // Build URL from template if we have conversation ID
+                    const { data: platform } = await supabase
                         .from('whatsapp_platforms')
-                        .select('id, name, provider, dashboard_url_template, instance_id, capabilities') as any)
-                        .eq('id', mapping.platform_id)
-                        .eq('is_active', true)
+                        .select('name, dashboard_url_template')
+                        .eq('id', conversation.platform_id)
                         .single()
 
-                    if (platform) {
-                        platformName = platform.name
-                        const capabilities = platform.capabilities as { has_direct_link?: boolean } | null
+                    if (platform?.dashboard_url_template) {
+                        targetUrl = platform.dashboard_url_template.replace('{conversation_id}', conversation.external_conversation_id)
+                        fallbackUsed = 'deep_link'
+                        platformName = platform.name || 'Echo'
+                    }
+                }
+            }
 
-                        // 4. Try to find existing conversation for this contact
-                        const { data: conversation } = await (supabase
-                            .from('whatsapp_conversations' as never)
-                            .select('external_conversation_id') as any)
-                            .eq('contact_id', card.pessoa_principal_id)
-                            .eq('platform_id', platform.id)
+            // PRIORITY 2: If no conversation found, try phase mapping fallback
+            if (!targetUrl) {
+                const currentPhaseId = card.pipeline_stage?.phase_id
+                if (currentPhaseId) {
+                    const { data: mapping } = await (supabase
+                        .from('whatsapp_phase_instance_map' as never)
+                        .select('platform_id') as any)
+                        .eq('phase_id', currentPhaseId)
+                        .eq('is_active', true)
+                        .order('priority')
+                        .limit(1)
+                        .single()
+
+                    if (mapping?.platform_id) {
+                        const { data: platform } = await supabase
+                            .from('whatsapp_platforms')
+                            .select('name, dashboard_url_template')
+                            .eq('id', mapping.platform_id)
+                            .eq('is_active', true)
                             .single()
 
-                        // 5. Smart Fallback Chain
-                        if (capabilities?.has_direct_link && conversation?.external_conversation_id && platform.dashboard_url_template) {
-                            // TIER 1: Direct deep link to conversation
-                            targetUrl = platform.dashboard_url_template
-                                .replace('{conversation_id}', conversation.external_conversation_id)
-                                .replace('{instance_id}', platform.instance_id || '')
-                                .replace('{phone}', cleanNumber)
-                            fallbackUsed = 'deep_link'
-                        } else if (platform.dashboard_url_template && !platform.dashboard_url_template.includes('{')) {
-                            // TIER 2: Static dashboard URL (like Echo)
+                        if (platform?.dashboard_url_template && !platform.dashboard_url_template.includes('{')) {
+                            // Static dashboard URL
                             targetUrl = platform.dashboard_url_template
                             fallbackUsed = 'dashboard'
-                        } else if (platform.dashboard_url_template) {
-                            // TIER 3: Dashboard with placeholder info
-                            const baseUrl = platform.dashboard_url_template.split('{')[0]
-                            targetUrl = baseUrl
-                            fallbackUsed = 'dashboard_base'
+                            platformName = platform.name || 'Echo'
                         }
                     }
                 }
@@ -156,7 +161,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
             console.warn('WhatsApp platform lookup failed, using fallback:', err)
         }
 
-        // TIER 4: Universal fallback to wa.me
+        // PRIORITY 3: Universal fallback to wa.me
         if (!targetUrl) {
             targetUrl = `https://wa.me/${cleanNumber}?text=${message}`
             fallbackUsed = 'wa_me'

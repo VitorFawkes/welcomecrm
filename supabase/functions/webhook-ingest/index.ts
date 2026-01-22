@@ -156,7 +156,7 @@ serve(async (req) => {
         const { entity_type, event_type, external_id } = parseACPayload(payload);
 
         // 5. Enqueue Event
-        const { error: insertError } = await supabaseClient
+        const { data: insertedEvent, error: insertError } = await supabaseClient
             .from("integration_events")
             .insert({
                 integration_id: integrationId,
@@ -167,13 +167,39 @@ serve(async (req) => {
                 external_id,
                 idempotency_key: idempotencyKey ? String(idempotencyKey) : null,
                 logs: [{ step: "ingest", timestamp: new Date().toISOString(), message: "Webhook received" }]
-            });
+            })
+            .select('id')
+            .single();
 
         if (insertError) {
             console.error("Failed to insert event:", insertError);
             return new Response(JSON.stringify({ error: "Internal Server Error" }), {
                 status: 500,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        // 6. AUTO-PROCESS: Call integration-process immediately (fire-and-forget)
+        // This makes processing automatic without waiting for a cron job
+        if (insertedEvent?.id) {
+            const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+            const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+            // Fire and forget - don't await, let it process in background
+            fetch(`${supabaseUrl}/functions/v1/integration-process`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${serviceKey}`
+                },
+                body: JSON.stringify({
+                    integration_id: integrationId,
+                    event_ids: [insertedEvent.id]
+                })
+            }).then(res => {
+                console.log(`Auto-process triggered for event ${insertedEvent.id}: ${res.status}`);
+            }).catch(err => {
+                console.error(`Auto-process failed for event ${insertedEvent.id}:`, err);
             });
         }
 

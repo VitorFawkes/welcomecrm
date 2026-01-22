@@ -13,7 +13,7 @@ export default function InvitePage() {
 
     const [loading, setLoading] = useState(true);
     const [valid, setValid] = useState(false);
-    const [inviteData, setInviteData] = useState<{ email: string; role: string } | null>(null);
+    const [inviteData, setInviteData] = useState<{ email: string; role: string; team_id?: string; team_name?: string } | null>(null);
 
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
@@ -33,10 +33,16 @@ export default function InvitePage() {
 
             if (error) throw error;
 
-            const result = data as unknown as { valid: boolean; email: string; role: string } | null;
-            if (result && result.valid) {
+            const result = data as unknown as { id?: string; email: string; role: string; team_id?: string; team_name?: string } | null;
+            // Check if we got valid data (has email and role)
+            if (result && result.email && result.role) {
                 setValid(true);
-                setInviteData({ email: result.email, role: result.role });
+                setInviteData({
+                    email: result.email,
+                    role: result.role,
+                    team_id: result.team_id,
+                    team_name: result.team_name
+                });
             } else {
                 setValid(false);
             }
@@ -68,7 +74,8 @@ export default function InvitePage() {
                 options: {
                     data: {
                         full_name: name,
-                        role: inviteData!.role // Pass role to metadata if needed by triggers
+                        role: inviteData!.role,
+                        team_id: inviteData!.team_id // Pass team_id to metadata
                     }
                 }
             });
@@ -137,6 +144,9 @@ export default function InvitePage() {
                     </p>
                     <div className="mt-4 p-3 bg-indigo-50 rounded-lg inline-block">
                         <p className="text-sm font-medium text-indigo-800">{inviteData?.email}</p>
+                        {inviteData?.team_name && (
+                            <p className="text-xs text-indigo-600 mt-1">Time: {inviteData.team_name}</p>
+                        )}
                     </div>
                 </div>
 

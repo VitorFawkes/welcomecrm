@@ -4,12 +4,12 @@ import { Input } from '../../ui/Input'
 import { Label } from '../../ui/label'
 import { Select } from '../../ui/Select'
 import { Button } from '../../ui/Button'
-import { Plus, Trash2, GripVertical, AlertCircle } from 'lucide-react'
-import { cn } from '../../../lib/utils'
+import { Plus, AlertCircle, Clock } from 'lucide-react'
 import type { Database } from '../../../database.types'
 import UniversalFieldRenderer from '../../fields/UniversalFieldRenderer'
 import { FIELD_TYPES } from '../../../constants/admin'
 import { useGovernableSections } from '../../../hooks/useSections'
+import SortableOptionsList from './SortableOptionsList'
 
 type SystemField = Database['public']['Tables']['system_fields']['Row']
 
@@ -20,16 +20,6 @@ interface FieldInspectorDrawerProps {
     onSave: (field: Partial<SystemField>) => void
     isCreating?: boolean
 }
-
-const COLORS = [
-    { value: 'gray', bg: 'bg-gray-100', text: 'text-gray-800' },
-    { value: 'blue', bg: 'bg-blue-100', text: 'text-blue-800' },
-    { value: 'green', bg: 'bg-green-100', text: 'text-green-800' },
-    { value: 'yellow', bg: 'bg-yellow-100', text: 'text-yellow-800' },
-    { value: 'red', bg: 'bg-red-100', text: 'text-red-800' },
-    { value: 'purple', bg: 'bg-purple-100', text: 'text-purple-800' },
-    { value: 'pink', bg: 'bg-pink-100', text: 'text-pink-800' },
-]
 
 export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, isCreating = false }: FieldInspectorDrawerProps) {
     const [formData, setFormData] = useState<Partial<SystemField>>({})
@@ -85,16 +75,6 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
         setOptions([...options, newOption])
         setNewOptionLabel('')
         setOptionError(null)
-    }
-
-    const removeOption = (index: number) => {
-        setOptions(options.filter((_, i) => i !== index))
-    }
-
-    const updateOptionColor = (index: number, color: string) => {
-        const newOptions = [...options]
-        newOptions[index] = { ...newOptions[index], color }
-        setOptions(newOptions)
     }
 
     const showOptionsManager = formData.type === 'select' || formData.type === 'multiselect' || formData.type === 'checklist'
@@ -168,6 +148,9 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                         break
                                     case 'currency':
                                         previewValue = 5000
+                                        break
+                                    case 'currency_range':
+                                        previewValue = { min: 5000, max: 15000 }
                                         break
                                     case 'number':
                                         previewValue = 42
@@ -257,6 +240,29 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                             </div>
                         </div>
 
+                        {/* Date Range Options (Include Time) */}
+                        {formData.type === 'date_range' && (
+                            <div className="border-t border-border pt-6">
+                                <h4 className="font-medium text-foreground mb-4">Configurações do Período</h4>
+                                <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={(formData.options as any)?.includeTime || false}
+                                        onChange={(e) => setFormData({
+                                            ...formData,
+                                            options: { ...((formData.options as any) || {}), includeTime: e.target.checked }
+                                        })}
+                                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium text-foreground">Incluir horário</span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground ml-auto">Permite selecionar hora além da data</span>
+                                </label>
+                            </div>
+                        )}
+
                         {/* Options Manager */}
                         {showOptionsManager && (
                             <div className="border-t border-border pt-6">
@@ -292,44 +298,11 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                     </p>
                                 )}
 
-                                <div className="space-y-2 bg-muted p-3 rounded-lg min-h-[100px]">
-                                    {options.length === 0 && (
-                                        <p className="text-sm text-muted-foreground text-center py-4">Nenhuma opção definida.</p>
-                                    )}
-                                    {options.map((opt, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 bg-card p-2 rounded border border-border shadow-sm group">
-                                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-move" />
 
-                                            {/* Color Picker */}
-                                            <div className="relative group/color">
-                                                <div className={cn("w-4 h-4 rounded-full cursor-pointer border border-border",
-                                                    COLORS.find(c => c.value === (opt.color || 'gray'))?.bg || 'bg-gray-100'
-                                                )} />
-                                                <div className="absolute left-0 top-6 bg-card border border-border shadow-lg rounded p-1 z-10 hidden group-hover/color:flex gap-1">
-                                                    {COLORS.map(c => (
-                                                        <button
-                                                            type="button"
-                                                            key={c.value}
-                                                            onClick={() => updateOptionColor(idx, c.value)}
-                                                            className={cn("w-4 h-4 rounded-full hover:scale-110 transition-transform", c.bg)}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <span className="text-sm font-medium flex-1 text-foreground">{opt.label}</span>
-                                            <span className="text-xs text-muted-foreground font-mono">{opt.value}</span>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => removeOption(idx)}
-                                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
+                                <SortableOptionsList
+                                    options={options}
+                                    onChange={setOptions}
+                                />
                             </div>
                         )}
                     </div>

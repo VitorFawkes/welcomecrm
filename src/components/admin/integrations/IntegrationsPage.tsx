@@ -10,13 +10,14 @@ import { IntegrationMapping } from './IntegrationMapping';
 import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
 import { InboundFieldMappingTab } from './InboundFieldMappingTab';
+import { InboundTriggerRulesTab } from './InboundTriggerRulesTab';
 import { ACFieldManager } from './ACFieldManager';
 import { PhaseInstanceMappingTab } from './PhaseInstanceMappingTab';
 import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/Button';
-import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch, ArrowUpRight, Link2, Database } from 'lucide-react';
+import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch, ArrowUpRight, Link2, Database, Zap } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export function IntegrationsPage() {
@@ -60,6 +61,10 @@ export function IntegrationsPage() {
                         <TabsTrigger value="inbox" className="gap-2">
                             <Inbox className="w-4 h-4" />
                             Entrada
+                        </TabsTrigger>
+                        <TabsTrigger value="triggers" className="gap-2">
+                            <Zap className="w-4 h-4" />
+                            Gatilhos
                         </TabsTrigger>
                         <TabsTrigger value="outbox" className="gap-2">
                             <Send className="w-4 h-4" />
@@ -105,6 +110,10 @@ export function IntegrationsPage() {
 
                     <TabsContent value="outbox">
                         <IntegrationLogs mode="outbox" />
+                    </TabsContent>
+
+                    <TabsContent value="triggers">
+                        <InboundTriggerRulesTab integrationId="a2141b92-561f-4514-92b4-9412a068d236" />
                     </TabsContent>
 
                     <TabsContent value="mapping">
