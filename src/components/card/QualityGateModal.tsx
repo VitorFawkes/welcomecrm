@@ -1,222 +1,79 @@
-import { useState, useEffect } from 'react'
+'use client'
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
-import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { AlertTriangle, ExternalLink } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface QualityGateModalProps {
     isOpen: boolean
     onClose: () => void
-    onConfirm: () => void
+    onConfirm: () => void // Keep for API compatibility but not used in new flow
     cardId: string
     targetStageName: string
     missingFields: { key: string, label: string }[]
-    initialData?: Record<string, any>  // Card data for pre-filling
+    initialData?: Record<string, any>  // Keep for API compatibility
 }
 
 export default function QualityGateModal({
     isOpen,
     onClose,
-    onConfirm,
     cardId,
     targetStageName,
     missingFields,
-    initialData
 }: QualityGateModalProps) {
-    const [values, setValues] = useState<Record<string, any>>({})
-    const [isSaving, setIsSaving] = useState(false)
-    const queryClient = useQueryClient()
+    const router = useRouter()
 
-    // Pre-fill values from initialData (card data) when modal opens
-    useEffect(() => {
-        if (!isOpen) {
-            setValues({}) // Reset when closed
-            return
-        }
-
-        const prefill: Record<string, any> = {}
-
-        missingFields.forEach(field => {
-            // Check root level first
-            if (initialData?.[field.key] !== undefined && initialData[field.key] !== null && initialData[field.key] !== '') {
-                prefill[field.key] = initialData[field.key]
-            }
-            // Then check produto_data (Waterfall Pattern)
-            else if (initialData?.produto_data && typeof initialData.produto_data === 'object') {
-                const produtoData = initialData.produto_data as Record<string, any>
-                if (produtoData[field.key] !== undefined && produtoData[field.key] !== null && produtoData[field.key] !== '') {
-                    prefill[field.key] = produtoData[field.key]
-                }
-            }
-            // Then check briefing_inicial (SDR data)
-            else if (initialData?.briefing_inicial && typeof initialData.briefing_inicial === 'object') {
-                const briefingData = initialData.briefing_inicial as Record<string, any>
-                if (briefingData[field.key] !== undefined && briefingData[field.key] !== null && briefingData[field.key] !== '') {
-                    prefill[field.key] = briefingData[field.key]
-                }
-            }
-        })
-
-        setValues(prefill)
-    }, [isOpen, initialData, missingFields])
-
-    const handleChange = (key: string, value: any) => {
-        setValues(prev => ({ ...prev, [key]: value }))
-    }
-
-    const updateCardMutation = useMutation({
-        mutationFn: async (updates: any) => {
-            // We need to handle where to save each field.
-            // Some are top level, some are in produto_data.
-            // This logic needs to be robust.
-
-            const topLevelFields = ['valor_estimado', 'data_viagem_inicio', 'prioridade', 'origem', 'external_id', 'campaign_id']
-            const produtoDataFields = ['destinos', 'orcamento', 'motivo', 'taxa_planejamento', 'epoca_viagem', 'pessoas']
-
-            const topLevelUpdates: any = {}
-            const produtoDataUpdates: any = {}
-
-            Object.entries(updates).forEach(([key, value]) => {
-                if (topLevelFields.includes(key)) {
-                    topLevelUpdates[key] = value
-                } else if (produtoDataFields.includes(key)) {
-                    produtoDataUpdates[key] = value
-                }
-            })
-
-            // If we have produto_data updates, we need to fetch current first to merge?
-            // Or we can use jsonb_set in SQL, but supabase js client does simple updates.
-            // Let's fetch current card first.
-
-            const finalUpdates = { ...topLevelUpdates }
-
-            if (Object.keys(produtoDataUpdates).length > 0) {
-                const { data: card } = await supabase.from('cards').select('produto_data').eq('id', cardId).single()
-                const currentData = card?.produto_data as any || {}
-
-                // Merge
-                // Note: This is a shallow merge for produto_data keys.
-                // If 'orcamento' is an object, we are replacing it with whatever the input gives.
-                // For this MVP, we assume simple inputs.
-
-                finalUpdates.produto_data = {
-                    ...currentData,
-                    ...produtoDataUpdates
-                }
-            }
-
-            const { error } = await supabase
-                .from('cards')
-                .update(finalUpdates)
-                .eq('id', cardId)
-
-            if (error) throw error
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['cards'] })
-            onConfirm()
-        }
-    })
-
-    const handleSave = async () => {
-        setIsSaving(true)
-        try {
-            await updateCardMutation.mutateAsync(values)
-        } catch (error) {
-            console.error(error)
-            alert('Erro ao salvar dados.')
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const renderInput = (field: { key: string, label: string }) => {
-        switch (field.key) {
-            case 'data_viagem_inicio':
-                return (
-                    <Input
-                        type="date"
-                        onChange={(e) => handleChange(field.key, e.target.value)}
-                        value={values[field.key] || ''}
-                    />
-                )
-            case 'valor_estimado':
-                return (
-                    <Input
-                        type="number"
-                        placeholder="0.00"
-                        onChange={(e) => handleChange(field.key, parseFloat(e.target.value))}
-                        value={values[field.key] || ''}
-                    />
-                )
-            case 'origem':
-                return (
-                    <Select
-                        options={[
-                            { value: 'site', label: 'Site' },
-                            { value: 'indicacao', label: 'Indicação' },
-                            { value: 'sdr', label: 'SDR' },
-                            { value: 'recorrencia', label: 'Recorrência' },
-                            { value: 'manual', label: 'Manual' },
-                            { value: 'outro', label: 'Outro' }
-                        ]}
-                        onChange={(val) => handleChange(field.key, val)}
-                        value={values[field.key] || ''}
-                    />
-                )
-            case 'prioridade':
-                return (
-                    <Select
-                        options={[
-                            { value: 'alta', label: 'Alta' },
-                            { value: 'media', label: 'Média' },
-                            { value: 'baixa', label: 'Baixa' }
-                        ]}
-                        onChange={(val) => handleChange(field.key, val)}
-                        value={values[field.key] || ''}
-                    />
-                )
-            default:
-                return (
-                    <Input
-                        type="text"
-                        placeholder={`Digite ${field.label}`}
-                        onChange={(e) => handleChange(field.key, e.target.value)}
-                        value={values[field.key] || ''}
-                    />
-                )
-        }
+    const handleOpenCard = () => {
+        onClose()
+        router.push(`/viagens/${cardId}`)
     }
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Campos Obrigatórios</DialogTitle>
-                    <p className="text-sm text-gray-500">
-                        Para mover para <strong>{targetStageName}</strong>, você precisa preencher os seguintes campos:
-                    </p>
+                    <DialogTitle className="flex items-center gap-2 text-amber-600">
+                        <AlertTriangle className="h-5 w-5" />
+                        Campos Obrigatórios
+                    </DialogTitle>
                 </DialogHeader>
 
-                <div className="grid gap-4 py-4">
-                    {missingFields.map(field => (
-                        <div key={field.key} className="grid gap-2">
-                            <label className="text-sm font-medium text-gray-700">
-                                {field.label}
-                            </label>
-                            {renderInput(field)}
-                        </div>
-                    ))}
+                <div className="py-4 space-y-4">
+                    <p className="text-sm text-gray-600">
+                        Para mover para a etapa <strong className="text-gray-900">{targetStageName}</strong>,
+                        é necessário preencher os seguintes campos:
+                    </p>
+
+                    <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+                        <ul className="space-y-2">
+                            {missingFields.map(field => (
+                                <li
+                                    key={field.key}
+                                    className="flex items-center gap-2 text-sm text-amber-800"
+                                >
+                                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0" />
+                                    {field.label}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <p className="text-xs text-gray-500">
+                        Acesse a página do card para preencher os campos necessários.
+                    </p>
                 </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose} disabled={isSaving}>
+                <DialogFooter className="gap-2 sm:gap-0">
+                    <Button variant="outline" onClick={onClose}>
                         Cancelar
                     </Button>
-                    <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? 'Salvando...' : 'Salvar e Mover'}
+                    <Button
+                        onClick={handleOpenCard}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                    >
+                        <ExternalLink className="w-4 h-4" />
+                        Abrir Card
                     </Button>
                 </DialogFooter>
             </DialogContent>
