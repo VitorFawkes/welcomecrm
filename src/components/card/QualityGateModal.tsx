@@ -1,9 +1,7 @@
-'use client'
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
 import { AlertTriangle, ExternalLink } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useNavigate } from 'react-router-dom'
 
 interface QualityGateModalProps {
     isOpen: boolean
@@ -22,11 +20,11 @@ export default function QualityGateModal({
     targetStageName,
     missingFields,
 }: QualityGateModalProps) {
-    const router = useRouter()
+    const navigate = useNavigate()
 
     const handleOpenCard = () => {
         onClose()
-        router.push(`/viagens/${cardId}`)
+        navigate(`/viagens/${cardId}`)
     }
 
     return (
