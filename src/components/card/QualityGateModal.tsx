@@ -24,7 +24,7 @@ export default function QualityGateModal({
 
     const handleOpenCard = () => {
         onClose()
-        navigate(`/viagens/${cardId}`)
+        navigate(`/cards/${cardId}`)
     }
 
     return (
