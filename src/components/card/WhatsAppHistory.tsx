@@ -12,7 +12,6 @@ import {
     Play,
     FileText,
     Image as ImageIcon,
-    Video,
     ExternalLink,
     Mic
 } from 'lucide-react';
@@ -120,7 +119,7 @@ function getStatusIcon(message: WhatsAppMessage) {
 
 // Render media content
 function MessageMedia({ message }: { message: WhatsAppMessage }) {
-    const { media_url, message_type, body } = message;
+    const { media_url, message_type, body: _body } = message;
 
     if (!media_url) return null;
 
@@ -353,7 +352,7 @@ export function WhatsAppHistory({ contactId, className }: WhatsAppHistoryProps) 
                     table: 'whatsapp_messages',
                     filter: `contact_id=eq.${contactId}`
                 },
-                (payload) => {
+                (_payload) => {
                     // Invalidate query to refetch with new message
                     queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', contactId] });
                 }

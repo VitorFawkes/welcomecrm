@@ -98,8 +98,8 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         try {
             // PRIORITY 1: Check if contact has an existing conversation with URL
             if (card.pessoa_principal_id) {
-                const { data: conversation } = await supabase
-                    .from('whatsapp_conversations')
+                const { data: conversation } = await (supabase
+                    .from('whatsapp_conversations') as any)
                     .select('external_conversation_id, external_conversation_url, platform_id')
                     .eq('contact_id', card.pessoa_principal_id)
                     .order('last_message_at', { ascending: false })

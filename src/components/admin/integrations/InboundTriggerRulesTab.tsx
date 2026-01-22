@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/switch';
 import { Plus, Trash2, AlertTriangle, CheckCircle, Zap } from 'lucide-react';
@@ -45,8 +45,8 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
     const { data: triggers, isLoading: triggersLoading } = useQuery({
         queryKey: ['inbound-triggers', integrationId],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('integration_inbound_triggers')
+            const { data, error } = await (supabase
+                .from('integration_inbound_triggers' as never) as any)
                 .select('*')
                 .eq('integration_id', integrationId)
                 .order('created_at', { ascending: false });
@@ -91,8 +91,8 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
     // Create trigger mutation
     const createMutation = useMutation({
         mutationFn: async () => {
-            const { error } = await supabase
-                .from('integration_inbound_triggers')
+            const { error } = await (supabase
+                .from('integration_inbound_triggers' as never) as any)
                 .insert({
                     integration_id: integrationId,
                     external_pipeline_id: newTrigger.pipelineId,
@@ -118,8 +118,8 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
     // Toggle trigger mutation
     const toggleMutation = useMutation({
         mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            const { error } = await supabase
-                .from('integration_inbound_triggers')
+            const { error } = await (supabase
+                .from('integration_inbound_triggers' as never) as any)
                 .update({ is_active: isActive })
                 .eq('id', id);
             if (error) throw error;
@@ -133,8 +133,8 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
     // Delete trigger mutation
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
-                .from('integration_inbound_triggers')
+            const { error } = await (supabase
+                .from('integration_inbound_triggers' as never) as any)
                 .delete()
                 .eq('id', id);
             if (error) throw error;
@@ -279,8 +279,8 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                                 <div
                                     key={trigger.id}
                                     className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${trigger.is_active
-                                            ? 'bg-white border-slate-200'
-                                            : 'bg-slate-50 border-slate-100 opacity-60'
+                                        ? 'bg-white border-slate-200'
+                                        : 'bg-slate-50 border-slate-100 opacity-60'
                                         }`}
                                 >
                                     <div className="flex items-center gap-4">
