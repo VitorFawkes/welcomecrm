@@ -86,7 +86,33 @@ export function useQualityGate() {
         for (const rule of fieldRules) {
             if (!rule.field_key) continue
 
-            const value = card[rule.field_key]
+            // Check multiple data sources (waterfall resolution)
+            let value = card[rule.field_key]
+
+            if (value === undefined || value === null || value === '') {
+                const produtoData = typeof card.produto_data === 'string'
+                    ? JSON.parse(card.produto_data || '{}')
+                    : (card.produto_data || {})
+                value = produtoData[rule.field_key]
+
+                if (typeof value === 'object' && value !== null) {
+                    if ('total' in value) value = value.total
+                    else if (Object.keys(value).length === 0) value = undefined
+                }
+            }
+
+            if (value === undefined || value === null || value === '') {
+                const briefingData = typeof card.briefing_inicial === 'string'
+                    ? JSON.parse(card.briefing_inicial || '{}')
+                    : (card.briefing_inicial || {})
+                value = briefingData[rule.field_key]
+
+                if (typeof value === 'object' && value !== null) {
+                    if ('total' in value) value = value.total
+                    else if (Object.keys(value).length === 0) value = undefined
+                }
+            }
+
             let isValid = true
 
             if (value === null || value === undefined || value === '') {
@@ -182,7 +208,37 @@ export function useQualityGate() {
         for (const rule of stageRules) {
             if (!rule.field_key) continue
 
-            const value = card[rule.field_key]
+            // Check multiple data sources (waterfall resolution)
+            // Priority: card column → produto_data → briefing_inicial → marketing_data
+            let value = card[rule.field_key]
+
+            if (value === undefined || value === null || value === '') {
+                // Check produto_data JSON
+                const produtoData = typeof card.produto_data === 'string'
+                    ? JSON.parse(card.produto_data || '{}')
+                    : (card.produto_data || {})
+                value = produtoData[rule.field_key]
+
+                // For nested objects like orcamento, check if it has content
+                if (typeof value === 'object' && value !== null) {
+                    if ('total' in value) value = value.total
+                    else if (Object.keys(value).length === 0) value = undefined
+                }
+            }
+
+            if (value === undefined || value === null || value === '') {
+                // Check briefing_inicial JSON
+                const briefingData = typeof card.briefing_inicial === 'string'
+                    ? JSON.parse(card.briefing_inicial || '{}')
+                    : (card.briefing_inicial || {})
+                value = briefingData[rule.field_key]
+
+                if (typeof value === 'object' && value !== null) {
+                    if ('total' in value) value = value.total
+                    else if (Object.keys(value).length === 0) value = undefined
+                }
+            }
+
             let isValid = true
 
             if (value === null || value === undefined || value === '') {

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
-import { Plus, User, X, Loader2, MapPin } from 'lucide-react'
+import { Plus, User, X, Loader2, MapPin, ChevronDown, Check } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
@@ -21,10 +21,182 @@ interface CreateCardModalProps {
 
 // RequiredFields interface removed - no fields are required for card creation
 
+interface AllowedStage {
+    id: string
+    nome: string
+    ordem: number
+    fase: string | null
+}
+
+interface QuickStageSelectorProps {
+    stages: AllowedStage[]
+    selectedStageId: string | null
+    onSelect: (stageId: string) => void
+    showMore: boolean
+    onToggleMore: () => void
+}
+
+// Phase colors for visual differentiation
+const PHASE_COLORS: Record<string, { bg: string; border: string; text: string; activeBg: string }> = {
+    'SDR': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', activeBg: 'bg-blue-100' },
+    'Planner': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', activeBg: 'bg-purple-100' },
+    'Pós-venda': { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', activeBg: 'bg-emerald-100' },
+    'default': { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', activeBg: 'bg-slate-100' }
+}
+
+function QuickStageSelector({ stages, selectedStageId, onSelect, showMore, onToggleMore }: QuickStageSelectorProps) {
+    // Group stages by phase and get the first stage of each phase
+    const { quickOptions, allGrouped, hasMoreOptions } = useMemo(() => {
+        const grouped = stages.reduce((acc, stage) => {
+            const phase = stage.fase || 'Outros'
+            if (!acc[phase]) acc[phase] = []
+            acc[phase].push(stage)
+            return acc
+        }, {} as Record<string, AllowedStage[]>)
+
+        // Sort each group by ordem
+        Object.values(grouped).forEach(group => group.sort((a, b) => a.ordem - b.ordem))
+
+        // Get first stage of each phase (in phase order: SDR, Planner, Pós-venda)
+        const phaseOrder = ['SDR', 'Planner', 'Pós-venda']
+        const quickOpts: { stage: AllowedStage; phase: string }[] = []
+
+        phaseOrder.forEach(phase => {
+            if (grouped[phase]?.length > 0) {
+                quickOpts.push({ stage: grouped[phase][0], phase })
+            }
+        })
+
+        // Add any other phases not in the standard order
+        Object.keys(grouped).forEach(phase => {
+            if (!phaseOrder.includes(phase) && grouped[phase]?.length > 0) {
+                quickOpts.push({ stage: grouped[phase][0], phase })
+            }
+        })
+
+        // Check if there are more stages than just the quick options
+        const totalQuickStages = quickOpts.length
+        const totalStages = stages.length
+        const hasMore = totalStages > totalQuickStages
+
+        return { quickOptions: quickOpts, allGrouped: grouped, hasMoreOptions: hasMore }
+    }, [stages])
+
+    const getPhaseColors = (phase: string) => PHASE_COLORS[phase] || PHASE_COLORS['default']
+
+    // Check if selected stage is one of the quick options
+    const selectedIsQuickOption = quickOptions.some(opt => opt.stage.id === selectedStageId)
+    const selectedStage = stages.find(s => s.id === selectedStageId)
+
+    return (
+        <div className="space-y-3">
+            {/* Quick option chips - First stage of each phase */}
+            <div className="flex flex-wrap gap-2">
+                {quickOptions.map(({ stage, phase }) => {
+                    const colors = getPhaseColors(phase)
+                    const isSelected = selectedStageId === stage.id
+
+                    return (
+                        <button
+                            key={stage.id}
+                            type="button"
+                            onClick={() => onSelect(stage.id)}
+                            className={cn(
+                                'flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200',
+                                'hover:shadow-sm active:scale-[0.98]',
+                                isSelected
+                                    ? `${colors.activeBg} ${colors.border} ring-2 ring-offset-1 ring-indigo-500`
+                                    : `${colors.bg} ${colors.border} hover:border-slate-300`
+                            )}
+                        >
+                            {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600" />}
+                            <span className="text-xs font-medium text-slate-500">{phase}</span>
+                            <span className={cn('text-sm font-medium', isSelected ? 'text-slate-900' : colors.text)}>
+                                {stage.nome}
+                            </span>
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* Show selected stage if it's not a quick option */}
+            {!selectedIsQuickOption && selectedStage && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 ring-2 ring-offset-1 ring-indigo-500">
+                    <Check className="h-3.5 w-3.5 text-indigo-600" />
+                    <span className="text-xs font-medium text-slate-500">{selectedStage.fase || 'Outros'}</span>
+                    <span className="text-sm font-medium text-slate-900">{selectedStage.nome}</span>
+                </div>
+            )}
+
+            {/* Expandable section for more stages */}
+            {hasMoreOptions && (
+                <div className="space-y-2">
+                    <button
+                        type="button"
+                        onClick={onToggleMore}
+                        className={cn(
+                            'flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors',
+                            'py-1 px-2 -mx-2 rounded hover:bg-slate-50'
+                        )}
+                    >
+                        <ChevronDown className={cn(
+                            'h-4 w-4 transition-transform duration-200',
+                            showMore && 'rotate-180'
+                        )} />
+                        {showMore ? 'Ocultar outras etapas' : 'Ver outras etapas'}
+                    </button>
+
+                    {showMore && (
+                        <div className="space-y-3 pt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                            {Object.entries(allGrouped).map(([phase, phaseStages]) => {
+                                // Skip stages already shown as quick options (first of each phase)
+                                const otherStages = phaseStages.slice(1)
+                                if (otherStages.length === 0) return null
+
+                                const colors = getPhaseColors(phase)
+
+                                return (
+                                    <div key={phase} className="space-y-1.5">
+                                        <p className={cn('text-xs font-medium', colors.text)}>{phase}</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {otherStages.map(stage => {
+                                                const isSelected = selectedStageId === stage.id
+                                                return (
+                                                    <button
+                                                        key={stage.id}
+                                                        type="button"
+                                                        onClick={() => onSelect(stage.id)}
+                                                        className={cn(
+                                                            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-sm transition-all duration-200',
+                                                            'hover:shadow-sm active:scale-[0.98]',
+                                                            isSelected
+                                                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-500'
+                                                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                        )}
+                                                    >
+                                                        {isSelected && <Check className="h-3 w-3" />}
+                                                        {stage.nome}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+
 export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProps) {
     const queryClient = useQueryClient()
     const contentRef = useRef<HTMLDivElement>(null)
     const [showContactSelector, setShowContactSelector] = useState(false)
+    const [showMoreStages, setShowMoreStages] = useState(false)
 
     // Scroll to top when modal opens or when returning from ContactSelector
     useEffect(() => {
@@ -228,7 +400,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                                    Responsável
+                                    SDR Responsável
                                 </label>
                                 <OwnerSelector
                                     value={formData.sdr_owner_id}
@@ -238,6 +410,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                                         sdr_owner_nome: nome
                                     })}
                                     product={formData.produto}
+                                    showNoSdrOption={true}
                                 />
                             </div>
                         </section>
@@ -250,7 +423,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                             </h3>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
                                     Criar card em <span className="text-red-500">*</span>
                                 </label>
                                 {loadingStages ? (
@@ -262,38 +435,14 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                                     <div className="text-center py-3 px-4 text-sm text-amber-600 bg-amber-50 rounded-lg border border-amber-200">
                                         Nenhuma etapa disponível para seu time.
                                     </div>
-                                ) : allowedStages.length === 1 ? (
-                                    <div className="flex items-center gap-2 p-3 border border-slate-200 rounded-lg bg-slate-50">
-                                        <MapPin className="h-4 w-4 text-emerald-600" />
-                                        <span className="text-sm font-medium text-slate-900">{allowedStages[0].nome}</span>
-                                        {allowedStages[0].fase && (
-                                            <span className="text-xs text-slate-500">({allowedStages[0].fase})</span>
-                                        )}
-                                    </div>
                                 ) : (
-                                    <select
-                                        value={formData.selectedStageId || ''}
-                                        onChange={(e) => setFormData({ ...formData, selectedStageId: e.target.value })}
-                                        className="w-full h-11 px-4 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                    >
-                                        {/* Group stages by phase */}
-                                        {Object.entries(
-                                            allowedStages.reduce((acc, stage) => {
-                                                const phase = stage.fase || 'Outros'
-                                                if (!acc[phase]) acc[phase] = []
-                                                acc[phase].push(stage)
-                                                return acc
-                                            }, {} as Record<string, typeof allowedStages>)
-                                        ).map(([phase, stages]) => (
-                                            <optgroup key={phase} label={phase}>
-                                                {stages.map(stage => (
-                                                    <option key={stage.id} value={stage.id}>
-                                                        {stage.nome}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
-                                    </select>
+                                    <QuickStageSelector
+                                        stages={allowedStages}
+                                        selectedStageId={formData.selectedStageId}
+                                        onSelect={(id) => setFormData({ ...formData, selectedStageId: id })}
+                                        showMore={showMoreStages}
+                                        onToggleMore={() => setShowMoreStages(!showMoreStages)}
+                                    />
                                 )}
 
                                 {isAdmin && (

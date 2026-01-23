@@ -27,10 +27,12 @@ export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnP
 
     return (
         <div
+            ref={setNodeRef}
             className={cn(
                 "flex w-80 min-w-[20rem] shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md hover:bg-white",
                 "border-t-4 h-full",
-                borderClass
+                borderClass,
+                isOver && "ring-2 ring-primary/40 ring-inset bg-primary/5"
             )}
             style={style}
         >
@@ -51,10 +53,8 @@ export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnP
             </div>
 
             <div
-                ref={setNodeRef}
                 className={cn(
-                    "flex flex-col gap-3 overflow-y-auto transition-colors scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent px-3 pt-3 pb-6 min-h-[120px]",
-                    isOver ? "bg-primary/5 rounded-lg ring-2 ring-primary/20 ring-inset" : ""
+                    "flex flex-col gap-3 overflow-y-auto transition-colors scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent px-3 pt-3 pb-6 min-h-[120px] flex-1"
                 )}
             >
                 {cards.length === 0 ? (

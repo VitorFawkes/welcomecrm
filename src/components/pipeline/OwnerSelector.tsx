@@ -24,6 +24,10 @@ interface OwnerSelectorProps {
     product: Product
     placeholder?: string
     className?: string
+    /** If true, shows "Sem SDR" as default and "Auto-atribuir" as an option */
+    showNoSdrOption?: boolean
+    /** Callback when auto-assign is selected */
+    onAutoAssign?: () => void
 }
 
 export default function OwnerSelector({
@@ -31,10 +35,13 @@ export default function OwnerSelector({
     onChange,
     product,
     placeholder = 'Selecionar responsável',
-    className
+    className,
+    showNoSdrOption = false,
+    onAutoAssign
 }: OwnerSelectorProps) {
     const [isOpen, setIsOpen] = useState(false)
-    const [autoMode, setAutoMode] = useState(!value)
+    // When showNoSdrOption is true, default to no selection (not auto mode)
+    const [autoMode, setAutoMode] = useState(!showNoSdrOption && !value)
 
     // Fetch eligible users (active users - produtos filter removed as data is not populated)
     const { data: users = [], isLoading } = useQuery({
@@ -147,6 +154,16 @@ export default function OwnerSelector({
                                 </div>
                             </div>
                         </>
+                    ) : showNoSdrOption ? (
+                        <>
+                            <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <User className="h-3.5 w-3.5 text-slate-400" />
+                            </div>
+                            <div className="text-left min-w-0">
+                                <p className="text-sm font-medium text-slate-600 truncate">Sem SDR</p>
+                                <p className="text-xs text-slate-400 truncate">Clique para atribuir</p>
+                            </div>
+                        </>
                     ) : (
                         <span className="text-sm text-slate-500">{placeholder}</span>
                     )}
@@ -164,10 +181,42 @@ export default function OwnerSelector({
                         onClick={() => setIsOpen(false)}
                     />
                     <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                        {/* Auto option */}
+                        {/* "Sem SDR" option - only when showNoSdrOption is true */}
+                        {showNoSdrOption && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAutoMode(false)
+                                        onChange(null, null)
+                                        setIsOpen(false)
+                                    }}
+                                    className={cn(
+                                        'w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors',
+                                        !autoMode && !value && 'bg-slate-50'
+                                    )}
+                                >
+                                    <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
+                                        <User className="h-4 w-4 text-slate-400" />
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-sm font-medium text-slate-700">Sem SDR</p>
+                                        <p className="text-xs text-slate-500">Card sem responsável definido</p>
+                                    </div>
+                                </button>
+                                <div className="border-t border-slate-100" />
+                            </>
+                        )}
+
+                        {/* Auto-atribuir option */}
                         <button
                             type="button"
-                            onClick={() => handleSelect(null)}
+                            onClick={() => {
+                                setAutoMode(true)
+                                onChange(null, null)
+                                onAutoAssign?.()
+                                setIsOpen(false)
+                            }}
                             className={cn(
                                 'w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors',
                                 autoMode && 'bg-indigo-50'

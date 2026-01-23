@@ -405,7 +405,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             </button>
 
                             {showStageDropdown && stages && (
-                                <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-30">
                                     <div className="max-h-[300px] overflow-y-auto">
                                         {stages.map((stage) => (
                                             <button
