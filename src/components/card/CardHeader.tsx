@@ -60,16 +60,31 @@ export default function CardHeader({ card }: CardHeaderProps) {
     const headerFields = card.pipeline_stage_id ? getHeaderFields(card.pipeline_stage_id) : []
     const { data: phasesData } = usePipelinePhases()
 
-    // Fetch pipeline stages
+    // Fetch pipeline stages with proper Kanban ordering (phase order_index -> stage ordem)
     const { data: stages } = useQuery({
-        queryKey: ['pipeline-stages'],
+        queryKey: ['pipeline-stages-ordered'],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('pipeline_stages')
-                .select('id, nome, ordem, fase')
-                .order('ordem')
+                .select(`
+                    id, 
+                    nome, 
+                    ordem, 
+                    fase,
+                    phase_id,
+                    pipeline_phases!pipeline_stages_phase_id_fkey(id, name, order_index)
+                `)
+                .eq('ativo', true)
+
             if (error) throw error
-            return data as { id: string; nome: string; ordem: number; fase: string }[]
+
+            // Sort by phase order_index first, then by stage ordem within phase
+            return (data || []).sort((a, b) => {
+                const phaseOrderA = (a.pipeline_phases as any)?.order_index ?? 999
+                const phaseOrderB = (b.pipeline_phases as any)?.order_index ?? 999
+                if (phaseOrderA !== phaseOrderB) return phaseOrderA - phaseOrderB
+                return a.ordem - b.ordem
+            }) as { id: string; nome: string; ordem: number; fase: string }[]
         }
     })
 

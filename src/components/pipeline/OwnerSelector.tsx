@@ -15,7 +15,7 @@ interface Profile {
     role: string | null
     produtos: string[] | null
     team_id: string | null
-    teams?: { nome: string } | null
+    teams?: { name: string } | null
 }
 
 interface OwnerSelectorProps {
@@ -36,7 +36,7 @@ export default function OwnerSelector({
     const [isOpen, setIsOpen] = useState(false)
     const [autoMode, setAutoMode] = useState(!value)
 
-    // Fetch eligible users (SDRs for the selected product)
+    // Fetch eligible users (active users - produtos filter removed as data is not populated)
     const { data: users = [], isLoading } = useQuery({
         queryKey: ['eligible-owners', product],
         queryFn: async () => {
@@ -49,10 +49,9 @@ export default function OwnerSelector({
           role,
           produtos,
           team_id,
-          teams(nome)
+          teams(name)
         `)
                 .eq('active', true)
-                .contains('produtos', [product])
                 .order('nome')
 
             if (error) throw error
@@ -142,8 +141,8 @@ export default function OwnerSelector({
                                 <p className="text-sm font-medium text-slate-900 truncate">{selectedUser.nome}</p>
                                 <div className="flex items-center gap-1.5">
                                     {getRoleBadge(selectedUser.role)}
-                                    {selectedUser.teams?.nome && (
-                                        <span className="text-xs text-slate-500">• {selectedUser.teams.nome}</span>
+                                    {selectedUser.teams?.name && (
+                                        <span className="text-xs text-slate-500">• {selectedUser.teams.name}</span>
                                     )}
                                 </div>
                             </div>
@@ -214,7 +213,7 @@ export default function OwnerSelector({
                                             {getRoleBadge(user.role)}
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            {user.teams?.nome && <span>{user.teams.nome}</span>}
+                                            {user.teams?.name && <span>{user.teams.name}</span>}
                                             {workload[user.id] !== undefined && (
                                                 <span className="flex items-center gap-0.5">
                                                     <Users className="h-3 w-3" />

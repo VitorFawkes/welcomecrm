@@ -26,6 +26,7 @@ import PipelineStudio from './pages/admin/PipelineStudio'
 import UserManagement from './pages/admin/UserManagement'
 import CategoryManagement from './pages/admin/CategoryManagement'
 import CRMHealth from './pages/admin/CRMHealth'
+import CardCreationRulesPage from './pages/admin/CardCreationRulesPage'
 import Lixeira from './pages/admin/Lixeira'
 import { IntegrationsPage } from './components/admin/integrations/IntegrationsPage'
 import { WhatsAppPage } from './components/admin/whatsapp/WhatsAppPage'
@@ -102,6 +103,7 @@ function App() {
                         TEAM: Users, Roles, Teams
                     ═══════════════════════════════════════════════════════════ */}
                     <Route path="team/members" element={<UserManagement />} />
+                    <Route path="team/card-rules" element={<CardCreationRulesPage />} />
 
                     {/* ═══════════════════════════════════════════════════════════
                         OPERATIONS: Maintenance & Health
