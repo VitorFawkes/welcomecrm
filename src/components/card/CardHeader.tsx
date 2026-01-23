@@ -264,6 +264,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
     const handleStageSelect = (stageId: string, stageName: string, stageFase: string) => {
         // 1. Validate Move
         const validation = validateMoveSync(card, stageId)
+
         if (!validation.valid) {
             setPendingStageChange({
                 stageId,
