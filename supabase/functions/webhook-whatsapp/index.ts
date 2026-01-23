@@ -1,176 +1,218 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-platform-id",
 };
 
-serve(async (req) => {
+/**
+ * WhatsApp Webhook Ingest (Unified)
+ * 
+ * Replaces the legacy function to support both ChatPro and Echo.
+ * Inserts into 'whatsapp_raw_events' for robust processing.
+ * 
+ * Auto-detects provider if ?provider= param is missing.
+ */
+Deno.serve(async (req) => {
+    // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
 
     try {
-        const supabase = createClient(
+        const supabaseClient = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
+        const url = new URL(req.url);
+        let provider = url.searchParams.get("provider");
+
+        // 1. Parse payload early to help with detection
         const payload = await req.json();
-        console.log("Webhook received:", JSON.stringify(payload));
 
-        // 1. Validate Payload Structure (ChatPro specific)
-        const messageData = payload.body?.message_data || payload.message_data;
-        if (!messageData) {
-            console.log("Ignored: No message_data found (likely a status update or other event)");
-            return new Response(JSON.stringify({ message: "Ignored event type" }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
+        // Handle array payloads (some platforms send batches)
+        const payloads = Array.isArray(payload) ? payload : [payload];
 
-        const {
-            id: externalId,
-            number: rawNumber,
-            message: body,
-            from_me: fromMe,
-            type: messageType,
-            file_type: fileType,
-            url: mediaUrl,
-            participant
-        } = messageData;
+        // 2. Auto-detect provider if missing
+        if (!provider && payloads.length > 0) {
+            const sample = payloads[0];
 
-        // 2. Idempotency Check
-        const { data: existing } = await supabase
-            .from("whatsapp_messages")
-            .select("id")
-            .eq("external_id", externalId)
-            .single();
+            // Check for Echo signatures
+            // Echo usually has 'status' event with 'message' object or 'type'='message_status'
+            // OR has 'data' property in some contexts (though usually flat in webhooks).
+            // Key Echo fields: 'whatsapp_message_id', 'conversation_id', 'message.conversation.id'
+            const isEcho =
+                sample.whatsapp_message_id ||
+                sample.conversation_id ||
+                (sample.data && (sample.data.whatsapp_message_id || sample.data.conversation_id)) ||
+                (sample.message && sample.message.conversation);
 
-        if (existing) {
-            console.log(`Duplicate message ignored: ${externalId}`);
-            return new Response(JSON.stringify({ message: "Duplicate" }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
+            // Check for ChatPro signatures
+            // ChatPro typically wraps in { "body": { "message_data": ... } } or just { "message_data": ... }
+            const isChatPro =
+                sample.message_data ||
+                (sample.body && sample.body.message_data) ||
+                sample.event === 'message_status'; // ChatPro statuses often look like this too, tricky.
 
-        // 3. Normalize Phone
-        // ChatPro sends "number" as "5511999999999@s.whatsapp.net" or just "5511999999999"
-        // We need to strip everything non-numeric.
-        // If from_me, 'number' is the recipient, 'participant' is me (or vice versa depending on API version, usually 'number' is the remote party in ChatPro webhooks)
-        // Actually, in ChatPro 'sent_message': 'number' is the destination. 'participant' is the sender (me).
-        // In 'new_message' (inbound): 'number' is the sender.
-
-        // Let's rely on 'number' field which usually points to the "Remote" party (the contact).
-        // If it's a group, logic might differ, but for 1:1:
-        // Inbound: number = sender
-        // Outbound: number = recipient
-        // So 'number' is ALWAYS the Contact's number.
-
-        const { data: normalizedPhone } = await supabase.rpc('normalize_phone', { phone_number: rawNumber });
-
-        if (!normalizedPhone) {
-            throw new Error("Failed to normalize phone number");
-        }
-
-        // 4. Find Contact
-        let { data: contact } = await supabase
-            .from("contatos")
-            .select("id, nome")
-            .or(`telefone.eq.${normalizedPhone},telefone.eq.+${normalizedPhone}`) // Try exact match or with +
-            .maybeSingle();
-
-        // 5. Auto-Create Logic (Governance)
-        if (!contact) {
-            // Fetch Config
-            const { data: config } = await supabase
-                .from("whatsapp_config")
-                .select("value")
-                .eq("key", "auto_create_leads")
-                .single();
-
-            const autoCreate = config?.value === true;
-
-            if (autoCreate) {
-                console.log(`Contact not found for ${normalizedPhone}. Auto-creating...`);
-
-                // Create Contact
-                const { data: newContact, error: contactError } = await supabase
-                    .from("contatos")
-                    .insert({
-                        nome: `WhatsApp ${normalizedPhone}`,
-                        telefone: normalizedPhone,
-                        tipo_pessoa: 'adulto', // Default
-                        observacoes: 'Criado automaticamente via integração WhatsApp'
-                    })
-                    .select("id")
-                    .single();
-
-                if (contactError) {
-                    console.error("Failed to create contact:", contactError);
-                    // Fallback: Store as orphan (contact_id null)
-                } else {
-                    contact = newContact;
-
-                    // Create Lead (Card) if configured
-                    const { data: pipelineConfig } = await supabase
-                        .from("whatsapp_config")
-                        .select("value")
-                        .eq("key", "default_pipeline_id")
-                        .single();
-
-                    const pipelineId = pipelineConfig?.value;
-
-                    if (pipelineId) {
-                        const { error: cardError } = await supabase
-                            .from("cards")
-                            .insert({
-                                titulo: `Lead WhatsApp ${normalizedPhone}`,
-                                pessoa_principal_id: contact.id,
-                                pipeline_id: pipelineId,
-                                produto: 'TRIPS', // Default
-                                origem: 'WhatsApp',
-                                status_comercial: 'novo'
-                            });
-                        if (cardError) console.error("Failed to create card:", cardError);
-                    }
-                }
+            if (isEcho) {
+                console.log("Auto-detected provider: ECHO");
+                provider = "echo";
             } else {
-                console.log(`Contact not found for ${normalizedPhone}. Auto-create disabled.`);
+                // Default to ChatPro for backward compatibility with the legacy function
+                console.log("Auto-detected provider: CHATPRO (Default)");
+                provider = "chatpro";
             }
         }
 
-        // 6. Insert Message
-        const { error: insertError } = await supabase
-            .from("whatsapp_messages")
-            .insert({
-                external_id: externalId,
-                contact_id: contact?.id || null, // Null if orphan
-                direction: fromMe ? 'outbound' : 'inbound',
-                type: fileType || messageType || 'text',
-                body: body,
-                media_url: mediaUrl,
-                status: 'delivered',
-                metadata: messageData,
-                created_at: new Date().toISOString() // Use current time for ingestion, or messageData.ts_receive if available
-            });
-
-        if (insertError) {
-            throw insertError;
+        // Validate provider
+        if (!provider || !["chatpro", "echo"].includes(provider)) {
+            return new Response(
+                JSON.stringify({ error: "Invalid or missing provider. Use ?provider=chatpro or ?provider=echo" }),
+                {
+                    status: 400,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                }
+            );
         }
 
-        return new Response(JSON.stringify({ success: true }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-        });
+        // 3. Fetch Platform Config
+        const { data: platform, error: platformError } = await supabaseClient
+            .from("whatsapp_platforms")
+            .select("id, is_active")
+            .eq("provider", provider)
+            .single();
+
+        if (platformError || !platform) {
+            console.error("Platform not found:", provider, platformError);
+            return new Response(
+                JSON.stringify({ error: `Platform '${provider}' not configured` }),
+                {
+                    status: 404,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                }
+            );
+        }
+
+        if (!platform.is_active) {
+            return new Response(
+                JSON.stringify({ error: `Platform '${provider}' is inactive` }),
+                {
+                    status: 403,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                }
+            );
+        }
+
+        const insertedIds: string[] = [];
+        const errors: string[] = [];
+
+        for (const singlePayload of payloads) {
+            // 4. Extract event type and idempotency key based on provider
+            let eventType: string | null = null;
+            let idempotencyKey: string | null = null;
+            let origem: string | null = null;
+
+            if (provider === "chatpro") {
+                // Handle ChatPro's nested structure if present
+                const effectiveData = singlePayload.body || singlePayload;
+                // Sometimes it's directly at root, sometimes in body.
+                // Re-normalizing for extraction:
+                const messageData = effectiveData.message_data || effectiveData;
+
+                eventType = effectiveData.event || effectiveData.message_type || (messageData ? 'message' : 'unknown');
+                idempotencyKey = messageData?.id || effectiveData.message_id || null;
+                origem = effectiveData.origem || null;
+            } else if (provider === "echo") {
+                // Echo logic
+                // Echo often sends flat JSON.
+                const data = singlePayload.data || singlePayload; // Handle envelope if present
+                eventType = data.event || data.type || (data.message ? 'message' : 'unknown');
+
+                // Idempotency: Echo sends 'id' for the message itself, or 'whatsapp_message_id' in a status update.
+                // We need a unique key.
+                idempotencyKey = data.id || data.whatsapp_message_id || data.message_id || null;
+                origem = null;
+            }
+
+            // 5. Idempotency Check
+            if (idempotencyKey) {
+                const { data: existingEvent } = await supabaseClient
+                    .from("whatsapp_raw_events")
+                    .select("id")
+                    .eq("platform_id", platform.id)
+                    .eq("idempotency_key", String(idempotencyKey))
+                    .single();
+
+                if (existingEvent) {
+                    console.log(`Duplicate event ignored: ${idempotencyKey}`);
+                    continue; // Skip duplicate
+                }
+            }
+
+            // 6. Insert raw event
+            const { data: insertedEvent, error: insertError } = await supabaseClient
+                .from("whatsapp_raw_events")
+                .insert({
+                    platform_id: platform.id,
+                    event_type: eventType,
+                    origem: origem,
+                    idempotency_key: idempotencyKey,
+                    raw_payload: singlePayload,
+                    status: "pending",
+                })
+                .select("id")
+                .single();
+
+            if (insertError) {
+                console.error("Failed to insert event:", insertError);
+                errors.push(insertError.message);
+            } else if (insertedEvent) {
+                insertedIds.push(insertedEvent.id);
+            }
+        }
+
+        // 7. Update platform last_event_at
+        await supabaseClient
+            .from("whatsapp_platforms")
+            .update({ last_event_at: new Date().toISOString() })
+            .eq("id", platform.id);
+
+        // 8. Return response
+        if (errors.length > 0 && insertedIds.length === 0) {
+            return new Response(
+                JSON.stringify({ error: "Failed to process all events", details: errors }),
+                {
+                    status: 500,
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                }
+            );
+        }
+
+        return new Response(
+            JSON.stringify({
+                message: "Accepted",
+                provider_detected: provider,
+                events_received: payloads.length,
+                events_inserted: insertedIds.length,
+                events_duplicated: payloads.length - insertedIds.length - errors.length,
+                event_ids: insertedIds,
+            }),
+            {
+                status: 202,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+        );
 
     } catch (error) {
-        console.error("Error processing webhook:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 500,
-        });
+        console.error("Error:", error);
+        return new Response(
+            JSON.stringify({ error: "Internal Server Error", details: String(error) }),
+            {
+                status: 500,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+        );
     }
 });
