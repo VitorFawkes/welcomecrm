@@ -77,14 +77,14 @@ export function ActiveFilters() {
                 {/* Dates */}
                 {(filters.startDate || filters.endDate) && (
                     <Chip
-                        label={`Viagem: ${filters.startDate ? format(new Date(filters.startDate), 'dd/MM/yyyy', { locale: ptBR }) : '...'} - ${filters.endDate ? format(new Date(filters.endDate), 'dd/MM/yyyy', { locale: ptBR }) : '...'}`}
+                        label={`Viagem: ${filters.startDate ? format(new Date(filters.startDate + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '...'} - ${filters.endDate ? format(new Date(filters.endDate + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '...'}`}
                         onRemove={() => { removeFilter('startDate'); removeFilter('endDate'); }}
                     />
                 )}
 
                 {(filters.creationStartDate || filters.creationEndDate) && (
                     <Chip
-                        label={`Criado: ${filters.creationStartDate ? format(new Date(filters.creationStartDate), 'dd/MM/yyyy', { locale: ptBR }) : '...'} - ${filters.creationEndDate ? format(new Date(filters.creationEndDate), 'dd/MM/yyyy', { locale: ptBR }) : '...'}`}
+                        label={`Criado: ${filters.creationStartDate ? format(new Date(filters.creationStartDate + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '...'} - ${filters.creationEndDate ? format(new Date(filters.creationEndDate + 'T12:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '...'}`}
                         onRemove={() => { removeFilter('creationStartDate'); removeFilter('creationEndDate'); }}
                     />
                 )}

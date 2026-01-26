@@ -10,6 +10,7 @@ import OwnerSelector from './OwnerSelector'
 import { Input } from '../ui/Input'
 import { useAuth } from '../../contexts/AuthContext'
 import { useAllowedStages } from '../../hooks/useCardCreationRules'
+import { useToast } from '../../contexts/ToastContext'
 import type { Database } from '../../database.types'
 
 type Product = Database['public']['Enums']['app_product']
@@ -251,6 +252,8 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
     // Title and stage are required for card creation
     const canSubmit = formData.titulo.trim().length > 0 && !!formData.selectedStageId && !!pipeline
 
+    const { toast } = useToast()
+
     const createCardMutation = useMutation({
         mutationFn: async () => {
             if (!pipeline || !formData.selectedStageId) throw new Error('Pipeline or stage not selected')
@@ -280,6 +283,10 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cards'] })
             queryClient.invalidateQueries({ queryKey: ['pipeline'] })
+            toast({
+                title: "Card criado com sucesso!",
+                type: "success"
+            })
             onClose()
             // Reset form
             setFormData({
@@ -290,6 +297,14 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                 sdr_owner_id: null,
                 sdr_owner_nome: null,
                 selectedStageId: null
+            })
+        },
+        onError: (error) => {
+            console.error('Erro ao criar card:', error)
+            toast({
+                title: "Erro ao criar card",
+                description: error.message || "Ocorreu um erro inesperado.",
+                type: "error"
             })
         }
     })

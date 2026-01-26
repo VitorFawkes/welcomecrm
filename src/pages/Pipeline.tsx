@@ -7,7 +7,7 @@ import { useProductContext } from '../hooks/useProductContext'
 
 import { FilterDrawer } from '../components/pipeline/FilterDrawer'
 import { ActiveFilters } from '../components/pipeline/ActiveFilters'
-import { Filter, Link, User, ArrowUpDown, Calendar, Clock, CheckSquare } from 'lucide-react'
+import { Filter, Link, User, ArrowUpDown, Calendar, Clock, CheckSquare, Search } from 'lucide-react'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -63,7 +63,21 @@ export default function Pipeline() {
 
                     <div className="flex flex-col gap-2">
                         <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center gap-4 flex-wrap">
+                            <div className="flex items-center gap-4 flex-wrap flex-1">
+                                {/* Search Bar */}
+                                <div className="relative flex-1 min-w-[200px] max-w-md">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Search className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Pesquisar viagem, contato, origem..."
+                                        className="block w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all shadow-sm"
+                                        value={filters.search || ''}
+                                        onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                                    />
+                                </div>
+
                                 {/* View Switcher (Persona Based) */}
                                 <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
                                     <button

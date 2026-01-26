@@ -48,7 +48,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
     const { validateMoveSync } = useQualityGate()
-    const { session } = useAuth() // Need auth to know who "ME" is
+    const { session, profile } = useAuth() // Need auth to know who "ME" is
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
 
@@ -123,8 +123,24 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         }
     })
 
+    // Fetch Team Members for Team View
+    const { data: myTeamMembers } = useQuery({
+        queryKey: ['my-team-members', profile?.team_id],
+        enabled: !!profile?.team_id && viewMode === 'MANAGER' && subView === 'TEAM_VIEW',
+        queryFn: async () => {
+            if (!profile?.team_id) return []
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('team_id', profile.team_id)
+
+            if (error) throw error
+            return data.map(p => p.id)
+        }
+    })
+
     const { data: cards, isError, refetch } = useQuery({
-        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters], // Re-fetch when view changes
+        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], // Re-fetch when view changes
         placeholderData: keepPreviousData,
         queryFn: async () => {
             let query = (supabase.from('view_cards_acoes') as any)
@@ -145,7 +161,10 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 // 'ATTENTION' logic would go here (e.g. overdue)
             } else if (viewMode === 'MANAGER') {
                 if (subView === 'TEAM_VIEW') {
-                    // Ideally filter by team, for now show all (Macro)
+                    // Filter by team members if available
+                    if (myTeamMembers && myTeamMembers.length > 0) {
+                        query = query.in('dono_atual_id', myTeamMembers)
+                    }
                 }
                 if (subView === 'FORECAST') {
                     // Filter by closing_date this month
@@ -157,7 +176,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
             // Apply Advanced Filters (from Drawer)
             if (filters.search) {
-                query = query.ilike('titulo', `% ${filters.search}% `)
+                const searchTerm = filters.search.trim();
+                if (searchTerm) {
+                    // Search in Title, Contact Name, Origin, and Current Owner Name
+                    // Note: 'destinos' is JSON, so simple ilike might not work as expected unless casted in view.
+                    // We will stick to text columns for now.
+                    query = query.or(`titulo.ilike.%${searchTerm}%,pessoa_nome.ilike.%${searchTerm}%,origem.ilike.%${searchTerm}%,dono_atual_nome.ilike.%${searchTerm}%`)
+                }
             }
 
             if ((filters.ownerIds?.length ?? 0) > 0) {
@@ -180,7 +205,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             // }
 
 
+
             if (filters.startDate) {
+                // Append time to ensure full day coverage if needed, but for 'data_viagem_inicio' (date type) it might be fine.
+                // However, if it's a timestamp, we need to be careful.
+                // Assuming 'data_viagem_inicio' is DATE type in DB, simple string comparison works.
+                // If it's TIMESTAMP, we should append time.
+                // Let's be safe and assume we want to include the whole day.
                 query = query.gte('data_viagem_inicio', filters.startDate)
             }
 
@@ -188,13 +219,16 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 query = query.lte('data_viagem_inicio', filters.endDate)
             }
 
-            // NEW: Creation Date Filter
+            // NEW: Creation Date Filter (TIMESTAMP)
+            // Fix: Append time to ensure we cover the selected days fully in local time perspective
             if (filters.creationStartDate) {
-                query = query.gte('created_at', filters.creationStartDate)
+                // Start of day: 00:00:00
+                query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
             }
 
             if (filters.creationEndDate) {
-                query = query.lte('created_at', filters.creationEndDate)
+                // End of day: 23:59:59
+                query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
             }
 
             // Apply Sorting
