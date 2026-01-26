@@ -3,6 +3,7 @@ import { SECTION_TYPE_CONFIG } from '@/types/proposals'
 import { Eye, Smartphone, Monitor } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { FlightItinerary } from './public/FlightItinerary'
 
 type ViewMode = 'desktop' | 'mobile'
 
@@ -91,28 +92,42 @@ export function ProposalPreview() {
 
                                             {section.items && section.items.length > 0 ? (
                                                 <div className="space-y-2">
-                                                    {section.items.map((item) => (
-                                                        <div
-                                                            key={item.id}
-                                                            className="flex items-center justify-between p-3 bg-slate-50 rounded-md"
-                                                        >
-                                                            <div>
-                                                                <p className="font-medium text-sm text-slate-700">
-                                                                    {item.title}
-                                                                </p>
-                                                                {item.description && (
-                                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                                        {item.description}
+                                                    {section.items.map((item) => {
+                                                        if (item.item_type === 'flight') {
+                                                            return (
+                                                                <div key={item.id} className="mb-4">
+                                                                    <FlightItinerary
+                                                                        item={item}
+                                                                        isSelected={false}
+                                                                        onToggle={() => { }}
+                                                                    />
+                                                                </div>
+                                                            )
+                                                        }
+
+                                                        return (
+                                                            <div
+                                                                key={item.id}
+                                                                className="flex items-center justify-between p-3 bg-slate-50 rounded-md"
+                                                            >
+                                                                <div>
+                                                                    <p className="font-medium text-sm text-slate-700">
+                                                                        {item.title}
                                                                     </p>
+                                                                    {item.description && (
+                                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                                            {item.description}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                {item.base_price && item.base_price > 0 && (
+                                                                    <span className="text-sm font-semibold text-green-600">
+                                                                        R$ {item.base_price.toLocaleString('pt-BR')}
+                                                                    </span>
                                                                 )}
                                                             </div>
-                                                            {item.base_price && item.base_price > 0 && (
-                                                                <span className="text-sm font-semibold text-green-600">
-                                                                    R$ {item.base_price.toLocaleString('pt-BR')}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <p className="text-xs text-slate-400 italic">

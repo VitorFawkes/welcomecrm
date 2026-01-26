@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
-import { Download, RefreshCw, ChevronDown, ChevronRight, Loader2, ArrowRightLeft, Search } from 'lucide-react';
+import { Download, RefreshCw, ChevronDown, ChevronRight, Loader2, ArrowRightLeft, Search, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/Input';
 
@@ -262,6 +262,73 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
         }
     });
 
+    // 3.1 Fetch recent webhook logs for Field Discovery
+    const { data: recentEvents = [] } = useQuery({
+        queryKey: ['integration-events-discovery', integrationId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('integration_events')
+                .select('payload')
+                .order('created_at', { ascending: false })
+                .limit(50);
+            if (error) throw error;
+            return data || [];
+        }
+    });
+
+    // 3.2 Discover fields from logs
+    const discoveredFields = useMemo(() => {
+        const discovered: ExternalField[] = [];
+        const existingIds = new Set(externalFields.map(f => f.external_id));
+        // Add hardcoded contact fields to existing IDs to avoid duplicates
+        AC_CONTACT_FIELDS.forEach(f => existingIds.add(f.external_id));
+
+        const seenInLogs = new Set<string>();
+
+        recentEvents.forEach(event => {
+            const payload = event.payload;
+            if (!payload) return;
+
+            // Helper to check keys
+            const checkKey = (key: string, value: any) => {
+                // Regex for contact[fields][ID] or deal[fields][ID]
+                const match = key.match(/(contact|deal)\[fields\]\[(\d+)\]/);
+                if (match) {
+                    const type = match[1]; // 'contact' or 'deal'
+                    const id = match[2];
+
+                    // Determine the external_id based on type pattern
+                    // Contact fields use the full path: contact[fields][123]
+                    // Deal fields use just the ID: 123
+                    const externalId = type === 'contact' ? key : id;
+
+                    if (!existingIds.has(externalId) && !seenInLogs.has(externalId)) {
+                        seenInLogs.add(externalId);
+                        discovered.push({
+                            external_id: externalId,
+                            external_name: `[Descoberto] ${type === 'contact' ? 'Contato' : 'Deal'} ${id}`,
+                            metadata: { discovered: true, sample_value: value, entity_type: type },
+                            inferred_section: 'contact_custom' // Default to custom
+                        });
+                    }
+                }
+            };
+
+            // Recursive traversal
+            const traverse = (obj: any) => {
+                if (!obj || typeof obj !== 'object') return;
+                Object.entries(obj).forEach(([key, value]) => {
+                    checkKey(key, value);
+                    if (typeof value === 'object') traverse(value);
+                });
+            };
+
+            traverse(payload);
+        });
+
+        return discovered;
+    }, [recentEvents, externalFields]);
+
     // 4. Fetch existing inbound mappings
     const { data: existingMappings = [], isLoading: loadingMappings } = useQuery({
         queryKey: ['inbound-field-mappings', integrationId, selectedPipelineId, selectedEntityType],
@@ -298,7 +365,7 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
         // For deals, use the custom deal fields from the catalog
         let fieldsToGroup: ExternalField[] = selectedEntityType === 'contact'
             ? AC_CONTACT_FIELDS as ExternalField[]
-            : externalFields;
+            : [...externalFields, ...discoveredFields]; // Include discovered fields for deals
 
         // Filter by search term
         if (searchTerm) {
@@ -315,7 +382,7 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
         });
 
         return grouped;
-    }, [externalFields, searchTerm]);
+    }, [externalFields, searchTerm, selectedEntityType, discoveredFields]);
 
     // Lookup for existing mappings by external_field_id
     const mappingByExternalField = useMemo(() => {
@@ -619,10 +686,17 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
             </Card>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
                 <div className="bg-white border border-slate-200 rounded-lg p-4 text-center shadow-sm">
                     <div className="text-2xl font-bold">{totalACFields}</div>
                     <div className="text-xs text-muted-foreground">Campos AC</div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-lg p-4 text-center shadow-sm">
+                    <div className="text-2xl font-bold">{discoveredFields.length}</div>
+                    <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                        Descobertos (Logs)
+                    </div>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-lg p-4 text-center shadow-sm">
                     <div className="text-2xl font-bold">{crmFields.length}</div>
@@ -705,8 +779,13 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
                                                         )}>
                                                             <td className="px-4 py-3">
                                                                 <div className="flex flex-col">
-                                                                    <span className="text-sm font-medium">
+                                                                    <span className="text-sm font-medium flex items-center gap-2">
                                                                         {field.external_name}
+                                                                        {(field.metadata as any)?.discovered && (
+                                                                            <Badge variant="outline" className="text-[10px] h-4 px-1 bg-yellow-50 text-yellow-700 border-yellow-200">
+                                                                                Descoberto
+                                                                            </Badge>
+                                                                        )}
                                                                     </span>
                                                                     <span className="text-xs text-muted-foreground font-mono">
                                                                         ID: {field.external_id}
@@ -735,7 +814,8 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
                                         </table>
                                     </div>
                                 </CardContent>
-                            )}
+                            )
+                            }
                         </Card>
                     );
                 })
@@ -755,6 +835,6 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
                     </ul>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

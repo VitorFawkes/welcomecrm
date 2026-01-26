@@ -4,6 +4,12 @@ import {
     Eraser, Type, Hash, CalendarDays, List, CheckSquare, Banknote
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { Input } from '../ui/Input'
+import { Textarea } from '../ui/textarea'
+import { Select } from '../ui/Select'
+import { Checkbox } from '../ui/checkbox'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
 import type { Database } from '../../database.types'
 
 type SystemField = Database['public']['Tables']['system_fields']['Row']
@@ -34,6 +40,50 @@ const formatBudget = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
 
+const LossReasonSelector = ({ value, onChange }: { value: any, onChange?: (val: any) => void }) => {
+    const { data: reasons = [] } = useQuery({
+        queryKey: ['loss-reasons', 'active'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('motivos_perda')
+                .select('*')
+                .eq('ativo', true)
+                .order('nome')
+            if (error) throw error
+            return data
+        }
+    })
+
+    return (
+        <Select
+            value={value || ''}
+            onChange={(val) => onChange?.(val)}
+            options={reasons.map(r => ({ value: r.id, label: r.nome }))}
+            placeholder="Selecione o motivo..."
+        />
+    )
+}
+
+const LossReasonDisplay = ({ value }: { value: any }) => {
+    const { data: reason } = useQuery({
+        queryKey: ['loss-reason', value],
+        queryFn: async () => {
+            if (!value) return null
+            const { data, error } = await supabase
+                .from('motivos_perda')
+                .select('nome')
+                .eq('id', value)
+                .single()
+            if (error) return null
+            return data
+        },
+        enabled: !!value
+    })
+
+    if (!value) return null
+    return <>{reason?.nome || '...'}</>
+}
+
 // --- SUB-COMPONENTS ---
 
 const FieldCard = ({
@@ -51,24 +101,21 @@ const FieldCard = ({
     return (
         <div
             className={cn(
-                "group relative p-4 rounded-xl border transition-all duration-200",
+                "group relative p-3.5 rounded-xl border transition-all duration-300",
                 correctionMode
                     ? "bg-[#fdfbf7] border-amber-200/50 border-dashed hover:border-amber-300 hover:bg-[#fffdf9] cursor-pointer"
                     : cn(
                         "bg-white",
                         status === 'blocking' ? "border-red-300 bg-red-50/30" :
                             status === 'attention' ? "border-orange-300 bg-orange-50/30" :
-                                "border-gray-300",
-                        "hover:shadow-md cursor-pointer",
-                        status === 'blocking' && "hover:border-red-400",
-                        status === 'attention' && "hover:border-orange-400",
-                        status === 'ok' && "hover:border-indigo-400"
+                                "border-gray-200",
+                        "hover:shadow-md cursor-pointer hover:border-indigo-300"
                     )
             )}
             onClick={onEdit}
         >
             <div className={cn(
-                "absolute top-3 right-3 transition-opacity",
+                "absolute top-3 right-3 transition-opacity duration-300",
                 correctionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}>
                 {correctionMode ? (
@@ -76,7 +123,9 @@ const FieldCard = ({
                         <Eraser className="h-3 w-3" /> Corrigir
                     </div>
                 ) : (
-                    <Edit2 className="h-4 w-4 text-indigo-500" />
+                    <div className="p-1.5 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                        <Edit2 className="h-3.5 w-3.5" />
+                    </div>
                 )}
             </div>
 
@@ -91,24 +140,24 @@ const FieldCard = ({
 
             <div className="flex items-start gap-3">
                 <div className={cn(
-                    "p-2 rounded-lg transition-colors",
+                    "p-2 rounded-lg transition-colors shadow-sm",
                     correctionMode ? "bg-gray-100 text-gray-400 grayscale" : iconColor
                 )}>
                     <Icon className="h-4 w-4" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 pt-0.5">
                     <p className={cn(
-                        "text-xs font-medium uppercase tracking-wide mb-1 flex items-center gap-2",
+                        "text-xs font-bold uppercase tracking-wide mb-1 flex items-center gap-2",
                         correctionMode ? "text-gray-400 font-mono" : "text-gray-500"
                     )}>
                         {label}
-                        {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold font-sans">Obrigatório</span>}
+                        {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold font-sans bg-red-50 px-1.5 py-0.5 rounded-full">Obrigatório</span>}
                     </p>
 
                     {/* Main Value */}
                     <div className={cn(
-                        "text-sm truncate",
-                        correctionMode ? "font-mono text-gray-700 font-medium" : "font-semibold text-gray-900"
+                        "text-sm font-medium leading-relaxed break-words",
+                        correctionMode ? "font-mono text-gray-700 font-medium" : "text-gray-900"
                     )}>
                         {(() => {
                             if (value === null || value === undefined || value === '') {
@@ -122,17 +171,17 @@ const FieldCard = ({
                             return value
                         })()}
                     </div>
-                    {subValue && <p className="text-xs text-gray-500 mt-0.5">{subValue}</p>}
+                    {subValue && <p className="text-xs text-gray-500 mt-1 font-medium">{subValue}</p>}
 
                     {/* SDR Reference Section */}
                     {showSdrSection && (
                         <div className="mt-3 pt-2 border-t border-gray-100">
                             <div className="flex items-center gap-1.5 mb-1">
                                 <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-wider">
-                                    SDR
+                                    Original SDR
                                 </span>
                             </div>
-                            <div className="text-xs text-gray-600 bg-gray-50/50 p-2 rounded-md border border-gray-100">
+                            <div className="text-xs text-gray-600 bg-gray-50/80 p-2 rounded-lg border border-gray-200/60">
                                 {sdrValue || <span className="text-gray-400 italic">Não informado pelo SDR</span>}
                             </div>
                         </div>
@@ -181,7 +230,7 @@ export default function UniversalFieldRenderer({
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <MapPin className="h-4 w-4 text-gray-400" />
                         </div>
-                        <input
+                        <Input
                             type="text"
                             defaultValue={textValue}
                             onBlur={(e) => {
@@ -192,7 +241,7 @@ export default function UniversalFieldRenderer({
                                 onChange?.(newDestinos)
                             }}
                             placeholder="Ex: Paris, Londres, Roma"
-                            className="block w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50/50 focus:bg-white transition-colors"
+                            className="pl-10 bg-gray-50/50 focus:bg-white transition-colors"
                         />
                     </div>
                     <p className="text-xs text-gray-500">
@@ -205,27 +254,24 @@ export default function UniversalFieldRenderer({
         switch (field.type) {
             case 'textarea':
                 return (
-                    <textarea
+                    <Textarea
                         value={value || ''}
                         onChange={(e) => onChange?.(e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-gray-50/50 focus:bg-white min-h-[120px]"
+                        className="min-h-[120px] bg-gray-50/50 focus:bg-white transition-colors"
                         placeholder={field.label || ''}
                     />
                 )
             case 'select':
                 return (
-                    <select
+                    <Select
                         value={value || ''}
-                        onChange={(e) => onChange?.(e.target.value)}
-                        className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                    >
-                        <option value="">Selecione...</option>
-                        {options.map((opt: any, idx: number) => {
-                            const optValue = typeof opt === 'object' ? opt.value : opt
-                            const optLabel = typeof opt === 'object' ? opt.label : opt
-                            return <option key={idx} value={optValue}>{optLabel}</option>
-                        })}
-                    </select>
+                        onChange={(val) => onChange?.(val)}
+                        options={options.map((opt: any) => ({
+                            value: typeof opt === 'object' ? opt.value : opt,
+                            label: typeof opt === 'object' ? opt.label : opt
+                        }))}
+                        placeholder="Selecione..."
+                    />
                 )
             case 'multiselect': {
                 // Support for value structure with explanations: { selected: [...], explanations: {...} }
@@ -252,7 +298,7 @@ export default function UniversalFieldRenderer({
 
                 return (
                     <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">Selecione as opções:</label>
+                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">Selecione as opções:</label>
 
                         {/* Premium Chip Grid - No internal scroll */}
                         <div className="flex flex-wrap gap-2">
@@ -325,17 +371,17 @@ export default function UniversalFieldRenderer({
 
                                         return (
                                             <div key={val} className="animate-in slide-in-from-top-2 duration-200">
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">
                                                     {optLabel}
                                                 </label>
-                                                <textarea
+                                                <Textarea
                                                     value={explanations[val] || ''}
                                                     onChange={(e) => {
                                                         const newExplanations = { ...explanations, [val]: e.target.value }
                                                         updateValue(selectedValues, newExplanations)
                                                     }}
                                                     placeholder={`Por que "${optLabel}"?`}
-                                                    className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-amber-50/50 resize-none min-h-[70px] transition-shadow"
+                                                    className="min-h-[70px] bg-amber-50/50 border-amber-200 focus:border-amber-500 focus:ring-amber-500"
                                                 />
                                             </div>
                                         )
@@ -370,7 +416,7 @@ export default function UniversalFieldRenderer({
 
                 return (
                     <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">Marque os itens aplicáveis:</label>
+                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">Marque os itens aplicáveis:</label>
                         <div className="space-y-2 bg-gray-50/50 p-3 rounded-lg border border-gray-200">
                             {options.length === 0 ? (
                                 <p className="text-sm text-gray-400 italic">Nenhuma opção configurada.</p>
@@ -389,10 +435,9 @@ export default function UniversalFieldRenderer({
                                                     isChecked ? "bg-green-50 border border-green-200" : "bg-white border border-gray-100 hover:bg-gray-50"
                                                 )}
                                             >
-                                                <input
-                                                    type="checkbox"
+                                                <Checkbox
                                                     checked={isChecked}
-                                                    onChange={() => {
+                                                    onCheckedChange={() => {
                                                         let newSelected: string[]
                                                         let newExplanations = { ...explanations }
 
@@ -404,7 +449,6 @@ export default function UniversalFieldRenderer({
                                                         }
                                                         updateValue(newSelected, newExplanations)
                                                     }}
-                                                    className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                                                 />
                                                 <span className={cn(
                                                     "text-sm font-medium flex-1",
@@ -422,14 +466,14 @@ export default function UniversalFieldRenderer({
                                             {/* Explanation textarea for options that require it */}
                                             {isChecked && requiresExplanation && (
                                                 <div className="ml-7 animate-in slide-in-from-top-2 duration-200">
-                                                    <textarea
+                                                    <Textarea
                                                         value={explanations[optValue] || ''}
                                                         onChange={(e) => {
                                                             const newExplanations = { ...explanations, [optValue]: e.target.value }
                                                             updateValue(checkedValues, newExplanations)
                                                         }}
                                                         placeholder="Explique o motivo..."
-                                                        className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-amber-50/50 resize-none min-h-[80px]"
+                                                        className="min-h-[80px] bg-amber-50/50 border-amber-200 focus:border-amber-500 focus:ring-amber-500"
                                                     />
                                                 </div>
                                             )}
@@ -444,22 +488,19 @@ export default function UniversalFieldRenderer({
             case 'boolean':
                 return (
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             checked={!!value}
-                            onChange={(e) => onChange?.(e.target.checked)}
-                            className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            onCheckedChange={(checked) => onChange?.(!!checked)}
                         />
                         <span className="text-sm font-medium text-gray-900">{field.label}</span>
                     </div>
                 )
             case 'date':
                 return (
-                    <input
+                    <Input
                         type="date"
                         value={value || ''}
                         onChange={(e) => onChange?.(e.target.value)}
-                        className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
                     />
                 )
             case 'datetime':
@@ -474,11 +515,10 @@ export default function UniversalFieldRenderer({
                     return value
                 })()
                 return (
-                    <input
+                    <Input
                         type="datetime-local"
                         value={normalizedDatetime}
                         onChange={(e) => onChange?.(e.target.value)}
-                        className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
                     />
                 )
             case 'date_range': {
@@ -491,21 +531,19 @@ export default function UniversalFieldRenderer({
                 return (
                     <div className="flex gap-2">
                         <div className="flex-1">
-                            <label className="text-xs text-gray-500 mb-1 block">{includeTime ? 'Data/Hora Início' : 'Início'}</label>
-                            <input
+                            <label className="text-sm font-medium text-gray-500 mb-1 block">{includeTime ? 'Data/Hora Início' : 'Início'}</label>
+                            <Input
                                 type={inputType}
                                 value={rangeValue?.start || ''}
                                 onChange={(e) => onChange?.({ ...rangeValue, start: e.target.value })}
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
                         <div className="flex-1">
-                            <label className="text-xs text-gray-500 mb-1 block">{includeTime ? 'Data/Hora Fim' : 'Fim'}</label>
-                            <input
+                            <label className="text-sm font-medium text-gray-500 mb-1 block">{includeTime ? 'Data/Hora Fim' : 'Fim'}</label>
+                            <Input
                                 type={inputType}
                                 value={rangeValue?.end || ''}
                                 onChange={(e) => onChange?.({ ...rangeValue, end: e.target.value })}
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
                     </div>
@@ -516,11 +554,11 @@ export default function UniversalFieldRenderer({
                     <div>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">R$</span>
-                            <input
+                            <Input
                                 type="number"
                                 value={value || ''}
                                 onChange={(e) => onChange?.(parseFloat(e.target.value) || 0)}
-                                className="w-full pl-12 pr-4 py-3 text-lg font-semibold text-gray-900 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                className="pl-12 text-lg font-semibold"
                                 placeholder="0,00"
                             />
                         </div>
@@ -530,31 +568,31 @@ export default function UniversalFieldRenderer({
                 const currencyRangeValue = typeof value === 'object' ? value : { min: '', max: '' }
                 return (
                     <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">Faixa de Valor</label>
+                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">Faixa de Valor</label>
                         <div className="flex gap-3 items-center">
                             <div className="flex-1">
-                                <label className="text-xs text-gray-500 mb-1 block">Mínimo</label>
+                                <label className="text-sm font-medium text-gray-500 mb-1 block">Mínimo</label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">R$</span>
-                                    <input
+                                    <Input
                                         type="number"
                                         value={currencyRangeValue?.min ?? ''}
                                         onChange={(e) => onChange?.({ ...currencyRangeValue, min: parseFloat(e.target.value) || 0 })}
-                                        className="w-full pl-10 pr-3 py-2.5 text-sm font-semibold text-gray-900 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                        className="pl-10"
                                         placeholder="0"
                                     />
                                 </div>
                             </div>
                             <span className="text-gray-400 font-medium mt-5">até</span>
                             <div className="flex-1">
-                                <label className="text-xs text-gray-500 mb-1 block">Máximo</label>
+                                <label className="text-sm font-medium text-gray-500 mb-1 block">Máximo</label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">R$</span>
-                                    <input
+                                    <Input
                                         type="number"
                                         value={currencyRangeValue?.max ?? ''}
                                         onChange={(e) => onChange?.({ ...currencyRangeValue, max: parseFloat(e.target.value) || 0 })}
-                                        className="w-full pl-10 pr-3 py-2.5 text-sm font-semibold text-gray-900 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                        className="pl-10"
                                         placeholder="0"
                                     />
                                 </div>
@@ -565,34 +603,28 @@ export default function UniversalFieldRenderer({
             }
             case 'json':
                 return (
-                    <textarea
+                    <Textarea
                         value={typeof value === 'object' ? JSON.stringify(value, null, 2) : (value || '')}
                         onChange={(e) => {
                             try {
                                 const parsed = JSON.parse(e.target.value)
                                 onChange?.(parsed)
                             } catch (err) {
-                                // Allow typing invalid JSON, but maybe don't trigger onChange or handle it gracefully?
-                                // For now, let's just pass the string if it fails parsing, or maybe just let them type
-                                // A better JSON editor would be nice, but for now a textarea is fine.
-                                // Actually, passing the string might break the type if the parent expects object.
-                                // Let's just pass the string and let the parent handle validation/parsing if needed,
-                                // or better: keep local state?
-                                // For simplicity in this renderer, we assume the parent handles the value.
                                 onChange?.(e.target.value)
                             }
                         }}
-                        className="w-full px-3 py-2.5 text-sm font-mono border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow resize-none bg-gray-50/50 focus:bg-white min-h-[120px]"
+                        className="font-mono min-h-[120px]"
                         placeholder="{}"
                     />
                 )
+            case 'loss_reason_selector':
+                return <LossReasonSelector value={value} onChange={onChange} />
             default: // text, number
                 return (
-                    <input
+                    <Input
                         type={field.type === 'number' ? 'number' : 'text'}
                         value={value || ''}
                         onChange={(e) => onChange?.(e.target.value)}
-                        className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow"
                         placeholder={field.label || ''}
                     />
                 )
@@ -668,6 +700,9 @@ export default function UniversalFieldRenderer({
         const sdrDisplay = sdrValue === 'Cortesia' ? 'Cortesia' : (typeof sdrValue === 'number' ? formatBudget(sdrValue) : sdrValue)
 
         return <FieldCard icon={Banknote} iconColor="bg-emerald-100 text-emerald-600" label={field.label} value={displayValue} status={status} sdrValue={sdrDisplay} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
+    }
+    if (field.type === 'loss_reason_selector') {
+        return <FieldCard icon={Tag} iconColor="bg-red-100 text-red-600" label={field.label} value={<LossReasonDisplay value={value} />} status={status} sdrValue={sdrValue} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
     }
 
     // 2. Generic Fields

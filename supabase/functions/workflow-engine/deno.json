@@ -1,0 +1,7 @@
+{
+    "functions": {
+        "workflow-engine": {
+            "schedule": "* * * * *"
+        }
+    }
+}

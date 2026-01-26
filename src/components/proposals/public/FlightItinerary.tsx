@@ -2,15 +2,14 @@
  * FlightItinerary - Premium visual timeline for multi-leg flight itineraries
  * 
  * Features:
- * - Intelligent IDA/VOLTA grouping based on first and last airport
- * - Visual timeline with connections
- * - Automatic duration and connection time calculation
- * - Airline branding with colored badges
- * - Table-style display matching the source image
+ * - Table-based layout matching the reference image
+ * - Transit time calculation between segments
+ * - Intelligent IDA/VOLTA grouping
+ * - Mobile-responsive card view
  */
 
 import type { ProposalItemWithOptions } from '@/types/proposals'
-import { Plane, Clock, ArrowRight } from 'lucide-react'
+import { Plane, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FlightSegment {
@@ -51,11 +50,11 @@ const AIRLINE_COLORS: Record<string, { bg: string; text: string }> = {
     'LH': { bg: 'bg-yellow-500', text: 'text-slate-900' },
 }
 
-function formatDateShort(dateStr: string): string {
+function formatDate(dateStr: string): string {
     if (!dateStr) return ''
     try {
         const date = new Date(dateStr + 'T00:00:00')
-        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+        return date.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })
     } catch {
         return dateStr
     }
@@ -74,9 +73,27 @@ function calculateDuration(dep: { date: string; time: string }, arr: { date: str
         const diffMs = arrDate.getTime() - depDate.getTime()
         const hours = Math.floor(diffMs / (1000 * 60 * 60))
         const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-        return `${hours}h${mins > 0 ? mins.toString().padStart(2, '0') : ''}`
+        return `${hours}h ${mins > 0 ? mins + 'm' : ''}`
     } catch {
         return ''
+    }
+}
+
+function calculateTransitTime(currentArr: { date: string; time: string }, nextDep: { date: string; time: string }): string | null {
+    if (!currentArr.date || !currentArr.time || !nextDep.date || !nextDep.time) return null
+    try {
+        const arrDate = new Date(`${currentArr.date}T${currentArr.time}`)
+        const depDate = new Date(`${nextDep.date}T${nextDep.time}`)
+        const diffMs = depDate.getTime() - arrDate.getTime()
+
+        // If transit is negative or unreasonably long (> 24h for a simple transit display), maybe don't show it or show warning
+        if (diffMs < 0) return null
+
+        const hours = Math.floor(diffMs / (1000 * 60 * 60))
+        const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+        return `${hours}h ${mins > 0 ? mins + 'm' : ''}`
+    } catch {
+        return null
     }
 }
 
@@ -85,16 +102,11 @@ function groupSegments(segments: FlightSegment[]): { ida: FlightSegment[]; volta
     if (segments.length === 0) return { ida: [], volta: [] }
     if (segments.length === 1) return { ida: segments, volta: [] }
 
-    // Get first origin and check when we return to it
     const originAirport = segments[0].departure_airport
-
-    // Find the index where we start returning to origin
     let returnStartIndex = -1
+
     for (let i = 1; i < segments.length; i++) {
         if (segments[i].arrival_airport === originAirport) {
-            // This segment ends at origin, so it's the last segment of volta
-            // The volta starts from the segment that leads here
-            // Find where this return journey starts
             for (let j = i; j >= 1; j--) {
                 if (segments[j - 1].arrival_airport === segments[j].departure_airport) {
                     returnStartIndex = j
@@ -108,12 +120,20 @@ function groupSegments(segments: FlightSegment[]): { ida: FlightSegment[]; volta
     }
 
     if (returnStartIndex === -1) {
-        // No clear return, try to split in half or by date gap
-        const midpoint = Math.ceil(segments.length / 2)
-        return {
-            ida: segments.slice(0, midpoint),
-            volta: segments.slice(midpoint)
+        // Fallback: if there's a large date gap (e.g. > 2 days), assume it's the return trip
+        for (let i = 0; i < segments.length - 1; i++) {
+            const d1 = new Date(segments[i].arrival_date)
+            const d2 = new Date(segments[i + 1].departure_date)
+            const diffDays = (d2.getTime() - d1.getTime()) / (1000 * 3600 * 24)
+            if (diffDays > 2) {
+                returnStartIndex = i + 1
+                break
+            }
         }
+    }
+
+    if (returnStartIndex === -1) {
+        return { ida: segments, volta: [] }
     }
 
     return {
@@ -135,7 +155,6 @@ export function FlightItinerary({ item, isSelected, onToggle }: FlightItineraryP
             currency: 'BRL',
         }).format(Number(value) || 0)
 
-    // If no segments, show placeholder
     if (segments.length === 0) {
         return (
             <div className="p-6 bg-sky-50 rounded-xl border-2 border-dashed border-sky-200 text-center">
@@ -146,7 +165,6 @@ export function FlightItinerary({ item, isSelected, onToggle }: FlightItineraryP
         )
     }
 
-    // Group into IDA and VOLTA
     const { ida, volta } = groupSegments(segments)
 
     return (
@@ -191,39 +209,31 @@ export function FlightItinerary({ item, isSelected, onToggle }: FlightItineraryP
                 </div>
             </div>
 
-            {/* Flight Table */}
-            <div className="divide-y divide-slate-100">
+            {/* Content Container */}
+            <div className="bg-white">
                 {/* IDA Section */}
                 {ida.length > 0 && (
-                    <div>
-                        <div className="px-4 py-2 bg-sky-50 border-b border-sky-100">
+                    <div className="border-b border-slate-100 last:border-0">
+                        <div className="px-4 py-2 bg-sky-50/50 border-b border-sky-100">
                             <span className="text-xs font-bold text-sky-700 uppercase tracking-wide flex items-center gap-2">
                                 <Plane className="h-3 w-3" />
                                 IDA
                             </span>
                         </div>
-                        <div className="divide-y divide-slate-50">
-                            {ida.map((segment) => (
-                                <SegmentRow key={segment.id} segment={segment} />
-                            ))}
-                        </div>
+                        <FlightTable segments={ida} />
                     </div>
                 )}
 
                 {/* VOLTA Section */}
                 {volta.length > 0 && (
-                    <div>
-                        <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-100">
+                    <div className="border-b border-slate-100 last:border-0">
+                        <div className="px-4 py-2 bg-indigo-50/50 border-b border-indigo-100">
                             <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide flex items-center gap-2">
                                 <Plane className="h-3 w-3 rotate-180" />
                                 VOLTA
                             </span>
                         </div>
-                        <div className="divide-y divide-slate-50">
-                            {volta.map((segment) => (
-                                <SegmentRow key={segment.id} segment={segment} />
-                            ))}
-                        </div>
+                        <FlightTable segments={volta} />
                     </div>
                 )}
             </div>
@@ -252,71 +262,128 @@ export function FlightItinerary({ item, isSelected, onToggle }: FlightItineraryP
     )
 }
 
-// Individual Segment Row - Table style matching the original image
-function SegmentRow({ segment }: { segment: FlightSegment }) {
-    const airlineStyle = AIRLINE_COLORS[segment.airline_code] || { bg: 'bg-slate-600', text: 'text-white' }
-    const duration = calculateDuration(
-        { date: segment.departure_date, time: segment.departure_time },
-        { date: segment.arrival_date, time: segment.arrival_time }
-    )
-
+function FlightTable({ segments }: { segments: FlightSegment[] }) {
     return (
-        <div className="px-4 py-3 hover:bg-slate-50 transition-colors">
-            <div className="flex items-center gap-3">
-                {/* Airline Badge */}
-                <div className={cn(
-                    "px-2 py-1 rounded text-xs font-bold min-w-[60px] text-center",
-                    airlineStyle.bg, airlineStyle.text
-                )}>
-                    {segment.airline_name}
-                </div>
+        <div className="w-full">
+            {/* Desktop Table Header */}
+            <div className="hidden md:grid grid-cols-[1.2fr_1.5fr_0.8fr_0.8fr_1.5fr_0.8fr_1.5fr_1fr_1fr] gap-2 px-4 py-2 bg-slate-50/50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                <div>Data</div>
+                <div>Cia Aérea</div>
+                <div>Voo</div>
+                <div>Saída</div>
+                <div>De</div>
+                <div>Chegada</div>
+                <div>Para</div>
+                <div>Duração</div>
+                <div>Conexão</div>
+            </div>
 
-                {/* Flight Number */}
-                <span className="text-xs text-slate-500 font-mono min-w-[50px]">
-                    {segment.flight_number}
-                </span>
+            {/* Rows */}
+            <div className="divide-y divide-slate-50">
+                {segments.map((segment, idx) => {
+                    const nextSegment = segments[idx + 1]
+                    const transitTime = nextSegment
+                        ? calculateTransitTime(
+                            { date: segment.arrival_date, time: segment.arrival_time },
+                            { date: nextSegment.departure_date, time: nextSegment.departure_time }
+                        )
+                        : null
 
-                {/* Route with dates/times */}
-                <div className="flex-1 flex items-center gap-2">
-                    {/* Departure */}
-                    <div className="text-right">
-                        <div className="text-xs text-slate-400">{formatDateShort(segment.departure_date)}</div>
-                        <div className="font-semibold text-slate-800">{formatTime(segment.departure_time)}</div>
-                    </div>
+                    const duration = calculateDuration(
+                        { date: segment.departure_date, time: segment.departure_time },
+                        { date: segment.arrival_date, time: segment.arrival_time }
+                    )
 
-                    {/* From Airport */}
-                    <div className="text-center min-w-[50px]">
-                        <div className="font-bold text-slate-800">{segment.departure_airport}</div>
-                        <div className="text-xs text-slate-400 truncate max-w-[80px]" title={segment.departure_city}>
-                            {segment.departure_city?.split(' ')[0]}
+                    const airlineStyle = AIRLINE_COLORS[segment.airline_code] || { bg: 'bg-slate-600', text: 'text-white' }
+
+                    return (
+                        <div key={segment.id} className="group hover:bg-slate-50 transition-colors">
+                            {/* Desktop Row */}
+                            <div className="hidden md:grid grid-cols-[1.2fr_1.5fr_0.8fr_0.8fr_1.5fr_0.8fr_1.5fr_1fr_1fr] gap-2 px-4 py-3 items-center text-xs text-slate-700">
+                                <div className="font-medium text-slate-900">
+                                    {formatDate(segment.departure_date)}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                        "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold",
+                                        airlineStyle.bg, airlineStyle.text
+                                    )}>
+                                        {segment.airline_code}
+                                    </div>
+                                    <span className="truncate" title={segment.airline_name}>{segment.airline_name}</span>
+                                </div>
+                                <div className="font-mono text-slate-500">{segment.flight_number}</div>
+                                <div className="font-bold">{formatTime(segment.departure_time)}</div>
+                                <div>
+                                    <div className="font-medium">{segment.departure_city}</div>
+                                    <div className="text-[10px] text-slate-400 font-bold">{segment.departure_airport}</div>
+                                </div>
+                                <div>
+                                    <div className="font-bold">{formatTime(segment.arrival_time)}</div>
+                                    {/* Optional: +1 day indicator could go here */}
+                                </div>
+                                <div>
+                                    <div className="font-medium">{segment.arrival_city}</div>
+                                    <div className="text-[10px] text-slate-400 font-bold">{segment.arrival_airport}</div>
+                                </div>
+                                <div className="text-slate-500">{duration}</div>
+                                <div className="text-slate-500 font-medium">
+                                    {transitTime ? (
+                                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100 text-[10px]">
+                                            {transitTime}
+                                        </span>
+                                    ) : '-'}
+                                </div>
+                            </div>
+
+                            {/* Mobile Card (Fallback) */}
+                            <div className="md:hidden p-4 space-y-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn(
+                                            "px-2 py-0.5 rounded text-[10px] font-bold",
+                                            airlineStyle.bg, airlineStyle.text
+                                        )}>
+                                            {segment.airline_name}
+                                        </div>
+                                        <span className="text-xs text-slate-500 font-mono">#{segment.flight_number}</span>
+                                    </div>
+                                    <div className="text-xs font-medium text-slate-900">
+                                        {formatDate(segment.departure_date)}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="text-lg font-bold text-slate-900">{formatTime(segment.departure_time)}</div>
+                                        <div className="text-xs font-medium text-slate-600">{segment.departure_airport}</div>
+                                        <div className="text-[10px] text-slate-400 truncate">{segment.departure_city}</div>
+                                    </div>
+
+                                    <div className="flex flex-col items-center px-2">
+                                        <div className="text-[10px] text-slate-400 mb-1">{duration}</div>
+                                        <div className="w-16 h-[1px] bg-slate-200 relative">
+                                            <Plane className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-slate-300 rotate-90" />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 text-right">
+                                        <div className="text-lg font-bold text-slate-900">{formatTime(segment.arrival_time)}</div>
+                                        <div className="text-xs font-medium text-slate-600">{segment.arrival_airport}</div>
+                                        <div className="text-[10px] text-slate-400 truncate">{segment.arrival_city}</div>
+                                    </div>
+                                </div>
+
+                                {transitTime && (
+                                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-amber-700">
+                                        <Clock className="w-3 h-3" />
+                                        <span>Conexão de <strong>{transitTime}</strong></span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Arrow + Duration */}
-                    <div className="flex flex-col items-center px-2">
-                        <ArrowRight className="h-4 w-4 text-slate-300" />
-                        {duration && (
-                            <span className="text-xs text-slate-400 flex items-center gap-0.5">
-                                <Clock className="h-2.5 w-2.5" />
-                                {duration}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* To Airport */}
-                    <div className="text-center min-w-[50px]">
-                        <div className="font-bold text-slate-800">{segment.arrival_airport}</div>
-                        <div className="text-xs text-slate-400 truncate max-w-[80px]" title={segment.arrival_city}>
-                            {segment.arrival_city?.split(' ')[0]}
-                        </div>
-                    </div>
-
-                    {/* Arrival */}
-                    <div className="text-left">
-                        <div className="text-xs text-slate-400">{formatDateShort(segment.arrival_date)}</div>
-                        <div className="font-semibold text-slate-800">{formatTime(segment.arrival_time)}</div>
-                    </div>
-                </div>
+                    )
+                })}
             </div>
         </div>
     )

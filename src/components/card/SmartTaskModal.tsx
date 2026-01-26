@@ -358,7 +358,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 feedback: meetingFeedback || null,
                 motivo_cancelamento: cancellationReason || null,
                 resultado: meetingResult || null,
-                categoria_outro: otherCategory || null
+                categoria_outro: otherCategory || null,
+                // Map status to outcome for workflow triggering
+                outcome: type === 'reuniao' && ['realizada', 'cancelada', 'nao_compareceu'].includes(meetingStatus)
+                    ? meetingStatus
+                    : (type === 'reuniao' && meetingStatus === 'reagendada' ? 'remarcada' : null)
             };
 
             // Only add participantes_externos if it's a meeting and has values
@@ -417,7 +421,8 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                         status: 'reagendada',
                         concluida: true,
                         concluida_em: new Date().toISOString(),
-                        rescheduled_to_id: newMeetingId
+                        rescheduled_to_id: newMeetingId,
+                        outcome: 'remarcada' // Trigger workflow
                         // Do NOT update title, description, date, participants, etc. to preserve history
                     };
 

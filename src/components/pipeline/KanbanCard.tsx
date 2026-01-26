@@ -253,17 +253,61 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                         </span>
                     </div>
                 )
+
+            // --- Marketing Data Renderers ---
+            case 'mkt_pretende_viajar_tempo':
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <Clock className="mr-1.5 h-3 w-3 flex-shrink-0 text-blue-600" />
+                        <span className="truncate block flex-1 text-gray-700">
+                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                        </span>
+                    </div>
+                )
+            case 'mkt_hospedagem_contratada':
+                const hasHotel = String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '').toLowerCase()
+                const isYes = hasHotel.includes('sim')
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <Building className={cn("mr-1.5 h-3 w-3 flex-shrink-0", isYes ? "text-green-600" : "text-gray-400")} />
+                        <span className="truncate block flex-1 text-gray-700">
+                            Hospedagem: <span className="font-medium">{hasHotel}</span>
+                        </span>
+                    </div>
+                )
+            case 'mkt_quem_vai_viajar_junto':
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <Users className="mr-1.5 h-3 w-3 flex-shrink-0 text-purple-600" />
+                        <span className="truncate block flex-1 text-gray-700">
+                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                        </span>
+                    </div>
+                )
+            case 'mkt_valor_por_pessoa_viagem':
+                return (
+                    <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
+                        <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />
+                        <span className="truncate block flex-1 font-medium text-gray-700">
+                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                        </span>
+                    </div>
+                )
         }
 
         // 2. Generic Dynamic Rendering (The "Ferrari Engine")
         const fieldDef = systemFields?.find(f => f.key === fieldId)
         if (!fieldDef) return null
 
-        // Resolve value (check root, then produto_data, then briefing_inicial)
+        // Resolve value (check root, then produto_data, then marketing_data, then briefing_inicial)
         let value = (card as any)[fieldId]
         if (value === undefined || value === null) {
             const produtoData = card.produto_data as any
             value = produtoData?.[fieldId]
+        }
+        if (value === undefined || value === null) {
+            const marketingData = card.marketing_data as any
+            value = marketingData?.[fieldId]
         }
         if (value === undefined || value === null) {
             const briefingData = card.briefing_inicial as any
@@ -483,26 +527,36 @@ export default function KanbanCard({ card }: KanbanCardProps) {
 
             <div className="flex flex-col gap-0.5">
                 {/* Always show product/value if available as header info */}
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    {card.valor_estimado && (
-                        <span className="font-medium text-gray-700">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_estimado)}
-                        </span>
-                    )}
-                </div>
+
 
                 {/* Dynamic Fields */}
-                {orderedFields.map(fieldId => renderDynamicField(fieldId))}
+                {orderedFields.filter(f => f !== 'task_status').map(fieldId => renderDynamicField(fieldId))}
+
+                {/* Task Status always at bottom of fields, above owner */}
+                {renderDynamicField('task_status')}
 
                 {/* Owner info always at bottom */}
                 <div className="mt-2 flex items-center justify-between border-t pt-2">
                     <div className="flex items-center gap-1.5">
-                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-600">
-                            {card.dono_atual_nome?.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-xs text-gray-500 truncate max-w-[80px]">
-                            {card.dono_atual_nome?.split(' ')[0]}
-                        </span>
+                        {card.dono_atual_nome ? (
+                            <>
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-600">
+                                    {card.dono_atual_nome.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs text-gray-500 truncate max-w-[80px]">
+                                    {card.dono_atual_nome.split(' ')[0]}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-50 text-[10px] font-medium text-gray-400">
+                                    <Users className="h-3 w-3" />
+                                </div>
+                                <span className="text-xs text-gray-400 italic truncate max-w-[100px]">
+                                    Sem responsável
+                                </span>
+                            </>
+                        )}
                     </div>
                     {card.tarefas_pendentes ? (
                         <div className="flex items-center gap-1 text-[10px] text-orange-600 font-medium bg-orange-50 px-1.5 py-0.5 rounded-full">

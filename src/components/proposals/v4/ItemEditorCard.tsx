@@ -32,7 +32,7 @@ import {
     Image as ImageIcon,
 } from 'lucide-react'
 import type { ProposalItemWithOptions, ProposalOption } from '@/types/proposals'
-import { FlightSegmentEditor, type FlightSegment } from './FlightSegmentEditor'
+import { FlightTableEditor, type FlightSegment } from './FlightTableEditor'
 
 interface ItemEditorCardProps {
     item: ProposalItemWithOptions
@@ -316,9 +316,9 @@ export function ItemEditorCard({
 
                     {/* Flight Segments Editor (only for flights) */}
                     {item.item_type === 'flight' && (
-                        <FlightSegmentEditor
+                        <FlightTableEditor
                             segments={(richContent.segments as FlightSegment[]) || []}
-                            onChange={(segments) => onUpdate({
+                            onChange={(segments: FlightSegment[]) => onUpdate({
                                 rich_content: { ...richContent, segments } as any
                             })}
                         />

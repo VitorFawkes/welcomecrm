@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle, Clock, UserX } from 'lucide-react'
+import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { SmartTaskModal } from './SmartTaskModal'
@@ -61,6 +61,20 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         staleTime: 1000 * 60 // 1 minute
     })
 
+    // Fetch Task Outcomes
+    const { data: outcomes } = useQuery({
+        queryKey: ['task-outcomes'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('task_type_outcomes')
+                .select('*')
+                .order('ordem')
+            if (error) throw error
+            return data
+        },
+        staleTime: 1000 * 60 * 60 // 1 hour
+    })
+
     // Fetch profiles to map names (avoiding join ambiguity)
     const { data: profiles } = useQuery({
         queryKey: ['profiles-list'],
@@ -102,10 +116,12 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const handleToggleComplete = (task: any) => {
         const isCompleted = !task.concluida
 
-        // Intercept Meeting Completion
-        if (task.tipo === 'reuniao' && isCompleted) {
+        // Intercept Completion if outcomes exist for this type
+        const taskOutcomes = outcomes?.filter((o: any) => o.tipo === task.tipo) || []
+
+        if (isCompleted && taskOutcomes.length > 0) {
             setTaskToComplete(task)
-            setOutcomeResult('realizada')
+            setOutcomeResult(taskOutcomes[0].outcome_key)
             setOutcomeFeedback('')
             setOutcomeModalOpen(true)
             return
@@ -385,60 +401,28 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                         <div className="space-y-3">
                             <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Resultado</Label>
                             <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    onClick={() => setOutcomeResult('realizada')}
-                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'realizada'
-                                        ? 'border-green-500 bg-green-50/50 text-green-700 shadow-sm'
-                                        : 'border-gray-100 bg-white text-gray-600 hover:border-green-200 hover:bg-green-50/30'
-                                        }`}
-                                >
-                                    <div className={`p-2 rounded-full ${outcomeResult === 'realizada' ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                        <CheckCircle2 className={`w-5 h-5 ${outcomeResult === 'realizada' ? 'text-green-600' : 'text-gray-500'}`} />
-                                    </div>
-                                    <span className="font-medium text-sm">Realizada</span>
-                                    {outcomeResult === 'realizada' && (
-                                        <div className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                                    )}
-                                </button>
-
-                                <button
-                                    onClick={() => setOutcomeResult('cancelada')}
-                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'cancelada'
-                                        ? 'border-red-500 bg-red-50/50 text-red-700 shadow-sm'
-                                        : 'border-gray-100 bg-white text-gray-600 hover:border-red-200 hover:bg-red-50/30'
-                                        }`}
-                                >
-                                    <div className={`p-2 rounded-full ${outcomeResult === 'cancelada' ? 'bg-red-100' : 'bg-gray-100'}`}>
-                                        <XCircle className={`w-5 h-5 ${outcomeResult === 'cancelada' ? 'text-red-600' : 'text-gray-500'}`} />
-                                    </div>
-                                    <span className="font-medium text-sm">Cancelada</span>
-                                </button>
-
-                                <button
-                                    onClick={() => setOutcomeResult('adiada')}
-                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'adiada'
-                                        ? 'border-orange-500 bg-orange-50/50 text-orange-700 shadow-sm'
-                                        : 'border-gray-100 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50/30'
-                                        }`}
-                                >
-                                    <div className={`p-2 rounded-full ${outcomeResult === 'adiada' ? 'bg-orange-100' : 'bg-gray-100'}`}>
-                                        <Clock className={`w-5 h-5 ${outcomeResult === 'adiada' ? 'text-orange-600' : 'text-gray-500'}`} />
-                                    </div>
-                                    <span className="font-medium text-sm">Adiada</span>
-                                </button>
-
-                                <button
-                                    onClick={() => setOutcomeResult('no_show')}
-                                    className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === 'no_show'
-                                        ? 'border-gray-500 bg-gray-50/50 text-gray-700 shadow-sm'
-                                        : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200 hover:bg-gray-50/30'
-                                        }`}
-                                >
-                                    <div className={`p-2 rounded-full ${outcomeResult === 'no_show' ? 'bg-gray-200' : 'bg-gray-100'}`}>
-                                        <UserX className={`w-5 h-5 ${outcomeResult === 'no_show' ? 'text-gray-700' : 'text-gray-500'}`} />
-                                    </div>
-                                    <span className="font-medium text-sm">No Show</span>
-                                </button>
+                                {taskToComplete && outcomes?.filter((o: any) => o.tipo === taskToComplete.tipo).map((outcome: any) => (
+                                    <button
+                                        key={outcome.outcome_key}
+                                        onClick={() => setOutcomeResult(outcome.outcome_key)}
+                                        className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === outcome.outcome_key
+                                            ? 'border-indigo-500 bg-indigo-50/50 text-indigo-700 shadow-sm'
+                                            : 'border-gray-100 bg-white text-gray-600 hover:border-indigo-200 hover:bg-indigo-50/30'
+                                            }`}
+                                    >
+                                        <div className={`p-2 rounded-full ${outcomeResult === outcome.outcome_key ? 'bg-indigo-100' : 'bg-gray-100'}`}>
+                                            {outcome.is_success ? (
+                                                <CheckCircle2 className={`w-5 h-5 ${outcomeResult === outcome.outcome_key ? 'text-indigo-600' : 'text-gray-500'}`} />
+                                            ) : (
+                                                <XCircle className={`w-5 h-5 ${outcomeResult === outcome.outcome_key ? 'text-indigo-600' : 'text-gray-500'}`} />
+                                            )}
+                                        </div>
+                                        <span className="font-medium text-sm">{outcome.outcome_label}</span>
+                                        {outcomeResult === outcome.outcome_key && (
+                                            <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -467,11 +451,12 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                     concluida: true,
                                     status: 'concluida',
                                     concluida_em: new Date().toISOString(),
-                                    resultado: outcomeResult,
+                                    resultado: outcomeResult, // Legacy support
+                                    outcome: outcomeResult, // New Workflow Trigger
                                     feedback: outcomeFeedback
                                 }
                                 updateTaskMutation.mutate({ id: taskToComplete.id, updates })
-                                toast.success('Reunião concluída com sucesso!')
+                                toast.success('Item concluído com sucesso!')
                                 setOutcomeModalOpen(false)
                                 setTaskToComplete(null)
                             }}

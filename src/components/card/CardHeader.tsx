@@ -207,7 +207,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
     }
 
     const updateOwnerMutation = useMutation({
-        mutationFn: async ({ field, userId }: { field: 'dono_atual_id' | 'sdr_owner_id', userId: string | null }) => {
+        mutationFn: async ({ field, userId }: { field: 'dono_atual_id' | 'sdr_owner_id' | 'vendas_owner_id' | 'pos_owner_id', userId: string | null }) => {
             const updateData: any = {}
             updateData[field] = userId || null
 
@@ -329,18 +329,34 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
     }
 
-    const handleOwnerSelect = (userId: string | null) => {
-        updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
-        const currentPhase = phasesData?.find(p => p.name === currentFase)
-        if (currentPhase?.slug === SystemPhase.SDR) {
-            updateOwnerMutation.mutate({ field: 'sdr_owner_id', userId })
-        }
-    }
+
 
     const handleSdrSelect = (userId: string | null) => {
         updateOwnerMutation.mutate({ field: 'sdr_owner_id', userId })
+
+        // If current stage is SDR, update current owner too
         const currentPhase = phasesData?.find(p => p.name === currentFase)
         if (currentPhase?.slug === SystemPhase.SDR) {
+            updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
+        }
+    }
+
+    const handlePlannerSelect = (userId: string | null) => {
+        updateOwnerMutation.mutate({ field: 'vendas_owner_id', userId })
+
+        // If current stage is Planner (Vendas), update current owner too
+        const currentPhase = phasesData?.find(p => p.name === currentFase)
+        if (currentPhase?.slug === SystemPhase.PLANNER) {
+            updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
+        }
+    }
+
+    const handlePosVendaSelect = (userId: string | null) => {
+        updateOwnerMutation.mutate({ field: 'pos_owner_id', userId })
+
+        // If current stage is Pós-Venda, update current owner too
+        const currentPhase = phasesData?.find(p => p.name === currentFase)
+        if (currentPhase?.slug === SystemPhase.POS_VENDA) {
             updateOwnerMutation.mutate({ field: 'dono_atual_id', userId })
         }
     }
@@ -532,21 +548,41 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                         {/* Budget Slot */}
                                         {budgetField && (() => {
                                             let value = 0
+                                            let textValue = ''
+
                                             if (card.produto === 'TRIPS') {
                                                 const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as TripsProdutoData
-                                                value = productData?.orcamento?.total || 0
+                                                value = productData?.orcamento?.total || card.valor_estimado || 0
+
+                                                // Fallback to briefing_inicial (SDR Data) if value is still 0
+                                                if (!value && card.briefing_inicial) {
+                                                    const briefingData = (typeof card.briefing_inicial === 'string' ? JSON.parse(card.briefing_inicial) : card.briefing_inicial) as any
+                                                    value = briefingData?.orcamento?.total || 0
+                                                }
                                             } else {
                                                 value = (card.status_comercial === 'ganho' || card.status_comercial === 'perdido')
                                                     ? (card.valor_final || card.valor_estimado || 0)
                                                     : (card.valor_estimado || 0)
                                             }
 
-                                            if (!value && !budgetField.isVisible) return null
+                                            // Fallback to Marketing Data (Text) if value is 0
+                                            if (!value) {
+                                                const marketingData = (card as any).marketing_data || {}
+                                                textValue = marketingData.mkt_valor_por_pessoa_viagem || ''
+                                            }
+
+                                            if (!value && !textValue && !budgetField.isVisible) return null
 
                                             return (
                                                 <div key="concept-budget" className="flex items-center gap-1.5 text-gray-600 font-medium">
                                                     <DollarSign className="h-3.5 w-3.5 text-gray-400" />
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
+                                                    {value ? (
+                                                        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+                                                    ) : textValue ? (
+                                                        <span className="text-xs">{textValue}</span>
+                                                    ) : (
+                                                        "R$ 0,00"
+                                                    )}
                                                 </div>
                                             )
                                         })()}
@@ -690,18 +726,33 @@ export default function CardHeader({ card }: CardHeaderProps) {
                     <div className="shrink-0 flex items-center gap-4">
                         {/* Owner Selectors - Horizontal Layout */}
                         <div className="flex items-center gap-4 pr-4 border-r border-gray-200">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Dono</span>
-                                <UserSelector
-                                    currentUserId={card.dono_atual_id}
-                                    onSelect={handleOwnerSelect}
-                                />
-                            </div>
+                            {/* SDR Selector */}
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SDR</span>
                                 <UserSelector
                                     currentUserId={card.sdr_owner_id}
                                     onSelect={handleSdrSelect}
+                                    roleFilter={['sdr', 'admin', 'manager']}
+                                />
+                            </div>
+
+                            {/* Planner Selector */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Planner</span>
+                                <UserSelector
+                                    currentUserId={card.vendas_owner_id}
+                                    onSelect={handlePlannerSelect}
+                                    roleFilter={['vendas', 'admin', 'manager']}
+                                />
+                            </div>
+
+                            {/* Pós-Venda Selector */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pós</span>
+                                <UserSelector
+                                    currentUserId={card.pos_owner_id}
+                                    onSelect={handlePosVendaSelect}
+                                    roleFilter={['pos_venda', 'admin', 'manager']}
                                 />
                             </div>
                         </div>

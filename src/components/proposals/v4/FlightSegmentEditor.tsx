@@ -2,15 +2,13 @@
  * FlightSegmentEditor - Elite flight segment editor for multi-leg itineraries
  * 
  * Features:
- * - Support for multiple flight segments (legs)
- * - Visual segment cards with departure/arrival details
- * - Add/remove/reorder segments
- * - Airline selector with logos
- * - Date/time pickers for departure and arrival
+ * - Smart Auto-fill: Next segment origin defaults to previous destination
+ * - Compact and clean UI
+ * - Airline selector with visual feedback
  */
 
 import { useCallback } from 'react'
-import { Plus, Trash2, GripVertical, Plane } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Plane, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -55,29 +53,30 @@ interface FlightSegmentEditorProps {
     onChange: (segments: FlightSegment[]) => void
 }
 
-function createEmptySegment(order: number): FlightSegment {
+function createEmptySegment(order: number, previousSegment?: FlightSegment): FlightSegment {
     return {
         id: `seg-${Date.now()}-${order}`,
         segment_order: order,
-        airline_code: 'LA',
-        airline_name: 'LATAM',
+        airline_code: previousSegment?.airline_code || 'LA',
+        airline_name: previousSegment?.airline_name || 'LATAM',
         flight_number: '',
-        departure_date: '',
+        departure_date: previousSegment?.arrival_date || '', // Suggest same day connection
         departure_time: '',
-        departure_airport: '',
-        departure_city: '',
-        arrival_date: '',
+        departure_airport: previousSegment?.arrival_airport || '', // Auto-fill origin
+        departure_city: previousSegment?.arrival_city || '',
+        arrival_date: previousSegment?.arrival_date || '',
         arrival_time: '',
         arrival_airport: '',
         arrival_city: '',
-        cabin_class: 'Economy',
-        baggage_included: '',
+        cabin_class: previousSegment?.cabin_class || 'Economy',
+        baggage_included: previousSegment?.baggage_included || '',
     }
 }
 
 export function FlightSegmentEditor({ segments, onChange }: FlightSegmentEditorProps) {
     const handleAddSegment = useCallback(() => {
-        const newSegment = createEmptySegment(segments.length + 1)
+        const lastSegment = segments[segments.length - 1]
+        const newSegment = createEmptySegment(segments.length + 1, lastSegment)
         onChange([...segments, newSegment])
     }, [segments, onChange])
 
@@ -134,7 +133,7 @@ export function FlightSegmentEditor({ segments, onChange }: FlightSegmentEditorP
                             key={segment.id}
                             segment={segment}
                             index={index}
-                            total={segments.length}
+
                             onUpdate={(updates) => handleUpdateSegment(index, updates)}
                             onRemove={() => handleRemoveSegment(index)}
                             onAirlineChange={(code) => handleAirlineChange(index, code)}
@@ -147,7 +146,9 @@ export function FlightSegmentEditor({ segments, onChange }: FlightSegmentEditorP
                         className="w-full py-3 border-2 border-dashed border-sky-200 rounded-lg text-sky-600 hover:border-sky-400 hover:bg-sky-50 transition-all flex items-center justify-center gap-2"
                     >
                         <Plus className="h-4 w-4" />
-                        <span className="text-sm font-medium">Adicionar Trecho</span>
+                        <span className="text-sm font-medium">
+                            {segments.length > 0 ? 'Adicionar Conexão / Próximo Trecho' : 'Adicionar Trecho'}
+                        </span>
                     </button>
                 </div>
             )}
@@ -159,13 +160,13 @@ export function FlightSegmentEditor({ segments, onChange }: FlightSegmentEditorP
 interface SegmentCardProps {
     segment: FlightSegment
     index: number
-    total: number
+
     onUpdate: (updates: Partial<FlightSegment>) => void
     onRemove: () => void
     onAirlineChange: (code: string) => void
 }
 
-function SegmentCard({ segment, index, total, onUpdate, onRemove, onAirlineChange }: SegmentCardProps) {
+function SegmentCard({ segment, index, onUpdate, onRemove, onAirlineChange }: SegmentCardProps) {
     const airline = AIRLINES.find(a => a.code === segment.airline_code) || AIRLINES[0]
 
     return (
@@ -177,8 +178,20 @@ function SegmentCard({ segment, index, total, onUpdate, onRemove, onAirlineChang
                     "px-2 py-0.5 rounded text-xs font-medium",
                     airline.color
                 )}>
-                    Trecho {index + 1} de {total}
+                    Trecho {index + 1}
                 </div>
+
+                {/* Compact Airline Selector in Header */}
+                <select
+                    value={segment.airline_code}
+                    onChange={(e) => onAirlineChange(e.target.value)}
+                    className="h-6 text-xs border-none bg-transparent font-medium text-slate-600 focus:ring-0 cursor-pointer"
+                >
+                    {AIRLINES.map(a => (
+                        <option key={a.code} value={a.code}>{a.name}</option>
+                    ))}
+                </select>
+
                 <div className="flex-1" />
                 <Button
                     variant="ghost"
@@ -191,139 +204,99 @@ function SegmentCard({ segment, index, total, onUpdate, onRemove, onAirlineChang
             </div>
 
             {/* Card Content */}
-            <div className="p-4 space-y-4">
-                {/* Airline and Flight Number Row */}
-                <div className="grid grid-cols-2 gap-3">
-                    {/* Airline Selector */}
-                    <div>
-                        <label className="text-xs text-slate-500 mb-1 block">Companhia</label>
-                        <select
-                            value={segment.airline_code}
-                            onChange={(e) => onAirlineChange(e.target.value)}
-                            className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none"
-                        >
-                            {AIRLINES.map(a => (
-                                <option key={a.code} value={a.code}>{a.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    {/* Flight Number */}
-                    <div>
-                        <label className="text-xs text-slate-500 mb-1 block">Nº do Voo</label>
-                        <input
-                            type="text"
-                            value={segment.flight_number}
-                            onChange={(e) => onUpdate({ flight_number: e.target.value })}
-                            placeholder="4904"
-                            className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none"
-                        />
-                    </div>
-                </div>
-
-                {/* Departure and Arrival */}
-                <div className="grid grid-cols-2 gap-4">
-                    {/* Departure */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full bg-sky-500" />
-                            <span className="text-xs font-medium text-sky-700">SAÍDA</span>
-                        </div>
-                        <div className="bg-sky-50 rounded-lg p-3 space-y-2 border border-sky-100">
-                            <div className="grid grid-cols-2 gap-2">
-                                <input
-                                    type="date"
-                                    value={segment.departure_date}
-                                    onChange={(e) => onUpdate({ departure_date: e.target.value })}
-                                    className="w-full h-8 px-2 text-xs border border-sky-200 rounded bg-white"
-                                />
-                                <input
-                                    type="time"
-                                    value={segment.departure_time}
-                                    onChange={(e) => onUpdate({ departure_time: e.target.value })}
-                                    className="w-full h-8 px-2 text-xs border border-sky-200 rounded bg-white"
-                                />
-                            </div>
+            <div className="p-3 space-y-3">
+                {/* Route Row: Origin -> Destination */}
+                <div className="flex items-center gap-2">
+                    {/* Origin */}
+                    <div className="flex-1 space-y-1">
+                        <label className="text-[10px] font-bold text-sky-700 uppercase">Saída (De)</label>
+                        <div className="flex gap-1">
                             <input
                                 type="text"
                                 value={segment.departure_airport}
                                 onChange={(e) => onUpdate({ departure_airport: e.target.value.toUpperCase() })}
                                 placeholder="GRU"
                                 maxLength={3}
-                                className="w-full h-8 px-2 text-sm font-bold text-center border border-sky-200 rounded bg-white uppercase"
+                                className="w-12 h-8 px-1 text-sm font-bold text-center border border-slate-200 rounded bg-slate-50 uppercase focus:border-sky-400 focus:bg-white transition-colors"
                             />
                             <input
-                                type="text"
-                                value={segment.departure_city}
-                                onChange={(e) => onUpdate({ departure_city: e.target.value })}
-                                placeholder="São Paulo Guarulhos"
-                                className="w-full h-8 px-2 text-xs border border-sky-200 rounded bg-white"
+                                type="time"
+                                value={segment.departure_time}
+                                onChange={(e) => onUpdate({ departure_time: e.target.value })}
+                                className="flex-1 h-8 px-2 text-xs border border-slate-200 rounded bg-white focus:border-sky-400"
                             />
                         </div>
+                        <input
+                            type="date"
+                            value={segment.departure_date}
+                            onChange={(e) => onUpdate({ departure_date: e.target.value })}
+                            className="w-full h-7 px-1 text-[10px] border-none bg-transparent text-slate-500 focus:ring-0 p-0"
+                        />
                     </div>
 
-                    {/* Arrival */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                            <span className="text-xs font-medium text-emerald-700">CHEGADA</span>
-                        </div>
-                        <div className="bg-emerald-50 rounded-lg p-3 space-y-2 border border-emerald-100">
-                            <div className="grid grid-cols-2 gap-2">
-                                <input
-                                    type="date"
-                                    value={segment.arrival_date}
-                                    onChange={(e) => onUpdate({ arrival_date: e.target.value })}
-                                    className="w-full h-8 px-2 text-xs border border-emerald-200 rounded bg-white"
-                                />
-                                <input
-                                    type="time"
-                                    value={segment.arrival_time}
-                                    onChange={(e) => onUpdate({ arrival_time: e.target.value })}
-                                    className="w-full h-8 px-2 text-xs border border-emerald-200 rounded bg-white"
-                                />
-                            </div>
+                    <ArrowRight className="h-4 w-4 text-slate-300 mt-4" />
+
+                    {/* Destination */}
+                    <div className="flex-1 space-y-1">
+                        <label className="text-[10px] font-bold text-emerald-700 uppercase">Chegada (Para)</label>
+                        <div className="flex gap-1">
                             <input
                                 type="text"
                                 value={segment.arrival_airport}
                                 onChange={(e) => onUpdate({ arrival_airport: e.target.value.toUpperCase() })}
-                                placeholder="BOG"
+                                placeholder="MIA"
                                 maxLength={3}
-                                className="w-full h-8 px-2 text-sm font-bold text-center border border-emerald-200 rounded bg-white uppercase"
+                                className="w-12 h-8 px-1 text-sm font-bold text-center border border-slate-200 rounded bg-slate-50 uppercase focus:border-emerald-400 focus:bg-white transition-colors"
                             />
                             <input
-                                type="text"
-                                value={segment.arrival_city}
-                                onChange={(e) => onUpdate({ arrival_city: e.target.value })}
-                                placeholder="Bogotá El Dorado"
-                                className="w-full h-8 px-2 text-xs border border-emerald-200 rounded bg-white"
+                                type="time"
+                                value={segment.arrival_time}
+                                onChange={(e) => onUpdate({ arrival_time: e.target.value })}
+                                className="flex-1 h-8 px-2 text-xs border border-slate-200 rounded bg-white focus:border-emerald-400"
                             />
                         </div>
+                        <input
+                            type="date"
+                            value={segment.arrival_date}
+                            onChange={(e) => onUpdate({ arrival_date: e.target.value })}
+                            className="w-full h-7 px-1 text-[10px] border-none bg-transparent text-slate-500 focus:ring-0 p-0"
+                        />
                     </div>
                 </div>
 
-                {/* Optional: Class and Baggage */}
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                {/* Details Row: Flight No, Class, Baggage */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
                     <div>
-                        <label className="text-xs text-slate-500 mb-1 block">Classe</label>
+                        <label className="text-[10px] text-slate-400 block mb-0.5">Voo Nº</label>
+                        <input
+                            type="text"
+                            value={segment.flight_number}
+                            onChange={(e) => onUpdate({ flight_number: e.target.value })}
+                            placeholder="1234"
+                            className="w-full h-7 px-2 text-xs border border-slate-200 rounded bg-white focus:border-sky-400"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-slate-400 block mb-0.5">Classe</label>
                         <select
                             value={segment.cabin_class || 'Economy'}
                             onChange={(e) => onUpdate({ cabin_class: e.target.value })}
-                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-lg bg-white"
+                            className="w-full h-7 px-1 text-xs border border-slate-200 rounded bg-white focus:border-sky-400"
                         >
                             <option value="Economy">Econômica</option>
-                            <option value="Premium Economy">Premium Economy</option>
+                            <option value="Premium Economy">Premium</option>
                             <option value="Business">Executiva</option>
-                            <option value="First">Primeira Classe</option>
+                            <option value="First">Primeira</option>
                         </select>
                     </div>
                     <div>
-                        <label className="text-xs text-slate-500 mb-1 block">Bagagem</label>
+                        <label className="text-[10px] text-slate-400 block mb-0.5">Bagagem</label>
                         <input
                             type="text"
                             value={segment.baggage_included || ''}
                             onChange={(e) => onUpdate({ baggage_included: e.target.value })}
-                            placeholder="2x 23kg"
-                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-lg bg-white"
+                            placeholder="23kg"
+                            className="w-full h-7 px-2 text-xs border border-slate-200 rounded bg-white focus:border-sky-400"
                         />
                     </div>
                 </div>

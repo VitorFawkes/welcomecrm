@@ -10,6 +10,9 @@ import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { SystemPhase } from '../../types/pipeline'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
+import { Input } from '../ui/Input'
+import { Button } from '../ui/Button'
+import { Checkbox } from '../ui/checkbox'
 
 interface TripsProdutoData {
     orcamento?: {
@@ -26,6 +29,7 @@ interface TripsProdutoData {
     origem_lead?: string
     motivo?: string
     taxa_planejamento?: string | number
+    quantidade_viajantes?: number
     [key: string]: unknown
 }
 
@@ -109,15 +113,15 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
                 </div>
 
                 <div className={cn("flex items-center justify-end gap-3 px-5 py-4 border-t", isCorrection ? "bg-amber-50/50" : "bg-gray-50")}>
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                    <Button variant="outline" onClick={onClose}>
                         Cancelar
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={onSave}
                         disabled={isSaving}
                         className={cn(
-                            "px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2",
-                            isCorrection ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                            "flex items-center gap-2",
+                            isCorrection ? "bg-amber-600 hover:bg-amber-700" : ""
                         )}
                     >
                         {isSaving ? (
@@ -131,7 +135,7 @@ function EditModal({ isOpen, onClose, onSave, title, children, isSaving, isCorre
                                 {isCorrection ? "Corrigir Registro" : "Salvar"}
                             </>
                         )}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>
@@ -167,8 +171,29 @@ const EMPTY_OBJECT = {}
 
 export default function TripInformation({ card }: TripInformationProps) {
     // Fix: Use useMemo and a stable empty object to prevent infinite loops
-    const productData = useMemo(() => (card.produto_data as any) || EMPTY_OBJECT, [card.produto_data])
-    const briefingData = useMemo(() => (card.briefing_inicial as any) || EMPTY_OBJECT, [card.briefing_inicial])
+    const productData = useMemo(() => {
+        if (typeof card.produto_data === 'string') {
+            try {
+                return JSON.parse(card.produto_data)
+            } catch (e) {
+                console.error('Failed to parse produto_data', e)
+                return {}
+            }
+        }
+        return (card.produto_data as any) || EMPTY_OBJECT
+    }, [card.produto_data])
+
+    const briefingData = useMemo(() => {
+        if (typeof card.briefing_inicial === 'string') {
+            try {
+                return JSON.parse(card.briefing_inicial)
+            } catch (e) {
+                console.error('Failed to parse briefing_inicial', e)
+                return {}
+            }
+        }
+        return (card.briefing_inicial as any) || EMPTY_OBJECT
+    }, [card.briefing_inicial])
     // Marketing data is now accessed via DynamicSectionWidget from produto_data
 
     const [viewMode, setViewMode] = useState<ViewMode>(SystemPhase.SDR)
@@ -457,11 +482,10 @@ export default function TripInformation({ card }: TripInformationProps) {
             >
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">Qual o motivo desta viagem?</label>
-                    <input
+                    <Input
                         type="text"
                         value={editedData.motivo || ''}
                         onChange={(e) => setEditedData({ ...editedData, motivo: e.target.value })}
-                        className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         autoFocus
                     />
                 </div>
@@ -494,7 +518,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 </button>
                             </span>
                         ))}
-                        <input
+                        <Input
                             type="text"
                             value={destinosInput}
                             onChange={(e) => setDestinosInput(e.target.value)}
@@ -509,7 +533,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                     }
                                 }
                             }}
-                            className="flex-1 min-w-[120px] border-none outline-none focus:ring-0 p-1 text-base bg-transparent"
+                            className="flex-1 min-w-[120px] border-none shadow-none focus-visible:ring-0 p-1 text-base bg-transparent h-auto"
                             placeholder={editedData.destinos?.length ? "" : "Digite um destino..."}
                             autoFocus
                         />
@@ -545,18 +569,63 @@ export default function TripInformation({ card }: TripInformationProps) {
                 isCorrection={correctionMode}
             >
                 <div className="space-y-4">
+                    {/* Traveler Count Display/Edit for Context */}
+                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-indigo-800 uppercase tracking-wide">Viajantes</label>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="number"
+                                    value={editedData.quantidade_viajantes || ''}
+                                    onChange={(e) => {
+                                        const qtd = parseInt(e.target.value) || 0
+                                        setEditedData(prev => {
+                                            const newData = { ...prev, quantidade_viajantes: qtd }
+                                            // Recalculate Total if Per Person exists
+                                            if (prev.orcamento?.por_pessoa) {
+                                                newData.orcamento = {
+                                                    ...prev.orcamento,
+                                                    total: prev.orcamento.por_pessoa * qtd
+                                                }
+                                            }
+                                            return newData
+                                        })
+                                    }}
+                                    className="w-20 h-8 text-right bg-white border-indigo-200 focus:border-indigo-500"
+                                    placeholder="0"
+                                />
+                                <span className="text-sm text-indigo-600 font-medium">pessoas</span>
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-indigo-600 mt-1">
+                            Usado para calcular automaticamente os valores abaixo.
+                        </p>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento Total (R$)</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                            <input
+                            <Input
                                 type="number"
                                 value={editedData.orcamento?.total || ''}
-                                onChange={(e) => setEditedData({
-                                    ...editedData,
-                                    orcamento: { ...editedData.orcamento, total: parseFloat(e.target.value) || 0 }
-                                })}
-                                className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                onChange={(e) => {
+                                    const newTotal = parseFloat(e.target.value) || 0
+                                    setEditedData(prev => {
+                                        const qtd = prev.quantidade_viajantes || 0
+                                        const newData = {
+                                            ...prev,
+                                            orcamento: {
+                                                ...prev.orcamento,
+                                                total: newTotal,
+                                                // Auto-calculate per person if travelers > 0
+                                                por_pessoa: qtd > 0 ? newTotal / qtd : prev.orcamento?.por_pessoa
+                                            }
+                                        }
+                                        return newData
+                                    })
+                                }}
+                                className="pl-12"
                                 placeholder="0,00"
                             />
                         </div>
@@ -565,14 +634,26 @@ export default function TripInformation({ card }: TripInformationProps) {
                         <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento por Pessoa (R$)</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                            <input
+                            <Input
                                 type="number"
                                 value={editedData.orcamento?.por_pessoa || ''}
-                                onChange={(e) => setEditedData({
-                                    ...editedData,
-                                    orcamento: { ...editedData.orcamento, por_pessoa: parseFloat(e.target.value) || 0 }
-                                })}
-                                className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                onChange={(e) => {
+                                    const newPorPessoa = parseFloat(e.target.value) || 0
+                                    setEditedData(prev => {
+                                        const qtd = prev.quantidade_viajantes || 0
+                                        const newData = {
+                                            ...prev,
+                                            orcamento: {
+                                                ...prev.orcamento,
+                                                por_pessoa: newPorPessoa,
+                                                // Auto-calculate total if travelers > 0
+                                                total: qtd > 0 ? newPorPessoa * qtd : prev.orcamento?.total
+                                            }
+                                        }
+                                        return newData
+                                    })
+                                }}
+                                className="pl-12"
                                 placeholder="0,00"
                             />
                         </div>
@@ -590,17 +671,15 @@ export default function TripInformation({ card }: TripInformationProps) {
             >
                 <div className="space-y-6">
                     <div className="flex items-center gap-3 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             checked={editedData.taxa_planejamento === 'Cortesia'}
-                            onChange={(e) => {
-                                if (e.target.checked) {
+                            onCheckedChange={(checked) => {
+                                if (checked) {
                                     setEditedData({ ...editedData, taxa_planejamento: 'Cortesia' })
                                 } else {
                                     setEditedData({ ...editedData, taxa_planejamento: 0 })
                                 }
                             }}
-                            className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                         />
                         <div className="flex-1">
                             <p className="text-sm font-bold text-indigo-900">É Cortesia?</p>
@@ -613,14 +692,14 @@ export default function TripInformation({ card }: TripInformationProps) {
                             <label className="block text-sm font-medium text-gray-700 mb-2">Valor da Taxa (R$)</label>
                             <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">R$</span>
-                                <input
+                                <Input
                                     type="number"
                                     value={typeof editedData.taxa_planejamento === 'number' ? editedData.taxa_planejamento : ''}
                                     onChange={(e) => setEditedData({
                                         ...editedData,
                                         taxa_planejamento: parseFloat(e.target.value) || 0
                                     })}
-                                    className="w-full pl-12 pr-4 py-3 text-lg font-semibold text-gray-900 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"
+                                    className="pl-12 text-lg font-semibold"
                                     placeholder="0,00"
                                     autoFocus
                                 />

@@ -358,20 +358,31 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {fields.map((field) => (
-                            <div key={field.key}>
-                                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-2">
-                                    <div className={cn("w-1.5 h-1.5 rounded-full",
-                                        field.key === 'o_que_e_importante' ? "bg-red-500" :
-                                            field.key === 'o_que_nao_pode_dar_errado' ? "bg-orange-500" :
-                                                field.key === 'sensibilidades' ? "bg-yellow-500" : "bg-gray-400"
-                                    )} />
-                                    {field.label}
-                                </label>
-                                {renderFieldInput(field)}
-                            </div>
-                        ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {fields.map((field) => {
+                            // Determine if field should be full width
+                            const isFullWidth = ['textarea', 'multiselect', 'checklist', 'json', 'destinos'].includes(field.type) || field.key === 'destinos'
+
+                            return (
+                                <div
+                                    key={field.key}
+                                    className={cn(
+                                        "space-y-2",
+                                        isFullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
+                                    )}
+                                >
+                                    <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 uppercase tracking-wide">
+                                        <div className={cn("w-1.5 h-1.5 rounded-full",
+                                            field.key === 'o_que_e_importante' ? "bg-red-500" :
+                                                field.key === 'o_que_nao_pode_dar_errado' ? "bg-orange-500" :
+                                                    field.key === 'sensibilidades' ? "bg-yellow-500" : "bg-gray-400"
+                                        )} />
+                                        {field.label}
+                                    </label>
+                                    {renderFieldInput(field)}
+                                </div>
+                            )
+                        })}
                     </div>
                 )}
             </div>

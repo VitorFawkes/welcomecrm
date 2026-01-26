@@ -51,6 +51,23 @@ Deno.serve(async (req) => {
         return new Response('ok', { headers: corsHeaders })
     }
 
+    // Security Check: Verify Cron Secret
+    const cronSecretHeader = req.headers.get('x-cron-secret');
+    const url = new URL(req.url);
+    const cronSecretQuery = url.searchParams.get('secret');
+
+    const providedSecret = cronSecretHeader || cronSecretQuery;
+    const expectedSecret = Deno.env.get('CRON_SECRET');
+
+    // Allow if secret matches OR if running locally (optional, but good for dev)
+    // For strict production, only allow matching secret
+    if (expectedSecret && providedSecret !== expectedSecret) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 401,
+        });
+    }
+
     try {
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',

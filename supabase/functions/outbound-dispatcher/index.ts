@@ -93,6 +93,16 @@ serve(async (req) => {
             userData = data;
         }
 
+        let lossReasonData = null;
+        if (table === "cards" && record.motivo_perda_id) {
+            const { data } = await supabaseClient
+                .from("motivos_perda")
+                .select("nome")
+                .eq("id", record.motivo_perda_id)
+                .single();
+            lossReasonData = data;
+        }
+
         // Process each integration
         for (const integration of integrations) {
             const config = integration.config;
@@ -113,6 +123,9 @@ serve(async (req) => {
                         created_at: record.created_at,
                         updated_at: record.updated_at,
                         metadata: record.metadata,
+                        motivo_perda_id: record.motivo_perda_id,
+                        motivo_perda_nome: lossReasonData?.nome || null,
+                        motivo_perda_comentario: record.motivo_perda_comentario,
                     } : null,
                     contact: contactData ? {
                         id: contactData.id,
@@ -140,6 +153,8 @@ serve(async (req) => {
                     .replace(/\{\{deal\.id\}\}/g, record.id || "")
                     .replace(/\{\{deal\.titulo\}\}/g, record.titulo || "")
                     .replace(/\{\{deal\.valor_estimado\}\}/g, record.valor_estimado || "")
+                    .replace(/\{\{deal\.motivo_perda_nome\}\}/g, lossReasonData?.nome || "")
+                    .replace(/\{\{deal\.motivo_perda_comentario\}\}/g, record.motivo_perda_comentario || "")
                     .replace(/\{\{contact\.nome\}\}/g, contactData?.nome || "")
                     .replace(/\{\{contact\.email\}\}/g, contactData?.email || "")
                     .replace(/\{\{contact\.telefone\}\}/g, contactData?.telefone || "")

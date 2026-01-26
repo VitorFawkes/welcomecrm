@@ -14,6 +14,7 @@ import { InboundTriggerRulesTab } from './InboundTriggerRulesTab';
 import { ACFieldManager } from './ACFieldManager';
 import { PhaseInstanceMappingTab } from './PhaseInstanceMappingTab';
 import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
+
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/Button';
@@ -21,7 +22,8 @@ import { ArrowLeft, Inbox, Send, Upload, Settings, GitBranch, ArrowUpRight, Link
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export function IntegrationsPage() {
-    const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer' | 'active_campaign'>('list');
+    const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer' | 'active_campaign' | 'api_keys' | 'api_docs'>('list');
+
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<IntegrationType>('input');
 

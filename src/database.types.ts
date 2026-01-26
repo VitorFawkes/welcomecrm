@@ -124,6 +124,126 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          metadata: Json | null
+          name: string
+          permissions: Json | null
+          rate_limit: number | null
+          request_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          metadata?: Json | null
+          name: string
+          permissions?: Json | null
+          rate_limit?: number | null
+          request_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          metadata?: Json | null
+          name?: string
+          permissions?: Json | null
+          rate_limit?: number | null
+          request_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_keys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "api_keys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_request_logs: {
+        Row: {
+          api_key_id: string | null
+          created_at: string | null
+          endpoint: string
+          error_message: string | null
+          id: string
+          ip_address: string | null
+          method: string
+          request_body: Json | null
+          response_time_ms: number | null
+          status_code: number
+          user_agent: string | null
+        }
+        Insert: {
+          api_key_id?: string | null
+          created_at?: string | null
+          endpoint: string
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          method: string
+          request_body?: Json | null
+          response_time_ms?: number | null
+          status_code: number
+          user_agent?: string | null
+        }
+        Update: {
+          api_key_id?: string | null
+          created_at?: string | null
+          endpoint?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          method?: string
+          request_body?: Json | null
+          response_time_ms?: number | null
+          status_code?: number
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_request_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arquivos: {
         Row: {
           caminho_arquivo: string
@@ -582,6 +702,7 @@ export type Database = {
           is_group_parent: boolean | null
           marketing_data: Json | null
           moeda: string | null
+          motivo_perda_comentario: string | null
           motivo_perda_id: string | null
           origem: string | null
           parent_card_id: string | null
@@ -638,6 +759,7 @@ export type Database = {
           is_group_parent?: boolean | null
           marketing_data?: Json | null
           moeda?: string | null
+          motivo_perda_comentario?: string | null
           motivo_perda_id?: string | null
           origem?: string | null
           parent_card_id?: string | null
@@ -694,6 +816,7 @@ export type Database = {
           is_group_parent?: boolean | null
           marketing_data?: Json | null
           moeda?: string | null
+          motivo_perda_comentario?: string | null
           motivo_perda_id?: string | null
           origem?: string | null
           parent_card_id?: string | null
@@ -1030,6 +1153,7 @@ export type Database = {
           external_id: string | null
           external_source: string | null
           id: string
+          last_whatsapp_conversation_id: string | null
           last_whatsapp_sync: string | null
           nome: string
           observacoes: string | null
@@ -1052,6 +1176,7 @@ export type Database = {
           external_id?: string | null
           external_source?: string | null
           id?: string
+          last_whatsapp_conversation_id?: string | null
           last_whatsapp_sync?: string | null
           nome: string
           observacoes?: string | null
@@ -1074,6 +1199,7 @@ export type Database = {
           external_id?: string | null
           external_source?: string | null
           id?: string
+          last_whatsapp_conversation_id?: string | null
           last_whatsapp_sync?: string | null
           nome?: string
           observacoes?: string | null
@@ -4153,6 +4279,7 @@ export type Database = {
           id: string
           metadata: Json | null
           motivo_cancelamento: string | null
+          outcome: string | null
           participantes_externos: string[] | null
           prioridade: string | null
           rescheduled_from_id: string | null
@@ -4180,6 +4307,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           motivo_cancelamento?: string | null
+          outcome?: string | null
           participantes_externos?: string[] | null
           prioridade?: string | null
           rescheduled_from_id?: string | null
@@ -4207,6 +4335,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           motivo_cancelamento?: string | null
+          outcome?: string | null
           participantes_externos?: string[] | null
           prioridade?: string | null
           rescheduled_from_id?: string | null
@@ -4342,6 +4471,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      task_type_outcomes: {
+        Row: {
+          is_success: boolean | null
+          ordem: number | null
+          outcome_key: string
+          outcome_label: string
+          tipo: string
+        }
+        Insert: {
+          is_success?: boolean | null
+          ordem?: number | null
+          outcome_key: string
+          outcome_label: string
+          tipo: string
+        }
+        Update: {
+          is_success?: boolean | null
+          ordem?: number | null
+          outcome_key?: string
+          outcome_label?: string
+          tipo?: string
+        }
+        Relationships: []
       }
       team_members: {
         Row: {
@@ -5202,6 +5355,436 @@ export type Database = {
           },
         ]
       }
+      workflow_edges: {
+        Row: {
+          condition: Json | null
+          created_at: string | null
+          edge_order: number | null
+          id: string
+          label: string | null
+          source_node_id: string
+          target_node_id: string
+          workflow_id: string
+        }
+        Insert: {
+          condition?: Json | null
+          created_at?: string | null
+          edge_order?: number | null
+          id?: string
+          label?: string | null
+          source_node_id: string
+          target_node_id: string
+          workflow_id: string
+        }
+        Update: {
+          condition?: Json | null
+          created_at?: string | null
+          edge_order?: number | null
+          id?: string
+          label?: string | null
+          source_node_id?: string
+          target_node_id?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_edges_source_node_id_fkey"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_edges_target_node_id_fkey"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_edges_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_instances: {
+        Row: {
+          card_id: string
+          completed_at: string | null
+          context: Json | null
+          current_node_id: string | null
+          error_message: string | null
+          id: string
+          resume_at: string | null
+          started_at: string | null
+          status: string | null
+          waiting_for: string | null
+          waiting_task_id: string | null
+          workflow_id: string
+        }
+        Insert: {
+          card_id: string
+          completed_at?: string | null
+          context?: Json | null
+          current_node_id?: string | null
+          error_message?: string | null
+          id?: string
+          resume_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          waiting_for?: string | null
+          waiting_task_id?: string | null
+          workflow_id: string
+        }
+        Update: {
+          card_id?: string
+          completed_at?: string | null
+          context?: Json | null
+          current_node_id?: string | null
+          error_message?: string | null
+          id?: string
+          resume_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          waiting_for?: string | null
+          waiting_task_id?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_current_node_id_fkey"
+            columns: ["current_node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_waiting_task_id_fkey"
+            columns: ["waiting_task_id"]
+            isOneToOne: false
+            referencedRelation: "tarefas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_waiting_task_id_fkey"
+            columns: ["waiting_task_id"]
+            isOneToOne: false
+            referencedRelation: "view_agenda"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_log: {
+        Row: {
+          card_id: string | null
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          event_type: string
+          id: string
+          input_data: Json | null
+          instance_id: string | null
+          node_id: string | null
+          output_data: Json | null
+          workflow_id: string | null
+        }
+        Insert: {
+          card_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          input_data?: Json | null
+          instance_id?: string | null
+          node_id?: string | null
+          output_data?: Json | null
+          workflow_id?: string | null
+        }
+        Update: {
+          card_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          input_data?: Json | null
+          instance_id?: string | null
+          node_id?: string | null
+          output_data?: Json | null
+          workflow_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "workflow_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_log_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_log_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_log_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_nodes: {
+        Row: {
+          action_config: Json | null
+          action_type: string | null
+          condition_config: Json | null
+          created_at: string | null
+          id: string
+          node_key: string
+          node_type: string
+          position_x: number | null
+          position_y: number | null
+          wait_config: Json | null
+          workflow_id: string
+        }
+        Insert: {
+          action_config?: Json | null
+          action_type?: string | null
+          condition_config?: Json | null
+          created_at?: string | null
+          id?: string
+          node_key: string
+          node_type: string
+          position_x?: number | null
+          position_y?: number | null
+          wait_config?: Json | null
+          workflow_id: string
+        }
+        Update: {
+          action_config?: Json | null
+          action_type?: string | null
+          condition_config?: Json | null
+          created_at?: string | null
+          id?: string
+          node_key?: string
+          node_type?: string
+          position_x?: number | null
+          position_y?: number | null
+          wait_config?: Json | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_nodes_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_queue: {
+        Row: {
+          action_payload: Json | null
+          attempts: number | null
+          created_at: string | null
+          execute_at: string
+          id: string
+          instance_id: string
+          last_error: string | null
+          max_attempts: number | null
+          node_id: string | null
+          priority: number | null
+          processed_at: string | null
+          status: string | null
+        }
+        Insert: {
+          action_payload?: Json | null
+          attempts?: number | null
+          created_at?: string | null
+          execute_at: string
+          id?: string
+          instance_id: string
+          last_error?: string | null
+          max_attempts?: number | null
+          node_id?: string | null
+          priority?: number | null
+          processed_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          action_payload?: Json | null
+          attempts?: number | null
+          created_at?: string | null
+          execute_at?: string
+          id?: string
+          instance_id?: string
+          last_error?: string | null
+          max_attempts?: number | null
+          node_id?: string | null
+          priority?: number | null
+          processed_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_queue_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_queue_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflows: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_draft: boolean | null
+          name: string
+          pipeline_id: string | null
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_draft?: boolean | null
+          name: string
+          pipeline_id?: string | null
+          trigger_config?: Json
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_draft?: boolean | null
+          name?: string
+          pipeline_id?: string | null
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "workflows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflows_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       v_contact_proposals: {
@@ -5613,6 +6196,10 @@ export type Database = {
     Functions: {
       auto_expire_proposals: { Args: never; Returns: number }
       f_unaccent: { Args: { "": string }; Returns: string }
+      find_contact_by_whatsapp: {
+        Args: { p_convo_id: string; p_phone: string }
+        Returns: string
+      }
       find_jsonb_diffs: {
         Args: { p_new: Json; p_old: Json; p_path: string }
         Returns: Database["public"]["CompositeTypes"]["jsonb_diff_record"][]
@@ -5622,6 +6209,18 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      generate_api_key: {
+        Args: {
+          p_expires_at?: string
+          p_name: string
+          p_permissions?: Json
+          p_rate_limit?: number
+        }
+        Returns: {
+          api_key_id: string
+          plain_text_key: string
+        }[]
       }
       generate_invite: {
         Args: {
@@ -5696,15 +6295,26 @@ export type Database = {
           similarity: number
         }[]
       }
-      mover_card: {
-        Args: {
-          p_card_id: string
-          p_motivo_perda_id?: string
-          p_nova_etapa_id: string
-        }
-        Returns: undefined
-      }
+      mover_card:
+        | {
+            Args: {
+              p_card_id: string
+              p_motivo_perda_id?: string
+              p_nova_etapa_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_card_id: string
+              p_motivo_perda_comentario?: string
+              p_motivo_perda_id?: string
+              p_nova_etapa_id: string
+            }
+            Returns: undefined
+          }
       normalize_phone: { Args: { phone_number: string }; Returns: string }
+      normalize_phone_robust: { Args: { p_phone: string }; Returns: string[] }
       pode_avancar_etapa: {
         Args: { p_card_id: string; p_nova_etapa_id: string }
         Returns: boolean
@@ -5716,6 +6326,20 @@ export type Database = {
       process_whatsapp_raw_event_v2: {
         Args: { event_id: string }
         Returns: Json
+      }
+      revoke_api_key: { Args: { p_key_id: string }; Returns: boolean }
+      save_workflow_definition: {
+        Args: {
+          p_description: string
+          p_edges: Json
+          p_is_active: boolean
+          p_name: string
+          p_nodes: Json
+          p_trigger_config: Json
+          p_trigger_type: string
+          p_workflow_id: string
+        }
+        Returns: string
       }
       search_proposal_library: {
         Args: {
@@ -5756,6 +6380,18 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
+      validate_api_key: {
+        Args: { p_key: string }
+        Returns: {
+          current_count: number
+          error_message: string
+          is_valid: boolean
+          key_id: string
+          key_name: string
+          permissions: Json
+          rate_limit: number
+        }[]
+      }
       validate_transition: {
         Args: { p_card_id: string; p_target_stage_id: string }
         Returns: boolean

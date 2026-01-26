@@ -14,9 +14,10 @@ interface UserSelectorProps {
     onSelect: (userId: string | null) => void
     label?: string
     disabled?: boolean
+    roleFilter?: string | string[]
 }
 
-export default function UserSelector({ currentUserId, onSelect, label, disabled = false }: UserSelectorProps) {
+export default function UserSelector({ currentUserId, onSelect, label, disabled = false, roleFilter }: UserSelectorProps) {
     const [profiles, setProfiles] = useState<Profile[]>([])
     const [loading, setLoading] = useState(false)
 
@@ -24,11 +25,21 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
         const fetchProfiles = async () => {
             setLoading(true)
             try {
-                const { data, error } = await supabase
+                let query = supabase
                     .from('profiles')
                     .select('id, nome, email, role')
                     .eq('active', true)
                     .order('nome')
+
+                if (roleFilter) {
+                    if (Array.isArray(roleFilter)) {
+                        query = query.in('role', roleFilter as any)
+                    } else {
+                        query = query.eq('role', roleFilter as any)
+                    }
+                }
+
+                const { data, error } = await query
 
                 if (error) throw error
                 setProfiles((data || []) as Profile[])
@@ -40,7 +51,7 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
         }
 
         fetchProfiles()
-    }, [])
+    }, [roleFilter])
 
     return (
         <div>

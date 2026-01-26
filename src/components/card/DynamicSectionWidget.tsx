@@ -51,8 +51,29 @@ export default function DynamicSectionWidget({
 
     // Data Sources - Unified data from both produto_data and marketing_data
     // Priority: produto_data (manual edits) > marketing_data (integration data)
-    const productData = useMemo(() => (card.produto_data as Record<string, any>) || {}, [card.produto_data])
-    const marketingData = useMemo(() => (card.marketing_data as Record<string, any>) || {}, [card.marketing_data])
+    const productData = useMemo(() => {
+        if (typeof card.produto_data === 'string') {
+            try {
+                return JSON.parse(card.produto_data)
+            } catch (e) {
+                console.error('Failed to parse produto_data', e)
+                return {}
+            }
+        }
+        return (card.produto_data as Record<string, any>) || {}
+    }, [card.produto_data])
+
+    const marketingData = useMemo(() => {
+        if (typeof card.marketing_data === 'string') {
+            try {
+                return JSON.parse(card.marketing_data)
+            } catch (e) {
+                console.error('Failed to parse marketing_data', e)
+                return {}
+            }
+        }
+        return (card.marketing_data as Record<string, any>) || {}
+    }, [card.marketing_data])
 
     // State
     const [editedData, setEditedData] = useState<Record<string, any>>({})

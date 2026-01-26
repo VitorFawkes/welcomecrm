@@ -127,6 +127,22 @@ export const CORE_FIELDS: DocField[] = [
         example: 'loss_reason_789',
     },
     {
+        key: 'deal.motivo_perda_nome',
+        label: 'Nome Motivo Perda',
+        type: 'text',
+        section: 'core_deal',
+        description: 'Nome legível do motivo de perda.',
+        example: 'Preço muito alto',
+    },
+    {
+        key: 'deal.motivo_perda_comentario',
+        label: 'Comentário Perda',
+        type: 'text',
+        section: 'core_deal',
+        description: 'Comentário detalhado sobre a perda.',
+        example: 'Cliente fechou com concorrente X por R$ 500 a menos.',
+    },
+    {
         key: 'deal.condicoes_pagamento',
         label: 'Condições de Pagamento',
         type: 'text',

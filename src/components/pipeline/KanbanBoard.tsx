@@ -20,6 +20,7 @@ import KanbanPhaseGroup from './KanbanPhaseGroup'
 import { Users } from 'lucide-react'
 import StageChangeModal from '../card/StageChangeModal'
 import QualityGateModal from '../card/QualityGateModal'
+import LossReasonModal from '../card/LossReasonModal'
 import { useQualityGate } from '../../hooks/useQualityGate'
 import { useAuth } from '../../contexts/AuthContext'
 import type { Database } from '../../database.types'
@@ -234,11 +235,12 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     })
 
     const moveCardMutation = useMutation({
-        mutationFn: async ({ cardId, stageId }: { cardId: string, stageId: string }) => {
+        mutationFn: async ({ cardId, stageId, motivoId, comentario }: { cardId: string, stageId: string, motivoId?: string, comentario?: string }) => {
             const { error } = await (supabase.rpc as any)('mover_card', {
                 p_card_id: cardId,
                 p_nova_etapa_id: stageId,
-                p_motivo_perda_id: null
+                p_motivo_perda_id: motivoId || null,
+                p_motivo_perda_comentario: comentario || null
             })
             if (error) throw error
         },
@@ -289,6 +291,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
     const [stageChangeModalOpen, setStageChangeModalOpen] = useState(false)
     const [qualityGateModalOpen, setQualityGateModalOpen] = useState(false)
+    const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false)
 
     const [pendingMove, setPendingMove] = useState<{
         cardId: string,
@@ -366,6 +369,18 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             const card = active.data.current as Card
 
             if (stageId !== currentStageId) {
+                // 0. Check Loss Reason (Is Lost Stage?)
+                if (targetStage?.is_lost) {
+                    setPendingMove({
+                        cardId,
+                        stageId,
+                        targetStageName: targetStage?.nome || 'Perdido',
+                    })
+                    setLossReasonModalOpen(true)
+                    setActiveCard(null)
+                    return
+                }
+
                 // 1. Check Quality Gate (Mandatory Fields)
                 const validation = validateMoveSync(card, stageId)
                 if (!validation.valid) {
@@ -448,6 +463,19 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 moveCardMutation.mutate({ cardId: pendingMove.cardId, stageId: pendingMove.stageId })
                 setPendingMove(null)
             }
+        }
+    }
+
+    const handleConfirmLossReason = (motivoId: string, comentario: string) => {
+        if (pendingMove) {
+            moveCardMutation.mutate({
+                cardId: pendingMove.cardId,
+                stageId: pendingMove.stageId,
+                motivoId,
+                comentario
+            })
+            setLossReasonModalOpen(false)
+            setPendingMove(null)
         }
     }
 
@@ -614,6 +642,18 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                         targetStageName={pendingMove.targetStageName}
                                         missingFields={pendingMove.missingFields || []}
                                         initialData={cards?.find(c => c.id === pendingMove.cardId) as any}
+                                    />
+
+                                    <LossReasonModal
+                                        isOpen={lossReasonModalOpen}
+                                        onClose={() => {
+                                            setLossReasonModalOpen(false)
+                                            setPendingMove(null)
+                                            setActiveCard(null)
+                                        }}
+                                        onConfirm={handleConfirmLossReason}
+                                        targetStageId={pendingMove.stageId}
+                                        targetStageName={pendingMove.targetStageName}
                                     />
                                 </>
                             )}

@@ -21,18 +21,22 @@ import ProfileSettings from './components/settings/profile/ProfileSettings'
 
 import StudioUnified from './components/admin/studio/StudioUnified'
 import SectionManager from './components/admin/studio/SectionManager'
-import FieldManager from './components/admin/FieldManager'
+// FieldManager removed - replaced by StudioUnified
 import PipelineStudio from './pages/admin/PipelineStudio'
 import UserManagement from './pages/admin/UserManagement'
 import CategoryManagement from './pages/admin/CategoryManagement'
+import LossReasonManagement from './pages/admin/LossReasonManagement'
 import CRMHealth from './pages/admin/CRMHealth'
 import CardCreationRulesPage from './pages/admin/CardCreationRulesPage'
 import Lixeira from './pages/admin/Lixeira'
 import { IntegrationsPage } from './components/admin/integrations/IntegrationsPage'
+import DeveloperHub from './pages/developer/DeveloperHub'
 import { WhatsAppPage } from './components/admin/whatsapp/WhatsAppPage'
 import KanbanCardSettings from './components/admin/KanbanCardSettings'
 import ActionRequirementsTab from './components/admin/studio/ActionRequirementsTab'
-import AutomationRulesPage from './components/admin/automation/AutomationRulesPage'
+// AutomationRulesPage removed - replaced by Workflows
+import WorkflowBuilderPage from './pages/admin/WorkflowBuilderPage'
+import WorkflowListPage from './pages/admin/WorkflowListPage'
 import { ToastProvider } from './contexts/ToastContext'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { Toaster } from 'sonner'
@@ -67,6 +71,10 @@ function App() {
                   <Route path="/proposals/:id/edit" element={<ProposalBuilderV4 />} />
                   <Route path="/proposals/:id/legacy" element={<ProposalBuilderElite />} />
 
+                  <Route path="/admin/workflows" element={<WorkflowListPage />} />
+                  <Route path="/admin/workflows/builder" element={<WorkflowBuilderPage />} />
+                  <Route path="/admin/workflows/builder/:id" element={<WorkflowBuilderPage />} />
+
                   <Route path="/admin" element={<Navigate to="/settings/system/governance" replace />} />
 
                   {/* Settings Routes */}
@@ -81,12 +89,23 @@ function App() {
                     {/* ═══════════════════════════════════════════════════════════
                         CUSTOMIZATION: Data Rules & Requirements
                     ═══════════════════════════════════════════════════════════ */}
-                    <Route path="customization/fields" element={<FieldManager />} />
+                    {/* FieldManager replaced by StudioUnified (data-rules) */}
+                    <Route path="customization/fields" element={<Navigate to="/settings/customization/data-rules" replace />} />
+
                     <Route path="customization/sections" element={<SectionManager />} />
                     <Route path="customization/data-rules" element={<StudioUnified />} />
                     <Route path="customization/action-requirements" element={<ActionRequirementsTab />} />
-                    <Route path="customization/automations" element={<AutomationRulesPage />} />
+
+                    {/* AutomationRulesPage replaced by Workflows */}
+                    <Route path="customization/automations" element={<Navigate to="/settings/workflows" replace />} />
+
                     <Route path="customization/categories" element={<CategoryManagement />} />
+                    <Route path="customization/loss-reasons" element={<LossReasonManagement />} />
+
+                    {/* Workflows moved to Settings */}
+                    <Route path="workflows" element={<WorkflowListPage />} />
+                    <Route path="workflows/builder" element={<WorkflowBuilderPage />} />
+                    <Route path="workflows/builder/:id" element={<WorkflowBuilderPage />} />
 
                     {/* ═══════════════════════════════════════════════════════════
                         PIPELINE: Funnel Structure
@@ -98,6 +117,7 @@ function App() {
                         INTEGRATIONS: External Connections
                     ═══════════════════════════════════════════════════════════ */}
                     <Route path="integrations" element={<IntegrationsPage />} />
+                    <Route path="developer-platform" element={<DeveloperHub />} />
 
                     {/* ═══════════════════════════════════════════════════════════
                         TEAM: Users, Roles, Teams

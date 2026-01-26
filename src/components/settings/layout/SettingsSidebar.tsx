@@ -9,15 +9,15 @@ import {
     Activity,
     Users as UsersIcon,
     MessageSquare,
-    ListChecks,
     Trash2,
     FileCheck,
     ChevronDown,
     Palette,
     GitBranch,
     Wrench,
-    Zap,
-    Layers
+    Layers,
+    Code,
+    XCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -125,12 +125,12 @@ export default function SettingsSidebar() {
                             CUSTOMIZATION: Data Rules & Requirements
                         ═══════════════════════════════════════════════════════════ */}
                         <NavSection title="Personalização" icon={Palette} defaultOpen={true}>
-                            <NavItem to="/settings/customization/fields" icon={ListChecks} label="Cadastro de Campos" />
-                            <NavItem to="/settings/customization/sections" icon={Layers} label="Seções" />
                             <NavItem to="/settings/customization/data-rules" icon={Database} label="Regras de Dados" />
+                            <NavItem to="/settings/customization/sections" icon={Layers} label="Seções" />
                             <NavItem to="/settings/customization/action-requirements" icon={FileCheck} label="Requisitos de Ação" />
-                            <NavItem to="/settings/customization/automations" icon={Zap} label="Automações" />
+                            <NavItem to="/settings/workflows" icon={GitBranch} label="Workflows" />
                             <NavItem to="/settings/customization/categories" icon={Tags} label="Categorias" />
+                            <NavItem to="/settings/customization/loss-reasons" icon={XCircle} label="Motivos de Perda" />
                         </NavSection>
 
                         {/* ═══════════════════════════════════════════════════════════
@@ -147,6 +147,7 @@ export default function SettingsSidebar() {
                         <NavSection title="Conexões" icon={Webhook}>
                             <NavItem to="/settings/integrations" icon={Webhook} label="Integrações" badge={blockedCount} />
                             <NavItem to="/settings/workspace/whatsapp" icon={MessageSquare} label="WhatsApp" />
+                            <NavItem to="/settings/developer-platform" icon={Code} label="Developer Platform" />
                         </NavSection>
 
                         {/* ═══════════════════════════════════════════════════════════
