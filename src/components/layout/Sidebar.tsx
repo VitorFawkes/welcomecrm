@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Kanban, Users, Settings, FileText, ChevronRight, User } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, Settings, FileText, ChevronRight, User, BarChart3 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { ProductSwitcher } from './ProductSwitcher'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,6 +12,7 @@ const navigation = [
     { name: 'Propostas', href: '/proposals', icon: FileText },
     { name: 'Grupos', href: '/groups', icon: Users },
     { name: 'Contatos', href: '/people', icon: User },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Configurações', href: '/settings', icon: Settings },
 ]
 

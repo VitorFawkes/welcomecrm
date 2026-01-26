@@ -13,6 +13,9 @@ import ProposalBuilderElite from './pages/ProposalBuilderElite'
 import ProposalBuilderV4 from './pages/ProposalBuilderV4'
 import ProposalsPage from './pages/ProposalsPage'
 import ProposalView from './pages/public/ProposalView'
+import Analytics from './pages/Analytics'
+
+
 import ProposalReview from './pages/public/ProposalReview'
 import ProposalConfirmed from './pages/public/ProposalConfirmed'
 
@@ -68,6 +71,7 @@ function App() {
                   <Route path="/cards/:id" element={<CardDetail />} />
                   <Route path="/people" element={<People />} />
                   <Route path="/proposals" element={<ProposalsPage />} />
+                  <Route path="/analytics" element={<Analytics />} />
                   <Route path="/proposals/:id/edit" element={<ProposalBuilderV4 />} />
                   <Route path="/proposals/:id/legacy" element={<ProposalBuilderElite />} />
 
