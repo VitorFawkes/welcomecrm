@@ -1,4 +1,4 @@
-import { Settings2, Columns } from 'lucide-react'
+import { Columns } from 'lucide-react'
 import { Button } from '../Button'
 import {
     DropdownMenu,

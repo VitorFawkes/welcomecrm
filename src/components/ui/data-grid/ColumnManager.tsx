@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
     DndContext,
     closestCenter,
@@ -16,7 +15,7 @@ import {
     useSortable
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Columns, GripVertical, Check } from 'lucide-react'
+import { Columns, GripVertical } from 'lucide-react'
 import { Button } from '../Button'
 import {
     Popover,
