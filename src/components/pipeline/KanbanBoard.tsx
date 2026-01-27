@@ -30,6 +30,7 @@ import { Button } from '../ui/Button'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { useHorizontalScroll } from '../../hooks/useHorizontalScroll'
 import { ScrollArrows } from '../ui/ScrollArrows'
+import { usePipelineCards } from '../../hooks/usePipelineCards'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -123,149 +124,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         }
     })
 
-    // Fetch Team Members for Team View
-    const { data: myTeamMembers } = useQuery({
-        queryKey: ['my-team-members', profile?.team_id],
-        enabled: !!profile?.team_id && viewMode === 'MANAGER' && subView === 'TEAM_VIEW',
-        queryFn: async () => {
-            if (!profile?.team_id) return []
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('team_id', profile.team_id)
-
-            if (error) throw error
-            return data.map(p => p.id)
-        }
-    })
-
-    const { data: cards, isError, refetch } = useQuery({
-        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], // Re-fetch when view changes
-        placeholderData: keepPreviousData,
-        queryFn: async () => {
-            let query = (supabase.from('view_cards_acoes') as any)
-                .select('*')
-
-            if (productFilter !== 'ALL') {
-                query = query.eq('produto', productFilter)
-            }
-
-            // Apply Smart View Filters
-            if (viewMode === 'AGENT') {
-                if (subView === 'MY_QUEUE') {
-                    // Filter by current user
-                    if (session?.user?.id) {
-                        query = query.eq('dono_atual_id', session.user.id)
-                    }
-                }
-                // 'ATTENTION' logic would go here (e.g. overdue)
-            } else if (viewMode === 'MANAGER') {
-                if (subView === 'TEAM_VIEW') {
-                    // Filter by team members if available
-                    if (myTeamMembers && myTeamMembers.length > 0) {
-                        query = query.in('dono_atual_id', myTeamMembers)
-                    }
-                }
-                if (subView === 'FORECAST') {
-                    // Filter by closing_date this month
-                    const startOfMonth = new Date(); startOfMonth.setDate(1);
-                    const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-                    query = query.gte('data_fechamento', startOfMonth.toISOString()).lt('data_fechamento', endOfMonth.toISOString())
-                }
-            }
-
-            // Apply Advanced Filters (from Drawer)
-            if (filters.search) {
-                const searchTerm = filters.search.trim();
-                if (searchTerm) {
-                    // Search in Title, Contact Name, Origin, and Current Owner Name
-                    // Note: 'destinos' is JSON, so simple ilike might not work as expected unless casted in view.
-                    // We will stick to text columns for now.
-                    query = query.or(`titulo.ilike.%${searchTerm}%,pessoa_nome.ilike.%${searchTerm}%,origem.ilike.%${searchTerm}%,dono_atual_nome.ilike.%${searchTerm}%`)
-                }
-            }
-
-            if ((filters.ownerIds?.length ?? 0) > 0) {
-                query = query.in('dono_atual_id', filters.ownerIds)
-            }
-
-            // NEW: SDR Filter
-            if ((filters.sdrIds?.length ?? 0) > 0) {
-                query = query.in('sdr_owner_id', filters.sdrIds)
-            }
-
-            // NEW: Team Filter (using new view column)
-            // if (filters.teamIds?.length > 0) {
-            //     query = query.in('owner_team_id', filters.teamIds)
-            // }
-
-            // NEW: Department Filter (using new view column)
-            // if (filters.departmentIds?.length > 0) {
-            //     query = query.in('owner_department_id', filters.departmentIds)
-            // }
-
-
-
-            if (filters.startDate) {
-                // Append time to ensure full day coverage if needed, but for 'data_viagem_inicio' (date type) it might be fine.
-                // However, if it's a timestamp, we need to be careful.
-                // Assuming 'data_viagem_inicio' is DATE type in DB, simple string comparison works.
-                // If it's TIMESTAMP, we should append time.
-                // Let's be safe and assume we want to include the whole day.
-                query = query.gte('data_viagem_inicio', filters.startDate)
-            }
-
-            if (filters.endDate) {
-                query = query.lte('data_viagem_inicio', filters.endDate)
-            }
-
-            // NEW: Creation Date Filter (TIMESTAMP)
-            // Fix: Append time to ensure we cover the selected days fully in local time perspective
-            if (filters.creationStartDate) {
-                // Start of day: 00:00:00
-                query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
-            }
-
-            if (filters.creationEndDate) {
-                // End of day: 23:59:59
-                query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
-            }
-
-            // Apply Sorting
-            if (filters.sortBy) {
-                // Handle special case for 'data_proxima_tarefa' which might be null
-                // We want nulls last usually, but Supabase/Postgres handles this.
-                // For 'data_proxima_tarefa' asc, we want earliest dates first. Nulls (no task) should be last.
-                // Postgres default for ASC is NULLS LAST, for DESC is NULLS FIRST.
-                // We might need to adjust if we want strict behavior, but standard order is fine for now.
-                query = query.order(filters.sortBy, { ascending: filters.sortDirection === 'asc', nullsFirst: false })
-            } else {
-                query = query.order('created_at', { ascending: false })
-            }
-
-            const { data, error } = await query
-            if (error) throw error
-
-            let filteredData = data as Card[]
-
-            // Apply Group Filters (Client-side for flexibility)
-            const { showLinked, showSolo } = groupFilters
-
-            filteredData = filteredData.filter(card => {
-                // ALWAYS exclude Group Parents from Kanban
-                if (card.is_group_parent) return false
-
-                const isLinked = !!card.parent_card_id
-                const isSolo = !isLinked
-
-                if (isLinked && showLinked) return true
-                if (isSolo && showSolo) return true
-
-                return false
-            })
-
-            return filteredData
-        }
+    // Fetch Cards using the new shared hook
+    const { data: cards, isError, refetch } = usePipelineCards({
+        productFilter,
+        viewMode,
+        subView,
+        filters,
+        groupFilters
     })
 
     const moveCardMutation = useMutation({
@@ -280,17 +145,17 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         },
         onMutate: ({ cardId, stageId }) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-            queryClient.cancelQueries({ queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters] })
+            queryClient.cancelQueries({ queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers] })
 
             // Snapshot the previous value
-            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters])
+            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers])
 
             // Find new stage info for complete update
             const newStage = stages?.find(s => s.id === stageId)
 
             // Optimistically update to the new value
             if (previousCards) {
-                queryClient.setQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters], (old) => {
+                queryClient.setQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], (old) => {
                     if (!old) return []
                     return old.map((card) => {
                         if (card.id === cardId) {
@@ -312,7 +177,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         onError: (_err, _variables, context) => {
             // If the mutation fails, use the context returned from onMutate to roll back
             if (context?.previousCards) {
-                queryClient.setQueryData(['cards', productFilter, viewMode, subView, filters, groupFilters], context.previousCards)
+                queryClient.setQueryData(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], context.previousCards)
             }
         },
         onSuccess: () => {

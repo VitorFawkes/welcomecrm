@@ -323,10 +323,10 @@ async function executeAction(supabase, node, instance) {
             // Fetch card owner
             const { data: card } = await supabase
                 .from("cards")
-                .select("responsavel_id")
+                .select("dono_atual_id")
                 .eq("id", instance.card_id)
                 .single();
-            responsavelId = card?.responsavel_id;
+            responsavelId = card?.dono_atual_id;
         } else if (config.assign_to?.startsWith("role:")) {
             // Handle Role Assignment (e.g. role:sdr)
             const roleKey = config.assign_to.split(":")[1];
@@ -346,10 +346,10 @@ async function executeAction(supabase, node, instance) {
                 // Fallback to card owner if no user found for role
                 const { data: card } = await supabase
                     .from("cards")
-                    .select("responsavel_id")
+                    .select("dono_atual_id")
                     .eq("id", instance.card_id)
                     .single();
-                responsavelId = card?.responsavel_id;
+                responsavelId = card?.dono_atual_id;
                 console.warn(`No active user found for role ${roleKey}. Falling back to card owner.`);
             }
         }

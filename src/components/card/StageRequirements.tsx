@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, AlertCircle, FileText, Phone, Users, Mail, MessageSquare } from 'lucide-react'
+import { CheckCircle2, Circle, AlertCircle, FileText, Phone, Users, Mail, MessageSquare, ListTodo } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { useStageRequirements, type Requirement } from '../../hooks/useStageRequirements'
@@ -9,17 +9,6 @@ interface StageRequirementsProps {
     card: Card
 }
 
-// Icon mapping for different task types
-const TASK_TYPE_ICONS: Record<string, React.ElementType> = {
-    ligacao: Phone,
-    reuniao: Users,
-    email: Mail,
-    whatsapp: MessageSquare,
-    enviar_proposta: FileText,
-    tarefa: CheckCircle2,
-    solicitacao_mudanca: AlertCircle
-}
-
 // Labels for proposal statuses
 const PROPOSAL_STATUS_LABELS: Record<string, string> = {
     draft: 'Criada (Rascunho)',
@@ -27,17 +16,6 @@ const PROPOSAL_STATUS_LABELS: Record<string, string> = {
     viewed: 'Visualizada',
     in_progress: 'Em Andamento',
     accepted: 'Aceita'
-}
-
-// Labels for task types
-const TASK_TYPE_LABELS: Record<string, string> = {
-    ligacao: 'Ligação',
-    reuniao: 'Reunião',
-    email: 'E-mail',
-    whatsapp: 'WhatsApp',
-    enviar_proposta: 'Enviar Proposta',
-    tarefa: 'Tarefa',
-    solicitacao_mudanca: 'Mudança'
 }
 
 export default function StageRequirements({ card }: StageRequirementsProps) {
@@ -54,17 +32,33 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
     const totalBlocking = blockingRequirements.length
     const isAllBlockingCompleted = completedBlocking === totalBlocking
 
+    // Helper to format dynamic labels
+    const formatTaskLabel = (tipo: string) => {
+        // Capitalize first letter and replace underscores
+        return tipo
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ')
+    }
+
     // Get icon for requirement
     const getRequirementIcon = (req: Requirement) => {
-        if (req.requirement_type === 'field') {
-            return CheckCircle2
-        }
-        if (req.requirement_type === 'proposal') {
-            return FileText
-        }
+        if (req.requirement_type === 'field') return CheckCircle2
+        if (req.requirement_type === 'proposal') return FileText
+
+        // Dynamic Task Icons Mapping
         if (req.requirement_type === 'task') {
-            return TASK_TYPE_ICONS[req.task_tipo] || CheckCircle2
+            const map: Record<string, any> = {
+                contato: Phone, // Or maybe a combined icon if available, but Phone is fine as primary contact
+                reuniao: Users,
+                email: Mail,
+                enviar_proposta: FileText,
+                cobranca: AlertCircle,
+                handover: CheckCircle2
+            }
+            return map[req.task_tipo] || ListTodo // Fallback icon
         }
+
         return CheckCircle2
     }
 
@@ -78,11 +72,13 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                 return `Proposta ${statusLabel}`
             }
             case 'task': {
-                const typeLabel = TASK_TYPE_LABELS[req.task_tipo] || req.task_tipo
+                // Use the label from config if available (it should be), otherwise format the type
+                if (req.label && req.label !== 'Requisito') return req.label
+
+                const typeLabel = formatTaskLabel(req.task_tipo)
                 return `${typeLabel} ${req.task_require_completed ? 'Concluída' : 'Criada'}`
             }
             default:
-                // Exhaustive check - should never reach here
                 return (req as { label?: string }).label || 'Requisito'
         }
     }
@@ -102,11 +98,11 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
         <div className="space-y-4 mb-6">
             {/* Blocking Requirements (Current Stage) */}
             <div className={cn(
-                "bg-white rounded-xl shadow-sm border overflow-hidden",
+                "bg-white rounded-xl shadow-sm border overflow-hidden transition-colors duration-300",
                 isAllBlockingCompleted ? "border-green-100" : "border-red-100"
             )}>
                 <div className={cn(
-                    "px-4 py-3 border-b flex justify-between items-center",
+                    "px-4 py-3 border-b flex justify-between items-center transition-colors duration-300",
                     isAllBlockingCompleted ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
                 )}>
                     <h3 className={cn(
@@ -117,7 +113,7 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                         Obrigações da Etapa Atual
                     </h3>
                     <span className={cn(
-                        "text-xs font-medium px-2 py-1 rounded-full",
+                        "text-xs font-medium px-2 py-1 rounded-full transition-colors duration-300",
                         isAllBlockingCompleted ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                     )}>
                         {completedBlocking}/{totalBlocking}

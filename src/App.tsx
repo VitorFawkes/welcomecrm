@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import InvitePage from './pages/InvitePage'
 import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
+import Cards from './pages/Cards'
 import People from './pages/People'
 import GroupsPage from './pages/GroupsPage'
 import ProposalBuilderElite from './pages/ProposalBuilderElite'
@@ -65,6 +66,7 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/pipeline" element={<Pipeline />} />
                   <Route path="/groups" element={<GroupsPage />} />
+                  <Route path="/cards" element={<Cards />} />
                   <Route path="/cards/:id" element={<CardDetail />} />
                   <Route path="/people" element={<People />} />
                   <Route path="/proposals" element={<ProposalsPage />} />
