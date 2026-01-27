@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from '../ui/avatar'
 import { Checkbox } from '../ui/checkbox'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
+import { ColumnManager } from '../ui/data-grid/ColumnManager'
 import { ColumnToggle } from '../ui/data-grid/ColumnToggle'
 import { BulkActions } from '../ui/data-grid/BulkActions'
 import { BulkEditModal, type BulkEditField } from '../ui/data-grid/BulkEditModal'
@@ -54,7 +55,14 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
         prioridade: true,
         proxima_tarefa: true,
         dono_atual_nome: true,
-        data_viagem_inicio: false // Hidden by default
+        data_viagem_inicio: false,
+        created_at: false,
+        updated_at: false,
+        origem: false,
+        produto: false,
+        sdr_nome: false,
+        vendas_nome: false,
+        tempo_etapa_dias: false
     })
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
@@ -164,6 +172,13 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
         { id: 'proxima_tarefa', label: 'Próxima Tarefa', isVisible: visibleColumns.proxima_tarefa },
         { id: 'dono_atual_nome', label: 'Responsável', isVisible: visibleColumns.dono_atual_nome },
         { id: 'data_viagem_inicio', label: 'Data Viagem', isVisible: visibleColumns.data_viagem_inicio },
+        { id: 'created_at', label: 'Data Criação', isVisible: visibleColumns.created_at },
+        { id: 'updated_at', label: 'Última Atualização', isVisible: visibleColumns.updated_at },
+        { id: 'origem', label: 'Origem', isVisible: visibleColumns.origem },
+        { id: 'produto', label: 'Produto', isVisible: visibleColumns.produto },
+        { id: 'sdr_nome', label: 'SDR', isVisible: visibleColumns.sdr_nome },
+        { id: 'vendas_nome', label: 'Closer', isVisible: visibleColumns.vendas_nome },
+        { id: 'tempo_etapa_dias', label: 'Dias na Etapa', isVisible: visibleColumns.tempo_etapa_dias },
     ]
 
     const bulkEditFields: BulkEditField[] = [
@@ -283,6 +298,69 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                     </div>
                                 </TableHead>
                             )}
+
+                            {visibleColumns.created_at && (
+                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('created_at')}>
+                                    <div className="flex items-center gap-1">
+                                        Criação
+                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </TableHead>
+                            )}
+
+                            {visibleColumns.updated_at && (
+                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('updated_at')}>
+                                    <div className="flex items-center gap-1">
+                                        Atualização
+                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </TableHead>
+                            )}
+
+                            {visibleColumns.origem && (
+                                <TableHead className="w-[100px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('origem')}>
+                                    <div className="flex items-center gap-1">
+                                        Origem
+                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </TableHead>
+                            )}
+
+                            {visibleColumns.produto && (
+                                <TableHead className="w-[100px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('produto')}>
+                                    <div className="flex items-center gap-1">
+                                        Produto
+                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </TableHead>
+                            )}
+
+                            {visibleColumns.sdr_nome && (
+                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('sdr_nome')}>
+                                    <div className="flex items-center gap-1">
+                                        SDR
+                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </TableHead>
+                            )}
+
+                            {visibleColumns.vendas_nome && (
+                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('vendas_nome')}>
+                                    <div className="flex items-center gap-1">
+                                        Closer
+                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </TableHead>
+                            )}
+
+                            {visibleColumns.tempo_etapa_dias && (
+                                <TableHead className="w-[100px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('tempo_etapa_dias')}>
+                                    <div className="flex items-center gap-1">
+                                        Dias Etapa
+                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                                    </div>
+                                </TableHead>
+                            )}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -381,6 +459,55 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                                     <Calendar className="h-3.5 w-3.5 text-gray-400" />
                                                     <span>{format(new Date(card.data_viagem_inicio), "dd/MM/yy")}</span>
                                                 </div>
+                                            ) : '-'}
+                                        </TableCell>
+                                    )}
+
+                                    {visibleColumns.created_at && (
+                                        <TableCell className="text-gray-600 text-xs">
+                                            {card.created_at ? format(new Date(card.created_at), "dd/MM/yy HH:mm") : '-'}
+                                        </TableCell>
+                                    )}
+
+                                    {visibleColumns.updated_at && (
+                                        <TableCell className="text-gray-600 text-xs">
+                                            {card.updated_at ? format(new Date(card.updated_at), "dd/MM/yy HH:mm") : '-'}
+                                        </TableCell>
+                                    )}
+
+                                    {visibleColumns.origem && (
+                                        <TableCell className="text-gray-600 text-sm capitalize">
+                                            {card.origem || '-'}
+                                        </TableCell>
+                                    )}
+
+                                    {visibleColumns.produto && (
+                                        <TableCell className="text-gray-600 text-sm capitalize">
+                                            {card.produto || '-'}
+                                        </TableCell>
+                                    )}
+
+                                    {visibleColumns.sdr_nome && (
+                                        <TableCell className="text-gray-600 text-sm">
+                                            {card.sdr_nome?.split(' ')[0] || '-'}
+                                        </TableCell>
+                                    )}
+
+                                    {visibleColumns.vendas_nome && (
+                                        <TableCell className="text-gray-600 text-sm">
+                                            {card.vendas_nome?.split(' ')[0] || '-'}
+                                        </TableCell>
+                                    )}
+
+                                    {visibleColumns.tempo_etapa_dias && (
+                                        <TableCell className="text-gray-600 text-sm text-center">
+                                            {card.tempo_etapa_dias !== null ? (
+                                                <Badge variant="outline" className={cn(
+                                                    "font-mono",
+                                                    (card.tempo_etapa_dias || 0) > 7 ? "text-red-600 border-red-200 bg-red-50" : "text-gray-600"
+                                                )}>
+                                                    {card.tempo_etapa_dias}d
+                                                </Badge>
                                             ) : '-'}
                                         </TableCell>
                                     )}

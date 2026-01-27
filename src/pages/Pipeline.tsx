@@ -30,7 +30,15 @@ export default function Pipeline() {
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
 
 
-    const [viewType, setViewType] = useState<'kanban' | 'list'>('kanban')
+    const [viewType, setViewType] = useState<'kanban' | 'list'>(() => {
+        const saved = localStorage.getItem('pipeline_view_type')
+        return (saved === 'kanban' || saved === 'list') ? saved : 'kanban'
+    })
+
+    const handleSetViewType = (type: 'kanban' | 'list') => {
+        setViewType(type)
+        localStorage.setItem('pipeline_view_type', type)
+    }
 
     const getSortLabel = () => {
         const { sortBy, sortDirection } = filters
@@ -66,7 +74,7 @@ export default function Pipeline() {
                         {/* View Type Toggle */}
                         <div className="flex bg-gray-100/50 p-1 rounded-lg border border-gray-200/50">
                             <button
-                                onClick={() => setViewType('kanban')}
+                                onClick={() => handleSetViewType('kanban')}
                                 className={cn(
                                     "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
                                     viewType === 'kanban'
@@ -78,7 +86,7 @@ export default function Pipeline() {
                                 Kanban
                             </button>
                             <button
-                                onClick={() => setViewType('list')}
+                                onClick={() => handleSetViewType('list')}
                                 className={cn(
                                     "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
                                     viewType === 'list'
