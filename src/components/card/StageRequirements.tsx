@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, AlertCircle, FileText, Phone, Users, Mail, ListTodo } from 'lucide-react'
+import { CheckCircle2, AlertCircle, FileText, Phone, Users, Mail, ListTodo } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { useStageRequirements, type Requirement } from '../../hooks/useStageRequirements'
@@ -123,7 +123,6 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                 <div className="divide-y divide-gray-50">
                     {blockingRequirements.map((req: Requirement) => {
                         const isCompleted = checkRequirement(req)
-                        const Icon = getRequirementIcon(req)
 
                         return (
                             <div key={req.id} className={`p-3 flex items-start gap-3 transition-colors ${isCompleted ? 'bg-gray-50/50' : 'bg-white'}`}>

@@ -35,8 +35,6 @@ type TaskType = 'tarefa' | 'contato' | 'ligacao' | 'whatsapp' | 'email' | 'reuni
 const TASK_TYPES: { id: TaskType; label: string; icon: any; color: string; activeColor: string }[] = [
     { id: 'tarefa', label: 'Tarefa', icon: CheckCircle2, color: 'text-indigo-600 bg-indigo-50 border-indigo-200', activeColor: 'ring-2 ring-indigo-500 bg-indigo-100' },
     { id: 'contato', label: 'Contato', icon: Phone, color: 'text-blue-600 bg-blue-50 border-blue-200', activeColor: 'ring-2 ring-blue-500 bg-blue-100' },
-    { id: 'ligacao', label: 'Ligação', icon: Phone, color: 'text-cyan-600 bg-cyan-50 border-cyan-200', activeColor: 'ring-2 ring-cyan-500 bg-cyan-100' },
-    { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, color: 'text-green-600 bg-green-50 border-green-200', activeColor: 'ring-2 ring-green-500 bg-green-100' },
     { id: 'email', label: 'E-mail', icon: Mail, color: 'text-blue-600 bg-blue-50 border-blue-200', activeColor: 'ring-2 ring-blue-500 bg-blue-100' },
     { id: 'reuniao', label: 'Reunião', icon: Users, color: 'text-purple-600 bg-purple-50 border-purple-200', activeColor: 'ring-2 ring-purple-500 bg-purple-100' },
     { id: 'solicitacao_mudanca', label: 'Mudança', icon: RefreshCw, color: 'text-orange-600 bg-orange-50 border-orange-200', activeColor: 'ring-2 ring-orange-500 bg-orange-100' },
@@ -211,7 +209,8 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             } else {
                 // Create mode - Reset everything
                 setStep(1);
-                setTitle('');
+                setTitle('Tarefa'); // Default title
+
                 setDescription('');
                 setType('tarefa');
                 setMetadata({});
@@ -265,7 +264,8 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
 
         // Reset title if it's empty or matches a known template (meaning user hasn't customized it)
         if (!initialData) {
-            setTitle('');
+            const typeLabel = TASK_TYPES.find(t => t.id === selectedType)?.label || '';
+            setTitle(typeLabel);
         }
     };
 
@@ -559,47 +559,12 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                 </div>
                                 <div className="grid gap-2">
                                     <Label>Hora</Label>
-                                    <div className="relative" ref={timeListRef}>
-                                        <Input
-                                            value={time}
-                                            onChange={e => setTime(e.target.value)}
-                                            onFocus={() => setShowTimeList(true)}
-                                            placeholder="00:00"
-                                            className="font-medium"
-                                            maxLength={5}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="absolute right-0 top-0 h-10 w-10 px-0 text-gray-400 hover:text-gray-600"
-                                            onClick={() => setShowTimeList(!showTimeList)}
-                                        >
-                                            <ChevronDown className="h-4 w-4" />
-                                        </Button>
-
-                                        {showTimeList && (
-                                            <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100">
-                                                {timeOptions.map((option) => (
-                                                    <div
-                                                        key={option.value}
-                                                        className={`
-                                                            relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors hover:bg-gray-100 hover:text-gray-900
-                                                            ${option.value === time ? "bg-blue-50 text-blue-900 font-medium" : ""}
-                                                        `}
-                                                        onClick={() => handleTimeSelect(option.value)}
-                                                    >
-                                                        <span className="block truncate">{option.label}</span>
-                                                        {option.value === time && (
-                                                            <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-                                                                <Check className="h-4 w-4 text-blue-600" />
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <Input
+                                        type="time"
+                                        value={time}
+                                        onChange={e => setTime(e.target.value)}
+                                        className="font-medium"
+                                    />
                                 </div>
                             </div>
                         )}
