@@ -14,7 +14,9 @@ import PessoasWidget from '../components/card/PessoasWidget'
 import ActivityFeed from '../components/card/ActivityFeed'
 import { ParentLinkBanner } from '../components/cards/group/ParentLinkBanner'
 import GroupDetailLayout from '../components/cards/group/GroupDetailLayout'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Zap } from 'lucide-react'
+import { Button } from '../components/ui/Button'
+import { toast } from 'sonner'
 
 import type { Database } from '../database.types'
 
@@ -85,9 +87,36 @@ export default function CardDetail() {
                 </nav>
             </div>
 
+
+
             {/* Sticky Header */}
             <div className="sticky top-0 z-10 bg-white shadow-md">
-                <CardHeader card={card} />
+                <div className="flex justify-between items-center pr-6">
+                    <CardHeader card={card} />
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 text-slate-600"
+                        onClick={async () => {
+                            const toastId = toast.loading('Sincronizando com ActiveCampaign...');
+                            try {
+                                const { error } = await supabase.functions.invoke('integration-sync-deals', {
+                                    body: {
+                                        deal_id: card.external_id,
+                                        force_update: true
+                                    }
+                                });
+                                if (error) throw error;
+                                toast.success('Sincronização solicitada! Os dados serão atualizados em instantes.', { id: toastId });
+                            } catch (err: any) {
+                                toast.error('Erro ao sincronizar: ' + err.message, { id: toastId });
+                            }
+                        }}
+                    >
+                        <Zap className="w-4 h-4" />
+                        Sincronizar AC
+                    </Button>
+                </div>
             </div>
 
             {/* 2-Column Layout: Work Area + Context/Accountability */}
@@ -136,6 +165,6 @@ export default function CardDetail() {
                     <ActivityFeed cardId={card.id!} />
                 </div>
             </div>
-        </div>
+        </div >
     )
 }

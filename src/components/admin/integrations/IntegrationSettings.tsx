@@ -271,6 +271,51 @@ export function IntegrationSettings() {
                     </div>
                 </CardHeader>
             </Card>
+
+            {/* Sync Operations */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <CardTitle className="flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-yellow-500" />
+                                Sincronização Manual
+                            </CardTitle>
+                            <CardDescription>
+                                Force a sincronização de dados do ActiveCampaign.
+                            </CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <Button
+                            variant="outline"
+                            onClick={async () => {
+                                const confirm = window.confirm('Isso irá buscar TODOS os negócios do ActiveCampaign e atualizar o CRM. Pode levar alguns minutos. Deseja continuar?');
+                                if (!confirm) return;
+
+                                const toastId = toast.loading('Iniciando sincronização...');
+                                try {
+                                    const { error } = await supabase.functions.invoke('integration-sync-deals', {
+                                        body: { force_update: true }
+                                    });
+                                    if (error) throw error;
+                                    toast.success('Sincronização iniciada com sucesso!', { id: toastId });
+                                } catch (err: any) {
+                                    toast.error('Erro ao iniciar sincronização: ' + err.message, { id: toastId });
+                                }
+                            }}
+                        >
+                            <Zap className="w-4 h-4 mr-2" />
+                            Forçar Sincronização Completa
+                        </Button>
+                        <p className="text-sm text-muted-foreground">
+                            Use isso se perceber que dados estão desatualizados.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

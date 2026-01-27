@@ -13,13 +13,41 @@ async function fetchDeals(
     baseUrl: string,
     apiKey: string,
     pipelineId: string,
-    limit: number = 100
+    limit: number = 100,
+    dealId?: string
 ): Promise<any[]> {
     const allDeals: any[] = [];
     let offset = 0;
 
+    // If specific deal ID requested, fetch just that one
+    if (dealId) {
+        const url = `${baseUrl}/api/3/deals/${dealId}?include=contact`;
+        const res = await fetch(url, {
+            headers: { 'Api-Token': apiKey }
+        });
+
+        if (!res.ok) {
+            // If 404, just return empty
+            if (res.status === 404) return [];
+            throw new Error(`AC API error: ${res.status} - ${await res.text()}`);
+        }
+
+        const data = await res.json();
+        // AC returns { deal: { ... } } for single fetch, but we need to normalize it
+        // Note: 'include=contact' might return side-loaded data in 'contacts' array
+        // We need to merge it manually if so.
+        // However, for simplicity in this script, let's stick to the list endpoint with filter if possible,
+        // OR handle the single response structure.
+        // The list endpoint supports filters[id]. Let's use that for consistency.
+    }
+
     while (true) {
-        const url = `${baseUrl}/api/3/deals?filters[pipeline]=${pipelineId}&limit=${limit}&offset=${offset}&orders[cdate]=DESC`;
+        let url = `${baseUrl}/api/3/deals?filters[pipeline]=${pipelineId}&limit=${limit}&offset=${offset}&orders[cdate]=DESC&include=contact`;
+
+        if (dealId) {
+            url = `${baseUrl}/api/3/deals?filters[id]=${dealId}&include=contact`;
+        }
+
         const res = await fetch(url, {
             headers: { 'Api-Token': apiKey }
         });
@@ -30,9 +58,26 @@ async function fetchDeals(
 
         const data = await res.json();
         const deals = data.deals || [];
-        allDeals.push(...deals);
+        const contacts = data.contacts || [];
+
+        // Merge contact data into deals if side-loaded
+        const enrichedDeals = deals.map((deal: any) => {
+            if (deal.contact) {
+                const contactId = deal.contact; // often just an ID string
+                const contactObj = contacts.find((c: any) => c.id === contactId);
+                if (contactObj) {
+                    deal.contact = contactObj; // Replace ID with full object
+                }
+            }
+            return deal;
+        });
+
+        allDeals.push(...enrichedDeals);
 
         console.log(`Fetched ${deals.length} deals from pipeline ${pipelineId}, offset ${offset}`);
+
+        // If specific deal, we are done
+        if (dealId) break;
 
         if (deals.length < limit) break;
         offset += limit;
@@ -75,7 +120,7 @@ Deno.serve(async (req) => {
         )
 
         // Parse body for options
-        let body: { pipeline_id?: string; limit?: number } = {};
+        let body: { pipeline_id?: string; limit?: number; force_update?: boolean; deal_id?: string } = {};
         try {
             body = await req.json();
         } catch (_e) {
@@ -85,6 +130,8 @@ Deno.serve(async (req) => {
         // Default to pipeline 8 (Trips) if not specified
         const pipelineId = body.pipeline_id || '8';
         const fetchLimit = body.limit || 100;
+        const forceUpdate = body.force_update || false;
+        const specificDealId = body.deal_id;
 
         // Get AC credentials
         const { data: settings } = await supabase
@@ -116,7 +163,7 @@ Deno.serve(async (req) => {
         }
 
         // Fetch deals from AC (limited for performance)
-        const deals = await fetchDeals(AC_API_URL, AC_API_KEY, pipelineId, fetchLimit);
+        const deals = await fetchDeals(AC_API_URL, AC_API_KEY, pipelineId, fetchLimit, specificDealId);
 
         if (deals.length === 0) {
             return new Response(JSON.stringify({
@@ -141,18 +188,24 @@ Deno.serve(async (req) => {
             const batchDeals = deals.slice(i, i + BATCH_SIZE);
 
             // Build idempotency keys for this batch
-            const batchKeys = batchDeals.map(d => `sync_${d.id}_${pipelineId}`);
+            // If force_update is true, append timestamp to make it unique
+            const timestamp = forceUpdate ? `_${Date.now()}` : '';
+            const batchKeys = batchDeals.map(d => `sync_${d.id}_${pipelineId}${timestamp}`);
 
-            // Check for existing events in this batch
-            const { data: existingEvents } = await supabase
-                .from('integration_events')
-                .select('idempotency_key')
-                .in('idempotency_key', batchKeys);
+            // Check for existing events in this batch ONLY if NOT forcing update
+            let existingKeySet = new Set<string>();
 
-            const existingKeySet = new Set(existingEvents?.map(e => e.idempotency_key) || []);
-            totalSkipped += existingKeySet.size;
+            if (!forceUpdate) {
+                const { data: existingEvents } = await supabase
+                    .from('integration_events')
+                    .select('idempotency_key')
+                    .in('idempotency_key', batchKeys);
 
-            // Filter out already synced deals
+                existingKeySet = new Set(existingEvents?.map(e => e.idempotency_key) || []);
+                totalSkipped += existingKeySet.size;
+            }
+
+            // Filter out already synced deals (if not forced)
             const newDeals = batchDeals.filter(d => !existingKeySet.has(`sync_${d.id}_${pipelineId}`));
 
             if (newDeals.length === 0) continue;
@@ -162,7 +215,7 @@ Deno.serve(async (req) => {
                 integration_id: integration.id,
                 status: 'pending',
                 entity_type: 'deal',
-                event_type: 'deal_add',
+                event_type: forceUpdate ? 'deal_update' : 'deal_add', // Use deal_update for forced syncs
                 external_id: String(deal.id),
                 payload: {
                     id: deal.id,
@@ -185,11 +238,17 @@ Deno.serve(async (req) => {
                     contact_email: deal.contact?.email,
                     contact_name: deal.contact?.firstName ? `${deal.contact.firstName} ${deal.contact.lastName || ''}`.trim() : undefined,
                     contact_phone: deal.contact?.phone,
+                    // Pass contact fields explicitly for mapping
+                    'contact[email]': deal.contact?.email,
+                    'contact[first_name]': deal.contact?.firstName,
+                    'contact[last_name]': deal.contact?.lastName,
+                    'contact[phone]': deal.contact?.phone,
                     import_mode: 'sync',
+                    force_update: forceUpdate,
                     synced_at: new Date().toISOString()
                 },
-                processing_log: `Synced from AC API (Pipeline ${pipelineId})`,
-                idempotency_key: `sync_${deal.id}_${pipelineId}`
+                processing_log: `Synced from AC API (Pipeline ${pipelineId}) - Force: ${forceUpdate}`,
+                idempotency_key: `sync_${deal.id}_${pipelineId}${timestamp}`
             }));
 
             // Insert batch

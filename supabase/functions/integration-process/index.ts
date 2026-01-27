@@ -494,16 +494,42 @@ Deno.serve(async (req) => {
                     unmapped_fields: {}
                 };
 
-                // Dynamic Field Mapping
+                // Dynamic Field Mapping with sync_always check
+                // We need to check if we should overwrite existing values
+                // For this, we need the existing card data, which we fetch later.
+                // So we will prepare the "potential" updates here, and filter them when we have the existing card.
+
+                const potentialUpdates: Record<string, any> = {};
+                const protectedFields: string[] = []; // List of local keys that should NOT be updated if they exist
+
                 Object.entries(acFields).forEach(([fieldId, value]) => {
                     const fieldMap = fieldMappings?.find(m => m.external_field_id === fieldId && m.integration_id === event.integration_id);
 
                     if (fieldMap) {
-                        marketingData[fieldMap.local_field_key] = value;
+                        // Store in potential updates
+                        potentialUpdates[fieldMap.local_field_key] = value;
+
+                        // If sync_always is false, mark as protected
+                        if (fieldMap.sync_always === false) {
+                            protectedFields.push(fieldMap.local_field_key);
+                        }
                     } else {
                         marketingData.unmapped_fields[fieldId] = value;
                     }
                 });
+
+                // Apply potential updates to marketingData (we will filter later or apply logic now if possible)
+                // Actually, for marketing_data fields, we can just put them in.
+                // The protection logic needs to happen when we merge with existing data.
+                // But wait, marketing_data is a JSONB column.
+                // If we want to protect "marketing_data.some_field", we need to know the existing value.
+
+                // Let's store the mapping instructions to apply during the Card Update phase
+                const fieldUpdateInstructions = Object.entries(potentialUpdates).map(([key, value]) => ({
+                    key,
+                    value,
+                    protected: protectedFields.includes(key)
+                }));
 
                 // Special Case: Epoca Viagem (109 = Start, 101 = End)
                 const dateStart = acFields['109'];
@@ -590,18 +616,82 @@ Deno.serve(async (req) => {
                     // UPSERT CARD
                     const { data: existingCard } = await supabase
                         .from('cards')
-                        .select('id')
+                        .select('*') // Fetch all fields to check for existing values
                         .eq('external_id', dealId)
                         .eq('external_source', 'active_campaign')
                         .single();
+
+                    // Apply Field Updates with Protection Logic
+                    const finalMarketingData = { ...marketingData };
+                    const topLevelUpdates: Record<string, any> = {};
+
+                    fieldUpdateInstructions.forEach(instruction => {
+                        const { key, value, protected: isProtected } = instruction;
+
+                        // Check if we should skip this update
+                        let shouldSkip = false;
+                        if (isProtected && existingCard) {
+                            // Check if existing card has a value for this key
+                            // The key could be a top-level column OR inside marketing_data
+                            let existingValue = existingCard[key];
+
+                            // If not found at top level, check marketing_data
+                            if (existingValue === undefined && existingCard.marketing_data) {
+                                existingValue = existingCard.marketing_data[key];
+                            }
+
+                            // If existing value is not null/undefined/empty, protect it
+                            if (existingValue !== null && existingValue !== undefined && existingValue !== '') {
+                                shouldSkip = true;
+                            }
+                        }
+
+                        if (!shouldSkip) {
+                            // Apply update
+                            // Check if it's a known top-level column (simple heuristic or explicit list would be better)
+                            // For now, if it's 'valor_estimado', 'titulo', 'status_comercial', it's top level.
+                            // Otherwise, it goes to marketing_data.
+                            if (['valor_estimado', 'titulo', 'status_comercial', 'data_fechamento'].includes(key)) {
+                                topLevelUpdates[key] = value;
+                            } else {
+                                finalMarketingData[key] = value;
+                            }
+                        }
+                    });
 
                     const cardPayload: Record<string, any> = {
                         titulo: title,
                         valor_estimado: value,
                         status_comercial: status,
-                        marketing_data: marketingData,
+                        ...topLevelUpdates, // Override with mapped values if they exist and are not protected
+                        marketing_data: finalMarketingData,
                         updated_at: new Date().toISOString()
                     };
+
+                    // Ensure title/value/status are not overwritten by default if they are protected via mapping
+                    // The ...topLevelUpdates above handles the "mapped" values.
+                    // But what if they are NOT mapped? Then 'title', 'value', 'status' variables are used.
+                    // We should probably respect protection for these standard fields too if they are mapped.
+                    // If they are NOT mapped, we use the standard AC values (title, value, status).
+                    // If they ARE mapped, 'topLevelUpdates' has the value (or not, if skipped).
+
+                    // Refinement:
+                    // If 'valor_estimado' is NOT in topLevelUpdates (because it was protected), 
+                    // we should NOT use the 'value' variable from AC payload either!
+                    // We need to check if these standard fields were "attempted" to be updated via mapping.
+
+                    // Actually, 'value', 'title', 'status' are extracted from payload directly.
+                    // If there is a mapping for them, it would be in 'fieldUpdateInstructions'.
+                    // If there is NO mapping, we default to using them.
+                    // If there IS a mapping and it was protected, we should use the EXISTING value (or just not include it in update).
+
+                    // Let's check if standard fields are being protected
+                    const isTitleProtected = fieldUpdateInstructions.some(i => i.key === 'titulo' && i.protected && existingCard?.titulo);
+                    const isValueProtected = fieldUpdateInstructions.some(i => i.key === 'valor_estimado' && i.protected && existingCard?.valor_estimado);
+
+                    if (isTitleProtected) delete cardPayload.titulo;
+                    if (isValueProtected) delete cardPayload.valor_estimado;
+
 
                     if (targetStageId && topology) {
                         cardPayload.pipeline_stage_id = targetStageId;

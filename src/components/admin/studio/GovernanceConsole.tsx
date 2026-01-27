@@ -6,7 +6,6 @@ import {
     FileText,
     CheckCircle2,
     AlertCircle,
-    Plus,
     Trash2,
     ArrowRight,
     LayoutList,
@@ -18,14 +17,6 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases'
 import { Button } from '../../ui/Button'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Checkbox } from '@/components/ui/checkbox'
 import {
     Dialog,
@@ -35,6 +26,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { RuleSelector } from './RuleSelector'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -133,6 +125,18 @@ export default function GovernanceConsole() {
         }
     })
 
+    // 3.5 Fetch Sections for Grouping
+    const { data: sections } = useQuery({
+        queryKey: ['sections-governance'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('sections')
+                .select('key, label, order_index')
+                .order('order_index')
+            return data || []
+        }
+    })
+
     // 4. Fetch Active Workflows
     const { data: activeWorkflows } = useQuery({
         queryKey: ['active-workflows-context'],
@@ -221,9 +225,17 @@ export default function GovernanceConsole() {
         })
     }, [stages, phases])
 
-    const selectedStage = stages?.find(s => s.id === selectedStageId)
-    const stageRules = requirements?.filter(r => r.stage_id === selectedStageId) || []
-    const stageWorkflows = activeWorkflows?.filter(w => (w.trigger_config as any)?.stage_id === selectedStageId) || []
+    const selectedStage = selectedStageId === 'all'
+        ? { id: 'all', nome: 'Todas as Etapas', fase: 'Visão Global' }
+        : stages?.find(s => s.id === selectedStageId)
+
+    const stageRules = selectedStageId === 'all'
+        ? requirements || []
+        : requirements?.filter(r => r.stage_id === selectedStageId) || []
+
+    const stageWorkflows = selectedStageId === 'all'
+        ? []
+        : activeWorkflows?.filter(w => (w.trigger_config as any)?.stage_id === selectedStageId) || []
 
     // Hydrate Rules (Self-Healing)
     const hydratedRules = useMemo(() => {
@@ -306,7 +318,7 @@ export default function GovernanceConsole() {
     }
 
     return (
-        <div className="flex h-[calc(100vh-12rem)] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex h-[calc(100vh-12rem)] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden relative">
             {/* LEFT: Stage Navigation */}
             <div className="w-1/3 min-w-[300px] border-r border-gray-200 overflow-y-auto bg-gray-50/50">
                 <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
@@ -317,6 +329,31 @@ export default function GovernanceConsole() {
                     <p className="text-xs text-gray-500 mt-1">Selecione uma etapa para gerenciar regras.</p>
                 </div>
                 <div className="p-2 space-y-1">
+                    {/* Global View Button */}
+                    <button
+                        onClick={() => {
+                            setSelectedStageId('all')
+                            setSelectedRuleIds(new Set())
+                        }}
+                        className={cn(
+                            "w-full text-left px-4 py-3 rounded-lg text-sm transition-all flex items-center justify-between group mb-2",
+                            selectedStageId === 'all'
+                                ? "bg-gray-900 text-white shadow-md ring-1 ring-gray-900"
+                                : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={cn("w-2 h-2 rounded-full", selectedStageId === 'all' ? "bg-white animate-pulse" : "bg-gray-400")} />
+                            <span className="font-medium">Todas as Etapas</span>
+                        </div>
+                        {requirements && requirements.length > 0 && (
+                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", selectedStageId === 'all' ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600")}>
+                                {requirements.length}
+                            </span>
+                        )}
+                    </button>
+                    <div className="h-px bg-gray-200 my-2 mx-2" />
+
                     {sortedStages.map(stage => {
                         const ruleCount = requirements?.filter(r => r.stage_id === stage.id).length || 0
                         const isActive = selectedStageId === stage.id
@@ -364,92 +401,80 @@ export default function GovernanceConsole() {
                         <div className="mb-8 flex justify-between items-start">
                             <div>
                                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                                    <span className="uppercase tracking-wider font-semibold text-[10px]">Governança da Etapa</span>
+                                    <span className="uppercase tracking-wider font-semibold text-[10px]">
+                                        {selectedStageId === 'all' ? 'Visão Global' : 'Governança da Etapa'}
+                                    </span>
                                 </div>
                                 <h2 className="text-3xl font-bold text-gray-900 mb-2">{selectedStage.nome}</h2>
                                 <p className="text-gray-500">
-                                    Defina o que é obrigatório para um card sair desta etapa.
+                                    {selectedStageId === 'all'
+                                        ? "Gerencie regras de todas as etapas em um único lugar."
+                                        : "Defina o que é obrigatório para um card sair desta etapa."}
                                 </p>
                             </div>
 
-                            {/* Add Rule Dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="default"
-                                        size="sm"
-                                        className="h-9 text-xs font-medium bg-gray-900 text-white border-0 hover:bg-gray-800 transition-colors"
-                                    >
-                                        <Plus className="w-3 h-3 mr-2" />
-                                        Adicionar Regra
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-[240px]">
-                                    <DropdownMenuLabel className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Campos Obrigatórios</DropdownMenuLabel>
-                                    <div className="max-h-[200px] overflow-y-auto">
-                                        {systemFields?.map(field => (
-                                            <DropdownMenuItem
-                                                key={field.key}
-                                                onSelect={() => handleAddRule('field', field.key)}
-                                                className="cursor-pointer"
-                                            >
-                                                {field.label}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </div>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuLabel className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tarefas</DropdownMenuLabel>
-                                    {taskTypes?.map(t => (
-                                        <DropdownMenuItem
-                                            key={t.tipo}
-                                            onSelect={() => handleAddRule('task', t.tipo)}
-                                            className="cursor-pointer"
-                                        >
-                                            Exigir {t.label}
-                                        </DropdownMenuItem>
-                                    ))}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuLabel className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Propostas</DropdownMenuLabel>
-                                    <DropdownMenuItem onSelect={() => handleAddRule('proposal', 'sent')} className="cursor-pointer">Exigir Proposta Enviada</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => handleAddRule('proposal', 'viewed')} className="cursor-pointer">Exigir Proposta Visualizada</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => handleAddRule('proposal', 'accepted')} className="cursor-pointer">Exigir Proposta Aceita</DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        {/* Context: Active Workflows */}
-                        <div className="mb-8 bg-blue-50/50 border border-blue-100 rounded-xl p-5">
-                            <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                                <ActivityIcon className="w-4 h-4" />
-                                Automações Ativas (Contexto)
-                            </h4>
-                            {stageWorkflows.length > 0 ? (
-                                <div className="space-y-2">
-                                    {stageWorkflows.map(w => (
-                                        <div key={w.id} className="flex items-center gap-2 text-sm text-blue-700 bg-white/60 px-3 py-2 rounded-lg border border-blue-100/50">
-                                            <ArrowRight className="w-3 h-3" />
-                                            {w.name}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-blue-400 italic">Nenhum workflow automático configurado para iniciar nesta etapa.</p>
+                            {/* Add Rule Dropdown - Hide in All mode */}
+                            {selectedStageId !== 'all' && (
+                                <RuleSelector
+                                    onSelect={handleAddRule}
+                                    systemFields={systemFields || []}
+                                    taskTypes={taskTypes || []}
+                                    sections={sections || []}
+                                />
                             )}
                         </div>
+
+                        {/* Context: Active Workflows - Hide in All mode */}
+                        {selectedStageId !== 'all' && (
+                            <div className="mb-8 bg-blue-50/50 border border-blue-100 rounded-xl p-5">
+                                <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                    <ActivityIcon className="w-4 h-4" />
+                                    Automações Ativas (Contexto)
+                                </h4>
+                                {stageWorkflows.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {stageWorkflows.map(w => (
+                                            <div key={w.id} className="flex items-center gap-2 text-sm text-blue-700 bg-white/60 px-3 py-2 rounded-lg border border-blue-100/50">
+                                                <ArrowRight className="w-3 h-3" />
+                                                {w.name}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-blue-400 italic">Nenhum workflow automático configurado para iniciar nesta etapa.</p>
+                                )}
+                            </div>
+                        )}
 
                         {/* Rules List - Grouped */}
                         <div className="space-y-8">
                             {/* Fields Group */}
                             {groupedRules.fields.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <FileText className="w-4 h-4" /> Campos Obrigatórios
-                                    </h3>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Checkbox
+                                            checked={groupedRules.fields.every(r => r.id && selectedRuleIds.has(r.id))}
+                                            onCheckedChange={(checked) => {
+                                                const newSet = new Set(selectedRuleIds)
+                                                groupedRules.fields.forEach(r => {
+                                                    if (r.id) {
+                                                        if (checked) newSet.add(r.id)
+                                                        else newSet.delete(r.id)
+                                                    }
+                                                })
+                                                setSelectedRuleIds(newSet)
+                                            }}
+                                        />
+                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                            <FileText className="w-4 h-4" /> Campos Obrigatórios
+                                        </h3>
+                                    </div>
                                     <div className="space-y-2">
                                         {groupedRules.fields.map(rule => (
                                             <RuleItem
                                                 key={rule.id}
                                                 rule={rule}
+                                                stageName={stages?.find(s => s.id === rule.stage_id)?.nome}
                                                 selected={rule.id ? selectedRuleIds.has(rule.id) : false}
                                                 onToggle={() => rule.id && toggleRuleSelection(rule.id)}
                                                 onDelete={() => rule.id && deleteMutation.mutate([rule.id])}
@@ -462,14 +487,30 @@ export default function GovernanceConsole() {
                             {/* Tasks Group */}
                             {groupedRules.tasks.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <CheckCircle2 className="w-4 h-4" /> Tarefas Obrigatórias
-                                    </h3>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Checkbox
+                                            checked={groupedRules.tasks.every(r => r.id && selectedRuleIds.has(r.id))}
+                                            onCheckedChange={(checked) => {
+                                                const newSet = new Set(selectedRuleIds)
+                                                groupedRules.tasks.forEach(r => {
+                                                    if (r.id) {
+                                                        if (checked) newSet.add(r.id)
+                                                        else newSet.delete(r.id)
+                                                    }
+                                                })
+                                                setSelectedRuleIds(newSet)
+                                            }}
+                                        />
+                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                            <CheckCircle2 className="w-4 h-4" /> Tarefas Obrigatórias
+                                        </h3>
+                                    </div>
                                     <div className="space-y-2">
                                         {groupedRules.tasks.map(rule => (
                                             <RuleItem
                                                 key={rule.id}
                                                 rule={rule}
+                                                stageName={stages?.find(s => s.id === rule.stage_id)?.nome}
                                                 selected={rule.id ? selectedRuleIds.has(rule.id) : false}
                                                 onToggle={() => rule.id && toggleRuleSelection(rule.id)}
                                                 onDelete={() => rule.id && deleteMutation.mutate([rule.id])}
@@ -482,14 +523,30 @@ export default function GovernanceConsole() {
                             {/* Proposals Group */}
                             {groupedRules.proposals.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <FileText className="w-4 h-4" /> Propostas
-                                    </h3>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Checkbox
+                                            checked={groupedRules.proposals.every(r => r.id && selectedRuleIds.has(r.id))}
+                                            onCheckedChange={(checked) => {
+                                                const newSet = new Set(selectedRuleIds)
+                                                groupedRules.proposals.forEach(r => {
+                                                    if (r.id) {
+                                                        if (checked) newSet.add(r.id)
+                                                        else newSet.delete(r.id)
+                                                    }
+                                                })
+                                                setSelectedRuleIds(newSet)
+                                            }}
+                                        />
+                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                            <FileText className="w-4 h-4" /> Propostas
+                                        </h3>
+                                    </div>
                                     <div className="space-y-2">
                                         {groupedRules.proposals.map(rule => (
                                             <RuleItem
                                                 key={rule.id}
                                                 rule={rule}
+                                                stageName={stages?.find(s => s.id === rule.stage_id)?.nome}
                                                 selected={rule.id ? selectedRuleIds.has(rule.id) : false}
                                                 onToggle={() => rule.id && toggleRuleSelection(rule.id)}
                                                 onDelete={() => rule.id && deleteMutation.mutate([rule.id])}
@@ -515,34 +572,35 @@ export default function GovernanceConsole() {
                     </div>
                 )}
 
-                {/* Bulk Actions Floating Bar */}
-                {selectedRuleIds.size > 0 && (
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-6 animate-in slide-in-from-bottom-4">
-                        <span className="font-medium text-sm">{selectedRuleIds.size} regras selecionadas</span>
-                        <div className="h-4 w-px bg-gray-700" />
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setIsReplicating(true)}
-                                className="text-sm font-medium hover:text-blue-300 transition-colors flex items-center gap-2"
-                            >
-                                <Copy className="w-4 h-4" /> Replicar
-                            </button>
-                            <button
-                                onClick={handleBulkDelete}
-                                className="text-sm font-medium hover:text-red-300 transition-colors flex items-center gap-2"
-                            >
-                                <Trash2 className="w-4 h-4" /> Excluir
-                            </button>
-                        </div>
+            </div>
+
+            {/* Bulk Actions Floating Bar - Fixed relative to the main container */}
+            {selectedRuleIds.size > 0 && (
+                <div className="absolute bottom-8 left-[60%] -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-6 animate-in slide-in-from-bottom-4 z-50">
+                    <span className="font-medium text-sm">{selectedRuleIds.size} regras selecionadas</span>
+                    <div className="h-4 w-px bg-gray-700" />
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setSelectedRuleIds(new Set())}
-                            className="ml-2 hover:bg-gray-800 rounded-full p-1"
+                            onClick={() => setIsReplicating(true)}
+                            className="text-sm font-medium hover:text-blue-300 transition-colors flex items-center gap-2"
                         >
-                            <X className="w-4 h-4" />
+                            <Copy className="w-4 h-4" /> Replicar
+                        </button>
+                        <button
+                            onClick={handleBulkDelete}
+                            className="text-sm font-medium hover:text-red-300 transition-colors flex items-center gap-2"
+                        >
+                            <Trash2 className="w-4 h-4" /> Excluir
                         </button>
                     </div>
-                )}
-            </div>
+                    <button
+                        onClick={() => setSelectedRuleIds(new Set())}
+                        className="ml-2 hover:bg-gray-800 rounded-full p-1"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
 
             {/* Replication Modal */}
             <Dialog open={isReplicating} onOpenChange={setIsReplicating}>
@@ -591,7 +649,7 @@ export default function GovernanceConsole() {
     )
 }
 
-function RuleItem({ rule, selected, onToggle, onDelete }: { rule: any, selected: boolean, onToggle: () => void, onDelete: () => void }) {
+function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any, stageName?: string, selected: boolean, onToggle: () => void, onDelete: () => void }) {
     return (
         <div className={cn(
             "group flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm transition-all cursor-pointer",
@@ -622,6 +680,11 @@ function RuleItem({ rule, selected, onToggle, onDelete }: { rule: any, selected:
                         {rule._isInvalid && <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full no-underline">Inválido</span>}
                     </h4>
                     <p className="text-xs text-gray-500 flex items-center gap-1">
+                        {stageName && (
+                            <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">
+                                {stageName}
+                            </span>
+                        )}
                         {rule.is_blocking ? (
                             <span className="text-red-600 font-medium flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" />
