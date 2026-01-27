@@ -85,8 +85,6 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
     const rescheduleDateInputRef = useRef<HTMLInputElement>(null);
 
     // Time Combobox State
-    const [showTimeList, setShowTimeList] = useState(false);
-    const timeListRef = useRef<HTMLDivElement>(null);
     const [showRescheduleTimeList, setShowRescheduleTimeList] = useState(false);
     const rescheduleTimeListRef = useRef<HTMLDivElement>(null);
 
@@ -239,19 +237,16 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
     // Close time list when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (timeListRef.current && !timeListRef.current.contains(event.target as Node)) {
-                setShowTimeList(false);
-            }
             if (rescheduleTimeListRef.current && !rescheduleTimeListRef.current.contains(event.target as Node)) {
                 setShowRescheduleTimeList(false);
             }
         };
 
-        if (showTimeList || showRescheduleTimeList) {
+        if (showRescheduleTimeList) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showTimeList, showRescheduleTimeList]);
+    }, [showRescheduleTimeList]);
 
     const handleTypeSelect = (selectedType: TaskType) => {
         // Reset metadata when switching types to avoid stale state
@@ -284,10 +279,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
         }
     };
 
-    const handleTimeSelect = (timeValue: string) => {
-        setTime(timeValue);
-        setShowTimeList(false);
-    };
+
 
     const handleRescheduleTimeSelect = (timeValue: string) => {
         setRescheduleTime(timeValue);

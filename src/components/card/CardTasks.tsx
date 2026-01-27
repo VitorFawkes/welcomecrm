@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle } from 'lucide-react'
+import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle, MessageSquare } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { SmartTaskModal } from './SmartTaskModal'
@@ -212,6 +212,31 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         return format(date, "dd/MM", { locale: ptBR })
     }
 
+    const renderOutcomeButtons = (filteredOutcomes: any[]) => {
+        return filteredOutcomes.map((outcome: any) => (
+            <button
+                key={outcome.outcome_key}
+                onClick={() => setOutcomeResult(outcome.outcome_key)}
+                className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === outcome.outcome_key
+                    ? 'border-indigo-500 bg-indigo-50/50 text-indigo-700 shadow-sm'
+                    : 'border-gray-100 bg-white text-gray-600 hover:border-indigo-200 hover:bg-indigo-50/30'
+                    }`}
+            >
+                <div className={`p-2 rounded-full ${outcomeResult === outcome.outcome_key ? 'bg-indigo-100' : 'bg-gray-100'}`}>
+                    {outcome.is_success ? (
+                        <CheckCircle2 className={`w-5 h-5 ${outcomeResult === outcome.outcome_key ? 'text-indigo-600' : 'text-gray-500'}`} />
+                    ) : (
+                        <XCircle className={`w-5 h-5 ${outcomeResult === outcome.outcome_key ? 'text-indigo-600' : 'text-gray-500'}`} />
+                    )}
+                </div>
+                <span className="font-medium text-sm">{outcome.outcome_label}</span>
+                {outcomeResult === outcome.outcome_key && (
+                    <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                )}
+            </button>
+        ))
+    }
+
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
             <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -401,29 +426,33 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     <div className="p-6 space-y-6">
                         <div className="space-y-3">
                             <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Resultado</Label>
-                            <div className="grid grid-cols-2 gap-3">
-                                {taskToComplete && outcomes?.filter((o: any) => o.tipo === taskToComplete.tipo).map((outcome: any) => (
-                                    <button
-                                        key={outcome.outcome_key}
-                                        onClick={() => setOutcomeResult(outcome.outcome_key)}
-                                        className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:scale-[1.02] ${outcomeResult === outcome.outcome_key
-                                            ? 'border-indigo-500 bg-indigo-50/50 text-indigo-700 shadow-sm'
-                                            : 'border-gray-100 bg-white text-gray-600 hover:border-indigo-200 hover:bg-indigo-50/30'
-                                            }`}
-                                    >
-                                        <div className={`p-2 rounded-full ${outcomeResult === outcome.outcome_key ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                                            {outcome.is_success ? (
-                                                <CheckCircle2 className={`w-5 h-5 ${outcomeResult === outcome.outcome_key ? 'text-indigo-600' : 'text-gray-500'}`} />
-                                            ) : (
-                                                <XCircle className={`w-5 h-5 ${outcomeResult === outcome.outcome_key ? 'text-indigo-600' : 'text-gray-500'}`} />
-                                            )}
+                            <div className="w-full">
+                                {taskToComplete?.tipo === 'contato' ? (
+                                    <div className="space-y-5">
+                                        <div>
+                                            <div className="flex items-center gap-1.5 mb-3 text-xs font-bold text-green-700 bg-green-50 w-fit px-2 py-1 rounded border border-green-100">
+                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                <span>WHATSAPP</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {renderOutcomeButtons(outcomes?.filter((o: any) => ['respondido', 'visualizado', 'enviado'].includes(o.outcome_key)) || [])}
+                                            </div>
                                         </div>
-                                        <span className="font-medium text-sm">{outcome.outcome_label}</span>
-                                        {outcomeResult === outcome.outcome_key && (
-                                            <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                                        )}
-                                    </button>
-                                ))}
+                                        <div>
+                                            <div className="flex items-center gap-1.5 mb-3 text-xs font-bold text-cyan-700 bg-cyan-50 w-fit px-2 py-1 rounded border border-cyan-100">
+                                                <Phone className="w-3.5 h-3.5" />
+                                                <span>LIGAÇÃO</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {renderOutcomeButtons(outcomes?.filter((o: any) => ['atendeu', 'nao_atendeu', 'caixa_postal', 'numero_invalido'].includes(o.outcome_key)) || [])}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {taskToComplete && renderOutcomeButtons(outcomes?.filter((o: any) => o.tipo === taskToComplete.tipo) || [])}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

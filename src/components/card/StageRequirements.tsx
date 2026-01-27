@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, FileText, Phone, Users, Mail, ListTodo } from 'lucide-react'
+import { CheckCircle2, AlertCircle } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { useStageRequirements, type Requirement } from '../../hooks/useStageRequirements'
@@ -41,26 +41,7 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
             .join(' ')
     }
 
-    // Get icon for requirement
-    const getRequirementIcon = (req: Requirement) => {
-        if (req.requirement_type === 'field') return CheckCircle2
-        if (req.requirement_type === 'proposal') return FileText
 
-        // Dynamic Task Icons Mapping
-        if (req.requirement_type === 'task') {
-            const map: Record<string, any> = {
-                contato: Phone, // Or maybe a combined icon if available, but Phone is fine as primary contact
-                reuniao: Users,
-                email: Mail,
-                enviar_proposta: FileText,
-                cobranca: AlertCircle,
-                handover: CheckCircle2
-            }
-            return map[req.task_tipo] || ListTodo // Fallback icon
-        }
-
-        return CheckCircle2
-    }
 
     // Get label for requirement
     const getRequirementLabel = (req: Requirement): string => {
