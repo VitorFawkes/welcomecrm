@@ -30,7 +30,7 @@ interface PipelineListViewProps {
     onCardClick?: (cardId: string) => void
 }
 
-export default function PipelineListView({ productFilter, viewMode, subView, filters, onCardClick }: PipelineListViewProps) {
+export default function PipelineListView({ productFilter, viewMode, subView, filters }: PipelineListViewProps) {
     const queryClient = useQueryClient()
     const { groupFilters } = usePipelineFilters()
 

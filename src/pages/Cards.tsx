@@ -4,7 +4,7 @@ import { useTripsFilters } from '../hooks/useTripsFilters'
 import TripsGrid from '../components/trips/TripsGrid'
 import TripsFilterDrawer from '../components/trips/TripsFilterDrawer'
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
-import { cn } from '../lib/utils'
+
 
 export default function Cards() {
     const { filters, setFilters } = useTripsFilters()

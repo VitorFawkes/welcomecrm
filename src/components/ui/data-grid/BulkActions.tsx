@@ -1,11 +1,5 @@
-import { Trash2, Download, Edit, MoreHorizontal } from 'lucide-react'
 import { Button } from '../Button'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '../dropdown-menu'
+
 
 interface Action {
     label: string

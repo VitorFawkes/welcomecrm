@@ -34,7 +34,7 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
         }
     })
 
-    return useQuery({
+    const query = useQuery({
         queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers],
         placeholderData: keepPreviousData,
         queryFn: async () => {
@@ -134,4 +134,9 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
             return filteredData
         }
     })
+
+    return {
+        ...query,
+        myTeamMembers
+    }
 }

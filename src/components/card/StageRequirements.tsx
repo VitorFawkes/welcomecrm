@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, AlertCircle, FileText, Phone, Users, Mail, MessageSquare, ListTodo } from 'lucide-react'
+import { CheckCircle2, Circle, AlertCircle, FileText, Phone, Users, Mail, ListTodo } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { useStageRequirements, type Requirement } from '../../hooks/useStageRequirements'

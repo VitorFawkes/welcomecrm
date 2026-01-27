@@ -12,7 +12,7 @@ import {
     type DragEndEvent,
     type DragStartEvent
 } from '@dnd-kit/core'
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
@@ -22,7 +22,6 @@ import StageChangeModal from '../card/StageChangeModal'
 import QualityGateModal from '../card/QualityGateModal'
 import LossReasonModal from '../card/LossReasonModal'
 import { useQualityGate } from '../../hooks/useQualityGate'
-import { useAuth } from '../../contexts/AuthContext'
 import type { Database } from '../../database.types'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { AlertTriangle } from 'lucide-react'
@@ -49,7 +48,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
     const { validateMoveSync } = useQualityGate()
-    const { session, profile } = useAuth() // Need auth to know who "ME" is
+
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
 
@@ -125,7 +124,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     })
 
     // Fetch Cards using the new shared hook
-    const { data: cards, isError, refetch } = usePipelineCards({
+    const { data: cards, isError, refetch, myTeamMembers } = usePipelineCards({
         productFilter,
         viewMode,
         subView,
@@ -151,7 +150,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers])
 
             // Find new stage info for complete update
-            const newStage = stages?.find(s => s.id === stageId)
+            const newStage = stages?.find((s: any) => s.id === stageId)
 
             // Optimistically update to the new value
             if (previousCards) {
@@ -264,7 +263,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             const cardId = active.id as string
             const stageId = over.id as string
             const currentStageId = active.data.current?.pipeline_stage_id
-            const targetStage = stages?.find(s => s.id === stageId)
+            const targetStage = stages?.find((s: any) => s.id === stageId)
             const card = active.data.current as Card
 
             if (stageId !== currentStageId) {
@@ -349,7 +348,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const handleConfirmQualityGate = () => {
         if (pendingMove) {
             // After filling fields, we still need to check if we need to change owner
-            const targetStage = stages?.find(s => s.id === pendingMove.stageId)
+            const targetStage = stages?.find((s: any) => s.id === pendingMove.stageId)
 
             setQualityGateModalOpen(false)
 
@@ -464,7 +463,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                 ) : displayPhases.map((phase) => {
                                     // Filter stages that belong to this phase
                                     // We support both phase_id (new) and fase name match (legacy migration)
-                                    const phaseStages = stages.filter(s =>
+                                    const phaseStages = stages.filter((s: any) =>
                                         s.phase_id === phase.id ||
                                         (!s.phase_id && s.fase === phase.name)
                                     )
@@ -472,7 +471,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                     // If no stages for this phase, skip rendering it (optional, but cleaner)
                                     if (phaseStages.length === 0) return null
 
-                                    const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
+                                    const phaseCards = cards.filter(c => phaseStages.some((s: any) => s.id === c.pipeline_stage_id))
                                     const totalCount = phaseCards.length
                                     const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
 
@@ -488,7 +487,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                             stages={phaseStages}
                                             cards={phaseCards}
                                         >
-                                            {phaseStages.map((stage) => (
+                                            {phaseStages.map((stage: any) => (
                                                 <KanbanColumn
                                                     key={stage.id}
                                                     stage={stage}
@@ -591,13 +590,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 <div className="flex items-center gap-6">
                     {/* Phase Summaries (Mini) */}
                     {displayPhases.map(phase => {
-                        const phaseStages = stages.filter(s =>
+                        const phaseStages = stages.filter((s: any) =>
                             s.phase_id === phase.id ||
                             (!s.phase_id && s.fase === phase.name)
                         )
                         if (phaseStages.length === 0) return null
 
-                        const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
+                        const phaseCards = cards.filter(c => phaseStages.some((s: any) => s.id === c.pipeline_stage_id))
                         const val = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
                         const count = phaseCards.length
 
