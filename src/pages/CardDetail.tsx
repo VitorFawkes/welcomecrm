@@ -14,9 +14,7 @@ import PessoasWidget from '../components/card/PessoasWidget'
 import ActivityFeed from '../components/card/ActivityFeed'
 import { ParentLinkBanner } from '../components/cards/group/ParentLinkBanner'
 import GroupDetailLayout from '../components/cards/group/GroupDetailLayout'
-import { ArrowLeft, Zap } from 'lucide-react'
-import { Button } from '../components/ui/Button'
-import { toast } from 'sonner'
+import { ArrowLeft } from 'lucide-react'
 
 import type { Database } from '../database.types'
 
@@ -91,36 +89,7 @@ export default function CardDetail() {
 
             {/* Sticky Header */}
             <div className="sticky top-0 z-10 bg-white shadow-md">
-                <div className="flex justify-between items-center pr-6">
-                    <CardHeader card={card} />
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 text-slate-600"
-                        disabled={!card.external_id}
-                        title={!card.external_id ? "Este card não possui vínculo com o ActiveCampaign" : "Sincronizar dados com ActiveCampaign"}
-                        onClick={async () => {
-                            if (!card.external_id) return;
-                            const toastId = toast.loading('Sincronizando com ActiveCampaign...');
-                            try {
-                                const { error } = await supabase.functions.invoke('integration-sync-deals', {
-                                    body: {
-                                        deal_id: card.external_id,
-                                        force_update: true
-                                    }
-                                });
-                                if (error) throw error;
-                                toast.success('Sincronização solicitada! Os dados serão atualizados em instantes.', { id: toastId });
-                            } catch (err: any) {
-                                console.error('Erro detalhado sync:', err);
-                                toast.error('Erro ao sincronizar: ' + (err.message || 'Erro desconhecido'), { id: toastId });
-                            }
-                        }}
-                    >
-                        <Zap className="w-4 h-4" />
-                        {!card.external_id ? 'Não vinculado' : 'Sincronizar AC'}
-                    </Button>
-                </div>
+                <CardHeader card={card} />
             </div>
 
             {/* 2-Column Layout: Work Area + Context/Accountability */}
