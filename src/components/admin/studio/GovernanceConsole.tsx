@@ -9,9 +9,9 @@ import {
     Trash2,
     ArrowRight,
     LayoutList,
-    ShieldAlert,
     Copy,
-    X
+    X,
+    ShieldAlert
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -35,7 +35,7 @@ import { RuleSelector } from './RuleSelector'
 interface ActionRequirement {
     id?: string
     stage_id: string
-    requirement_type: 'proposal' | 'task' | 'field'
+    requirement_type: 'proposal' | 'task' | 'field' | 'rule'
     requirement_label: string
     is_required: boolean
     is_blocking: boolean
@@ -44,6 +44,10 @@ interface ActionRequirement {
     task_require_completed?: boolean
     field_key?: string
 }
+
+export const SPECIAL_RULES = [
+    { key: 'lost_reason_required', label: 'Motivo de Perda Obrigatório', icon: ShieldAlert }
+]
 
 
 
@@ -263,7 +267,8 @@ export default function GovernanceConsole() {
         return {
             fields: hydratedRules.filter(r => r.requirement_type === 'field'),
             tasks: hydratedRules.filter(r => r.requirement_type === 'task'),
-            proposals: hydratedRules.filter(r => r.requirement_type === 'proposal')
+            proposals: hydratedRules.filter(r => r.requirement_type === 'proposal'),
+            rules: hydratedRules.filter(r => r.requirement_type === 'rule')
         }
     }, [hydratedRules])
 
@@ -275,17 +280,20 @@ export default function GovernanceConsole() {
             ? `Proposta ${value}`
             : type === 'task'
                 ? taskTypes?.find(t => t.tipo === value)?.label || value
-                : systemFields?.find(f => f.key === value)?.label || value
+                : type === 'rule'
+                    ? SPECIAL_RULES.find(r => r.key === value)?.label || value
+                    : systemFields?.find(f => f.key === value)?.label || value
 
         const newReq: ActionRequirement = {
             stage_id: selectedStageId,
-            requirement_type: type as 'proposal' | 'task' | 'field',
+            requirement_type: type as 'proposal' | 'task' | 'field' | 'rule',
             requirement_label: label,
             is_required: true,
             is_blocking: true,
             ...(type === 'proposal' && { proposal_min_status: value }),
             ...(type === 'task' && { task_tipo: value, task_require_completed: true }),
-            ...(type === 'field' && { field_key: value })
+            ...(type === 'field' && { field_key: value }),
+            ...(type === 'rule' && { field_key: value }) // We store rule key in field_key for simplicity
         }
         insertMutation.mutate(newReq)
     }
@@ -420,6 +428,7 @@ export default function GovernanceConsole() {
                                     systemFields={systemFields || []}
                                     taskTypes={taskTypes || []}
                                     sections={sections || []}
+                                    specialRules={SPECIAL_RULES}
                                 />
                             )}
                         </div>
@@ -448,6 +457,42 @@ export default function GovernanceConsole() {
 
                         {/* Rules List - Grouped */}
                         <div className="space-y-8">
+                            {/* Special Rules Group */}
+                            {groupedRules.rules.length > 0 && (
+                                <div>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Checkbox
+                                            checked={groupedRules.rules.every(r => r.id && selectedRuleIds.has(r.id))}
+                                            onCheckedChange={(checked) => {
+                                                const newSet = new Set(selectedRuleIds)
+                                                groupedRules.rules.forEach(r => {
+                                                    if (r.id) {
+                                                        if (checked) newSet.add(r.id)
+                                                        else newSet.delete(r.id)
+                                                    }
+                                                })
+                                                setSelectedRuleIds(newSet)
+                                            }}
+                                        />
+                                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                            <ShieldAlert className="w-4 h-4" /> Regras Especiais
+                                        </h3>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {groupedRules.rules.map(rule => (
+                                            <RuleItem
+                                                key={rule.id}
+                                                rule={rule}
+                                                stageName={stages?.find(s => s.id === rule.stage_id)?.nome}
+                                                selected={rule.id ? selectedRuleIds.has(rule.id) : false}
+                                                onToggle={() => rule.id && toggleRuleSelection(rule.id)}
+                                                onDelete={() => rule.id && deleteMutation.mutate([rule.id])}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Fields Group */}
                             {groupedRules.fields.length > 0 && (
                                 <div>
@@ -668,11 +713,13 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any
                     "p-2 rounded-lg",
                     rule.requirement_type === 'task' ? "bg-purple-50 text-purple-600" :
                         rule.requirement_type === 'proposal' ? "bg-emerald-50 text-emerald-600" :
-                            "bg-blue-50 text-blue-600"
+                            rule.requirement_type === 'rule' ? "bg-amber-50 text-amber-600" :
+                                "bg-blue-50 text-blue-600"
                 )}>
                     {rule.requirement_type === 'task' ? <CheckCircle2 className="w-5 h-5" /> :
                         rule.requirement_type === 'proposal' ? <FileText className="w-5 h-5" /> :
-                            <FileText className="w-5 h-5" />}
+                            rule.requirement_type === 'rule' ? <ShieldAlert className="w-5 h-5" /> :
+                                <FileText className="w-5 h-5" />}
                 </div>
                 <div>
                     <h4 className={cn("font-medium", rule._isInvalid ? "text-red-500 line-through" : "text-gray-900")}>

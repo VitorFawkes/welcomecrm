@@ -126,29 +126,30 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                         const Icon = getRequirementIcon(req)
 
                         return (
-                            <div key={req.id} className={`p-3 flex items-start gap-3 hover:bg-gray-50 transition-colors ${isCompleted ? 'opacity-75' : ''}`}>
+                            <div key={req.id} className={`p-3 flex items-start gap-3 transition-colors ${isCompleted ? 'bg-gray-50/50' : 'bg-white'}`}>
                                 <div className={`mt-0.5 flex-shrink-0`}>
                                     {isCompleted ? (
                                         <CheckCircle2 className="w-5 h-5 text-green-500" />
                                     ) : (
-                                        <Circle className="w-5 h-5 text-red-300" />
+                                        <div className="w-5 h-5 rounded-full border-2 border-red-200 bg-red-50 flex items-center justify-center">
+                                            <div className="w-2 h-2 rounded-full bg-red-400" />
+                                        </div>
                                     )}
                                 </div>
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Icon className={cn(
-                                            "w-4 h-4",
-                                            isCompleted ? "text-gray-400" : "text-gray-600"
-                                        )} />
                                         <p className={`text-sm font-medium ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-700'}`}>
                                             {getRequirementLabel(req)}
                                         </p>
                                         {getTypeBadge(req)}
                                     </div>
                                     {!isCompleted && (
-                                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                                            <AlertCircle className="w-3 h-3" />
-                                            Bloqueia avanço de etapa
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {req.requirement_type === 'task'
+                                                ? 'Complete esta tarefa na agenda para avançar.'
+                                                : req.requirement_type === 'proposal'
+                                                    ? 'Mude o status da proposta para avançar.'
+                                                    : 'Preencha este campo para avançar.'}
                                         </p>
                                     )}
                                 </div>

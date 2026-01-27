@@ -104,9 +104,12 @@ Deno.serve(async (req) => {
     const providedSecret = cronSecretHeader || cronSecretQuery;
     const expectedSecret = Deno.env.get('CRON_SECRET');
 
-    // Allow if secret matches OR if running locally (optional, but good for dev)
-    // For strict production, only allow matching secret
-    if (expectedSecret && providedSecret !== expectedSecret) {
+    // Allow if secret matches OR if request is authenticated (User context)
+    // We trust the Authorization header because verify_jwt=true is enforced at deployment
+    const authHeader = req.headers.get('Authorization');
+    const isAuthorizedUser = !!authHeader;
+
+    if (expectedSecret && providedSecret !== expectedSecret && !isAuthorizedUser) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 401,

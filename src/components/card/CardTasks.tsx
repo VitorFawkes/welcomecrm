@@ -107,6 +107,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
             queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] }) // Update header counts
+            queryClient.invalidateQueries({ queryKey: ['card-tasks-completed', cardId] }) // Update requirements
         },
         onError: () => {
             toast.error('Erro ao atualizar tarefa')

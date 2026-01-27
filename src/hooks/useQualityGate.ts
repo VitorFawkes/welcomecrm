@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 
 // Requirement types for validation
-type RequirementType = 'field' | 'proposal' | 'task'
+type RequirementType = 'field' | 'proposal' | 'task' | 'rule'
 
 interface RequirementRule {
     stage_id: string
@@ -31,11 +31,17 @@ interface MissingTask {
     task_tipo: string
 }
 
+interface MissingRule {
+    key: string
+    label: string
+}
+
 interface ValidationResult {
     valid: boolean
     missingFields: MissingField[]
     missingProposals: MissingProposal[]
     missingTasks: MissingTask[]
+    missingRules: MissingRule[]
 }
 
 // Proposal status hierarchy
@@ -73,13 +79,14 @@ export function useQualityGate() {
     })
 
     const validateMove = async (card: any, targetStageId: string): Promise<ValidationResult> => {
-        if (!rules) return { valid: true, missingFields: [], missingProposals: [], missingTasks: [] }
+        if (!rules) return { valid: true, missingFields: [], missingProposals: [], missingTasks: [], missingRules: [] }
 
         const stageRules = rules.filter(r => r.stage_id === targetStageId && r.is_blocking)
 
         const missingFields: MissingField[] = []
         const missingProposals: MissingProposal[] = []
         const missingTasks: MissingTask[] = []
+        const missingRules: MissingRule[] = []
 
         // --- Validate Field Requirements ---
         const fieldRules = stageRules.filter(r => r.requirement_type === 'field')
@@ -186,77 +193,117 @@ export function useQualityGate() {
             }
         }
 
-        return {
-            valid: missingFields.length === 0 && missingProposals.length === 0 && missingTasks.length === 0,
-            missingFields,
-            missingProposals,
-            missingTasks
-        }
-    }
-
-    // Synchronous version for backward compatibility (fields only)
-    const validateMoveSync = (card: any, targetStageId: string): { valid: boolean, missingFields: { key: string, label: string }[] } => {
-        if (!rules) return { valid: true, missingFields: [] }
-
-        const stageRules = rules.filter(r =>
-            r.stage_id === targetStageId &&
-            r.is_blocking &&
-            r.requirement_type === 'field'
-        )
-        const missingFields: { key: string, label: string }[] = []
-
-        for (const rule of stageRules) {
-            if (!rule.field_key) continue
-
-            // Check multiple data sources (waterfall resolution)
-            // Priority: card column → produto_data → briefing_inicial → marketing_data
-            let value = card[rule.field_key]
-
-            if (value === undefined || value === null || value === '') {
-                // Check produto_data JSON
-                const produtoData = typeof card.produto_data === 'string'
-                    ? JSON.parse(card.produto_data || '{}')
-                    : (card.produto_data || {})
-                value = produtoData[rule.field_key]
-
-                // For nested objects like orcamento, check if it has content
-                if (typeof value === 'object' && value !== null) {
-                    if ('total' in value) value = value.total
-                    else if (Object.keys(value).length === 0) value = undefined
-                }
-            }
-
-            if (value === undefined || value === null || value === '') {
-                // Check briefing_inicial JSON
-                const briefingData = typeof card.briefing_inicial === 'string'
-                    ? JSON.parse(card.briefing_inicial || '{}')
-                    : (card.briefing_inicial || {})
-                value = briefingData[rule.field_key]
-
-                if (typeof value === 'object' && value !== null) {
-                    if ('total' in value) value = value.total
-                    else if (Object.keys(value).length === 0) value = undefined
-                }
-            }
+        // --- Validate Special Rules ---
+        const specialRules = stageRules.filter(r => r.requirement_type === 'rule')
+        for (const rule of specialRules) {
+            if (!rule.field_key) continue // We store rule key in field_key
 
             let isValid = true
 
-            if (value === null || value === undefined || value === '') {
-                isValid = false
-            } else if (Array.isArray(value) && value.length === 0) {
-                isValid = false
-            } else if (typeof value === 'object' && Object.keys(value).length === 0) {
-                isValid = false
+            if (rule.field_key === 'lost_reason_required') {
+                // Check if lost reason is present
+                const hasId = !!card.motivo_perda_id
+                const hasComment = !!card.motivo_perda_comentario && card.motivo_perda_comentario.trim().length > 0
+                isValid = hasId || hasComment
             }
 
             if (!isValid) {
-                missingFields.push({ key: rule.field_key, label: rule.label })
+                missingRules.push({
+                    key: rule.field_key,
+                    label: rule.label
+                })
             }
         }
 
         return {
-            valid: missingFields.length === 0,
-            missingFields
+            valid: missingFields.length === 0 && missingProposals.length === 0 && missingTasks.length === 0 && missingRules.length === 0,
+            missingFields,
+            missingProposals,
+            missingTasks,
+            missingRules
+        }
+    }
+
+    // Synchronous version for backward compatibility (fields only + rules sync check)
+    const validateMoveSync = (card: any, targetStageId: string): { valid: boolean, missingFields: { key: string, label: string }[], missingRules: { key: string, label: string }[] } => {
+        if (!rules) return { valid: true, missingFields: [], missingRules: [] }
+
+        const stageRules = rules.filter(r =>
+            r.stage_id === targetStageId &&
+            r.is_blocking
+        )
+        const missingFields: { key: string, label: string }[] = []
+        const missingRules: { key: string, label: string }[] = []
+
+        for (const rule of stageRules) {
+            if (rule.requirement_type === 'field') {
+                if (!rule.field_key) continue
+
+                // Check multiple data sources (waterfall resolution)
+                // Priority: card column → produto_data → briefing_inicial → marketing_data
+                let value = card[rule.field_key]
+
+                if (value === undefined || value === null || value === '') {
+                    // Check produto_data JSON
+                    const produtoData = typeof card.produto_data === 'string'
+                        ? JSON.parse(card.produto_data || '{}')
+                        : (card.produto_data || {})
+                    value = produtoData[rule.field_key]
+
+                    // For nested objects like orcamento, check if it has content
+                    if (typeof value === 'object' && value !== null) {
+                        if ('total' in value) value = value.total
+                        else if (Object.keys(value).length === 0) value = undefined
+                    }
+                }
+
+                if (value === undefined || value === null || value === '') {
+                    // Check briefing_inicial JSON
+                    const briefingData = typeof card.briefing_inicial === 'string'
+                        ? JSON.parse(card.briefing_inicial || '{}')
+                        : (card.briefing_inicial || {})
+                    value = briefingData[rule.field_key]
+
+                    if (typeof value === 'object' && value !== null) {
+                        if ('total' in value) value = value.total
+                        else if (Object.keys(value).length === 0) value = undefined
+                    }
+                }
+
+                let isValid = true
+
+                if (value === null || value === undefined || value === '') {
+                    isValid = false
+                } else if (Array.isArray(value) && value.length === 0) {
+                    isValid = false
+                } else if (typeof value === 'object' && Object.keys(value).length === 0) {
+                    isValid = false
+                }
+
+                if (!isValid) {
+                    missingFields.push({ key: rule.field_key, label: rule.label })
+                }
+            } else if (rule.requirement_type === 'rule') {
+                if (!rule.field_key) continue
+
+                let isValid = true
+
+                if (rule.field_key === 'lost_reason_required') {
+                    const hasId = !!card.motivo_perda_id
+                    const hasComment = !!card.motivo_perda_comentario && card.motivo_perda_comentario.trim().length > 0
+                    isValid = hasId || hasComment
+                }
+
+                if (!isValid) {
+                    missingRules.push({ key: rule.field_key, label: rule.label })
+                }
+            }
+        }
+
+        return {
+            valid: missingFields.length === 0 && missingRules.length === 0,
+            missingFields,
+            missingRules
         }
     }
 

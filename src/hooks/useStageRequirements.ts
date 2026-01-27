@@ -5,7 +5,7 @@ import type { Database } from '../database.types'
 type Card = Database['public']['Tables']['cards']['Row']
 
 // Unified requirement types
-type RequirementType = 'field' | 'proposal' | 'task'
+type RequirementType = 'field' | 'proposal' | 'task' | 'rule'
 
 interface BaseRequirement {
     id: string
@@ -33,7 +33,12 @@ interface TaskRequirement extends BaseRequirement {
     task_require_completed: boolean
 }
 
-export type Requirement = FieldRequirement | ProposalRequirement | TaskRequirement
+interface RuleRequirement extends BaseRequirement {
+    requirement_type: 'rule'
+    field_key: string // We use field_key to store the rule key
+}
+
+export type Requirement = FieldRequirement | ProposalRequirement | TaskRequirement | RuleRequirement
 
 // Legacy interface for backward compatibility
 export interface LegacyRequirement {
@@ -119,7 +124,7 @@ export function useStageRequirements(card: Card) {
                 const baseReq = {
                     id: config.id,
                     stage_id: config.stage_id,
-                    isBlocking: config.pipeline_stages.ordem === currentOrder,
+                    isBlocking: config.stage_id === card.pipeline_stage_id,
                     isFuture: config.pipeline_stages.ordem > currentOrder,
                     is_blocking_config: config.is_blocking ?? true
                 }
@@ -143,6 +148,15 @@ export function useStageRequirements(card: Card) {
                         task_tipo: config.task_tipo,
                         task_require_completed: config.task_require_completed ?? true
                     } as TaskRequirement
+                }
+
+                if (reqType === 'rule') {
+                    return {
+                        ...baseReq,
+                        requirement_type: 'rule',
+                        label: config.requirement_label || config.field_key,
+                        field_key: config.field_key
+                    } as RuleRequirement
                 }
 
                 // Default: field type
@@ -230,6 +244,13 @@ export function useStageRequirements(card: Card) {
                 return checkProposalRequirement(req.proposal_min_status)
             case 'task':
                 return checkTaskRequirement(req.task_tipo, req.task_require_completed)
+            case 'rule':
+                if (req.field_key === 'lost_reason_required') {
+                    const hasId = !!card.motivo_perda_id
+                    const hasComment = !!card.motivo_perda_comentario && (card.motivo_perda_comentario as string).trim().length > 0
+                    return hasId || hasComment
+                }
+                return true
             default:
                 return true
         }
@@ -244,6 +265,7 @@ export function useStageRequirements(card: Card) {
     const fieldRequirements = requirements?.filter((r): r is FieldRequirement => r.requirement_type === 'field') || []
     const proposalRequirements = requirements?.filter((r): r is ProposalRequirement => r.requirement_type === 'proposal') || []
     const taskRequirements = requirements?.filter((r): r is TaskRequirement => r.requirement_type === 'task') || []
+    const ruleRequirements = requirements?.filter((r): r is RuleRequirement => r.requirement_type === 'rule') || []
 
     // Categorize by blocking/future
     const blockingRequirements = requirements?.filter((r: Requirement) => r.isBlocking) || []
@@ -263,6 +285,7 @@ export function useStageRequirements(card: Card) {
         fieldRequirements,
         proposalRequirements,
         taskRequirements,
+        ruleRequirements,
         // Categorized by stage
         blockingRequirements,
         futureRequirements,

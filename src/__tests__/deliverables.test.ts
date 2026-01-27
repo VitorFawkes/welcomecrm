@@ -45,7 +45,7 @@ describe('useQualityGate', () => {
 
     it('should return valid when required field is present', () => {
         const rules = [
-            { stage_id: 'stage-1', field_key: 'destinos', label: 'Destinos' },
+            { stage_id: 'stage-1', field_key: 'destinos', label: 'Destinos', requirement_type: 'field' },
         ]
         const card = { destinos: ['Paris', 'Londres'] }
         const targetStageId = 'stage-1'
@@ -63,6 +63,53 @@ describe('useQualityGate', () => {
         }
 
         expect(missingFields.length).toBe(0)
+    })
+
+    it('should return invalid when lost reason rule is violated', () => {
+        const rules = [
+            { stage_id: 'stage-lost', field_key: 'lost_reason_required', label: 'Motivo de Perda', requirement_type: 'rule' },
+        ]
+        const card = { motivo_perda_id: null, motivo_perda_comentario: '' }
+        const targetStageId = 'stage-lost'
+
+        const stageRules = rules.filter(r => r.stage_id === targetStageId)
+        const missingRules: { key: string; label: string }[] = []
+
+        for (const rule of stageRules) {
+            if (rule.requirement_type === 'rule' && rule.field_key === 'lost_reason_required') {
+                const hasId = !!card.motivo_perda_id
+                const hasComment = !!card.motivo_perda_comentario && card.motivo_perda_comentario.trim().length > 0
+                if (!hasId && !hasComment) {
+                    missingRules.push({ key: rule.field_key, label: rule.label })
+                }
+            }
+        }
+
+        expect(missingRules.length).toBe(1)
+        expect(missingRules[0].key).toBe('lost_reason_required')
+    })
+
+    it('should return valid when lost reason is present', () => {
+        const rules = [
+            { stage_id: 'stage-lost', field_key: 'lost_reason_required', label: 'Motivo de Perda', requirement_type: 'rule' },
+        ]
+        const card = { motivo_perda_id: 'some-uuid', motivo_perda_comentario: '' }
+        const targetStageId = 'stage-lost'
+
+        const stageRules = rules.filter(r => r.stage_id === targetStageId)
+        const missingRules: { key: string; label: string }[] = []
+
+        for (const rule of stageRules) {
+            if (rule.requirement_type === 'rule' && rule.field_key === 'lost_reason_required') {
+                const hasId = !!card.motivo_perda_id
+                const hasComment = !!card.motivo_perda_comentario && card.motivo_perda_comentario.trim().length > 0
+                if (!hasId && !hasComment) {
+                    missingRules.push({ key: rule.field_key, label: rule.label })
+                }
+            }
+        }
+
+        expect(missingRules.length).toBe(0)
     })
 })
 

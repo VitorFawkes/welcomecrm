@@ -97,7 +97,10 @@ export default function CardDetail() {
                         variant="outline"
                         size="sm"
                         className="gap-2 text-slate-600"
+                        disabled={!card.external_id}
+                        title={!card.external_id ? "Este card não possui vínculo com o ActiveCampaign" : "Sincronizar dados com ActiveCampaign"}
                         onClick={async () => {
+                            if (!card.external_id) return;
                             const toastId = toast.loading('Sincronizando com ActiveCampaign...');
                             try {
                                 const { error } = await supabase.functions.invoke('integration-sync-deals', {
@@ -109,12 +112,13 @@ export default function CardDetail() {
                                 if (error) throw error;
                                 toast.success('Sincronização solicitada! Os dados serão atualizados em instantes.', { id: toastId });
                             } catch (err: any) {
-                                toast.error('Erro ao sincronizar: ' + err.message, { id: toastId });
+                                console.error('Erro detalhado sync:', err);
+                                toast.error('Erro ao sincronizar: ' + (err.message || 'Erro desconhecido'), { id: toastId });
                             }
                         }}
                     >
                         <Zap className="w-4 h-4" />
-                        Sincronizar AC
+                        {!card.external_id ? 'Não vinculado' : 'Sincronizar AC'}
                     </Button>
                 </div>
             </div>

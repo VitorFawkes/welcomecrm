@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronsUpDown, Search, FileText, CheckCircle2, LayoutList } from "lucide-react"
+import { ChevronsUpDown, Search, FileText, CheckCircle2, LayoutList, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/Button"
 import {
     Command,
@@ -17,13 +17,14 @@ import {
 } from "@/components/ui/popover"
 
 interface RuleSelectorProps {
-    onSelect: (type: 'field' | 'task' | 'proposal', value: string) => void
+    onSelect: (type: 'field' | 'task' | 'proposal' | 'rule', value: string) => void
     systemFields: any[]
     taskTypes: any[]
     sections: any[]
+    specialRules?: { key: string, label: string, icon: any }[]
 }
 
-export function RuleSelector({ onSelect, systemFields, taskTypes, sections }: RuleSelectorProps) {
+export function RuleSelector({ onSelect, systemFields, taskTypes, sections, specialRules = [] }: RuleSelectorProps) {
     const [open, setOpen] = useState(false)
 
     // Group fields by section
@@ -69,6 +70,27 @@ export function RuleSelector({ onSelect, systemFields, taskTypes, sections }: Ru
                     <CommandInput placeholder="Buscar regra, campo ou tarefa..." />
                     <CommandList>
                         <CommandEmpty>Nenhuma regra encontrada.</CommandEmpty>
+
+                        {/* SPECIAL RULES */}
+                        {specialRules.length > 0 && (
+                            <CommandGroup heading="Regras Especiais">
+                                {specialRules.map((rule) => (
+                                    <CommandItem
+                                        key={rule.key}
+                                        value={`rule-${rule.key}`}
+                                        onSelect={() => {
+                                            onSelect('rule', rule.key)
+                                            setOpen(false)
+                                        }}
+                                        className="cursor-pointer !pointer-events-auto !opacity-100"
+                                    >
+                                        <ShieldAlert className="mr-2 h-4 w-4 text-amber-500" />
+                                        <span>{rule.label}</span>
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        )}
+                        {specialRules.length > 0 && <CommandSeparator />}
 
                         {/* PROPOSALS */}
                         <CommandGroup heading="Propostas">

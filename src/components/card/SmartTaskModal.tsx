@@ -30,10 +30,11 @@ interface SmartTaskModalProps {
     mode?: 'create' | 'edit' | 'reschedule';
 }
 
-type TaskType = 'tarefa' | 'ligacao' | 'whatsapp' | 'email' | 'reuniao' | 'solicitacao_mudanca' | 'enviar_proposta';
+type TaskType = 'tarefa' | 'contato' | 'ligacao' | 'whatsapp' | 'email' | 'reuniao' | 'solicitacao_mudanca' | 'enviar_proposta';
 
 const TASK_TYPES: { id: TaskType; label: string; icon: any; color: string; activeColor: string }[] = [
     { id: 'tarefa', label: 'Tarefa', icon: CheckCircle2, color: 'text-indigo-600 bg-indigo-50 border-indigo-200', activeColor: 'ring-2 ring-indigo-500 bg-indigo-100' },
+    { id: 'contato', label: 'Contato', icon: Phone, color: 'text-blue-600 bg-blue-50 border-blue-200', activeColor: 'ring-2 ring-blue-500 bg-blue-100' },
     { id: 'ligacao', label: 'Ligação', icon: Phone, color: 'text-cyan-600 bg-cyan-50 border-cyan-200', activeColor: 'ring-2 ring-cyan-500 bg-cyan-100' },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, color: 'text-green-600 bg-green-50 border-green-200', activeColor: 'ring-2 ring-green-500 bg-green-100' },
     { id: 'email', label: 'E-mail', icon: Mail, color: 'text-blue-600 bg-blue-50 border-blue-200', activeColor: 'ring-2 ring-blue-500 bg-blue-100' },
@@ -44,6 +45,7 @@ const TASK_TYPES: { id: TaskType; label: string; icon: any; color: string; activ
 
 const TEMPLATES: Record<TaskType, string> = {
     tarefa: "Ex: Enviar briefing por e-mail...",
+    contato: "Ex: Realizar contato inicial...",
     ligacao: "Ex: Ligar para confirmar detalhes...",
     whatsapp: "Ex: WhatsApp para follow-up...",
     email: "Ex: E-mail com proposta...",
@@ -458,6 +460,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
 
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] });
             queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] });
+            queryClient.invalidateQueries({ queryKey: ['card-tasks-completed', cardId] });
 
             onClose();
         } catch (error: any) {

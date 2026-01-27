@@ -279,8 +279,21 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     return
                 }
 
-                // 1. Check Quality Gate (Mandatory Fields)
+                // 1. Check Quality Gate (Mandatory Fields & Rules)
                 const validation = validateMoveSync(card, stageId)
+
+                // Check for Lost Reason Rule
+                if (validation.missingRules?.some(r => r.key === 'lost_reason_required')) {
+                    setPendingMove({
+                        cardId,
+                        stageId,
+                        targetStageName: targetStage?.nome || 'Perdido',
+                    })
+                    setLossReasonModalOpen(true)
+                    setActiveCard(null)
+                    return
+                }
+
                 if (!validation.valid) {
                     setPendingMove({
                         cardId,
