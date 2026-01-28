@@ -8,13 +8,18 @@ const corsHeaders = {
 /**
  * Fetch deals from ActiveCampaign API with pagination.
  * Filters by pipeline (6 = Wedding, 8 = Trips).
+ * Date filters use ISO format and filter by cdate (created) or mdate (modified).
  */
 async function fetchDeals(
     baseUrl: string,
     apiKey: string,
     pipelineId: string,
     limit: number = 100,
-    dealId?: string
+    dealId?: string,
+    ownerId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    dateField: 'cdate' | 'mdate' = 'mdate'
 ): Promise<any[]> {
     const allDeals: any[] = [];
     let offset = 0;
@@ -42,10 +47,23 @@ async function fetchDeals(
     }
 
     while (true) {
-        let url = `${baseUrl}/api/3/deals?filters[pipeline]=${pipelineId}&limit=${limit}&offset=${offset}&orders[cdate]=DESC&include=contact`;
+        let url = `${baseUrl}/api/3/deals?filters[pipeline]=${pipelineId}&limit=${limit}&offset=${offset}&orders[cdate]=DESC&include=contact,contact.fieldValues`;
 
         if (dealId) {
-            url = `${baseUrl}/api/3/deals?filters[id]=${dealId}&include=contact`;
+            url = `${baseUrl}/api/3/deals?filters[id]=${dealId}&include=contact,contact.fieldValues`;
+        } else if (ownerId) {
+            url += `&filters[owner]=${ownerId}`;
+        }
+
+        // Add date range filters (AC uses YYYY-MM-DD format)
+        // Map 'cdate' -> 'created' and 'mdate' -> 'updated'
+        const filterPrefix = dateField === 'cdate' ? 'created' : 'updated';
+
+        if (dateFrom) {
+            url += `&filters[${filterPrefix}_after]=${dateFrom}`;
+        }
+        if (dateTo) {
+            url += `&filters[${filterPrefix}_before]=${dateTo}`;
         }
 
         const res = await fetch(url, {
@@ -59,6 +77,7 @@ async function fetchDeals(
         const data = await res.json();
         const deals = data.deals || [];
         const contacts = data.contacts || [];
+        const fieldValues = data.fieldValues || [];
 
         // Merge contact data into deals if side-loaded
         const enrichedDeals = deals.map((deal: any) => {
@@ -66,6 +85,14 @@ async function fetchDeals(
                 const contactId = deal.contact; // often just an ID string
                 const contactObj = contacts.find((c: any) => c.id === contactId);
                 if (contactObj) {
+                    // Merge fieldValues into contactObj
+                    const myFields = fieldValues.filter((fv: any) => fv.contact === contactId);
+                    const fieldsMap: Record<string, any> = {};
+                    myFields.forEach((fv: any) => {
+                        fieldsMap[fv.field] = fv.value;
+                    });
+                    contactObj.fields = fieldsMap;
+
                     deal.contact = contactObj; // Replace ID with full object
                 }
             }
@@ -123,7 +150,16 @@ Deno.serve(async (req) => {
         )
 
         // Parse body for options
-        let body: { pipeline_id?: string; limit?: number; force_update?: boolean; deal_id?: string } = {};
+        let body: {
+            pipeline_id?: string;
+            limit?: number;
+            force_update?: boolean;
+            deal_id?: string;
+            owner_id?: string;
+            date_from?: string;    // YYYY-MM-DD format
+            date_to?: string;      // YYYY-MM-DD format
+            date_field?: 'cdate' | 'mdate';  // cdate = created, mdate = modified (default)
+        } = {};
         try {
             body = await req.json();
         } catch (_e) {
@@ -135,6 +171,10 @@ Deno.serve(async (req) => {
         const fetchLimit = body.limit || 100;
         const forceUpdate = body.force_update || false;
         const specificDealId = body.deal_id;
+        const ownerId = body.owner_id;
+        const dateFrom = body.date_from;
+        const dateTo = body.date_to;
+        const dateField = body.date_field || 'mdate';
 
         // Get AC credentials
         const { data: settings } = await supabase
@@ -166,7 +206,17 @@ Deno.serve(async (req) => {
         }
 
         // Fetch deals from AC (limited for performance)
-        const deals = await fetchDeals(AC_API_URL, AC_API_KEY, pipelineId, fetchLimit, specificDealId);
+        const deals = await fetchDeals(
+            AC_API_URL,
+            AC_API_KEY,
+            pipelineId,
+            fetchLimit,
+            specificDealId,
+            ownerId,
+            dateFrom,
+            dateTo,
+            dateField
+        );
 
         if (deals.length === 0) {
             return new Response(JSON.stringify({
@@ -186,6 +236,7 @@ Deno.serve(async (req) => {
         let totalInserted = 0;
         let totalSkipped = 0;
         let lastError = null;
+        const allInsertedIds: string[] = [];
 
         for (let i = 0; i < deals.length; i += BATCH_SIZE) {
             const batchDeals = deals.slice(i, i + BATCH_SIZE);
@@ -238,14 +289,23 @@ Deno.serve(async (req) => {
                     'deal[stageid]': deal.stage,
                     'deal[pipelineid]': pipelineId,
                     'deal[owner]': deal.owner,
+                    'deal[contactid]': deal.contact?.id,  // Include contactid for proper contact linking
+                    contactid: deal.contact?.id,          // Alternative format
+                    contact_id: deal.contact?.id,         // Another alternative format
                     contact_email: deal.contact?.email,
                     contact_name: deal.contact?.firstName ? `${deal.contact.firstName} ${deal.contact.lastName || ''}`.trim() : undefined,
                     contact_phone: deal.contact?.phone,
                     // Pass contact fields explicitly for mapping
+                    'contact[id]': deal.contact?.id,
                     'contact[email]': deal.contact?.email,
                     'contact[first_name]': deal.contact?.firstName,
                     'contact[last_name]': deal.contact?.lastName,
                     'contact[phone]': deal.contact?.phone,
+                    // Flatten contact custom fields for mapping
+                    ...(deal.contact?.fields ? Object.entries(deal.contact.fields).reduce((acc, [k, v]) => ({
+                        ...acc,
+                        [`contact[fields][${k}]`]: v
+                    }), {}) : {}),
                     import_mode: 'sync',
                     force_update: forceUpdate,
                     synced_at: new Date().toISOString()
@@ -255,18 +315,62 @@ Deno.serve(async (req) => {
             }));
 
             // Insert batch
-            const { error } = await supabase
+            const { data: insertedEvents, error } = await supabase
                 .from('integration_events')
-                .insert(events);
+                .insert(events)
+                .select('id');
 
             if (error) {
                 console.error(`Batch ${Math.floor(i / BATCH_SIZE)} insert error:`, error.message);
                 lastError = error.message;
             } else {
                 totalInserted += events.length;
+                if (insertedEvents) {
+                    insertedEvents.forEach(e => allInsertedIds.push(e.id));
+                }
             }
 
             console.log(`Batch ${Math.floor(i / BATCH_SIZE)}: ${newDeals.length} new, ${existingKeySet.size} skipped`);
+        }
+
+        // AUTO-PROCESS: Trigger integration-process to handle the created events
+        // This makes the sync actually update the CRM, not just create pending events
+        let processedCount = 0;
+        let processError = null;
+
+        if (totalInserted > 0) {
+            try {
+                const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+                const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+                // Use service_role_key for both headers - it has admin privileges
+                // and satisfies JWT verification requirements
+                const processResponse = await fetch(`${supabaseUrl}/functions/v1/integration-process`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${serviceKey}`,
+                        'apikey': serviceKey
+                    },
+                    body: JSON.stringify({
+                        integration_id: integration.id,
+                        event_ids: allInsertedIds // Pass specific IDs to bypass queue backlog
+                    })
+                });
+
+                if (processResponse.ok) {
+                    const processResult = await processResponse.json();
+                    processedCount = processResult.stats?.updated || 0;
+                    console.log(`Auto-process completed: ${processedCount} events processed`);
+                } else {
+                    const errorText = await processResponse.text();
+                    processError = `Process failed: ${processResponse.status} - ${errorText}`;
+                    console.error(processError);
+                }
+            } catch (procErr: unknown) {
+                processError = procErr instanceof Error ? procErr.message : String(procErr);
+                console.error('Auto-process error:', processError);
+            }
         }
 
         return new Response(JSON.stringify({
@@ -274,7 +378,9 @@ Deno.serve(async (req) => {
             deals_fetched: deals.length,
             already_synced: totalSkipped,
             new_events_created: totalInserted,
-            error: lastError
+            events_processed: processedCount,
+            error: lastError,
+            process_error: processError
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: lastError && totalInserted === 0 ? 400 : 200,

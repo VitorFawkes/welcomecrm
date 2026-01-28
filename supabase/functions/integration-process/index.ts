@@ -10,6 +10,20 @@ Deno.serve(async (req) => {
         return new Response('ok', { headers: corsHeaders })
     }
 
+    // Manual Service Key Validation (Robust Security)
+    // We disable Gateway JWT verification to avoid 401 issues with Service Role Key,
+    // but we enforce it here to ensure only authorized internal calls can trigger this.
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!authHeader || !serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
+        console.error('Unauthorized access attempt to integration-process');
+        return new Response(JSON.stringify({ error: 'Unauthorized: Invalid Service Key' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+
     try {
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
@@ -96,8 +110,8 @@ Deno.serve(async (req) => {
         const { data: fieldMappings } = await supabase.from('integration_field_map').select('*');
         const { data: systemFields } = await supabase.from('system_fields').select('key, type, section');
 
-        // Load Topology
-        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome');
+        // Load Topology (include fase for SDR owner assignment)
+        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome, fase');
         const { data: pipelines } = await supabase.from('pipelines').select('id, nome, produto');
 
         // Load Inbound Trigger Rules (for selective entity creation)
@@ -132,7 +146,8 @@ Deno.serve(async (req) => {
                 pipelineId: pipeline.id,
                 pipelineName: pipeline.nome,
                 produto: pipeline.produto,
-                stageName: stage.nome
+                stageName: stage.nome,
+                fase: (stage as any).fase || null  // Include fase for SDR owner assignment
             };
         };
 
@@ -432,19 +447,24 @@ Deno.serve(async (req) => {
                 const acPipelineId = payload.pipeline || payload.pipeline_id || payload['deal[pipelineid]'];
 
                 // 3.1.1 CHECK INBOUND TRIGGER RULES (selective entity creation)
-                const triggerCheck = checkInboundTrigger(
-                    event.integration_id,
-                    String(acPipelineId || ''),
-                    String(acStageId || ''),
-                    event.event_type,
-                    entity
-                );
+                // BYPASS triggers for manual sync operations (import_mode: 'sync' or force_update: true)
+                const isManualSync = importMode === 'sync' || payload.force_update === true;
 
-                if (!triggerCheck.allowed) {
-                    stats.ignored_by_trigger++;
-                    await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`);
-                    results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
-                    continue;
+                if (!isManualSync) {
+                    const triggerCheck = checkInboundTrigger(
+                        event.integration_id,
+                        String(acPipelineId || ''),
+                        String(acStageId || ''),
+                        event.event_type,
+                        entity
+                    );
+
+                    if (!triggerCheck.allowed) {
+                        stats.ignored_by_trigger++;
+                        await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`);
+                        results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
+                        continue;
+                    }
                 }
 
                 let targetStageId: string | null = null;
@@ -487,10 +507,24 @@ Deno.serve(async (req) => {
 
                 // 3.4 Parse Custom Fields & Map Data
                 const acFields = parseCustomFields(payload);
+
+                // ALSO Parse Contact Fields (for Deal events that carry contact data)
+                const parseContactFieldsForDeal = (payload: Record<string, any>) => {
+                    const fields: Record<string, any> = {};
+                    Object.keys(payload).forEach(key => {
+                        const match = key.match(/^contact\[fields\]\[(\d+)\]$/);
+                        if (match) {
+                            fields[match[1]] = payload[key];
+                        }
+                    });
+                    return fields;
+                };
+                const acContactFields = parseContactFieldsForDeal(payload);
+
                 const marketingData: Record<string, any> = {
                     active_campaign_id: payload.id || payload['deal[id]'],
                     source: 'active_campaign',
-                    raw_fields: acFields,
+                    raw_fields: { ...acFields, ...acContactFields }, // Store both in raw_fields
                     unmapped_fields: {}
                 };
 
@@ -503,7 +537,7 @@ Deno.serve(async (req) => {
                 const protectedFields: string[] = []; // List of local keys that should NOT be updated if they exist
 
                 Object.entries(acFields).forEach(([fieldId, value]) => {
-                    const fieldMap = fieldMappings?.find(m => m.external_field_id === fieldId && m.integration_id === event.integration_id);
+                    const fieldMap = fieldMappings?.find(m => m.external_field_id === fieldId && m.integration_id === event.integration_id && m.entity_type === 'deal');
 
                     if (fieldMap) {
                         // Store in potential updates
@@ -515,6 +549,25 @@ Deno.serve(async (req) => {
                         }
                     } else {
                         marketingData.unmapped_fields[fieldId] = value;
+                    }
+                });
+
+                // Apply Contact Field Mappings
+                Object.entries(acContactFields).forEach(([fieldId, value]) => {
+                    // Note: external_field_id for contact usually has format "contact[fields][ID]" or just "ID"?
+                    // In integration_field_map, it seems to be stored as "contact[fields][ID]" for contacts.
+                    // But let's check how it's stored.
+                    // The query result showed: "external_field_id":"contact[fields][46]"
+                    // So we need to match that.
+                    const externalKey = `contact[fields][${fieldId}]`;
+
+                    const fieldMap = fieldMappings?.find(m => m.external_field_id === externalKey && m.integration_id === event.integration_id && m.entity_type === 'contact');
+
+                    if (fieldMap) {
+                        potentialUpdates[fieldMap.local_field_key] = value;
+                        if (fieldMap.sync_always === false) {
+                            protectedFields.push(fieldMap.local_field_key);
+                        }
                     }
                 });
 
@@ -701,6 +754,15 @@ Deno.serve(async (req) => {
 
                     if (targetOwnerId) {
                         cardPayload.dono_atual_id = targetOwnerId;
+
+                        // Also set role-specific owner based on fase
+                        if (topology?.fase === 'SDR') {
+                            cardPayload.sdr_owner_id = targetOwnerId;
+                        } else if (topology?.fase === 'Planner') {
+                            cardPayload.vendas_owner_id = targetOwnerId;
+                        } else if (topology?.fase === 'Pós-venda') {
+                            cardPayload.concierge_owner_id = targetOwnerId;
+                        }
                     }
 
                     if (existingCard) {
