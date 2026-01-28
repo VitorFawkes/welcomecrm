@@ -67,12 +67,62 @@ Cada agent tem:
 
 ---
 
+## ⚡ PROTOCOLO DE ENTRADA (OBRIGATÓRIO - QUALQUER AGENTE)
+
+> ⛔ **BLOQUEIO:** Nenhuma ação de código/banco pode ser executada sem completar este protocolo.
+
+### PASSO 1: Classificar a Tarefa
+
+Identificar o tipo e carregar o agent correspondente (seção acima).
+
+### PASSO 2: Ler Documentação
+
+**ANTES de escrever qualquer código, LER:**
+1. O agent correspondente: `.agent/agents/{agent}.md`
+2. A seção relevante do `.agent/CODEBASE.md`
+3. Se SQL: ler `docs/SQL_SOP.md` e verificar estado LIVE
+
+### PASSO 3: Declarar Contexto
+
+**O agente DEVE declarar antes de executar:**
+
+```
+🤖 Contexto Carregado:
+- Agent: {nome do agent}
+- CODEBASE.md seções: {seções lidas}
+- Entidades envolvidas: {tabelas/hooks/pages}
+```
+
+⛔ **Se não declarar, o usuário pode cobrar: "Você seguiu o protocolo de entrada?"**
+
+---
+
+## ✅ CHECKLIST DE SAÍDA (BLOQUEANTE)
+
+> ⛔ O agente **NÃO PODE** dizer "concluído" sem verificar:
+
+| Criei... | Ação Obrigatória | Seção CODEBASE.md |
+|----------|------------------|-------------------|
+| Nova página | Adicionar à lista | 3.3 Pages |
+| Novo hook | Adicionar à lista | 2.3 Hooks |
+| Nova tabela/coluna | Adicionar à lista | 1. Core Entities |
+| Novo componente crítico | Documentar | 9. Componentes Críticos |
+
+**Comando de verificação:**
+```bash
+grep "nome_do_item_criado" .agent/CODEBASE.md
+# Se não encontrar → ATUALIZAR antes de finalizar
+```
+
+---
+
 ## 🔐 Rules Globais (SEMPRE ATIVAS)
 
 Ler e seguir TODAS as rules em `.agent/rules/`:
 
 | Rule | Propósito |
 |------|-----------|
+| `01-mandatory-context.md` | **⚡ Protocolo de entrada/saída** |
 | `00-project-context.md` | IDs do Supabase, stack |
 | `10-secrets-protection.md` | **🚨 NUNCA hardcodar tokens/keys** |
 | `20-supabase-safety.md` | Segurança SQL |
@@ -157,6 +207,7 @@ Comandos estruturados para tarefas complexas (ler em `.agent/workflows/`):
 | `/status` | `status.md` | Verificar estado do projeto |
 | `/brainstorm` | `brainstorm.md` | Explorar ideias (Socratic) |
 | `/new-module` | `new-module.md` | Criar módulo completo |
+| `/sync` | `sync.md` | **Sincronizar CODEBASE.md com código** |
 
 ---
 
