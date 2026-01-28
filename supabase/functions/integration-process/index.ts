@@ -701,12 +701,24 @@ Deno.serve(async (req) => {
 
                         if (!shouldSkip) {
                             // Apply update
-                            // Check if it's a known top-level column (simple heuristic or explicit list would be better)
-                            // For now, if it's 'valor_estimado', 'titulo', 'status_comercial', it's top level.
-                            // Otherwise, it goes to marketing_data.
-                            if (['valor_estimado', 'titulo', 'status_comercial', 'data_fechamento'].includes(key)) {
-                                topLevelUpdates[key] = value;
+                            // Known top-level columns in cards table
+                            const cardColumns = [
+                                'valor_estimado', 'titulo', 'status_comercial', 'data_fechamento',
+                                'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+                                'origem_lead', 'mkt_buscando_para_viagem',
+                                'data_viagem_inicio', 'data_viagem_fim'
+                            ];
+
+                            // Handle both direct column names and card.* prefixed names
+                            let columnName = key;
+                            if (key.startsWith('card.')) {
+                                columnName = key.replace('card.', '');
+                            }
+
+                            if (cardColumns.includes(columnName)) {
+                                topLevelUpdates[columnName] = value;
                             } else {
+                                // Store in marketing_data (keep original key for reference)
                                 finalMarketingData[key] = value;
                             }
                         }
