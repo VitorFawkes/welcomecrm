@@ -74,6 +74,7 @@ Ler e seguir TODAS as rules em `.agent/rules/`:
 | Rule | Propósito |
 |------|-----------|
 | `00-project-context.md` | IDs do Supabase, stack |
+| `10-secrets-protection.md` | **🚨 NUNCA hardcodar tokens/keys** |
 | `20-supabase-safety.md` | Segurança SQL |
 | `90-project-architecture.md` | Arquitetura |
 | `91-project-design.md` | Design system |
@@ -91,6 +92,24 @@ Ler e seguir TODAS as rules em `.agent/rules/`:
   "supabase_management_key": "sb_secret_..."
 }
 ```
+
+### ⛔ REGRA CRÍTICA DE SECRETS
+
+**NUNCA** escrever tokens, keys ou senhas diretamente em código.
+
+```typescript
+// ❌ PROIBIDO
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+// ✅ CORRETO
+const KEY = process.env.SUPABASE_KEY;
+```
+
+**Antes de criar qualquer arquivo**, verificar:
+1. Contém strings que parecem tokens? → Usar `process.env`
+2. É arquivo de debug/teste? → Verificar se está no `.gitignore`
+
+**Ler obrigatoriamente:** `.agent/rules/10-secrets-protection.md`
 
 ---
 
