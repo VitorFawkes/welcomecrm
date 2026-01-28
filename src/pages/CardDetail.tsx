@@ -85,6 +85,8 @@ export default function CardDetail() {
                 </nav>
             </div>
 
+
+
             {/* Sticky Header */}
             <div className="sticky top-0 z-10 bg-white shadow-md">
                 <CardHeader card={card} />
@@ -136,6 +138,6 @@ export default function CardDetail() {
                     <ActivityFeed cardId={card.id!} />
                 </div>
             </div>
-        </div>
+        </div >
     )
 }

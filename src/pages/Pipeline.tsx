@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import KanbanBoard from '../components/pipeline/KanbanBoard'
+import PipelineListView from '../components/pipeline/PipelineListView'
 import { cn } from '../lib/utils'
 import CreateCardModal from '../components/pipeline/CreateCardModal'
 import { usePipelineFilters } from '../hooks/usePipelineFilters'
@@ -7,7 +8,7 @@ import { useProductContext } from '../hooks/useProductContext'
 
 import { FilterDrawer } from '../components/pipeline/FilterDrawer'
 import { ActiveFilters } from '../components/pipeline/ActiveFilters'
-import { Filter, Link, User, ArrowUpDown, Calendar, Clock, CheckSquare } from 'lucide-react'
+import { Filter, Link, User, ArrowUpDown, Calendar, Clock, CheckSquare, Search } from 'lucide-react'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -28,6 +29,16 @@ export default function Pipeline() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
 
+
+    const [viewType, setViewType] = useState<'kanban' | 'list'>(() => {
+        const saved = localStorage.getItem('pipeline_view_type')
+        return (saved === 'kanban' || saved === 'list') ? saved : 'kanban'
+    })
+
+    const handleSetViewType = (type: 'kanban' | 'list') => {
+        setViewType(type)
+        localStorage.setItem('pipeline_view_type', type)
+    }
 
     const getSortLabel = () => {
         const { sortBy, sortDirection } = filters
@@ -59,11 +70,53 @@ export default function Pipeline() {
                             <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Pipeline</h1>
                             <span className="text-sm text-gray-400 hidden md:inline">Gerencie suas oportunidades</span>
                         </div>
+
+                        {/* View Type Toggle */}
+                        <div className="flex bg-gray-100/50 p-1 rounded-lg border border-gray-200/50">
+                            <button
+                                onClick={() => handleSetViewType('kanban')}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
+                                    viewType === 'kanban'
+                                        ? "bg-white text-primary shadow-sm border border-gray-200/50"
+                                        : "text-gray-500 hover:text-gray-700"
+                                )}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+                                Kanban
+                            </button>
+                            <button
+                                onClick={() => handleSetViewType('list')}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
+                                    viewType === 'list'
+                                        ? "bg-white text-primary shadow-sm border border-gray-200/50"
+                                        : "text-gray-500 hover:text-gray-700"
+                                )}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                                Lista
+                            </button>
+                        </div>
                     </header>
 
                     <div className="flex flex-col gap-2">
                         <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center gap-4 flex-wrap">
+                            <div className="flex items-center gap-4 flex-wrap flex-1">
+                                {/* Search Bar */}
+                                <div className="relative flex-1 min-w-[200px] max-w-md">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Search className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Pesquisar viagem, contato, origem..."
+                                        className="block w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all shadow-sm"
+                                        value={filters.search || ''}
+                                        onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                                    />
+                                </div>
+
                                 {/* View Switcher (Persona Based) */}
                                 <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
                                     <button
@@ -221,14 +274,31 @@ export default function Pipeline() {
 
 
                 {/* Board Container: Fills remaining space, passes padding prop for alignment */}
-                <div className="flex-1 min-h-0 relative">
-                    <KanbanBoard
-                        productFilter={currentProduct}
-                        viewMode={viewMode}
-                        subView={subView}
-                        filters={usePipelineFilters().filters}
-                        className="h-full px-8 pb-4" // Shared horizontal padding
-                    />
+                <div className={cn(
+                    "flex-1 min-h-0 relative",
+                    viewType === 'list' && "overflow-y-auto"
+                )}>
+                    {viewType === 'kanban' ? (
+                        <KanbanBoard
+                            productFilter={currentProduct}
+                            viewMode={viewMode}
+                            subView={subView}
+                            filters={usePipelineFilters().filters}
+                            className="h-full px-8 pb-4" // Shared horizontal padding
+                        />
+                    ) : (
+                        <PipelineListView
+                            productFilter={currentProduct}
+                            viewMode={viewMode}
+                            subView={subView}
+                            filters={usePipelineFilters().filters}
+                            onCardClick={(cardId) => {
+                                // For now, maybe navigate? Or just log.
+                                // Ideally open CardDetail.
+                                window.location.href = `/cards/${cardId}`
+                            }}
+                        />
+                    )}
                 </div>
 
                 <CreateCardModal

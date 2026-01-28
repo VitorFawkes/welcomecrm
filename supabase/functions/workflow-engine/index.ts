@@ -320,13 +320,25 @@ async function executeAction(supabase, node, instance) {
         let responsavelId = config.assign_to_user_id;
 
         if (config.assign_to === "card_owner") {
-            // Fetch card owner
+            // Fetch card owner with fallbacks
             const { data: card } = await supabase
                 .from("cards")
-                .select("responsavel_id")
+                .select("dono_atual_id, sdr_owner_id, vendas_owner_id, concierge_owner_id, created_by")
                 .eq("id", instance.card_id)
                 .single();
-            responsavelId = card?.responsavel_id;
+
+            // Try to find ANY responsible person
+            responsavelId = card?.dono_atual_id ||
+                card?.sdr_owner_id ||
+                card?.vendas_owner_id ||
+                card?.concierge_owner_id ||
+                card?.created_by;
+
+            if (!responsavelId) {
+                console.warn(`No owner found for card ${instance.card_id}. Task will be unassigned.`);
+                // Optional: Assign to a default admin or keep null (if DB allows, but it doesn't)
+                // We will let it fail if absolutely no one is found, but this covers 99% of cases.
+            }
         } else if (config.assign_to?.startsWith("role:")) {
             // Handle Role Assignment (e.g. role:sdr)
             const roleKey = config.assign_to.split(":")[1];
@@ -346,10 +358,10 @@ async function executeAction(supabase, node, instance) {
                 // Fallback to card owner if no user found for role
                 const { data: card } = await supabase
                     .from("cards")
-                    .select("responsavel_id")
+                    .select("dono_atual_id, created_by")
                     .eq("id", instance.card_id)
                     .single();
-                responsavelId = card?.responsavel_id;
+                responsavelId = card?.dono_atual_id || card?.created_by;
                 console.warn(`No active user found for role ${roleKey}. Falling back to card owner.`);
             }
         }

@@ -451,7 +451,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 </div>
 
                 {/* Main Content: Title & Actions */}
-                <div className="px-6 py-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="px-4 md:px-6 py-4 md:py-5 flex flex-col gap-4 md:gap-6">
+                    {/* Row 1: Title */}
                     <div className="flex-1 min-w-0 space-y-3">
                         <div className="flex items-start gap-3">
                             {isEditingTitle ? (
@@ -497,7 +498,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                         </div>
 
                         {/* Metadata Row: Badges | Value | Trip Date */}
-                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3 text-sm">
                             <span className={cn(
                                 "px-2.5 py-0.5 rounded-full font-semibold text-xs uppercase tracking-wide",
                                 getPhaseColor(currentFase)
@@ -722,53 +723,60 @@ export default function CardHeader({ card }: CardHeaderProps) {
                         </div>
                     </div>
 
-                    {/* Right Side: Owners & Actions */}
-                    <div className="shrink-0 flex items-center gap-4">
-                        {/* Owner Selectors - Horizontal Layout */}
-                        <div className="flex items-center gap-4 pr-4 border-r border-gray-200">
+                    {/* Row 2: Owners & Actions */}
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-2 border-t border-gray-100">
+                        {/* Owner Selectors */}
+                        <div className="flex flex-wrap items-center gap-3 md:gap-4">
                             {/* SDR Selector */}
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SDR</span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider w-12 md:w-auto">SDR</span>
                                 <UserSelector
                                     currentUserId={card.sdr_owner_id}
                                     onSelect={handleSdrSelect}
-                                    roleFilter={['sdr', 'admin', 'manager']}
+                                    roleFilter={['sdr', 'admin', 'gestor']}
                                 />
                             </div>
+
+                            <div className="hidden md:block h-6 w-px bg-gray-200" />
 
                             {/* Planner Selector */}
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Planner</span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider w-12 md:w-auto">Planner</span>
                                 <UserSelector
                                     currentUserId={card.vendas_owner_id}
                                     onSelect={handlePlannerSelect}
-                                    roleFilter={['vendas', 'admin', 'manager']}
+                                    roleFilter={['vendas', 'admin', 'gestor']}
                                 />
                             </div>
 
+                            <div className="hidden md:block h-6 w-px bg-gray-200" />
+
                             {/* Pós-Venda Selector */}
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pós</span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider w-12 md:w-auto">Pós</span>
                                 <UserSelector
                                     currentUserId={card.pos_owner_id}
                                     onSelect={handlePosVendaSelect}
-                                    roleFilter={['pos_venda', 'admin', 'manager']}
+                                    roleFilter={['pos_venda', 'admin', 'gestor']}
                                 />
                             </div>
                         </div>
 
-                        {missingBlocking.length > 0 && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setQualityGateModalOpen(true)}
-                                className="gap-2 text-red-600 border-red-200 bg-red-50"
-                            >
-                                <AlertCircle className="h-4 w-4" />
-                                {missingBlocking.length} Pendências
-                            </Button>
-                        )}
-                        <ActionButtons card={card} />
+                        {/* Actions */}
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                            {missingBlocking.length > 0 && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setQualityGateModalOpen(true)}
+                                    className="gap-2 text-red-600 border-red-200 bg-red-50"
+                                >
+                                    <AlertCircle className="h-4 w-4" />
+                                    <span className="hidden sm:inline">{missingBlocking.length}</span> Pendências
+                                </Button>
+                            )}
+                            <ActionButtons card={card} />
+                        </div>
                     </div>
                 </div>
             </div>

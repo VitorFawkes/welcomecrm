@@ -7,6 +7,7 @@ interface Profile {
     nome: string
     email: string
     role: string
+    roles?: { name: string } | null
 }
 
 interface UserSelectorProps {
@@ -25,24 +26,31 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
         const fetchProfiles = async () => {
             setLoading(true)
             try {
-                let query = supabase
-                    .from('profiles')
-                    .select('id, nome, email, role')
-                    .eq('active', true)
-                    .order('nome')
-
+                // Se há filtro de role, usamos inner join com a tabela roles
+                // Isso usa role_id (novo sistema) em vez do campo legado 'role'
                 if (roleFilter) {
-                    if (Array.isArray(roleFilter)) {
-                        query = query.in('role', roleFilter as any)
-                    } else {
-                        query = query.eq('role', roleFilter as any)
-                    }
+                    const roleArray = Array.isArray(roleFilter) ? roleFilter : [roleFilter]
+
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('id, nome, email, role, roles!inner(name)')
+                        .eq('active', true)
+                        .in('roles.name', roleArray)
+                        .order('nome')
+
+                    if (error) throw error
+                    setProfiles((data || []) as Profile[])
+                } else {
+                    // Sem filtro, busca todos os usuários ativos
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('id, nome, email, role')
+                        .eq('active', true)
+                        .order('nome')
+
+                    if (error) throw error
+                    setProfiles((data || []) as Profile[])
                 }
-
-                const { data, error } = await query
-
-                if (error) throw error
-                setProfiles((data || []) as Profile[])
             } catch (error) {
                 console.error('Error fetching profiles:', error)
             } finally {

@@ -12,7 +12,7 @@ import {
     type DragEndEvent,
     type DragStartEvent
 } from '@dnd-kit/core'
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
@@ -22,7 +22,6 @@ import StageChangeModal from '../card/StageChangeModal'
 import QualityGateModal from '../card/QualityGateModal'
 import LossReasonModal from '../card/LossReasonModal'
 import { useQualityGate } from '../../hooks/useQualityGate'
-import { useAuth } from '../../contexts/AuthContext'
 import type { Database } from '../../database.types'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { AlertTriangle } from 'lucide-react'
@@ -30,6 +29,7 @@ import { Button } from '../ui/Button'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { useHorizontalScroll } from '../../hooks/useHorizontalScroll'
 import { ScrollArrows } from '../ui/ScrollArrows'
+import { usePipelineCards } from '../../hooks/usePipelineCards'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -48,7 +48,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
     const { validateMoveSync } = useQualityGate()
-    const { session } = useAuth() // Need auth to know who "ME" is
+
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
 
@@ -123,115 +123,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         }
     })
 
-    const { data: cards, isError, refetch } = useQuery({
-        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters], // Re-fetch when view changes
-        placeholderData: keepPreviousData,
-        queryFn: async () => {
-            let query = (supabase.from('view_cards_acoes') as any)
-                .select('*')
-
-            if (productFilter !== 'ALL') {
-                query = query.eq('produto', productFilter)
-            }
-
-            // Apply Smart View Filters
-            if (viewMode === 'AGENT') {
-                if (subView === 'MY_QUEUE') {
-                    // Filter by current user
-                    if (session?.user?.id) {
-                        query = query.eq('dono_atual_id', session.user.id)
-                    }
-                }
-                // 'ATTENTION' logic would go here (e.g. overdue)
-            } else if (viewMode === 'MANAGER') {
-                if (subView === 'TEAM_VIEW') {
-                    // Ideally filter by team, for now show all (Macro)
-                }
-                if (subView === 'FORECAST') {
-                    // Filter by closing_date this month
-                    const startOfMonth = new Date(); startOfMonth.setDate(1);
-                    const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-                    query = query.gte('data_fechamento', startOfMonth.toISOString()).lt('data_fechamento', endOfMonth.toISOString())
-                }
-            }
-
-            // Apply Advanced Filters (from Drawer)
-            if (filters.search) {
-                query = query.ilike('titulo', `% ${filters.search}% `)
-            }
-
-            if ((filters.ownerIds?.length ?? 0) > 0) {
-                query = query.in('dono_atual_id', filters.ownerIds)
-            }
-
-            // NEW: SDR Filter
-            if ((filters.sdrIds?.length ?? 0) > 0) {
-                query = query.in('sdr_owner_id', filters.sdrIds)
-            }
-
-            // NEW: Team Filter (using new view column)
-            // if (filters.teamIds?.length > 0) {
-            //     query = query.in('owner_team_id', filters.teamIds)
-            // }
-
-            // NEW: Department Filter (using new view column)
-            // if (filters.departmentIds?.length > 0) {
-            //     query = query.in('owner_department_id', filters.departmentIds)
-            // }
-
-
-            if (filters.startDate) {
-                query = query.gte('data_viagem_inicio', filters.startDate)
-            }
-
-            if (filters.endDate) {
-                query = query.lte('data_viagem_inicio', filters.endDate)
-            }
-
-            // NEW: Creation Date Filter
-            if (filters.creationStartDate) {
-                query = query.gte('created_at', filters.creationStartDate)
-            }
-
-            if (filters.creationEndDate) {
-                query = query.lte('created_at', filters.creationEndDate)
-            }
-
-            // Apply Sorting
-            if (filters.sortBy) {
-                // Handle special case for 'data_proxima_tarefa' which might be null
-                // We want nulls last usually, but Supabase/Postgres handles this.
-                // For 'data_proxima_tarefa' asc, we want earliest dates first. Nulls (no task) should be last.
-                // Postgres default for ASC is NULLS LAST, for DESC is NULLS FIRST.
-                // We might need to adjust if we want strict behavior, but standard order is fine for now.
-                query = query.order(filters.sortBy, { ascending: filters.sortDirection === 'asc', nullsFirst: false })
-            } else {
-                query = query.order('created_at', { ascending: false })
-            }
-
-            const { data, error } = await query
-            if (error) throw error
-
-            let filteredData = data as Card[]
-
-            // Apply Group Filters (Client-side for flexibility)
-            const { showLinked, showSolo } = groupFilters
-
-            filteredData = filteredData.filter(card => {
-                // ALWAYS exclude Group Parents from Kanban
-                if (card.is_group_parent) return false
-
-                const isLinked = !!card.parent_card_id
-                const isSolo = !isLinked
-
-                if (isLinked && showLinked) return true
-                if (isSolo && showSolo) return true
-
-                return false
-            })
-
-            return filteredData
-        }
+    // Fetch Cards using the new shared hook
+    const { data: cards, isError, refetch, myTeamMembers } = usePipelineCards({
+        productFilter,
+        viewMode,
+        subView,
+        filters,
+        groupFilters
     })
 
     const moveCardMutation = useMutation({
@@ -246,17 +144,17 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         },
         onMutate: ({ cardId, stageId }) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-            queryClient.cancelQueries({ queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters] })
+            queryClient.cancelQueries({ queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers] })
 
             // Snapshot the previous value
-            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters])
+            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers])
 
             // Find new stage info for complete update
-            const newStage = stages?.find(s => s.id === stageId)
+            const newStage = stages?.find((s: any) => s.id === stageId)
 
             // Optimistically update to the new value
             if (previousCards) {
-                queryClient.setQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters], (old) => {
+                queryClient.setQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], (old) => {
                     if (!old) return []
                     return old.map((card) => {
                         if (card.id === cardId) {
@@ -278,7 +176,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         onError: (_err, _variables, context) => {
             // If the mutation fails, use the context returned from onMutate to roll back
             if (context?.previousCards) {
-                queryClient.setQueryData(['cards', productFilter, viewMode, subView, filters, groupFilters], context.previousCards)
+                queryClient.setQueryData(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], context.previousCards)
             }
         },
         onSuccess: () => {
@@ -365,7 +263,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             const cardId = active.id as string
             const stageId = over.id as string
             const currentStageId = active.data.current?.pipeline_stage_id
-            const targetStage = stages?.find(s => s.id === stageId)
+            const targetStage = stages?.find((s: any) => s.id === stageId)
             const card = active.data.current as Card
 
             if (stageId !== currentStageId) {
@@ -381,8 +279,21 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     return
                 }
 
-                // 1. Check Quality Gate (Mandatory Fields)
+                // 1. Check Quality Gate (Mandatory Fields & Rules)
                 const validation = validateMoveSync(card, stageId)
+
+                // Check for Lost Reason Rule
+                if (validation.missingRules?.some(r => r.key === 'lost_reason_required')) {
+                    setPendingMove({
+                        cardId,
+                        stageId,
+                        targetStageName: targetStage?.nome || 'Perdido',
+                    })
+                    setLossReasonModalOpen(true)
+                    setActiveCard(null)
+                    return
+                }
+
                 if (!validation.valid) {
                     setPendingMove({
                         cardId,
@@ -450,7 +361,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const handleConfirmQualityGate = () => {
         if (pendingMove) {
             // After filling fields, we still need to check if we need to change owner
-            const targetStage = stages?.find(s => s.id === pendingMove.stageId)
+            const targetStage = stages?.find((s: any) => s.id === pendingMove.stageId)
 
             setQualityGateModalOpen(false)
 
@@ -565,7 +476,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                 ) : displayPhases.map((phase) => {
                                     // Filter stages that belong to this phase
                                     // We support both phase_id (new) and fase name match (legacy migration)
-                                    const phaseStages = stages.filter(s =>
+                                    const phaseStages = stages.filter((s: any) =>
                                         s.phase_id === phase.id ||
                                         (!s.phase_id && s.fase === phase.name)
                                     )
@@ -573,7 +484,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                     // If no stages for this phase, skip rendering it (optional, but cleaner)
                                     if (phaseStages.length === 0) return null
 
-                                    const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
+                                    const phaseCards = cards.filter(c => phaseStages.some((s: any) => s.id === c.pipeline_stage_id))
                                     const totalCount = phaseCards.length
                                     const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
 
@@ -589,7 +500,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                             stages={phaseStages}
                                             cards={phaseCards}
                                         >
-                                            {phaseStages.map((stage) => (
+                                            {phaseStages.map((stage: any) => (
                                                 <KanbanColumn
                                                     key={stage.id}
                                                     stage={stage}
@@ -692,13 +603,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 <div className="flex items-center gap-6">
                     {/* Phase Summaries (Mini) */}
                     {displayPhases.map(phase => {
-                        const phaseStages = stages.filter(s =>
+                        const phaseStages = stages.filter((s: any) =>
                             s.phase_id === phase.id ||
                             (!s.phase_id && s.fase === phase.name)
                         )
                         if (phaseStages.length === 0) return null
 
-                        const phaseCards = cards.filter(c => phaseStages.some(s => s.id === c.pipeline_stage_id))
+                        const phaseCards = cards.filter(c => phaseStages.some((s: any) => s.id === c.pipeline_stage_id))
                         const val = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
                         const count = phaseCards.length
 

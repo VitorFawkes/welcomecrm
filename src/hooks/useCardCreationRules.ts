@@ -119,6 +119,7 @@ export function useAllowedStages(product: string) {
             // If user is admin or has no team, return all stages for the product
             if (isAdmin || !teamId) {
                 // Get stages with their phase info, ordered by phase then stage order
+                // Filter by product via pipeline relationship
                 const { data, error } = await supabase
                     .from('pipeline_stages')
                     .select(`
@@ -127,9 +128,11 @@ export function useAllowedStages(product: string) {
                         ordem,
                         fase,
                         phase_id,
-                        pipeline_phases!pipeline_stages_phase_id_fkey(id, name, order_index)
+                        pipeline_phases!pipeline_stages_phase_id_fkey(id, name, order_index),
+                        pipelines!inner(produto)
                     `)
                     .eq('ativo', true)
+                    .eq('pipelines.produto', product as any)
 
                 if (error) throw error
 
@@ -154,9 +157,17 @@ export function useAllowedStages(product: string) {
                 .from('card_creation_rules')
                 .select(`
                     stage_id,
-                    pipeline_stages(id, nome, ordem, fase, phase_id)
+                    pipeline_stages!inner(
+                        id, 
+                        nome, 
+                        ordem, 
+                        fase, 
+                        phase_id,
+                        pipelines!inner(produto)
+                    )
                 `)
                 .eq('team_id', teamId)
+                .eq('pipeline_stages.pipelines.produto', product as any)
 
             if (error) throw error
 

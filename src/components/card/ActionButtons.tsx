@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mail, X, Send, Loader2, Trash2 } from 'lucide-react'
+import { Mail, X, Send, Loader2, Trash2, Zap } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useCreateProposal } from '@/hooks/useProposal'
+import { useAuth } from '@/contexts/AuthContext'
 import { useDeleteCard } from '@/hooks/useDeleteCard'
 import DeleteCardModal from './DeleteCardModal'
 import { toast } from 'sonner'
@@ -20,6 +21,7 @@ interface ActionButtonsProps {
 export default function ActionButtons({ card }: ActionButtonsProps) {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
+    const { profile } = useAuth()
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [isCreatingProposal, setIsCreatingProposal] = useState(false)
     const createProposal = useCreateProposal()
@@ -260,6 +262,34 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                     )}
                     {isCreatingProposal ? 'Criando...' : 'Proposta'}
                 </button>
+
+                {(profile?.role === 'admin' || profile?.is_admin) && (
+                    <button
+                        onClick={async () => {
+                            if (!card.external_id) return;
+                            const toastId = toast.loading('Sincronizando com ActiveCampaign...');
+                            try {
+                                const { error } = await supabase.functions.invoke('integration-sync-deals', {
+                                    body: {
+                                        deal_id: card.external_id,
+                                        force_update: true
+                                    }
+                                });
+                                if (error) throw error;
+                                toast.success('Sincronização solicitada!', { id: toastId });
+                            } catch (err: any) {
+                                console.error('Erro detalhado sync:', err);
+                                toast.error('Erro ao sincronizar', { id: toastId });
+                            }
+                        }}
+                        disabled={!card.external_id}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors text-sm font-medium disabled:opacity-50"
+                        title={!card.external_id ? "Sem vínculo externo" : "Sincronizar AC"}
+                    >
+                        <Zap className="h-4 w-4" />
+                        Sync
+                    </button>
+                )}
 
                 <button
                     onClick={() => setShowDeleteModal(true)}

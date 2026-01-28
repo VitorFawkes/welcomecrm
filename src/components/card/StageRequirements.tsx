@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, AlertCircle, FileText, Phone, Users, Mail, MessageSquare } from 'lucide-react'
+import { CheckCircle2, AlertCircle } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { useStageRequirements, type Requirement } from '../../hooks/useStageRequirements'
@@ -9,17 +9,6 @@ interface StageRequirementsProps {
     card: Card
 }
 
-// Icon mapping for different task types
-const TASK_TYPE_ICONS: Record<string, React.ElementType> = {
-    ligacao: Phone,
-    reuniao: Users,
-    email: Mail,
-    whatsapp: MessageSquare,
-    enviar_proposta: FileText,
-    tarefa: CheckCircle2,
-    solicitacao_mudanca: AlertCircle
-}
-
 // Labels for proposal statuses
 const PROPOSAL_STATUS_LABELS: Record<string, string> = {
     draft: 'Criada (Rascunho)',
@@ -27,17 +16,6 @@ const PROPOSAL_STATUS_LABELS: Record<string, string> = {
     viewed: 'Visualizada',
     in_progress: 'Em Andamento',
     accepted: 'Aceita'
-}
-
-// Labels for task types
-const TASK_TYPE_LABELS: Record<string, string> = {
-    ligacao: 'Ligação',
-    reuniao: 'Reunião',
-    email: 'E-mail',
-    whatsapp: 'WhatsApp',
-    enviar_proposta: 'Enviar Proposta',
-    tarefa: 'Tarefa',
-    solicitacao_mudanca: 'Mudança'
 }
 
 export default function StageRequirements({ card }: StageRequirementsProps) {
@@ -54,19 +32,16 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
     const totalBlocking = blockingRequirements.length
     const isAllBlockingCompleted = completedBlocking === totalBlocking
 
-    // Get icon for requirement
-    const getRequirementIcon = (req: Requirement) => {
-        if (req.requirement_type === 'field') {
-            return CheckCircle2
-        }
-        if (req.requirement_type === 'proposal') {
-            return FileText
-        }
-        if (req.requirement_type === 'task') {
-            return TASK_TYPE_ICONS[req.task_tipo] || CheckCircle2
-        }
-        return CheckCircle2
+    // Helper to format dynamic labels
+    const formatTaskLabel = (tipo: string) => {
+        // Capitalize first letter and replace underscores
+        return tipo
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ')
     }
+
+
 
     // Get label for requirement
     const getRequirementLabel = (req: Requirement): string => {
@@ -78,11 +53,13 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                 return `Proposta ${statusLabel}`
             }
             case 'task': {
-                const typeLabel = TASK_TYPE_LABELS[req.task_tipo] || req.task_tipo
+                // Use the label from config if available (it should be), otherwise format the type
+                if (req.label && req.label !== 'Requisito') return req.label
+
+                const typeLabel = formatTaskLabel(req.task_tipo)
                 return `${typeLabel} ${req.task_require_completed ? 'Concluída' : 'Criada'}`
             }
             default:
-                // Exhaustive check - should never reach here
                 return (req as { label?: string }).label || 'Requisito'
         }
     }
@@ -102,11 +79,11 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
         <div className="space-y-4 mb-6">
             {/* Blocking Requirements (Current Stage) */}
             <div className={cn(
-                "bg-white rounded-xl shadow-sm border overflow-hidden",
+                "bg-white rounded-xl shadow-sm border overflow-hidden transition-colors duration-300",
                 isAllBlockingCompleted ? "border-green-100" : "border-red-100"
             )}>
                 <div className={cn(
-                    "px-4 py-3 border-b flex justify-between items-center",
+                    "px-4 py-3 border-b flex justify-between items-center transition-colors duration-300",
                     isAllBlockingCompleted ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
                 )}>
                     <h3 className={cn(
@@ -117,7 +94,7 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                         Obrigações da Etapa Atual
                     </h3>
                     <span className={cn(
-                        "text-xs font-medium px-2 py-1 rounded-full",
+                        "text-xs font-medium px-2 py-1 rounded-full transition-colors duration-300",
                         isAllBlockingCompleted ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                     )}>
                         {completedBlocking}/{totalBlocking}
@@ -127,32 +104,32 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                 <div className="divide-y divide-gray-50">
                     {blockingRequirements.map((req: Requirement) => {
                         const isCompleted = checkRequirement(req)
-                        const Icon = getRequirementIcon(req)
 
                         return (
-                            <div key={req.id} className={`p-3 flex items-start gap-3 hover:bg-gray-50 transition-colors ${isCompleted ? 'opacity-75' : ''}`}>
+                            <div key={req.id} className={`p-3 flex items-start gap-3 transition-colors ${isCompleted ? 'bg-gray-50/50' : 'bg-white'}`}>
                                 <div className={`mt-0.5 flex-shrink-0`}>
                                     {isCompleted ? (
                                         <CheckCircle2 className="w-5 h-5 text-green-500" />
                                     ) : (
-                                        <Circle className="w-5 h-5 text-red-300" />
+                                        <div className="w-5 h-5 rounded-full border-2 border-red-200 bg-red-50 flex items-center justify-center">
+                                            <div className="w-2 h-2 rounded-full bg-red-400" />
+                                        </div>
                                     )}
                                 </div>
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Icon className={cn(
-                                            "w-4 h-4",
-                                            isCompleted ? "text-gray-400" : "text-gray-600"
-                                        )} />
                                         <p className={`text-sm font-medium ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-700'}`}>
                                             {getRequirementLabel(req)}
                                         </p>
                                         {getTypeBadge(req)}
                                     </div>
                                     {!isCompleted && (
-                                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                                            <AlertCircle className="w-3 h-3" />
-                                            Bloqueia avanço de etapa
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {req.requirement_type === 'task'
+                                                ? 'Complete esta tarefa na agenda para avançar.'
+                                                : req.requirement_type === 'proposal'
+                                                    ? 'Mude o status da proposta para avançar.'
+                                                    : 'Preencha este campo para avançar.'}
                                         </p>
                                     )}
                                 </div>

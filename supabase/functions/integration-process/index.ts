@@ -10,6 +10,20 @@ Deno.serve(async (req) => {
         return new Response('ok', { headers: corsHeaders })
     }
 
+    // Manual Service Key Validation (Robust Security)
+    // We disable Gateway JWT verification to avoid 401 issues with Service Role Key,
+    // but we enforce it here to ensure only authorized internal calls can trigger this.
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!authHeader || !serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
+        console.error('Unauthorized access attempt to integration-process');
+        return new Response(JSON.stringify({ error: 'Unauthorized: Invalid Service Key' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+
     try {
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
@@ -96,8 +110,8 @@ Deno.serve(async (req) => {
         const { data: fieldMappings } = await supabase.from('integration_field_map').select('*');
         const { data: systemFields } = await supabase.from('system_fields').select('key, type, section');
 
-        // Load Topology
-        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome');
+        // Load Topology (include fase for SDR owner assignment)
+        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome, fase');
         const { data: pipelines } = await supabase.from('pipelines').select('id, nome, produto');
 
         // Load Inbound Trigger Rules (for selective entity creation)
@@ -132,7 +146,8 @@ Deno.serve(async (req) => {
                 pipelineId: pipeline.id,
                 pipelineName: pipeline.nome,
                 produto: pipeline.produto,
-                stageName: stage.nome
+                stageName: stage.nome,
+                fase: (stage as any).fase || null  // Include fase for SDR owner assignment
             };
         };
 
@@ -432,19 +447,24 @@ Deno.serve(async (req) => {
                 const acPipelineId = payload.pipeline || payload.pipeline_id || payload['deal[pipelineid]'];
 
                 // 3.1.1 CHECK INBOUND TRIGGER RULES (selective entity creation)
-                const triggerCheck = checkInboundTrigger(
-                    event.integration_id,
-                    String(acPipelineId || ''),
-                    String(acStageId || ''),
-                    event.event_type,
-                    entity
-                );
+                // BYPASS triggers for manual sync operations (import_mode: 'sync' or force_update: true)
+                const isManualSync = importMode === 'sync' || payload.force_update === true;
 
-                if (!triggerCheck.allowed) {
-                    stats.ignored_by_trigger++;
-                    await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`);
-                    results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
-                    continue;
+                if (!isManualSync) {
+                    const triggerCheck = checkInboundTrigger(
+                        event.integration_id,
+                        String(acPipelineId || ''),
+                        String(acStageId || ''),
+                        event.event_type,
+                        entity
+                    );
+
+                    if (!triggerCheck.allowed) {
+                        stats.ignored_by_trigger++;
+                        await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`);
+                        results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
+                        continue;
+                    }
                 }
 
                 let targetStageId: string | null = null;
@@ -487,23 +507,82 @@ Deno.serve(async (req) => {
 
                 // 3.4 Parse Custom Fields & Map Data
                 const acFields = parseCustomFields(payload);
+
+                // ALSO Parse Contact Fields (for Deal events that carry contact data)
+                const parseContactFieldsForDeal = (payload: Record<string, any>) => {
+                    const fields: Record<string, any> = {};
+                    Object.keys(payload).forEach(key => {
+                        const match = key.match(/^contact\[fields\]\[(\d+)\]$/);
+                        if (match) {
+                            fields[match[1]] = payload[key];
+                        }
+                    });
+                    return fields;
+                };
+                const acContactFields = parseContactFieldsForDeal(payload);
+
                 const marketingData: Record<string, any> = {
                     active_campaign_id: payload.id || payload['deal[id]'],
                     source: 'active_campaign',
-                    raw_fields: acFields,
+                    raw_fields: { ...acFields, ...acContactFields }, // Store both in raw_fields
                     unmapped_fields: {}
                 };
 
-                // Dynamic Field Mapping
+                // Dynamic Field Mapping with sync_always check
+                // We need to check if we should overwrite existing values
+                // For this, we need the existing card data, which we fetch later.
+                // So we will prepare the "potential" updates here, and filter them when we have the existing card.
+
+                const potentialUpdates: Record<string, any> = {};
+                const protectedFields: string[] = []; // List of local keys that should NOT be updated if they exist
+
                 Object.entries(acFields).forEach(([fieldId, value]) => {
-                    const fieldMap = fieldMappings?.find(m => m.external_field_id === fieldId && m.integration_id === event.integration_id);
+                    const fieldMap = fieldMappings?.find(m => m.external_field_id === fieldId && m.integration_id === event.integration_id && m.entity_type === 'deal');
 
                     if (fieldMap) {
-                        marketingData[fieldMap.local_field_key] = value;
+                        // Store in potential updates
+                        potentialUpdates[fieldMap.local_field_key] = value;
+
+                        // If sync_always is false, mark as protected
+                        if (fieldMap.sync_always === false) {
+                            protectedFields.push(fieldMap.local_field_key);
+                        }
                     } else {
                         marketingData.unmapped_fields[fieldId] = value;
                     }
                 });
+
+                // Apply Contact Field Mappings
+                Object.entries(acContactFields).forEach(([fieldId, value]) => {
+                    // Note: external_field_id for contact usually has format "contact[fields][ID]" or just "ID"?
+                    // In integration_field_map, it seems to be stored as "contact[fields][ID]" for contacts.
+                    // But let's check how it's stored.
+                    // The query result showed: "external_field_id":"contact[fields][46]"
+                    // So we need to match that.
+                    const externalKey = `contact[fields][${fieldId}]`;
+
+                    const fieldMap = fieldMappings?.find(m => m.external_field_id === externalKey && m.integration_id === event.integration_id && m.entity_type === 'contact');
+
+                    if (fieldMap) {
+                        potentialUpdates[fieldMap.local_field_key] = value;
+                        if (fieldMap.sync_always === false) {
+                            protectedFields.push(fieldMap.local_field_key);
+                        }
+                    }
+                });
+
+                // Apply potential updates to marketingData (we will filter later or apply logic now if possible)
+                // Actually, for marketing_data fields, we can just put them in.
+                // The protection logic needs to happen when we merge with existing data.
+                // But wait, marketing_data is a JSONB column.
+                // If we want to protect "marketing_data.some_field", we need to know the existing value.
+
+                // Let's store the mapping instructions to apply during the Card Update phase
+                const fieldUpdateInstructions = Object.entries(potentialUpdates).map(([key, value]) => ({
+                    key,
+                    value,
+                    protected: protectedFields.includes(key)
+                }));
 
                 // Special Case: Epoca Viagem (109 = Start, 101 = End)
                 const dateStart = acFields['109'];
@@ -590,18 +669,94 @@ Deno.serve(async (req) => {
                     // UPSERT CARD
                     const { data: existingCard } = await supabase
                         .from('cards')
-                        .select('id')
+                        .select('*') // Fetch all fields to check for existing values
                         .eq('external_id', dealId)
                         .eq('external_source', 'active_campaign')
                         .single();
+
+                    // Apply Field Updates with Protection Logic
+                    const finalMarketingData = { ...marketingData };
+                    const topLevelUpdates: Record<string, any> = {};
+
+                    fieldUpdateInstructions.forEach(instruction => {
+                        const { key, value, protected: isProtected } = instruction;
+
+                        // Check if we should skip this update
+                        let shouldSkip = false;
+                        if (isProtected && existingCard) {
+                            // Check if existing card has a value for this key
+                            // The key could be a top-level column OR inside marketing_data
+                            let existingValue = existingCard[key];
+
+                            // If not found at top level, check marketing_data
+                            if (existingValue === undefined && existingCard.marketing_data) {
+                                existingValue = existingCard.marketing_data[key];
+                            }
+
+                            // If existing value is not null/undefined/empty, protect it
+                            if (existingValue !== null && existingValue !== undefined && existingValue !== '') {
+                                shouldSkip = true;
+                            }
+                        }
+
+                        if (!shouldSkip) {
+                            // Apply update
+                            // Known top-level columns in cards table
+                            const cardColumns = [
+                                'valor_estimado', 'titulo', 'status_comercial', 'data_fechamento',
+                                'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+                                'origem_lead', 'mkt_buscando_para_viagem',
+                                'data_viagem_inicio', 'data_viagem_fim'
+                            ];
+
+                            // Handle both direct column names and card.* prefixed names
+                            let columnName = key;
+                            if (key.startsWith('card.')) {
+                                columnName = key.replace('card.', '');
+                            }
+
+                            if (cardColumns.includes(columnName)) {
+                                topLevelUpdates[columnName] = value;
+                            } else {
+                                // Store in marketing_data (keep original key for reference)
+                                finalMarketingData[key] = value;
+                            }
+                        }
+                    });
 
                     const cardPayload: Record<string, any> = {
                         titulo: title,
                         valor_estimado: value,
                         status_comercial: status,
-                        marketing_data: marketingData,
+                        ...topLevelUpdates, // Override with mapped values if they exist and are not protected
+                        marketing_data: finalMarketingData,
                         updated_at: new Date().toISOString()
                     };
+
+                    // Ensure title/value/status are not overwritten by default if they are protected via mapping
+                    // The ...topLevelUpdates above handles the "mapped" values.
+                    // But what if they are NOT mapped? Then 'title', 'value', 'status' variables are used.
+                    // We should probably respect protection for these standard fields too if they are mapped.
+                    // If they are NOT mapped, we use the standard AC values (title, value, status).
+                    // If they ARE mapped, 'topLevelUpdates' has the value (or not, if skipped).
+
+                    // Refinement:
+                    // If 'valor_estimado' is NOT in topLevelUpdates (because it was protected), 
+                    // we should NOT use the 'value' variable from AC payload either!
+                    // We need to check if these standard fields were "attempted" to be updated via mapping.
+
+                    // Actually, 'value', 'title', 'status' are extracted from payload directly.
+                    // If there is a mapping for them, it would be in 'fieldUpdateInstructions'.
+                    // If there is NO mapping, we default to using them.
+                    // If there IS a mapping and it was protected, we should use the EXISTING value (or just not include it in update).
+
+                    // Let's check if standard fields are being protected
+                    const isTitleProtected = fieldUpdateInstructions.some(i => i.key === 'titulo' && i.protected && existingCard?.titulo);
+                    const isValueProtected = fieldUpdateInstructions.some(i => i.key === 'valor_estimado' && i.protected && existingCard?.valor_estimado);
+
+                    if (isTitleProtected) delete cardPayload.titulo;
+                    if (isValueProtected) delete cardPayload.valor_estimado;
+
 
                     if (targetStageId && topology) {
                         cardPayload.pipeline_stage_id = targetStageId;
@@ -611,6 +766,15 @@ Deno.serve(async (req) => {
 
                     if (targetOwnerId) {
                         cardPayload.dono_atual_id = targetOwnerId;
+
+                        // Also set role-specific owner based on fase
+                        if (topology?.fase === 'SDR') {
+                            cardPayload.sdr_owner_id = targetOwnerId;
+                        } else if (topology?.fase === 'Planner') {
+                            cardPayload.vendas_owner_id = targetOwnerId;
+                        } else if (topology?.fase === 'Pós-venda') {
+                            cardPayload.concierge_owner_id = targetOwnerId;
+                        }
                     }
 
                     if (existingCard) {
