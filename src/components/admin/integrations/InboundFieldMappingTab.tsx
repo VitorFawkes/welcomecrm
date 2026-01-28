@@ -29,13 +29,11 @@ const CONTACT_SECTION_LABELS: Record<string, string> = {
     other: '📝 Outros',
 };
 
-// AC Contact fields - using REAL webhook payload keys from AC
-// Standard fields: contact[field_name]
-// Custom fields: contact[fields][ID]
-const AC_CONTACT_FIELDS = [
-    // ============================================
-    // STANDARD AC CONTACT FIELDS (from payload root)
-    // ============================================
+// ============================================
+// STANDARD AC CONTACT FIELDS (campos padrão que sempre existem no payload)
+// Estes não vêm do catálogo, são fixos do ActiveCampaign
+// ============================================
+const AC_STANDARD_CONTACT_FIELDS = [
     { external_id: 'contact[id]', external_name: 'Contact ID (AC)', inferred_section: 'contact_standard' },
     { external_id: 'contact[first_name]', external_name: 'First Name', inferred_section: 'contact_standard' },
     { external_id: 'contact[last_name]', external_name: 'Last Name', inferred_section: 'contact_standard' },
@@ -43,63 +41,8 @@ const AC_CONTACT_FIELDS = [
     { external_id: 'contact[phone]', external_name: 'Phone', inferred_section: 'contact_standard' },
     { external_id: 'contact[orgname]', external_name: 'Account (Organization)', inferred_section: 'contact_standard' },
     { external_id: 'contact[tags]', external_name: 'Tags (AC)', inferred_section: 'contact_standard' },
-    { external_id: 'contact[ip]', external_name: 'IP Address', inferred_section: 'contact_tracking' },
-
-    // ============================================
-    // WT (TRIPS) CUSTOM FIELDS - IDs confirmados do payload
-    // ============================================
-    { external_id: 'contact[fields][306]', external_name: 'WT - E quem vai embarcar nessa viagem? (Família/Casal/etc)', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][309]', external_name: 'WT Qual é o investimento estimado por pessoa? (Até 20 mil, etc)', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][310]', external_name: 'Você já tem hospedagem contratada para essa viagem?', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][311]', external_name: 'O que você está buscando para essa viagem? (Viagem Personalizada, etc)', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][312]', external_name: 'Em quanto tempo você pretende fazer essa viagem? (3-6 meses)', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][69]', external_name: 'WT Mensagem (Sim/Não)', inferred_section: 'contact_preferences' },
-
-    // ============================================
-    // OTHER CUSTOM FIELDS FROM PAYLOAD
-    // ============================================
-    { external_id: 'contact[fields][40]', external_name: 'Campo Custom 40 (texto)', inferred_section: 'contact_custom' },
-    { external_id: 'contact[fields][42]', external_name: 'Campo Custom 42 (texto)', inferred_section: 'contact_custom' },
-    { external_id: 'contact[fields][56]', external_name: 'Data/Hora Conversão (timestamp ISO)', inferred_section: 'contact_tracking' },
-    { external_id: 'contact[fields][303]', external_name: 'WT - O que está buscando? (v1)', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][353]', external_name: 'wt_primeiro_contato', inferred_section: 'contact_custom' },
-    { external_id: 'contact[fields][40]', external_name: 'Campo Custom 40', inferred_section: 'contact_custom' },
-    { external_id: 'contact[fields][42]', external_name: 'Campo Custom 42', inferred_section: 'contact_custom' },
-
-    // ============================================
-    // MARKETING / UTM FIELDS - IDs CONFIRMADOS DO PAYLOAD
-    // ============================================
-    { external_id: 'contact[fields][46]', external_name: 'utm_source', inferred_section: 'contact_marketing' },
-    { external_id: 'contact[fields][47]', external_name: 'utm_medium', inferred_section: 'contact_marketing' },
-    { external_id: 'contact[fields][48]', external_name: 'utm_campaign', inferred_section: 'contact_marketing' },
-    { external_id: 'contact[fields][208]', external_name: 'utm_content', inferred_section: 'contact_marketing' },
-    { external_id: 'contact[fields][207]', external_name: 'utm_term', inferred_section: 'contact_marketing' },
-
-    // ============================================
-    // LOCALIZAÇÃO / ORIGEM - IDs CONFIRMADOS DO PAYLOAD
-    // ============================================
-    { external_id: 'contact[fields][17]', external_name: 'localização-cidade', inferred_section: 'contact_personal' },
-    { external_id: 'contact[fields][18]', external_name: 'localização - estado', inferred_section: 'contact_personal' },
-    { external_id: 'contact[fields][19]', external_name: 'data e hora da conversão', inferred_section: 'contact_tracking' },
-    { external_id: 'contact[fields][20]', external_name: 'nome do fluxo', inferred_section: 'contact_tracking' },
-    { external_id: 'contact[fields][21]', external_name: 'URL de referência', inferred_section: 'contact_tracking' },
-
-    // ============================================
-    // WEDDING / NY FIELDS (preserving existing)
-    // ============================================
-    { external_id: 'contact[fields][400]', external_name: 'NY - O que mais te atrai nessa experiência?', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][401]', external_name: 'NY - O que tornaria essa experiência perfeita?', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][402]', external_name: 'NY - Quanto você pretende investir', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][403]', external_name: 'WWP - Investimento ideal para convidado', inferred_section: 'contact_preferences' },
-    { external_id: 'contact[fields][404]', external_name: 'DW - Pretendem se casar no civil?', inferred_section: 'contact_preferences' },
-
-    // ============================================
-    // PERSONAL DATA FIELDS (common IDs - may need adjustment)
-    // ============================================
-    { external_id: 'contact[fields][500]', external_name: 'Data de nascimento', inferred_section: 'contact_personal' },
-    { external_id: 'contact[fields][501]', external_name: 'CPF', inferred_section: 'contact_personal' },
-    { external_id: 'contact[fields][502]', external_name: 'WhatsApp', inferred_section: 'contact_standard' },
 ];
+// NOTA: Campos customizados de contato (contact[fields][X]) vêm do catálogo dinâmico
 
 // AC Section labels based on AC structure
 const AC_SECTION_LABELS: Record<string, string> = {
@@ -280,8 +223,8 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
     const discoveredFields = useMemo(() => {
         const discovered: ExternalField[] = [];
         const existingIds = new Set(externalFields.map(f => f.external_id));
-        // Add hardcoded contact fields to existing IDs to avoid duplicates
-        AC_CONTACT_FIELDS.forEach(f => existingIds.add(f.external_id));
+        // Add standard contact fields to existing IDs to avoid duplicates
+        AC_STANDARD_CONTACT_FIELDS.forEach(f => existingIds.add(f.external_id));
 
         const seenInLogs = new Set<string>();
 
@@ -358,14 +301,32 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
     });
 
     // Group AC fields by their inferred section
+    // 100% DYNAMIC - uses catalog + standard fields only
     const acFieldsBySection = useMemo(() => {
         const grouped: Record<string, ExternalField[]> = {};
 
-        // For contacts, use the standard AC contact fields
-        // For deals, use the custom deal fields from the catalog
-        let fieldsToGroup: ExternalField[] = selectedEntityType === 'contact'
-            ? AC_CONTACT_FIELDS as ExternalField[]
-            : [...externalFields, ...discoveredFields]; // Include discovered fields for deals
+        // All catalog fields + discovered fields
+        const allCatalogFields = [...externalFields, ...discoveredFields];
+
+        let fieldsToGroup: ExternalField[] = [];
+
+        if (selectedEntityType === 'contact') {
+            // For contacts: standard fields + contact[*] from catalog
+            const standardFields = AC_STANDARD_CONTACT_FIELDS as ExternalField[];
+            const standardIds = new Set(standardFields.map(f => f.external_id));
+
+            // Contact custom fields from catalog (contact[fields][X])
+            const catalogContactFields = allCatalogFields.filter(f =>
+                f.external_id?.startsWith('contact[') && !standardIds.has(f.external_id)
+            );
+
+            fieldsToGroup = [...standardFields, ...catalogContactFields];
+        } else {
+            // For deals: only deal fields (NOT contact[*])
+            fieldsToGroup = allCatalogFields.filter(f =>
+                !f.external_id?.startsWith('contact[')
+            );
+        }
 
         // Filter by search term
         if (searchTerm) {
@@ -460,65 +421,93 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
         return options;
     }, [selectedEntityType, systemFields]);
 
+    // Helper: Infer storage_location from local_field_key
+    const inferStorageLocation = (localFieldKey: string): string => {
+        if (localFieldKey.startsWith('__briefing_inicial__')) return 'briefing_inicial';
+        if (localFieldKey.startsWith('__produto_data__')) return 'produto_data';
+        if (localFieldKey.startsWith('__marketing_data__')) return 'marketing_data';
+        if (localFieldKey.startsWith('contact.')) return 'marketing_data'; // Contact fields go to marketing_data on card
+        if (localFieldKey.startsWith('card.')) return 'marketing_data'; // Card custom fields go to marketing_data
+        // Default: marketing_data (safe fallback for all inbound mappings)
+        return 'marketing_data';
+    };
+
+    // Helper: Infer correct entity_type from external_field_id
+    const inferEntityType = (externalFieldId: string, selectedType: string): string => {
+        // If external field is from contact (contact[fields][X] or contact[X]), entity should be 'contact'
+        if (externalFieldId.startsWith('contact[')) return 'contact';
+        // If external field is from deal (deal[fields][X] or just numeric ID), entity should be 'deal'
+        if (externalFieldId.startsWith('deal[') || /^\d+$/.test(externalFieldId)) return 'deal';
+        // Fallback to user selection
+        return selectedType;
+    };
+
     // Upsert mapping mutation
+    // CONSTRAINT: (integration_id, external_field_id, entity_type, COALESCE(external_pipeline_id, ''))
+    // IMPORTANT: Supabase JS onConflict does NOT support COALESCE expressions.
+    // Solution: DELETE existing + INSERT new (atomic sequence matching constraint fields exactly)
     const upsertMapping = useMutation({
         mutationFn: async ({ externalFieldId, localFieldKey }: { externalFieldId: string; localFieldKey: string | null }) => {
-            if (!localFieldKey) {
-                // Delete mapping
-                const deleteQuery = supabase
-                    .from('integration_field_map')
-                    .delete()
-                    .eq('integration_id', integrationId)
-                    .eq('external_field_id', externalFieldId)
-                    .eq('entity_type', selectedEntityType)
-                    .eq('direction', 'inbound');
+            // Infer correct entity_type based on external_field_id
+            const correctEntityType = inferEntityType(externalFieldId, selectedEntityType);
 
-                if (selectedEntityType === 'deal' && selectedPipelineId) {
-                    deleteQuery.eq('external_pipeline_id', selectedPipelineId);
-                }
+            // Determine pipeline_id (NULL for contacts)
+            const pipelineId = correctEntityType === 'deal' && selectedPipelineId
+                ? selectedPipelineId
+                : null;
 
-                const { error } = await deleteQuery;
-                if (error) throw error;
+            // Build delete query matching the UNIQUE constraint fields
+            // For NULL pipeline_id, use .is('external_pipeline_id', null)
+            // For non-NULL, use .eq('external_pipeline_id', pipelineId)
+            let deleteQuery = supabase
+                .from('integration_field_map')
+                .delete()
+                .eq('integration_id', integrationId)
+                .eq('external_field_id', externalFieldId)
+                .eq('entity_type', correctEntityType);
+
+            if (pipelineId === null) {
+                deleteQuery = deleteQuery.is('external_pipeline_id', null);
             } else {
-                // Upsert mapping
-                const mappingData = {
+                deleteQuery = deleteQuery.eq('external_pipeline_id', pipelineId);
+            }
+
+            // Step 1: Always delete existing mapping (if any)
+            const { error: deleteError } = await deleteQuery;
+            if (deleteError) {
+                console.error('Delete error:', deleteError);
+                throw deleteError;
+            }
+
+            // Step 2: If localFieldKey provided, insert new mapping
+            if (localFieldKey) {
+                const storageLocation = inferStorageLocation(localFieldKey);
+
+                const newMapping = {
                     integration_id: integrationId,
                     external_field_id: externalFieldId,
                     local_field_key: localFieldKey,
-                    entity_type: selectedEntityType,
+                    entity_type: correctEntityType,
                     source: 'active_campaign',
                     direction: 'inbound',
-                    external_pipeline_id: selectedEntityType === 'deal' ? selectedPipelineId : null,
+                    external_pipeline_id: pipelineId,
                     sync_always: true,
                     is_active: true,
+                    storage_location: storageLocation,
+                    created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
 
-                // Try insert, if conflict update
                 const { error: insertError } = await supabase
                     .from('integration_field_map')
-                    .insert(mappingData);
+                    .insert(newMapping);
 
                 if (insertError) {
-                    // Update existing
-                    const updateQuery = supabase
-                        .from('integration_field_map')
-                        .update({
-                            local_field_key: localFieldKey,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('integration_id', integrationId)
-                        .eq('external_field_id', externalFieldId)
-                        .eq('entity_type', selectedEntityType);
-
-                    if (selectedEntityType === 'deal' && selectedPipelineId) {
-                        updateQuery.eq('external_pipeline_id', selectedPipelineId);
-                    }
-
-                    const { error: updateError } = await updateQuery;
-                    if (updateError) throw updateError;
+                    console.error('Insert error:', insertError);
+                    throw insertError;
                 }
             }
+            // If localFieldKey is null/empty, the delete already removed the mapping
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['inbound-field-mappings'] });
@@ -576,9 +565,11 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
         return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
     });
 
+    // Count total fields from catalog (dynamic)
+    const allCatalogFields = [...externalFields, ...discoveredFields];
     const totalACFields = selectedEntityType === 'contact'
-        ? AC_CONTACT_FIELDS.length
-        : externalFields.length;
+        ? AC_STANDARD_CONTACT_FIELDS.length + allCatalogFields.filter(f => f.external_id?.startsWith('contact[')).length
+        : allCatalogFields.filter(f => !f.external_id?.startsWith('contact[')).length;
     const mappedCount = existingMappings.length;
 
     return (
