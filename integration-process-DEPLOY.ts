@@ -824,7 +824,7 @@ Deno.serve(async (req) => {
                     // If they ARE mapped, 'topLevelUpdates' has the value (or not, if skipped).
 
                     // Refinement:
-                    // If 'valor_estimado' is NOT in topLevelUpdates (because it was protected), 
+                    // If 'valor_estimado' is NOT in topLevelUpdates (because it was protected),
                     // we should NOT use the 'value' variable from AC payload either!
                     // We need to check if these standard fields were "attempted" to be updated via mapping.
 

@@ -273,6 +273,9 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
     }, [recentEvents, externalFields]);
 
     // 4. Fetch existing inbound mappings
+    // NOTE: Due to historical data inconsistency, external_pipeline_id can be either NULL or ''
+    // for records without a pipeline. The constraint uses COALESCE(external_pipeline_id, '')
+    // which treats both as equivalent.
     const { data: existingMappings = [], isLoading: loadingMappings } = useQuery({
         queryKey: ['inbound-field-mappings', integrationId, selectedPipelineId, selectedEntityType],
         queryFn: async () => {
@@ -289,9 +292,10 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
                 query = query.eq('external_pipeline_id', selectedPipelineId);
             }
 
-            // For contacts, get mappings without pipeline
-            if (selectedEntityType === 'contact') {
-                query = query.is('external_pipeline_id', null);
+            // For contacts (or deals without selected pipeline), get mappings without pipeline
+            // Must match BOTH null AND '' due to legacy data inconsistency
+            if (selectedEntityType === 'contact' || !selectedPipelineId) {
+                query = query.or('external_pipeline_id.is.null,external_pipeline_id.eq.');
             }
 
             const { data, error } = await query;
@@ -443,46 +447,84 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
     };
 
     // Upsert mapping mutation
+    // ===================================================================================
     // CONSTRAINT: (integration_id, external_field_id, entity_type, COALESCE(external_pipeline_id, ''))
-    // IMPORTANT: Supabase JS onConflict does NOT support COALESCE expressions.
-    // Solution: DELETE existing + INSERT new (atomic sequence matching constraint fields exactly)
+    //
+    // CRITICAL UNDERSTANDING:
+    // - The constraint uses COALESCE, which means NULL and '' are treated as EQUIVALENT
+    // - Supabase JS .upsert() with onConflict does NOT support COALESCE expressions
+    // - Historical data has BOTH null AND '' (empty string) for contacts without pipeline
+    //
+    // SOLUTION: DELETE + INSERT with proper handling of NULL vs '' equivalence
+    // - DELETE must match BOTH null AND '' when no pipeline (to handle legacy data)
+    // - INSERT uses '' (empty string) to be consistent with COALESCE behavior
+    // ===================================================================================
     const upsertMapping = useMutation({
         mutationFn: async ({ externalFieldId, localFieldKey }: { externalFieldId: string; localFieldKey: string | null }) => {
             // Infer correct entity_type based on external_field_id
             const correctEntityType = inferEntityType(externalFieldId, selectedEntityType);
 
-            // Determine pipeline_id (NULL for contacts)
+            // Determine pipeline_id:
+            // - For deals with selected pipeline: use the pipeline ID
+            // - For contacts or deals without pipeline: use '' (empty string) to match COALESCE behavior
             const pipelineId = correctEntityType === 'deal' && selectedPipelineId
                 ? selectedPipelineId
-                : null;
+                : '';  // Use empty string, not null, to match COALESCE(external_pipeline_id, '')
 
-            // Build delete query matching the UNIQUE constraint fields
-            // For NULL pipeline_id, use .is('external_pipeline_id', null)
-            // For non-NULL, use .eq('external_pipeline_id', pipelineId)
-            let deleteQuery = supabase
-                .from('integration_field_map')
-                .delete()
-                .eq('integration_id', integrationId)
-                .eq('external_field_id', externalFieldId)
-                .eq('entity_type', correctEntityType);
+            // Step 1: DELETE existing mapping(s)
+            // For no-pipeline case, we must delete BOTH null AND '' records (legacy data inconsistency)
+            if (pipelineId === '') {
+                // Delete records with NULL external_pipeline_id
+                const { error: deleteNullError } = await supabase
+                    .from('integration_field_map')
+                    .delete()
+                    .eq('integration_id', integrationId)
+                    .eq('external_field_id', externalFieldId)
+                    .eq('entity_type', correctEntityType)
+                    .is('external_pipeline_id', null);
 
-            if (pipelineId === null) {
-                deleteQuery = deleteQuery.is('external_pipeline_id', null);
+                if (deleteNullError) {
+                    console.error('Delete (null) error:', deleteNullError);
+                    throw deleteNullError;
+                }
+
+                // Delete records with empty string external_pipeline_id
+                const { error: deleteEmptyError } = await supabase
+                    .from('integration_field_map')
+                    .delete()
+                    .eq('integration_id', integrationId)
+                    .eq('external_field_id', externalFieldId)
+                    .eq('entity_type', correctEntityType)
+                    .eq('external_pipeline_id', '');
+
+                if (deleteEmptyError) {
+                    console.error('Delete (empty) error:', deleteEmptyError);
+                    throw deleteEmptyError;
+                }
             } else {
-                deleteQuery = deleteQuery.eq('external_pipeline_id', pipelineId);
-            }
+                // For specific pipeline, just delete exact match
+                const { error: deleteError } = await supabase
+                    .from('integration_field_map')
+                    .delete()
+                    .eq('integration_id', integrationId)
+                    .eq('external_field_id', externalFieldId)
+                    .eq('entity_type', correctEntityType)
+                    .eq('external_pipeline_id', pipelineId);
 
-            // Step 1: Always delete existing mapping (if any)
-            const { error: deleteError } = await deleteQuery;
-            if (deleteError) {
-                console.error('Delete error:', deleteError);
-                throw deleteError;
+                if (deleteError) {
+                    console.error('Delete error:', deleteError);
+                    throw deleteError;
+                }
             }
 
             // Step 2: If localFieldKey provided, insert new mapping
             if (localFieldKey) {
                 const storageLocation = inferStorageLocation(localFieldKey);
 
+                // Table schema: id, source, entity_type, external_field_id, local_field_key,
+                // direction, integration_id, section, external_pipeline_id, sync_always,
+                // is_active, updated_at, storage_location, db_column_name
+                // NOTE: No created_at column exists in this table
                 const newMapping = {
                     integration_id: integrationId,
                     external_field_id: externalFieldId,
@@ -490,11 +532,10 @@ export function InboundFieldMappingTab({ integrationId }: InboundFieldMappingTab
                     entity_type: correctEntityType,
                     source: 'active_campaign',
                     direction: 'inbound',
-                    external_pipeline_id: pipelineId,
+                    external_pipeline_id: pipelineId,  // '' for no pipeline, actual ID for deals
                     sync_always: true,
                     is_active: true,
                     storage_location: storageLocation,
-                    created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
 

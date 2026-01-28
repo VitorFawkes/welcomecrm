@@ -26,3 +26,15 @@ dist-ssr
 .vercel
 .env*.local
 lint_output.txt
+
+
+# Claude IDE secrets (nunca commitar!)
+.claude/secrets.json
+
+# Reports and temporary files
+*.docx
+*_REPORT.md
+*_INDEX.txt
+*_SUMMARY.txt
+*_SUMMARY.md
+*.bak
