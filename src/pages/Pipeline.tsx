@@ -274,7 +274,10 @@ export default function Pipeline() {
 
 
                 {/* Board Container: Fills remaining space, passes padding prop for alignment */}
-                <div className="flex-1 min-h-0 relative">
+                <div className={cn(
+                    "flex-1 min-h-0 relative",
+                    viewType === 'list' && "overflow-y-auto"
+                )}>
                     {viewType === 'kanban' ? (
                         <KanbanBoard
                             productFilter={currentProduct}
