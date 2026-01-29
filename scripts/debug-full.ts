@@ -4,8 +4,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://szyrzxvlptqqheizyrxu.supabase.co';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6eXJ6eHZscHRxcWhlaXp5cnh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDE4OTIyMywiZXhwIjoyMDc5NzY1MjIzfQ.sb_secret_RFrk_cRPCfIES5-wrwfHiQ_LskCpaab';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://szyrzxvlptqqheizyrxu.supabase.co';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+if (!SERVICE_ROLE_KEY) {
+  console.error('Error: SUPABASE_SERVICE_ROLE_KEY is required.');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -26,7 +31,7 @@ async function diagnose() {
   } else if (triggers && triggers.length > 0) {
     console.log(`  ⚠️  ${triggers.length} TRIGGER(S) ATIVO(S) - Isso está filtrando eventos!\n`);
     triggers.forEach((t, i) => {
-      console.log(`  [${i+1}] Pipeline: ${t.external_pipeline_id} | Stage: ${t.external_stage_id}`);
+      console.log(`  [${i + 1}] Pipeline: ${t.external_pipeline_id} | Stage: ${t.external_stage_id}`);
       console.log(`      Entidades: ${t.entity_types?.join(', ') || 'N/A'}`);
       console.log(`      Ação: ${t.action_type}`);
       console.log(`      Descrição: ${t.description || 'N/A'}`);
@@ -108,9 +113,9 @@ async function diagnose() {
   if (statusCounts) {
     Object.entries(statusCounts).forEach(([status, count]) => {
       const icon = status === 'processed' ? '✅' :
-                   status === 'pending' ? '⏳' :
-                   status === 'failed' ? '❌' :
-                   status === 'ignored' ? '🚫' : '❓';
+        status === 'pending' ? '⏳' :
+          status === 'failed' ? '❌' :
+            status === 'ignored' ? '🚫' : '❓';
       console.log(`  ${icon} ${status}: ${count}`);
     });
   }
@@ -129,7 +134,7 @@ async function diagnose() {
     pendingEvents.forEach((e, i) => {
       const stage = e.payload?.stage || e.payload?.stage_id || e.payload?.['deal[stageid]'] || '?';
       const pipeline = e.payload?.pipeline || e.payload?.pipeline_id || e.payload?.['deal[pipelineid]'] || '?';
-      console.log(`  [${i+1}] Deal ${e.external_id} | Pipeline ${pipeline} | Stage ${stage}`);
+      console.log(`  [${i + 1}] Deal ${e.external_id} | Pipeline ${pipeline} | Stage ${stage}`);
     });
   } else {
     console.log('  Nenhum evento pendente');
@@ -147,7 +152,7 @@ async function diagnose() {
 
   if (failedEvents && failedEvents.length > 0) {
     failedEvents.forEach((e, i) => {
-      console.log(`  [${i+1}] Deal ${e.external_id}`);
+      console.log(`  [${i + 1}] Deal ${e.external_id}`);
       console.log(`      Erro: ${e.processing_log}`);
       console.log('');
     });

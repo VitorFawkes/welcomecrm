@@ -4,8 +4,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://szyrzxvlptqqheizyrxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6eXJ6eHZscHRxcWhlaXp5cnh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxODkyMjMsImV4cCI6MjA3OTc2NTIyM30.nfzDHPWE7gjEztY9wY7sh_hSyu_xNZlkFqrYZ3KKQsw';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://szyrzxvlptqqheizyrxu.supabase.co';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || '';
+
+if (!SUPABASE_ANON_KEY) {
+  console.error('Error: SUPABASE_ANON_KEY or VITE_SUPABASE_KEY is required.');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -45,22 +50,22 @@ async function debug() {
       data.forEach((row, i) => {
         // Mostrar campos principais dependendo da tabela
         if (table === 'integrations') {
-          console.log(`     ${i+1}. provider=${row.provider}, is_active=${row.is_active}, id=${row.id}`);
+          console.log(`     ${i + 1}. provider=${row.provider}, is_active=${row.is_active}, id=${row.id}`);
         } else if (table === 'integration_stage_map') {
-          console.log(`     ${i+1}. pipeline=${row.pipeline_id}, ext_stage=${row.external_stage_id} -> int_stage=${row.internal_stage_id?.substring(0,8)}...`);
+          console.log(`     ${i + 1}. pipeline=${row.pipeline_id}, ext_stage=${row.external_stage_id} -> int_stage=${row.internal_stage_id?.substring(0, 8)}...`);
         } else if (table === 'integration_user_map') {
-          console.log(`     ${i+1}. ext_user=${row.external_user_id} -> int_user=${row.internal_user_id?.substring(0,8)}...`);
+          console.log(`     ${i + 1}. ext_user=${row.external_user_id} -> int_user=${row.internal_user_id?.substring(0, 8)}...`);
         } else if (table === 'integration_field_map') {
-          console.log(`     ${i+1}. ext_field=${row.external_field_id} -> local=${row.local_field_key}`);
+          console.log(`     ${i + 1}. ext_field=${row.external_field_id} -> local=${row.local_field_key}`);
         } else if (table === 'integration_catalog') {
-          console.log(`     ${i+1}. type=${row.entity_type}, ext_id=${row.external_id}, name=${row.external_name?.substring(0,30)}`);
+          console.log(`     ${i + 1}. type=${row.entity_type}, ext_id=${row.external_id}, name=${row.external_name?.substring(0, 30)}`);
         } else if (table === 'integration_settings') {
-          const val = row.value?.length > 30 ? row.value.substring(0,30) + '...' : row.value;
-          console.log(`     ${i+1}. ${row.key} = ${val}`);
+          const val = row.value?.length > 30 ? row.value.substring(0, 30) + '...' : row.value;
+          console.log(`     ${i + 1}. ${row.key} = ${val}`);
         } else if (table === 'integration_events') {
-          console.log(`     ${i+1}. status=${row.status}, type=${row.event_type}, ext_id=${row.external_id}`);
+          console.log(`     ${i + 1}. status=${row.status}, type=${row.event_type}, ext_id=${row.external_id}`);
         } else {
-          console.log(`     ${i+1}.`, JSON.stringify(row).substring(0, 100));
+          console.log(`     ${i + 1}.`, JSON.stringify(row).substring(0, 100));
         }
       });
     }
@@ -87,7 +92,7 @@ async function debug() {
 
       if (stages) {
         stages.forEach(s => {
-          console.log(`    - ${s.nome} (ordem: ${s.ordem}, id: ${s.id.substring(0,8)}...)`);
+          console.log(`    - ${s.nome} (ordem: ${s.ordem}, id: ${s.id.substring(0, 8)}...)`);
         });
       }
     }

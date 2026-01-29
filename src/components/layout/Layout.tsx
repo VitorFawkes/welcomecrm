@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Sidebar from './Sidebar'
 import { ThemeBoundary } from "../ui/ThemeBoundary";
 import { useProposalNotifications } from '@/hooks/useProposalNotifications';
+import { usePipelinePersistence } from '@/hooks/usePipelinePersistence';
 import { GlobalSearchProvider } from '@/components/search/GlobalSearchProvider';
 import { GlobalSearchModal } from '@/components/search/GlobalSearchModal';
 
@@ -12,6 +13,8 @@ export default function Layout() {
 
     // Enable real-time proposal notifications
     useProposalNotifications()
+    // Enable per-user pipeline filter persistence
+    usePipelinePersistence()
 
     if (loading) {
         return (

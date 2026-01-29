@@ -2,8 +2,14 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Hardcoded credentials from seed_activities.ts for convenience in this script
-const supabaseUrl = 'https://szyrzxvlptqqheizyrxu.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6eXJ6eHZscHRxcWhlaXp5cnh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxODkyMjMsImV4cCI6MjA3OTc2NTIyM30.nfzDHPWE7gjEztY9wY7sh_hSyu_xNZlkFqrYZ3KKQsw'
+// Credentials should be loaded from environment
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://szyrzxvlptqqheizyrxu.supabase.co'
+const supabaseKey = process.env.VITE_SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || ''
+
+if (!supabaseKey) {
+    console.error('Error: SUPABASE_ANON_KEY or VITE_SUPABASE_KEY is required.')
+    process.exit(1)
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
