@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -500,6 +500,120 @@ export type Database = {
         }
         Relationships: []
       }
+      card_auto_creation_rules: {
+        Row: {
+          copy_contacts: boolean | null
+          copy_title: boolean | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          source_owner_ids: string[] | null
+          source_pipeline_ids: string[]
+          source_stage_ids: string[]
+          target_owner_id: string | null
+          target_owner_mode: string
+          target_pipeline_id: string
+          target_stage_id: string
+          title_prefix: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          copy_contacts?: boolean | null
+          copy_title?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          source_owner_ids?: string[] | null
+          source_pipeline_ids: string[]
+          source_stage_ids: string[]
+          target_owner_id?: string | null
+          target_owner_mode?: string
+          target_pipeline_id: string
+          target_stage_id: string
+          title_prefix?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          copy_contacts?: boolean | null
+          copy_title?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          source_owner_ids?: string[] | null
+          source_pipeline_ids?: string[]
+          source_stage_ids?: string[]
+          target_owner_id?: string | null
+          target_owner_mode?: string
+          target_pipeline_id?: string
+          target_stage_id?: string
+          title_prefix?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_auto_creation_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_auto_creation_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "card_auto_creation_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_auto_creation_rules_target_owner_id_fkey"
+            columns: ["target_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_auto_creation_rules_target_owner_id_fkey"
+            columns: ["target_owner_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "card_auto_creation_rules_target_owner_id_fkey"
+            columns: ["target_owner_id"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_auto_creation_rules_target_pipeline_id_fkey"
+            columns: ["target_pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_auto_creation_rules_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_creation_rules: {
         Row: {
           created_at: string | null
@@ -685,6 +799,7 @@ export type Database = {
           condicoes_pagamento: string | null
           created_at: string | null
           created_by: string | null
+          data_fechamento: string | null
           data_pronto_erp: string | null
           data_viagem_fim: string | null
           data_viagem_inicio: string | null
@@ -701,10 +816,12 @@ export type Database = {
           id: string
           is_group_parent: boolean | null
           marketing_data: Json | null
+          mkt_buscando_para_viagem: string | null
           moeda: string | null
           motivo_perda_comentario: string | null
           motivo_perda_id: string | null
           origem: string | null
+          origem_lead: string | null
           parent_card_id: string | null
           pessoa_principal_id: string | null
           pipeline_id: string
@@ -728,6 +845,11 @@ export type Database = {
           titulo: string
           updated_at: string | null
           updated_by: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
           valor_estimado: number | null
           valor_final: number | null
           vendas_owner_id: string | null
@@ -742,6 +864,7 @@ export type Database = {
           condicoes_pagamento?: string | null
           created_at?: string | null
           created_by?: string | null
+          data_fechamento?: string | null
           data_pronto_erp?: string | null
           data_viagem_fim?: string | null
           data_viagem_inicio?: string | null
@@ -758,10 +881,12 @@ export type Database = {
           id?: string
           is_group_parent?: boolean | null
           marketing_data?: Json | null
+          mkt_buscando_para_viagem?: string | null
           moeda?: string | null
           motivo_perda_comentario?: string | null
           motivo_perda_id?: string | null
           origem?: string | null
+          origem_lead?: string | null
           parent_card_id?: string | null
           pessoa_principal_id?: string | null
           pipeline_id: string
@@ -785,6 +910,11 @@ export type Database = {
           titulo: string
           updated_at?: string | null
           updated_by?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           valor_estimado?: number | null
           valor_final?: number | null
           vendas_owner_id?: string | null
@@ -799,6 +929,7 @@ export type Database = {
           condicoes_pagamento?: string | null
           created_at?: string | null
           created_by?: string | null
+          data_fechamento?: string | null
           data_pronto_erp?: string | null
           data_viagem_fim?: string | null
           data_viagem_inicio?: string | null
@@ -815,10 +946,12 @@ export type Database = {
           id?: string
           is_group_parent?: boolean | null
           marketing_data?: Json | null
+          mkt_buscando_para_viagem?: string | null
           moeda?: string | null
           motivo_perda_comentario?: string | null
           motivo_perda_id?: string | null
           origem?: string | null
+          origem_lead?: string | null
           parent_card_id?: string | null
           pessoa_principal_id?: string | null
           pipeline_id?: string
@@ -842,6 +975,11 @@ export type Database = {
           titulo?: string
           updated_at?: string | null
           updated_by?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           valor_estimado?: number | null
           valor_final?: number | null
           vendas_owner_id?: string | null
@@ -1781,6 +1919,7 @@ export type Database = {
       }
       integration_field_map: {
         Row: {
+          db_column_name: string | null
           direction: string | null
           entity_type: string
           external_field_id: string
@@ -1791,10 +1930,12 @@ export type Database = {
           local_field_key: string
           section: string | null
           source: string
+          storage_location: string | null
           sync_always: boolean | null
           updated_at: string | null
         }
         Insert: {
+          db_column_name?: string | null
           direction?: string | null
           entity_type: string
           external_field_id: string
@@ -1805,10 +1946,12 @@ export type Database = {
           local_field_key: string
           section?: string | null
           source?: string
+          storage_location?: string | null
           sync_always?: boolean | null
           updated_at?: string | null
         }
         Update: {
+          db_column_name?: string | null
           direction?: string | null
           entity_type?: string
           external_field_id?: string
@@ -1819,6 +1962,7 @@ export type Database = {
           local_field_key?: string
           section?: string | null
           source?: string
+          storage_location?: string | null
           sync_always?: boolean | null
           updated_at?: string | null
         }
@@ -2507,6 +2651,33 @@ export type Database = {
           ativo?: boolean | null
           id?: string
           nome?: string
+        }
+        Relationships: []
+      }
+      organization_settings: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: Json
         }
         Relationships: []
       }
@@ -5938,6 +6109,7 @@ export type Database = {
           concierge_owner_id: string | null
           condicoes_pagamento: string | null
           created_at: string | null
+          data_fechamento: string | null
           data_viagem_inicio: string | null
           destinos: Json | null
           dias_ate_viagem: number | null
@@ -6195,6 +6367,16 @@ export type Database = {
     }
     Functions: {
       auto_expire_proposals: { Args: never; Returns: number }
+      delete_user: { Args: { user_id: string }; Returns: undefined }
+      describe_table: {
+        Args: { p_table: string }
+        Returns: {
+          column_name: string
+          data_type: string
+          is_nullable: string
+        }[]
+      }
+      exec_sql: { Args: { query: string }; Returns: Json }
       f_unaccent: { Args: { "": string }; Returns: string }
       find_contact_by_whatsapp: {
         Args: { p_convo_id: string; p_phone: string }
@@ -6224,10 +6406,10 @@ export type Database = {
       }
       generate_invite: {
         Args: {
-          p_created_by?: string
+          p_created_by: string
           p_email: string
           p_role: string
-          p_team_id?: string
+          p_team_id: string
         }
         Returns: string
       }
@@ -6272,12 +6454,17 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_admin_or_manager: { Args: never; Returns: boolean }
-      is_card_owner: { Args: { p_card_id: string }; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
       is_manager_or_admin: { Args: never; Returns: boolean }
       is_operational: { Args: never; Returns: boolean }
-      is_privileged_user: { Args: never; Returns: boolean }
       jsonb_get_path: { Args: { data: Json; path: string }; Returns: string }
+      list_all_tables: {
+        Args: never
+        Returns: {
+          row_estimate: number
+          table_name: string
+        }[]
+      }
       match_documents_v2: {
         Args: {
           filter: Json
@@ -6315,10 +6502,6 @@ export type Database = {
           }
       normalize_phone: { Args: { phone_number: string }; Returns: string }
       normalize_phone_robust: { Args: { p_phone: string }; Returns: string[] }
-      pode_avancar_etapa: {
-        Args: { p_card_id: string; p_nova_etapa_id: string }
-        Returns: boolean
-      }
       process_all_pending_whatsapp_events: { Args: never; Returns: Json }
       process_pending_whatsapp_events: { Args: never; Returns: Json }
       process_task_queue: { Args: never; Returns: number }
@@ -6328,6 +6511,14 @@ export type Database = {
         Returns: Json
       }
       revoke_api_key: { Args: { p_key_id: string }; Returns: boolean }
+      safe_log_trigger_error: {
+        Args: {
+          p_context?: Json
+          p_error_message: string
+          p_function_name: string
+        }
+        Returns: undefined
+      }
       save_workflow_definition: {
         Args: {
           p_description: string

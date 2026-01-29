@@ -8,6 +8,16 @@ import {
     TableHeader,
     TableRow
 } from '../../components/ui/Table';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -34,6 +44,7 @@ export default function UserManagement() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
     // Get roles for display
     const { roles } = useRoles();
@@ -64,11 +75,10 @@ export default function UserManagement() {
     };
 
     const handleDeleteUser = async (userId: string) => {
-        if (!confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) return;
-
         try {
             await deleteUser.mutateAsync(userId);
             toast({ title: 'Sucesso', description: 'Usuário excluído com sucesso.', type: 'success' });
+            setUserToDelete(null);
         } catch (error) {
             console.error('Error deleting user:', error);
             toast({ title: 'Erro', description: 'Falha ao excluir usuário.', type: 'error' });
@@ -229,7 +239,7 @@ export default function UserManagement() {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        onClick={() => setUserToDelete(user.id)}
                                                         className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
                                                         title="Excluir Usuário"
                                                     >
@@ -269,6 +279,26 @@ export default function UserManagement() {
                 teams={teams}
                 onSuccess={refetchUsers}
             />
+
+            <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita e removerá o acesso ao sistema.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => userToDelete && handleDeleteUser(userToDelete)}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            Excluir
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
