@@ -335,9 +335,9 @@ async function executeAction(supabase, node, instance) {
                 card?.created_by;
 
             if (!responsavelId) {
-                console.warn(`No owner found for card ${instance.card_id}. Task will be unassigned.`);
-                // Optional: Assign to a default admin or keep null (if DB allows, but it doesn't)
-                // We will let it fail if absolutely no one is found, but this covers 99% of cases.
+                console.warn(`No owner found for card ${instance.card_id}. Assigning to Fallback Admin.`);
+                // Fallback to Vitor Gambetti (Admin)
+                responsavelId = "dfdc4512-d842-4487-be80-11df91f24057";
             }
         } else if (config.assign_to?.startsWith("role:")) {
             // Handle Role Assignment (e.g. role:sdr)
@@ -362,7 +362,12 @@ async function executeAction(supabase, node, instance) {
                     .eq("id", instance.card_id)
                     .single();
                 responsavelId = card?.dono_atual_id || card?.created_by;
-                console.warn(`No active user found for role ${roleKey}. Falling back to card owner.`);
+
+                if (!responsavelId) {
+                    // Fallback to Vitor Gambetti (Admin)
+                    responsavelId = "dfdc4512-d842-4487-be80-11df91f24057";
+                }
+                console.warn(`No active user found for role ${roleKey}. Falling back to card owner/admin.`);
             }
         }
 

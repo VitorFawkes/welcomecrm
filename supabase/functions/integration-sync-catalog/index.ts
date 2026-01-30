@@ -9,7 +9,7 @@ const corsHeaders = {
  * Fetch ALL pages from ActiveCampaign API with pagination.
  * Simplified version - only syncs custom fields (fastest).
  */
-async function fetchAllFields(
+async function fetchDealFields(
     baseUrl: string,
     apiKey: string
 ): Promise<{ id: string; fieldLabel: string }[]> {
@@ -23,11 +23,38 @@ async function fetchAllFields(
         });
 
         if (!res.ok) {
-            throw new Error(`AC API error: ${res.status}`);
+            throw new Error(`AC API error (Deals): ${res.status}`);
         }
 
         const data = await res.json();
         const fields = data.dealCustomFieldMeta || [];
+        allFields.push(...fields);
+
+        if (fields.length < limit) break;
+        offset += limit;
+    }
+    return allFields;
+}
+
+async function fetchContactFields(
+    baseUrl: string,
+    apiKey: string
+): Promise<{ id: string; title: string }[]> {
+    const allFields: { id: string; title: string }[] = [];
+    const limit = 100;
+    let offset = 0;
+
+    while (true) {
+        const res = await fetch(`${baseUrl}/api/3/fields?limit=${limit}&offset=${offset}`, {
+            headers: { 'Api-Token': apiKey }
+        });
+
+        if (!res.ok) {
+            throw new Error(`AC API error (Contacts): ${res.status}`);
+        }
+
+        const data = await res.json();
+        const fields = data.fields || [];
         allFields.push(...fields);
 
         if (fields.length < limit) break;
@@ -72,18 +99,31 @@ Deno.serve(async (req) => {
             throw new Error('No AC integration found');
         }
 
-        // Fetch ALL fields with pagination
-        const fields = await fetchAllFields(AC_API_URL, AC_API_KEY);
+        // Fetch Deal fields
+        const dealFields = await fetchDealFields(AC_API_URL, AC_API_KEY);
+
+        // Fetch Contact fields
+        const contactFields = await fetchContactFields(AC_API_URL, AC_API_KEY);
 
         // Batch upsert
-        const entries = fields.map(f => ({
-            integration_id: integration.id,
-            entity_type: 'field',
-            external_id: f.id,
-            external_name: f.fieldLabel,
-            parent_external_id: '',
-            metadata: f
-        }));
+        const entries = [
+            ...dealFields.map(f => ({
+                integration_id: integration.id,
+                entity_type: 'field', // or 'deal_field' if we want to distinguish
+                external_id: f.id,
+                external_name: f.fieldLabel,
+                parent_external_id: '',
+                metadata: { ...f, type: 'deal' }
+            })),
+            ...contactFields.map(f => ({
+                integration_id: integration.id,
+                entity_type: 'field',
+                external_id: `contact[fields][${f.id}]`, // Prefix to match mapping logic
+                external_name: `${f.title} (Contact)`,
+                parent_external_id: '',
+                metadata: { ...f, type: 'contact' }
+            }))
+        ];
 
         const { error } = await supabase
             .from('integration_catalog')

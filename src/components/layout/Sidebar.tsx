@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Kanban, Users, Settings, FileText, ChevronRight, User, BarChart3, Plane } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, Settings, FileText, ChevronRight, User, BarChart3, Plane, LogOut } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { ProductSwitcher } from './ProductSwitcher'
 import { useAuth } from '../../contexts/AuthContext'
@@ -19,7 +19,7 @@ const navigation = [
 
 export default function Sidebar() {
     const location = useLocation()
-    const { session } = useAuth()
+    const { session, signOut } = useAuth()
     const [isExpanded, setIsExpanded] = useState(false)
 
     const userInitials = session?.user?.email?.substring(0, 2).toUpperCase() || 'U'
@@ -103,6 +103,13 @@ export default function Sidebar() {
                                 <span className="text-xs text-primary-light truncate">{session?.user?.email}</span>
                             </div>
                             <NotificationCenter triggerClassName="text-primary-light hover:text-white hover:bg-primary/20" />
+                            <button
+                                onClick={() => signOut()}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-light hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                                title="Sair"
+                            >
+                                <LogOut className="h-4 w-4" />
+                            </button>
                         </>
                     )}
                 </div>

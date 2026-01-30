@@ -26,3 +26,31 @@ dist-ssr
 .vercel
 .env*.local
 lint_output.txt
+
+
+# Claude IDE secrets (nunca commitar!)
+.claude/secrets.json
+.claude/settings.local.json
+
+# Scripts de debug com credenciais (NUNCA commitar!)
+debug_*.js
+debug_*.ts
+test-*.ts
+*-admin.ts
+scripts/debug-*.ts
+scripts/*-admin.ts
+update_card_contact.ts
+
+# Arquivos que podem conter secrets
+*.secret
+*.secrets
+*credentials*
+*_KEY*
+
+# Reports and temporary files
+*.docx
+*_REPORT.md
+*_INDEX.txt
+*_SUMMARY.txt
+*_SUMMARY.md
+*.bak

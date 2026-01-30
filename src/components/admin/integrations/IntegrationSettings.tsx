@@ -24,6 +24,7 @@ export function IntegrationSettings() {
         apiKey: ''
     });
     const [credentialsLoaded, setCredentialsLoaded] = useState(false);
+    const [ownerId, setOwnerId] = useState('');
 
     const { data: settings, isLoading } = useQuery({
         queryKey: ['integration-settings'],
@@ -289,28 +290,54 @@ export function IntegrationSettings() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">
+                        <div className="flex-1 max-w-xs">
+                            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                                Filtrar por Dono (ID do Usuário AC)
+                            </label>
+                            <Input
+                                placeholder="Ex: 1"
+                                value={ownerId}
+                                onChange={(e) => setOwnerId(e.target.value)}
+                                className="h-9"
+                            />
+                        </div>
                         <Button
                             variant="outline"
+                            className="mt-5"
                             onClick={async () => {
-                                const confirm = window.confirm('Isso irá buscar TODOS os negócios do ActiveCampaign e atualizar o CRM. Pode levar alguns minutos. Deseja continuar?');
+                                const confirm = window.confirm(`Isso irá buscar ${ownerId ? `apenas negócios do dono ${ownerId}` : 'TODOS os negócios'} do ActiveCampaign e atualizar o CRM. Pode levar alguns minutos. Deseja continuar?`);
                                 if (!confirm) return;
 
-                                const toastId = toast.loading('Iniciando sincronização...');
+                                const toastId = toast.loading('Sincronizando dados do ActiveCampaign...');
                                 try {
-                                    const { error } = await supabase.functions.invoke('integration-sync-deals', {
-                                        body: { force_update: true }
+                                    const { data, error } = await supabase.functions.invoke('integration-sync-deals', {
+                                        body: {
+                                            force_update: true,
+                                            owner_id: ownerId || undefined
+                                        }
                                     });
                                     if (error) throw error;
-                                    toast.success('Sincronização iniciada com sucesso!', { id: toastId });
+
+                                    const fetched = data?.deals_fetched || 0;
+                                    const processed = data?.events_processed || 0;
+                                    const processError = data?.process_error;
+
+                                    if (fetched === 0) {
+                                        toast.info('Nenhum deal encontrado para sincronizar.', { id: toastId });
+                                    } else if (processError) {
+                                        toast.warning(`${fetched} deals encontrados, mas houve erro no processamento: ${processError}`, { id: toastId });
+                                    } else {
+                                        toast.success(`✅ ${fetched} deals encontrados, ${processed} atualizados no CRM!`, { id: toastId });
+                                    }
                                 } catch (err: any) {
-                                    toast.error('Erro ao iniciar sincronização: ' + err.message, { id: toastId });
+                                    toast.error('Erro ao sincronizar: ' + err.message, { id: toastId });
                                 }
                             }}
                         >
                             <Zap className="w-4 h-4 mr-2" />
-                            Forçar Sincronização Completa
+                            Forçar Sincronização {ownerId ? 'Filtrada' : 'Completa'}
                         </Button>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground mt-5">
                             Use isso se perceber que dados estão desatualizados.
                         </p>
                     </div>

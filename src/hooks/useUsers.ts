@@ -58,10 +58,8 @@ export function useUsers() {
 
     const deleteUser = useMutation({
         mutationFn: async (userId: string) => {
-            const { error } = await supabase
-                .from('profiles')
-                .delete()
-                .eq('id', userId);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error } = await supabase.rpc('delete_user' as any, { user_id: userId });
 
             if (error) throw error;
             return userId;

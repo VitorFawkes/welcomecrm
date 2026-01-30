@@ -10,55 +10,19 @@ Deno.serve(async (req) => {
         return new Response('ok', { headers: corsHeaders })
     }
 
-    // Authentication: Accept EITHER service role key OR authenticated admin user
+    // Manual Service Key Validation (Robust Security)
+    // We disable Gateway JWT verification to avoid 401 issues with Service Role Key,
+    // but we enforce it here to ensure only authorized internal calls can trigger this.
     const authHeader = req.headers.get('Authorization');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 
-    let isAuthorized = false;
-    let authMethod = '';
-
-    // Method 1: Service Role Key (for webhooks, cron jobs, internal calls)
-    if (authHeader === `Bearer ${serviceRoleKey}`) {
-        isAuthorized = true;
-        authMethod = 'service_role';
-    }
-
-    // Method 2: Authenticated user with admin role (for frontend calls)
-    if (!isAuthorized && authHeader) {
-        try {
-            const anonClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '');
-            const { data: { user }, error } = await anonClient.auth.getUser(authHeader.replace('Bearer ', ''));
-
-            if (user && !error) {
-                // Check if user has admin or gestor role
-                const serviceClient = createClient(supabaseUrl, serviceRoleKey ?? '');
-                const { data: profile } = await serviceClient
-                    .from('profiles')
-                    .select('role_id, roles(name)')
-                    .eq('id', user.id)
-                    .single();
-
-                const roleName = (profile?.roles as any)?.name;
-                if (roleName && ['admin', 'gestor', 'superadmin'].includes(roleName)) {
-                    isAuthorized = true;
-                    authMethod = `user:${roleName}`;
-                }
-            }
-        } catch (e) {
-            console.error('Auth check error:', e);
-        }
-    }
-
-    if (!isAuthorized) {
+    if (!authHeader || !serviceRoleKey || authHeader !== `Bearer ${serviceRoleKey}`) {
         console.error('Unauthorized access attempt to integration-process');
-        return new Response(JSON.stringify({ error: 'Unauthorized: Admin access required' }), {
+        return new Response(JSON.stringify({ error: 'Unauthorized: Invalid Service Key' }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
-
-    console.log(`integration-process called via ${authMethod}`);
 
     try {
         const supabase = createClient(

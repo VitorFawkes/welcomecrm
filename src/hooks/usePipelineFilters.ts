@@ -37,32 +37,33 @@ interface PipelineFiltersState {
     setFilters: (filters: FilterState) => void
     setGroupFilters: (filters: GroupFilters) => void
     setCollapsedPhases: (phases: string[]) => void
+    setAll: (state: Partial<PipelineFiltersState>) => void
+    reset: () => void
 }
 
-import { persist } from 'zustand/middleware'
 
-export const usePipelineFilters = create<PipelineFiltersState>()(
-    persist(
-        (set) => ({
-            viewMode: 'AGENT',
-            subView: 'MY_QUEUE',
-            filters: {
-                sortBy: 'created_at',
-                sortDirection: 'desc'
-            },
-            groupFilters: {
-                showLinked: true,
-                showSolo: true
-            },
-            collapsedPhases: [],
-            setViewMode: (mode) => set({ viewMode: mode }),
-            setSubView: (view) => set({ subView: view }),
-            setFilters: (filters) => set({ filters }),
-            setGroupFilters: (groupFilters) => set({ groupFilters }),
-            setCollapsedPhases: (phases) => set({ collapsedPhases: phases }),
-        }),
-        {
-            name: 'pipeline-filters', // unique name for localStorage key
-        }
-    )
-)
+
+export const initialState: Omit<PipelineFiltersState, 'setViewMode' | 'setSubView' | 'setFilters' | 'setGroupFilters' | 'setCollapsedPhases' | 'setAll' | 'reset'> = {
+    viewMode: 'AGENT',
+    subView: 'MY_QUEUE',
+    filters: {
+        sortBy: 'created_at',
+        sortDirection: 'desc'
+    },
+    groupFilters: {
+        showLinked: true,
+        showSolo: true
+    },
+    collapsedPhases: []
+}
+
+export const usePipelineFilters = create<PipelineFiltersState>()((set) => ({
+    ...initialState,
+    setViewMode: (mode) => set({ viewMode: mode }),
+    setSubView: (view) => set({ subView: view }),
+    setFilters: (filters) => set({ filters }),
+    setGroupFilters: (groupFilters) => set({ groupFilters }),
+    setCollapsedPhases: (phases) => set({ collapsedPhases: phases }),
+    setAll: (state) => set((prev) => ({ ...prev, ...state })),
+    reset: () => set(initialState)
+}))

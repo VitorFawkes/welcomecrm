@@ -5,8 +5,9 @@
 > Use o workflow `/new-module` Phase 5 para manter sincronizado.
 
 > **Purpose:** Source of Truth for the AI Agent. Read this BEFORE any implementation.
-> **Last Updated:** 2026-01-24
+> **Last Updated:** 2026-01-28
 > **Trigger:** ALWAYS ON
+> **Stats:** 87 tabelas | 28 páginas | 38 hooks | 13 views
 
 ---
 
@@ -21,14 +22,43 @@ All tables must FK to at least one of these:
 | **User** | `profiles` | The CRM user (agent) |
 
 **Verified Satellites:**
-- `activities` → cards, profiles
+- `activities` (21.974) → cards, profiles
 - `arquivos` → cards
-- `tarefas` → cards, profiles
-- `whatsapp_messages` → cards, contatos, profiles
-- `proposals` → cards
+- `tarefas` (19.009) → cards, profiles
+- `proposals` (6) + `proposal_versions` (54) + `proposal_sections` (246) + `proposal_items` (583)
 - `automation_rules` → cards
 - `api_keys` → profiles
 - `api_request_logs` → api_keys
+
+**Integration System (12 tabelas):**
+- `integrations` (19) - Configurações de integrações
+- `integration_catalog` (1.094) - Catálogo de entidades externas
+- `integration_events` (10.488) - Eventos de sync
+- `integration_field_map` (65) - Mapeamento de campos inbound
+- `integration_outbound_field_map` (19) - Mapeamento outbound
+- `integration_outbound_queue` (28) - Fila de sync
+- `integration_router_config` (8) - Roteamento de eventos
+- `integration_settings` (12) - Configurações
+- `integration_stage_map` (16) - Mapeamento de stages
+- `integration_inbound_triggers` (1) - Triggers de entrada
+
+**WhatsApp System (8 tabelas):**
+- `whatsapp_platforms` (3) - Configurações de plataformas
+- `whatsapp_conversations` (1) - Conversas
+- `whatsapp_messages` (495) → cards, contatos, profiles
+- `whatsapp_raw_events` (4.054) - Eventos brutos
+- `whatsapp_custom_fields` (1) - Campos customizados
+- `whatsapp_field_mappings` (36) - Mapeamentos
+- `whatsapp_linha_config` (4) - Config de linhas
+- `whatsapp_phase_instance_map` (2) - Mapeamento de fases
+
+**Workflow System (5 tabelas):**
+- `workflows` (5) - Definições de workflows
+- `workflow_nodes` (31) - Nós do workflow
+- `workflow_edges` (26) - Conexões entre nós
+- `workflow_instances` (109) - Instâncias ativas
+- `workflow_queue` (43.106) - Fila de execução
+- `workflow_log` (132.757) - Logs de execução
 
 ---
 
@@ -55,7 +85,7 @@ All tables must FK to at least one of these:
 | `marketing_informacoes_preenchidas` | Marketing & Info Preenchidas | right_column | ✅ | - |
 | `system` | Sistema / Interno | right_column | ❌ | - |
 
-### 2.3 Frontend Hooks (COMPLETE - 35 hooks)
+### 2.3 Frontend Hooks (COMPLETE - 38 hooks)
 
 #### Section & Field Management
 | Hook | File | Purpose |
@@ -65,20 +95,23 @@ All tables must FK to at least one of these:
 | `useGovernableSections()` | `useSections.ts` | Filter governable only |
 | `useFieldConfig()` | `useFieldConfig.ts` | Field visibility/required per stage |
 | `useStageRequiredFields()` | `useStageRequiredFields.ts` | Required fields for stage |
-| `useStageRequirements()` | `useStageRequirements.ts` | Stage requirements |
+| `useStageRequirements()` | `useStageRequirements.ts` | Validador completo de requisitos (fields, proposals, tasks, rules) |
 
 #### Pipeline & Cards
 | Hook | File | Purpose |
 |------|------|---------|
 | `usePipelineStages()` | `usePipelineStages.ts` | Pipeline stages data |
 | `usePipelinePhases()` | `usePipelinePhases.ts` | Pipeline phases data |
-| `usePipelineFilters()` | `usePipelineFilters.ts` | Kanban filtering |
+| `usePipelineFilters()` | `usePipelineFilters.ts` | Zustand store para filtros do Kanban (persisted) |
+| `usePipelineCards()` | `usePipelineCards.ts` | **Query de cards com filtros (view_cards_acoes)** |
 | `useCardContacts()` | `useCardContacts.ts` | Contacts linked to card |
 | `useCardPeople()` | `useCardPeople.ts` | People on a card |
 | `useCardCreationRules()` | `useCardCreationRules.ts` | Who can create cards where |
 | `useDeleteCard()` | `useDeleteCard.ts` | Card deletion logic |
 | `useQualityGate()` | `useQualityGate.ts` | Stage transition validation |
 | `useFilterOptions()` | `useFilterOptions.ts` | Filter options for pipeline |
+| `useTrips()` | `useTrips.ts` | Query de viagens ganhas |
+| `useTripsFilters()` | `useTripsFilters.ts` | Zustand store para filtros de viagens |
 
 #### Proposals
 | Hook | File | Purpose |
@@ -151,52 +184,59 @@ All tables must FK to at least one of these:
 | `SettingsLayout` | `src/components/settings/layout/SettingsLayout.tsx` | Settings pages |
 | `GroupDetailLayout` | `src/components/cards/group/GroupDetailLayout.tsx` | Group detail view |
 
-### 3.3 All Pages (COMPLETE - 25 pages)
+### 3.3 All Pages (COMPLETE - 28 pages)
 
-#### Core Pages
-| Page | Path | Description |
-|------|------|-------------|
-| `CardDetail` | `src/pages/CardDetail.tsx` | **360° Deal View** |
-| `Pipeline` | `src/pages/Pipeline.tsx` | Kanban board |
-| `Dashboard` | `src/pages/Dashboard.tsx` | Main dashboard |
-| `People` | `src/pages/People.tsx` | Contacts list |
-| `Cards` | `src/pages/Cards.tsx` | Cards list view |
-| `Tasks` | `src/pages/Tasks.tsx` | Task management |
-| `ActivitiesPage` | `src/pages/ActivitiesPage.tsx` | Activities view |
-| `GroupsPage` | `src/pages/GroupsPage.tsx` | Groups management |
+#### Core Pages (8)
+| Page | Path | Route | Description |
+|------|------|-------|-------------|
+| `CardDetail` | `src/pages/CardDetail.tsx` | `/cards/:id` | **360° Deal View** |
+| `Pipeline` | `src/pages/Pipeline.tsx` | `/pipeline` | Kanban board |
+| `Dashboard` | `src/pages/Dashboard.tsx` | `/dashboard` | Main dashboard |
+| `People` | `src/pages/People.tsx` | `/people` | Contacts list |
+| `Cards` | `src/pages/Cards.tsx` | `/cards` | Cards list view |
+| `Tasks` | `src/pages/Tasks.tsx` | `/tasks` | Task management |
+| `ActivitiesPage` | `src/pages/ActivitiesPage.tsx` | `/activities` | Activities view |
+| `GroupsPage` | `src/pages/GroupsPage.tsx` | `/groups` | Groups management |
 
-#### Proposals
-| Page | Path | Description |
-|------|------|-------------|
-| `ProposalsPage` | `src/pages/ProposalsPage.tsx` | Proposals list |
-| `ProposalBuilderV4` | `src/pages/ProposalBuilderV4.tsx` | **Latest proposal builder** |
-| `ProposalBuilderV3` | `src/pages/ProposalBuilderV3.tsx` | Legacy builder v3 |
-| `ProposalBuilderElite` | `src/pages/ProposalBuilderElite.tsx` | Elite builder |
-| `ProposalBuilder` | `src/pages/ProposalBuilder.tsx` | Original builder |
+#### Proposals (5)
+| Page | Path | Route | Description |
+|------|------|-------|-------------|
+| `ProposalsPage` | `src/pages/ProposalsPage.tsx` | `/proposals` | Proposals list |
+| `ProposalBuilderV4` | `src/pages/ProposalBuilderV4.tsx` | `/proposals/:id/v4` | **Latest proposal builder** |
+| `ProposalBuilderV3` | `src/pages/ProposalBuilderV3.tsx` | `/proposals/:id/v3` | Legacy builder v3 |
+| `ProposalBuilderElite` | `src/pages/ProposalBuilderElite.tsx` | `/proposals/:id/elite` | Elite builder |
+| `ProposalBuilder` | `src/pages/ProposalBuilder.tsx` | `/proposals/:id/edit` | Original builder |
 
-#### Admin Pages
-| Page | Path | Description |
-|------|------|-------------|
-| `PipelineStudio` | `src/pages/admin/PipelineStudio.tsx` | Pipeline configuration |
-| `UserManagement` | `src/pages/admin/UserManagement.tsx` | User admin |
-| `CardCreationRulesPage` | `src/pages/admin/CardCreationRulesPage.tsx` | Creation rules |
-| `CategoryManagement` | `src/pages/admin/CategoryManagement.tsx` | Categories |
-| `CRMHealth` | `src/pages/admin/CRMHealth.tsx` | System health |
-| `Lixeira` | `src/pages/admin/Lixeira.tsx` | Trash/recycle bin |
+#### Admin Pages (9)
+| Page | Path | Route | Description |
+|------|------|-------|-------------|
+| `PipelineStudio` | `src/pages/admin/PipelineStudio.tsx` | `/settings/pipeline/structure` | Pipeline configuration |
+| `UserManagement` | `src/pages/admin/UserManagement.tsx` | `/settings/team/members` | User admin |
+| `CardCreationRulesPage` | `src/pages/admin/CardCreationRulesPage.tsx` | `/settings/team/card-rules` | Creation rules |
+| `CategoryManagement` | `src/pages/admin/CategoryManagement.tsx` | `/settings/customization/categories` | Categories |
+| `CRMHealth` | `src/pages/admin/CRMHealth.tsx` | `/settings/operations/health` | System health |
+| `Lixeira` | `src/pages/admin/Lixeira.tsx` | `/settings/operations/trash` | Trash/recycle bin |
+| `LossReasonManagement` | `src/pages/admin/LossReasonManagement.tsx` | `/settings/customization/loss-reasons` | **Motivos de perda** |
+| `WorkflowBuilderPage` | `src/pages/admin/WorkflowBuilderPage.tsx` | `/settings/workflows/builder/:id?` | **Visual workflow builder** |
+| `WorkflowListPage` | `src/pages/admin/WorkflowListPage.tsx` | `/settings/workflows` | **Lista de workflows** |
 
-#### Public Pages (No Auth)
-| Page | Path | Description |
-|------|------|-------------|
-| `ProposalView` | `src/pages/public/ProposalView.tsx` | Public proposal view |
-| `ProposalReview` | `src/pages/public/ProposalReview.tsx` | Client review |
-| `ProposalConfirmed` | `src/pages/public/ProposalConfirmed.tsx` | Confirmation |
+#### Developer (1)
+| Page | Path | Route | Description |
+|------|------|-------|-------------|
+| `DeveloperHub` | `src/pages/developer/DeveloperHub.tsx` | `/settings/developer-platform` | API keys, Swagger UI |
 
-#### Auth & Settings
-| Page | Path | Description |
-|------|------|-------------|
-| `Login` | `src/pages/Login.tsx` | Authentication |
-| `InvitePage` | `src/pages/InvitePage.tsx` | User invitation |
-| `SettingsPage` | `src/pages/SettingsPage.tsx` | Settings |
+#### Public Pages - No Auth (3)
+| Page | Path | Route | Description |
+|------|------|-------|-------------|
+| `ProposalView` | `src/pages/public/ProposalView.tsx` | `/p/:token` | Public proposal view |
+| `ProposalReview` | `src/pages/public/ProposalReview.tsx` | `/p/:token/review` | Client review |
+| `ProposalConfirmed` | `src/pages/public/ProposalConfirmed.tsx` | `/p/:token/confirmed` | Confirmation |
+
+#### Auth & Settings (2)
+| Page | Path | Route | Description |
+|------|------|-------|-------------|
+| `Login` | `src/pages/Login.tsx` | `/login` | Authentication |
+| `InvitePage` | `src/pages/InvitePage.tsx` | `/invite/:token` | User invitation |
 
 ---
 
@@ -323,7 +363,33 @@ npm run build
 
 ---
 
-## 9. Critical Rules Summary
+## 9. Componentes Críticos (Comportamento Importante)
+
+### CardHeader.tsx
+- **Edição de título:** Inline editing com mutation
+- **Mudança de etapa:** Dropdown ordenado por fase, valida quality gate antes de mover
+- **Seleção de owners:** SDR, Planner, Pós-Venda (baseado na fase)
+- **Quality Gate:** Usa `useQualityGate().validateMoveSync()` antes de permitir mudança
+
+### KanbanBoard.tsx
+- **Drag-drop:** @dnd-kit para arrastar cards entre etapas
+- **RPC de mover:** Usa `mover_card(p_card_id, p_nova_etapa_id, p_motivo_perda_id?, p_motivo_perda_comentario?)`
+- **Validações:** Quality gate, governance rules, loss reason
+- **Scroll horizontal:** `useHorizontalScroll()` com drag-to-pan
+
+### KanbanCard.tsx
+- **Campos dinâmicos:** Renderiza baseado em `pipeline_card_settings.campos_kanban`
+- **Field registry:** Usa `fieldRegistry.ts` para componentes de campo
+- **Tipos suportados:** currency, date, select, boolean, numeric, text
+
+### CreateCardModal.tsx
+- **Allowed stages:** Usa `useAllowedStages(product)` baseado no time do usuário
+- **Auto-select:** Primeira etapa permitida é selecionada automaticamente
+- **Owner default:** `dono_atual_id = profile.id` do usuário logado
+
+---
+
+## 10. Critical Rules Summary
 
 1. **No DashboardLayout** → Use `Layout`
 2. **No DataTable** → Use `Table`
@@ -332,3 +398,6 @@ npm run build
 5. **CardDetail is in `pages/`** → Not in `components/cards/`
 6. **Always use hooks** → `useSections()`, `useFieldConfig()` for dynamic data
 7. **ProposalBuilderV4** → Latest version, use this for new features
+8. **Mover card** → Sempre via RPC `mover_card`, nunca UPDATE direto
+9. **Quality Gate** → Validar antes de mover para nova etapa
+10. **Campos dinâmicos** → Via `pipeline_card_settings` + `system_fields`
