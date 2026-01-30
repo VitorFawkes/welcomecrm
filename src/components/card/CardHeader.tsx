@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase'
 import { useQualityGate } from '../../hooks/useQualityGate'
 import QualityGateModal from './QualityGateModal'
 import StageChangeModal from './StageChangeModal'
+import LossReasonModal from './LossReasonModal'
 import { useStageRequirements } from '../../hooks/useStageRequirements'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
@@ -54,6 +55,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
         currentOwnerId?: string,
         sdrName?: string
     } | null>(null)
+
+    const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false)
 
     const { missingBlocking } = useStageRequirements(card)
     const { getHeaderFields } = useFieldConfig()
@@ -199,12 +202,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
         return phase?.color || 'bg-gray-500'
     }
 
-    const statusColors = {
-        'aberto': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        'ganho': 'bg-green-100 text-green-800 border-green-200',
-        'perdido': 'bg-red-100 text-red-800 border-red-200',
-        'pausado': 'bg-gray-100 text-gray-800 border-gray-300'
-    }
+    // statusColors moved to StatusSelector component
 
     const updateOwnerMutation = useMutation({
         mutationFn: async ({ field, userId }: { field: 'dono_atual_id' | 'sdr_owner_id' | 'vendas_owner_id' | 'pos_owner_id', userId: string | null }) => {
@@ -297,6 +295,47 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
         // 3. Proceed if valid
         updateStageMutation.mutate(stageId)
+    }
+
+    const updateStatusMutation = useMutation({
+        mutationFn: async (vars: { status: string, motivoId?: string, comentario?: string }) => {
+            const updateData: any = { status_comercial: vars.status }
+
+            if (vars.status === 'ganho') {
+                updateData.taxa_data_status = new Date().toISOString()
+            } else if (vars.status === 'perdido') {
+                updateData.motivo_perda_id = vars.motivoId
+                updateData.motivo_perda_comentario = vars.comentario
+            }
+
+            const { error } = await (supabase.from('cards') as any)
+                .update(updateData)
+                .eq('id', card.id)
+
+            if (error) throw error
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
+            queryClient.invalidateQueries({ queryKey: ['card', card.id] })
+            queryClient.invalidateQueries({ queryKey: ['cards'] }) // Refresh lists/analytics
+            setLossReasonModalOpen(false)
+        },
+        onError: (error) => {
+            console.error('Failed to update status:', error)
+            alert('Erro ao atualizar status: ' + error.message)
+        }
+    })
+
+    const handleStatusSelect = (newStatus: string) => {
+        if (newStatus === 'perdido') {
+            setLossReasonModalOpen(true)
+        } else {
+            updateStatusMutation.mutate({ status: newStatus })
+        }
+    }
+
+    const handleLossConfirm = (motivoId: string, comentario: string) => {
+        updateStatusMutation.mutate({ status: 'perdido', motivoId, comentario })
     }
 
     const handleConfirmQualityGate = () => {
@@ -509,12 +548,11 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             {/* Operational Badge */}
                             {getOperationalBadge()}
 
-                            <span className={cn(
-                                "px-2.5 py-0.5 rounded-md border text-xs font-medium uppercase tracking-wide",
-                                statusColors[card.status_comercial?.toLowerCase() as keyof typeof statusColors] || statusColors['aberto']
-                            )}>
-                                {card.status_comercial?.replace('_', ' ')}
-                            </span>
+                            {/* Status Selector */}
+                            <StatusSelector
+                                currentStatus={card.status_comercial}
+                                onSelect={handleStatusSelect}
+                            />
 
                             {/* Divider */}
                             <div className="h-4 w-px bg-gray-300 mx-1" />
@@ -681,6 +719,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 </div>
             </div>
 
+
             {/* Close dropdown when clicking outside */}
             {showStageDropdown && (
                 <div
@@ -702,7 +741,6 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 onConfirm={handleConfirmQualityGate}
                 targetStageName={pendingStageChange?.targetStageName || ''}
                 cardId={card.id!}
-                initialData={card as any}
             />
 
             <StageChangeModal
@@ -713,6 +751,71 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 currentOwnerId={pendingStageChange?.currentOwnerId || null}
                 sdrName={pendingStageChange?.sdrName}
             />
+
+            <LossReasonModal
+                isOpen={lossReasonModalOpen}
+                onClose={() => setLossReasonModalOpen(false)}
+                onConfirm={handleLossConfirm}
+                targetStageId={card.pipeline_stage_id || ''}
+                targetStageName="Perdido"
+            />
         </>
+    )
+}
+
+function StatusSelector({ currentStatus, onSelect }: { currentStatus: string | null, onSelect: (status: string) => void }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const statusOptions = [
+        { value: 'aberto', label: 'Em Aberto', color: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200' },
+        { value: 'ganho', label: 'Ganho', color: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200' },
+        { value: 'perdido', label: 'Perdido', color: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200' },
+        { value: 'pausado', label: 'Pausado', color: 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200' }
+    ]
+
+    const statusColors: any = {
+        'aberto': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        'ganho': 'bg-green-100 text-green-800 border-green-200',
+        'perdido': 'bg-red-100 text-red-800 border-red-200',
+        'pausado': 'bg-gray-100 text-gray-800 border-gray-300'
+    }
+
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={cn(
+                    "px-2.5 py-0.5 rounded-md border text-xs font-medium uppercase tracking-wide flex items-center gap-1 hover:brightness-95 transition-all",
+                    statusColors[currentStatus?.toLowerCase() as keyof typeof statusColors] || statusColors['aberto']
+                )}
+            >
+                {currentStatus?.replace('_', ' ') || 'Em Aberto'}
+                <ChevronDown className="h-3 w-3 opacity-50" />
+            </button>
+
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+                    <div className="absolute top-full left-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                        {statusOptions.map((option) => (
+                            <button
+                                key={option.value}
+                                onClick={() => {
+                                    onSelect(option.value)
+                                    setIsOpen(false)
+                                }}
+                                className={cn(
+                                    "w-full px-3 py-2 text-left text-xs font-medium uppercase tracking-wide transition-colors flex items-center justify-between",
+                                    option.value === currentStatus ? "bg-gray-50" : "hover:bg-gray-50",
+                                    option.color.split(' ').filter(c => c.startsWith('text-')).join(' ') // Keep text color
+                                )}
+                            >
+                                {option.label}
+                                {option.value === currentStatus && <Check className="h-3 w-3" />}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
     )
 }
