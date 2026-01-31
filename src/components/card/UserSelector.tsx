@@ -6,8 +6,7 @@ interface Profile {
     id: string
     nome: string
     email: string
-    role: string
-    roles?: { name: string } | null
+    role: string | null
 }
 
 interface UserSelectorProps {
@@ -26,31 +25,26 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
         const fetchProfiles = async () => {
             setLoading(true)
             try {
-                // Se há filtro de role, usamos inner join com a tabela roles
-                // Isso usa role_id (novo sistema) em vez do campo legado 'role'
+                // Busca todos os usuários ativos
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, nome, email, role')
+                    .eq('active', true)
+                    .order('nome')
+
+                if (error) throw error
+
+                let filteredProfiles = data || []
+
+                // Filtra por role se especificado (usando o campo 'role' diretamente)
                 if (roleFilter) {
                     const roleArray = Array.isArray(roleFilter) ? roleFilter : [roleFilter]
-
-                    const { data, error } = await supabase
-                        .from('profiles')
-                        .select('id, nome, email, role, roles!inner(name)')
-                        .eq('active', true)
-                        .in('roles.name', roleArray)
-                        .order('nome')
-
-                    if (error) throw error
-                    setProfiles((data || []) as Profile[])
-                } else {
-                    // Sem filtro, busca todos os usuários ativos
-                    const { data, error } = await supabase
-                        .from('profiles')
-                        .select('id, nome, email, role')
-                        .eq('active', true)
-                        .order('nome')
-
-                    if (error) throw error
-                    setProfiles((data || []) as Profile[])
+                    filteredProfiles = filteredProfiles.filter(p =>
+                        p.role && roleArray.includes(p.role)
+                    )
                 }
+
+                setProfiles(filteredProfiles as Profile[])
             } catch (error) {
                 console.error('Error fetching profiles:', error)
             } finally {

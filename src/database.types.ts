@@ -6130,6 +6130,8 @@ export type Database = {
           origem: string | null
           parent_card_id: string | null
           pessoa_nome: string | null
+          pessoa_telefone: string | null
+          pessoa_email: string | null
           pessoa_principal_id: string | null
           pipeline_id: string | null
           pipeline_nome: string | null

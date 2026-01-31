@@ -110,7 +110,7 @@ export default function Pipeline() {
                                     </div>
                                     <input
                                         type="text"
-                                        placeholder="Pesquisar viagem, contato, origem..."
+                                        placeholder="Buscar por nome, telefone, email, título..."
                                         className="block w-full pl-10 pr-3 py-1.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all shadow-sm"
                                         value={filters.search || ''}
                                         onChange={(e) => setFilters({ ...filters, search: e.target.value })}

@@ -14,16 +14,24 @@ import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { Checkbox } from '../ui/checkbox'
 
+import type { EpocaViagem } from '../pipeline/fields/FlexibleDateField'
+import type { DuracaoViagem } from '../pipeline/fields/FlexibleDurationField'
+import type { OrcamentoViagem } from '../pipeline/fields/SmartBudgetField'
+
 interface TripsProdutoData {
-    orcamento?: {
+    // New flexible types
+    orcamento?: OrcamentoViagem | {
+        // Legacy format support
         total?: number
         por_pessoa?: number
     }
-    epoca_viagem?: {
+    epoca_viagem?: EpocaViagem | {
+        // Legacy format support
         inicio?: string
         fim?: string
         flexivel?: boolean
     }
+    duracao_viagem?: DuracaoViagem
     destinos?: string[]
     origem?: string
     origem_lead?: string
@@ -246,28 +254,65 @@ export default function TripInformation({ card }: TripInformationProps) {
         mutationFn: async ({ newData, target }: { newData: TripsProdutoData, target: 'produto_data' | 'briefing_inicial' }) => {
             const updates: Record<string, unknown> = { [target]: newData }
 
-            // If updating 'produto_data' (Planner Proposal), sync legacy columns
+            // Helper to sync normalized columns from produto_data
+            const syncNormalizedColumns = (data: TripsProdutoData) => {
+                // Sync orcamento -> valor_estimado
+                const orcamento = data.orcamento as OrcamentoViagem | undefined
+                if (orcamento) {
+                    if ('total_calculado' in orcamento && orcamento.total_calculado) {
+                        updates.valor_estimado = orcamento.total_calculado
+                    } else if ('total' in orcamento && orcamento.total) {
+                        updates.valor_estimado = orcamento.total
+                    } else if ('valor' in orcamento && orcamento.tipo === 'total' && orcamento.valor) {
+                        updates.valor_estimado = orcamento.valor
+                    }
+                }
+
+                // Sync epoca_viagem -> normalized columns
+                const epoca = data.epoca_viagem as EpocaViagem | undefined
+                if (epoca) {
+                    if ('tipo' in epoca) {
+                        // New format
+                        updates.epoca_tipo = epoca.tipo
+                        updates.epoca_mes_inicio = epoca.mes_inicio || null
+                        updates.epoca_mes_fim = epoca.mes_fim || null
+                        updates.epoca_ano = epoca.ano || null
+
+                        // Sync legacy columns for data_exata
+                        if (epoca.tipo === 'data_exata') {
+                            updates.data_viagem_inicio = epoca.data_inicio || null
+                            updates.data_viagem_fim = epoca.data_fim || null
+                        } else {
+                            updates.data_viagem_inicio = null
+                            updates.data_viagem_fim = null
+                        }
+                    } else if ('inicio' in epoca) {
+                        // Legacy format
+                        updates.data_viagem_inicio = epoca.inicio || null
+                        updates.data_viagem_fim = epoca.fim || null
+                    }
+                }
+
+                // Sync duracao_viagem -> normalized columns
+                const duracao = data.duracao_viagem as DuracaoViagem | undefined
+                if (duracao) {
+                    updates.duracao_dias_min = duracao.dias_min || null
+                    updates.duracao_dias_max = duracao.dias_max || null
+                }
+            }
+
+            // If updating 'produto_data' (Planner Proposal), sync normalized columns
             if (target === 'produto_data') {
-                if (newData.orcamento?.total) updates.valor_estimado = newData.orcamento.total
-                if (newData.epoca_viagem?.inicio) updates.data_viagem_inicio = newData.epoca_viagem.inicio
-                else updates.data_viagem_inicio = null
-                if (newData.epoca_viagem?.fim) updates.data_viagem_fim = newData.epoca_viagem.fim
-                else updates.data_viagem_fim = null
+                syncNormalizedColumns(newData)
             }
             // If updating 'briefing_inicial' (SDR Correction), ALSO sync 'produto_data' IF we are in SDR stage
-            // This keeps them in sync until the Planner starts diverging
             else if (target === 'briefing_inicial') {
                 const sdrPhase = phases?.find(p => p.slug === SystemPhase.SDR)
                 const isSdr = sdrPhase && card.fase === sdrPhase.name
 
                 if (isSdr) {
                     updates.produto_data = newData
-                    // And sync legacy
-                    if (newData.orcamento?.total) updates.valor_estimado = newData.orcamento.total
-                    if (newData.epoca_viagem?.inicio) updates.data_viagem_inicio = newData.epoca_viagem.inicio
-                    else updates.data_viagem_inicio = null
-                    if (newData.epoca_viagem?.fim) updates.data_viagem_fim = newData.epoca_viagem.fim
-                    else updates.data_viagem_fim = null
+                    syncNormalizedColumns(newData)
                 }
             }
 

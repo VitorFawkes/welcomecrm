@@ -25,6 +25,8 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
     // Search states
     const [searchOwner, setSearchOwner] = useState('')
     const [searchSdr, setSearchSdr] = useState('')
+    const [searchPlanner, setSearchPlanner] = useState('')
+    const [searchPos, setSearchPos] = useState('')
     const [searchTeam, setSearchTeam] = useState('')
 
     // Update local state when global filters change
@@ -48,7 +50,7 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
         setFilters({})
     }
 
-    const toggleSelection = (field: 'ownerIds' | 'sdrIds' | 'teamIds' | 'departmentIds', value: string) => {
+    const toggleSelection = (field: 'ownerIds' | 'sdrIds' | 'plannerIds' | 'posIds' | 'teamIds' | 'departmentIds', value: string) => {
         setLocalFilters(prev => {
             const current = (prev[field] as string[]) || []
             const updated = current.includes(value)
@@ -67,6 +69,16 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
     const filteredSdrs = profiles.filter(p =>
         (p.full_name?.toLowerCase() || '').includes(searchSdr.toLowerCase()) ||
         (p.email?.toLowerCase() || '').includes(searchSdr.toLowerCase())
+    )
+
+    const filteredPlanners = profiles.filter(p =>
+        (p.full_name?.toLowerCase() || '').includes(searchPlanner.toLowerCase()) ||
+        (p.email?.toLowerCase() || '').includes(searchPlanner.toLowerCase())
+    )
+
+    const filteredPos = profiles.filter(p =>
+        (p.full_name?.toLowerCase() || '').includes(searchPos.toLowerCase()) ||
+        (p.email?.toLowerCase() || '').includes(searchPos.toLowerCase())
     )
 
     const filteredTeams = teams.filter(t => t.name.toLowerCase().includes(searchTeam.toLowerCase()))
@@ -239,6 +251,88 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
                                                     {(profile.full_name || profile.email || '?').substring(0, 2).toUpperCase()}
                                                 </div>
                                                 <span className={cn("text-sm", isSelected ? "font-medium text-secondary-dark" : "text-gray-700")}>
+                                                    {profile.full_name || profile.email}
+                                                </span>
+                                            </div>
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Planners */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Planners (Vendas)</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar Planner..."
+                                    className="w-full pl-9 h-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all mb-2"
+                                    value={searchPlanner}
+                                    onChange={(e) => setSearchPlanner(e.target.value)}
+                                />
+                            </div>
+                            <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-1 space-y-0.5 bg-gray-50/30 custom-scrollbar">
+                                {filteredPlanners.map(profile => {
+                                    const isSelected = (localFilters.plannerIds || []).includes(profile.id)
+                                    return (
+                                        <label key={`planner-${profile.id}`} className={cn(
+                                            "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
+                                            isSelected ? "bg-amber-50" : "hover:bg-white"
+                                        )}>
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelection('plannerIds', profile.id)}
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center text-xs font-bold text-amber-700 border border-amber-200">
+                                                    {(profile.full_name || profile.email || '?').substring(0, 2).toUpperCase()}
+                                                </div>
+                                                <span className={cn("text-sm", isSelected ? "font-medium text-amber-700" : "text-gray-700")}>
+                                                    {profile.full_name || profile.email}
+                                                </span>
+                                            </div>
+                                        </label>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Pós-Venda */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Pós-Venda</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar Pós-Venda..."
+                                    className="w-full pl-9 h-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all mb-2"
+                                    value={searchPos}
+                                    onChange={(e) => setSearchPos(e.target.value)}
+                                />
+                            </div>
+                            <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-1 space-y-0.5 bg-gray-50/30 custom-scrollbar">
+                                {filteredPos.map(profile => {
+                                    const isSelected = (localFilters.posIds || []).includes(profile.id)
+                                    return (
+                                        <label key={`pos-${profile.id}`} className={cn(
+                                            "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
+                                            isSelected ? "bg-emerald-50" : "hover:bg-white"
+                                        )}>
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelection('posIds', profile.id)}
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700 border border-emerald-200">
+                                                    {(profile.full_name || profile.email || '?').substring(0, 2).toUpperCase()}
+                                                </div>
+                                                <span className={cn("text-sm", isSelected ? "font-medium text-emerald-700" : "text-gray-700")}>
                                                     {profile.full_name || profile.email}
                                                 </span>
                                             </div>

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { type ViewMode, type SubView, type FilterState, type GroupFilters } from './usePipelineFilters'
 import type { Database } from '../database.types'
+import { prepareSearchTerms } from '../lib/utils'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 export type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -69,11 +70,35 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 }
             }
 
-            // Apply Advanced Filters (from Drawer)
+            // Apply Advanced Filters (from Drawer) - SMART SEARCH
             if (filters.search) {
-                const searchTerm = filters.search.trim();
-                if (searchTerm) {
-                    query = query.or(`titulo.ilike.%${searchTerm}%,pessoa_nome.ilike.%${searchTerm}%,origem.ilike.%${searchTerm}%,dono_atual_nome.ilike.%${searchTerm}%`)
+                const { original, normalized } = prepareSearchTerms(filters.search)
+
+                if (original) {
+                    // Campos de texto padrão
+                    const textFields = [
+                        `titulo.ilike.%${original}%`,
+                        `pessoa_nome.ilike.%${original}%`,
+                        `origem.ilike.%${original}%`,
+                        `dono_atual_nome.ilike.%${original}%`,
+                        `sdr_owner_nome.ilike.%${original}%`,
+                        `vendas_nome.ilike.%${original}%`,
+                        `pessoa_email.ilike.%${original}%`,
+                        `external_id.ilike.%${original}%`
+                    ]
+
+                    // Se parece telefone, adiciona busca normalizada
+                    if (normalized) {
+                        // Busca pelo telefone normalizado (sem formatação)
+                        textFields.push(`pessoa_telefone.ilike.%${normalized}%`)
+                        // Também busca pelo termo original caso o telefone esteja formatado no banco
+                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                    } else {
+                        // Busca normal por telefone (caso o usuário digite parte do número)
+                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                    }
+
+                    query = query.or(textFields.join(','))
                 }
             }
 
@@ -84,6 +109,16 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
             // NEW: SDR Filter
             if ((filters.sdrIds?.length ?? 0) > 0) {
                 query = query.in('sdr_owner_id', filters.sdrIds)
+            }
+
+            // NEW: Planner Filter (vendas_owner_id)
+            if ((filters.plannerIds?.length ?? 0) > 0) {
+                query = query.in('vendas_owner_id', filters.plannerIds)
+            }
+
+            // NEW: Pós-Venda Filter (pos_owner_id)
+            if ((filters.posIds?.length ?? 0) > 0) {
+                query = query.in('pos_owner_id', filters.posIds)
             }
 
             if (filters.startDate) {

@@ -1,7 +1,7 @@
 import React from 'react'
 import {
     MapPin, Calendar, DollarSign, Tag, X, Check, Edit2, AlertCircle,
-    Eraser, Type, Hash, CalendarDays, List, CheckSquare, Banknote
+    Eraser, Type, Hash, CalendarDays, List, CheckSquare, Banknote, Clock
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { Input } from '../ui/Input'
@@ -11,6 +11,9 @@ import { Checkbox } from '../ui/checkbox'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../../database.types'
+import FlexibleDateField, { type EpocaViagem } from '../pipeline/fields/FlexibleDateField'
+import FlexibleDurationField, { type DuracaoViagem } from '../pipeline/fields/FlexibleDurationField'
+import SmartBudgetField, { type OrcamentoViagem } from '../pipeline/fields/SmartBudgetField'
 
 type SystemField = Database['public']['Tables']['system_fields']['Row']
 
@@ -619,6 +622,30 @@ export default function UniversalFieldRenderer({
                 )
             case 'loss_reason_selector':
                 return <LossReasonSelector value={value} onChange={onChange} />
+            case 'flexible_date':
+                return (
+                    <FlexibleDateField
+                        label={field.label || ''}
+                        value={value}
+                        onChange={onChange}
+                    />
+                )
+            case 'flexible_duration':
+                return (
+                    <FlexibleDurationField
+                        label={field.label || ''}
+                        value={value}
+                        onChange={onChange}
+                    />
+                )
+            case 'smart_budget':
+                return (
+                    <SmartBudgetField
+                        label={field.label || ''}
+                        value={value}
+                        onChange={onChange}
+                    />
+                )
             default: // text, number
                 return (
                     <Input
@@ -703,6 +730,35 @@ export default function UniversalFieldRenderer({
     }
     if (field.type === 'loss_reason_selector') {
         return <FieldCard icon={Tag} iconColor="bg-red-100 text-red-600" label={field.label} value={<LossReasonDisplay value={value} />} status={status} sdrValue={sdrValue} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
+    }
+
+    // New Flexible Field Types
+    if (field.type === 'flexible_date') {
+        const epocaValue = value as EpocaViagem | null
+        const displayVal = epocaValue?.display || null
+        const subVal = epocaValue?.flexivel ? '📌 Datas flexíveis' : undefined
+        const sdrEpoca = sdrValue as EpocaViagem | null
+        const sdrDisplay = sdrEpoca?.display || undefined
+
+        return <FieldCard icon={Calendar} iconColor="bg-orange-100 text-orange-600" label={field.label} value={displayVal} subValue={subVal} status={status} sdrValue={sdrDisplay} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
+    }
+
+    if (field.type === 'flexible_duration') {
+        const duracaoValue = value as DuracaoViagem | null
+        const displayVal = duracaoValue?.display || null
+        const sdrDuracao = sdrValue as DuracaoViagem | null
+        const sdrDisplay = sdrDuracao?.display || undefined
+
+        return <FieldCard icon={Clock} iconColor="bg-purple-100 text-purple-600" label={field.label} value={displayVal} status={status} sdrValue={sdrDisplay} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
+    }
+
+    if (field.type === 'smart_budget') {
+        const orcamentoValue = value as OrcamentoViagem | null
+        const displayVal = orcamentoValue?.display || null
+        const sdrOrcamento = sdrValue as OrcamentoViagem | null
+        const sdrDisplay = sdrOrcamento?.display || undefined
+
+        return <FieldCard icon={DollarSign} iconColor="bg-green-100 text-green-600" label={field.label} value={displayVal} status={status} sdrValue={sdrDisplay} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
     }
 
     // 2. Generic Fields

@@ -31,8 +31,6 @@ interface LinhaConfig {
     phone_number_id: string | null;
     ativo: boolean;
     produto: string | null;
-    pipeline_id: string | null;
-    stage_id: string | null;
 }
 
 const TOGGLE_DEFINITIONS = [
@@ -45,11 +43,6 @@ const TOGGLE_DEFINITIONS = [
         key: 'WHATSAPP_CREATE_CONTACT',
         label: 'Criar contato para números novos',
         tooltip: 'Se desligado, mensagens de desconhecidos ficam órfãs'
-    },
-    {
-        key: 'WHATSAPP_CREATE_CARD',
-        label: 'Criar card automaticamente',
-        tooltip: 'Se desligado, precisa criar card manualmente'
     },
     {
         key: 'WHATSAPP_LINK_TO_CARD',
@@ -104,32 +97,6 @@ export function WhatsAppGovernanceTab() {
         }
     });
 
-    // Fetch Pipelines
-    const { data: pipelines } = useQuery({
-        queryKey: ['pipelines'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('pipelines')
-                .select('id, nome')
-                .eq('ativo', true);
-            if (error) throw error;
-            return data;
-        }
-    });
-
-    // Fetch Stages for all pipelines
-    const { data: stages } = useQuery({
-        queryKey: ['pipeline_stages'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('pipeline_stages')
-                .select('id, nome, pipeline_id, ordem')
-                .order('ordem');
-            if (error) throw error;
-            return data;
-        }
-    });
-
     // Sync state with remote data
     useEffect(() => {
         if (togglesData) {
@@ -176,8 +143,6 @@ export function WhatsAppGovernanceTab() {
                 .update({
                     ativo: linha.ativo,
                     produto: linha.produto,
-                    pipeline_id: linha.pipeline_id,
-                    stage_id: linha.stage_id,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', linha.id);
@@ -200,12 +165,6 @@ export function WhatsAppGovernanceTab() {
     const handleLinhaChange = (id: string, field: keyof LinhaConfig, value: string | boolean | null) => {
         setLinhas(prev => prev.map(l => {
             if (l.id !== id) return l;
-
-            // When pipeline changes, clear the stage_id
-            if (field === 'pipeline_id') {
-                return { ...l, [field]: value as string | null, stage_id: null };
-            }
-
             return { ...l, [field]: value };
         }));
     };
@@ -359,10 +318,10 @@ export function WhatsAppGovernanceTab() {
                                 </div>
 
                                 {linha.ativo && (
-                                    <div className="grid grid-cols-3 gap-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200">
-                                        <div className="space-y-2">
+                                    <div className="pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="space-y-2 max-w-xs">
                                             <label className="text-xs font-medium text-muted-foreground">
-                                                Produto
+                                                Produto (filtra qual card vincular)
                                             </label>
                                             <Select
                                                 value={linha.produto || ''}
@@ -370,44 +329,7 @@ export function WhatsAppGovernanceTab() {
                                                     handleLinhaChange(linha.id, 'produto', val || null)
                                                 }
                                                 options={PRODUTOS}
-                                                placeholder="Selecione..."
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-medium text-muted-foreground">
-                                                Pipeline
-                                            </label>
-                                            <Select
-                                                value={linha.pipeline_id || ''}
-                                                onChange={(val) =>
-                                                    handleLinhaChange(linha.id, 'pipeline_id', val || null)
-                                                }
-                                                options={pipelines?.map((p: any) => ({
-                                                    value: p.id,
-                                                    label: p.nome
-                                                })) || []}
-                                                placeholder="Selecione..."
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-medium text-muted-foreground">
-                                                Etapa Inicial
-                                            </label>
-                                            <Select
-                                                value={linha.stage_id || ''}
-                                                onChange={(val) =>
-                                                    handleLinhaChange(linha.id, 'stage_id', val || null)
-                                                }
-                                                options={
-                                                    (stages || [])
-                                                        .filter((s: any) => s.pipeline_id === linha.pipeline_id)
-                                                        .map((s: any) => ({
-                                                            value: s.id,
-                                                            label: s.nome
-                                                        }))
-                                                }
-                                                placeholder="Selecione..."
-                                                disabled={!linha.pipeline_id}
+                                                placeholder="Todos os produtos"
                                             />
                                         </div>
                                     </div>

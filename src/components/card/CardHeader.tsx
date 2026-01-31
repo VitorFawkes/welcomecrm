@@ -671,7 +671,6 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 <UserSelector
                                     currentUserId={card.sdr_owner_id}
                                     onSelect={handleSdrSelect}
-                                    roleFilter={['sdr', 'admin', 'gestor']}
                                 />
                             </div>
 
@@ -683,7 +682,6 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 <UserSelector
                                     currentUserId={card.vendas_owner_id}
                                     onSelect={handlePlannerSelect}
-                                    roleFilter={['vendas', 'admin', 'gestor']}
                                 />
                             </div>
 
@@ -695,7 +693,6 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 <UserSelector
                                     currentUserId={card.pos_owner_id}
                                     onSelect={handlePosVendaSelect}
-                                    roleFilter={['pos_venda', 'admin', 'gestor']}
                                 />
                             </div>
                         </div>
