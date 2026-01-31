@@ -667,7 +667,8 @@ export default function UniversalFieldRenderer({
     if (field.key === 'destinos') {
         return <FieldCard icon={MapPin} iconColor="bg-blue-100 text-blue-600" label={field.label} value={Array.isArray(value) ? value.join(' • ') : value} status={status} sdrValue={Array.isArray(sdrValue) ? sdrValue.join(' • ') : sdrValue} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
     }
-    if (field.type === 'date_range' || field.key === 'epoca_viagem') {
+    // Skip if using new flexible_date type (handled below)
+    if ((field.type === 'date_range' || field.key === 'epoca_viagem') && field.type !== 'flexible_date') {
         // Handle all date range formats: {start, end}, {inicio, fim}, or raw string
         let startStr = ''
         let endStr = ''
@@ -715,7 +716,8 @@ export default function UniversalFieldRenderer({
 
         return <FieldCard icon={Calendar} iconColor="bg-orange-100 text-orange-600" label={field.label} value={displayVal} subValue={subVal} status={status} sdrValue={sdrDisplay} onEdit={onEdit} correctionMode={correctionMode} showSdrSection={isPlanner} />
     }
-    if (field.key === 'orcamento') {
+    // Skip if using new smart_budget type (handled below)
+    if (field.key === 'orcamento' && field.type !== 'smart_budget') {
         const displayVal = value?.total ? formatBudget(value.total) : undefined
         const subVal = value?.por_pessoa ? `${formatBudget(value.por_pessoa)} por pessoa` : undefined
         const sdrDisplay = sdrValue?.total ? formatBudget(sdrValue.total) : undefined

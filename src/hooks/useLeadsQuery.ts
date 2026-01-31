@@ -11,14 +11,26 @@ interface UseLeadsQueryProps {
     enabled?: boolean
 }
 
+interface LeadsQueryResult {
+    data: LeadCard[]
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+}
+
 export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
     return useQuery({
         queryKey: ['leads', filters],
         enabled,
         placeholderData: keepPreviousData,
-        queryFn: async () => {
+        queryFn: async (): Promise<LeadsQueryResult> => {
+            const page = filters.page || 1
+            const pageSize = filters.pageSize || 50
+
+            // Build base query for filtering
             let query = (supabase.from('view_cards_acoes') as any)
-                .select('*')
+                .select('*', { count: 'exact' })
 
             // Search filter
             if (filters.search) {
@@ -65,6 +77,11 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
                 query = query.in('prioridade', filters.prioridade)
             }
 
+            // Pipeline filter (new)
+            if ((filters.pipelineIds?.length ?? 0) > 0) {
+                query = query.in('pipeline_id', filters.pipelineIds)
+            }
+
             // Creation date filter
             if (filters.creationStartDate) {
                 query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
@@ -73,6 +90,36 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
             if (filters.creationEndDate) {
                 query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
             }
+
+            // Trip date filter (new)
+            if (filters.dataViagemStart) {
+                query = query.gte('data_viagem_inicio', filters.dataViagemStart)
+            }
+
+            if (filters.dataViagemEnd) {
+                query = query.lte('data_viagem_inicio', filters.dataViagemEnd)
+            }
+
+            // Value range filter (new)
+            if (filters.valorMin !== undefined) {
+                query = query.gte('valor_estimado', filters.valorMin)
+            }
+
+            if (filters.valorMax !== undefined) {
+                query = query.lte('valor_estimado', filters.valorMax)
+            }
+
+            // Days without contact filter (new)
+            if (filters.diasSemContatoMin !== undefined) {
+                query = query.gte('tempo_sem_contato', filters.diasSemContatoMin)
+            }
+
+            if (filters.diasSemContatoMax !== undefined) {
+                query = query.lte('tempo_sem_contato', filters.diasSemContatoMax)
+            }
+
+            // Exclude group parents
+            query = query.eq('is_group_parent', false)
 
             // Sorting
             if (filters.sortBy) {
@@ -84,11 +131,24 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
                 query = query.order('created_at', { ascending: false })
             }
 
-            const { data, error } = await query
+            // Pagination
+            const from = (page - 1) * pageSize
+            const to = from + pageSize - 1
+            query = query.range(from, to)
+
+            const { data, error, count } = await query
             if (error) throw error
 
-            // Filter out group parents (view already excludes deleted cards)
-            return (data as LeadCard[]).filter(card => !card.is_group_parent)
+            const total = count || 0
+            const totalPages = Math.ceil(total / pageSize)
+
+            return {
+                data: data as LeadCard[],
+                total,
+                page,
+                pageSize,
+                totalPages
+            }
         }
     })
 }

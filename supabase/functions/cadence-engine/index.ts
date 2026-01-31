@@ -422,7 +422,13 @@ async function executeCreateTaskAction(
     let dueDate = new Date();
     if (trigger.delay_minutes > 0) {
         if (trigger.delay_type === 'business') {
-            dueDate = calculateBusinessTime(new Date(), trigger.delay_minutes);
+            // Usar configurações customizadas de horário comercial do trigger
+            const businessConfig: BusinessHoursConfig = {
+                start: trigger.business_hours_start ?? BUSINESS_HOURS_START,
+                end: trigger.business_hours_end ?? BUSINESS_HOURS_END,
+                allowedWeekdays: trigger.allowed_weekdays ?? [1, 2, 3, 4, 5]
+            };
+            dueDate = calculateBusinessTime(new Date(), trigger.delay_minutes, businessConfig);
         } else {
             dueDate = addMinutes(new Date(), trigger.delay_minutes);
         }
@@ -771,11 +777,18 @@ async function executeWaitStep(
     const config = step.wait_config || {};
     const durationMinutes = config.duration_minutes || 60;
     const durationType = config.duration_type || 'business';
+    const template = instance.template || {};
 
     // Calcular próximo horário de execução
     let executeAt: Date;
     if (durationType === 'business') {
-        executeAt = calculateBusinessTime(new Date(), durationMinutes);
+        // Usar configurações de business hours do template da cadência
+        const businessConfig: BusinessHoursConfig = {
+            start: template.business_hours_start ?? BUSINESS_HOURS_START,
+            end: template.business_hours_end ?? BUSINESS_HOURS_END,
+            allowedWeekdays: template.allowed_weekdays ?? [1, 2, 3, 4, 5]
+        };
+        executeAt = calculateBusinessTime(new Date(), durationMinutes, businessConfig);
     } else {
         executeAt = addMinutes(new Date(), durationMinutes);
     }
@@ -1162,50 +1175,117 @@ async function evaluateCondition(
 ): Promise<boolean> {
     if (!condition) return false;
 
+    let result = false;
+    const logContext = {
+        condition_type: condition.type,
+        card_id: card?.id,
+        instance_id: instance?.id,
+        card_stage_id: card?.pipeline_stage_id
+    };
+
     switch (condition.type) {
         case 'task_outcome':
-            return instance.context?.last_outcome === condition.outcome;
+            result = instance.context?.last_outcome === condition.outcome;
+            console.log(`[CadenceEngine] evaluateCondition: task_outcome`, {
+                ...logContext,
+                expected: condition.outcome,
+                actual: instance.context?.last_outcome,
+                result
+            });
+            return result;
 
         case 'card_in_stage':
-            return card.pipeline_stage_id === condition.stage_id;
+            result = card.pipeline_stage_id === condition.stage_id;
+            console.log(`[CadenceEngine] evaluateCondition: card_in_stage`, {
+                ...logContext,
+                expected_stage: condition.stage_id,
+                result
+            });
+            return result;
 
         case 'card_in_stages':
-            return condition.stage_ids?.includes(card.pipeline_stage_id);
+            result = condition.stage_ids?.includes(card.pipeline_stage_id);
+            console.log(`[CadenceEngine] evaluateCondition: card_in_stages`, {
+                ...logContext,
+                expected_stages: condition.stage_ids,
+                result
+            });
+            return result;
 
         case 'successful_contacts_gte':
-            return instance.successful_contacts >= condition.value;
+            result = instance.successful_contacts >= condition.value;
+            console.log(`[CadenceEngine] evaluateCondition: successful_contacts_gte`, {
+                ...logContext,
+                expected_min: condition.value,
+                actual: instance.successful_contacts,
+                result
+            });
+            return result;
 
         case 'total_contacts_gte':
-            return instance.total_contacts_attempted >= condition.value;
+            result = instance.total_contacts_attempted >= condition.value;
+            console.log(`[CadenceEngine] evaluateCondition: total_contacts_gte`, {
+                ...logContext,
+                expected_min: condition.value,
+                actual: instance.total_contacts_attempted,
+                result
+            });
+            return result;
 
         default:
+            console.warn(`[CadenceEngine] WARNING: Unknown condition type "${condition.type}"`, {
+                ...logContext,
+                full_condition: JSON.stringify(condition)
+            });
             return false;
     }
 }
 
-function calculateBusinessTime(fromDate: Date, minutesToAdd: number): Date {
+interface BusinessHoursConfig {
+    start: number;
+    end: number;
+    allowedWeekdays: number[]; // 1=Seg, 2=Ter, ..., 7=Dom
+}
+
+function isAllowedWeekday(date: Date, allowedWeekdays: number[]): boolean {
+    // JavaScript getDay(): 0=Dom, 1=Seg, ..., 6=Sáb
+    // Nossa convenção: 1=Seg, ..., 7=Dom
+    const jsDay = date.getDay();
+    const ourDay = jsDay === 0 ? 7 : jsDay; // Converter 0 (Dom) para 7
+    return allowedWeekdays.includes(ourDay);
+}
+
+function calculateBusinessTime(
+    fromDate: Date,
+    minutesToAdd: number,
+    config?: BusinessHoursConfig
+): Date {
+    const businessStart = config?.start ?? BUSINESS_HOURS_START;
+    const businessEnd = config?.end ?? BUSINESS_HOURS_END;
+    const allowedWeekdays = config?.allowedWeekdays ?? [1, 2, 3, 4, 5]; // Seg-Sex por padrão
+
     const localTime = utcToZonedTime(fromDate, TIMEZONE);
     let result = new Date(localTime);
     let remainingMinutes = minutesToAdd;
 
     while (remainingMinutes > 0) {
-        // Pular para próximo dia útil se necessário
-        while (isWeekend(result)) {
+        // Pular para próximo dia útil se necessário (usando allowed_weekdays)
+        while (!isAllowedWeekday(result, allowedWeekdays)) {
             result = addDays(result, 1);
-            result = setHours(setMinutes(result, 0), BUSINESS_HOURS_START);
+            result = setHours(setMinutes(result, 0), businessStart);
         }
 
         // Se antes do horário comercial, ajustar para início
-        const startOfBusiness = setHours(setMinutes(result, 0), BUSINESS_HOURS_START);
+        const startOfBusiness = setHours(setMinutes(result, 0), businessStart);
         if (isBefore(result, startOfBusiness)) {
             result = startOfBusiness;
         }
 
         // Se depois do horário comercial, ir para próximo dia
-        const endOfBusiness = setHours(setMinutes(result, 0), BUSINESS_HOURS_END);
+        const endOfBusiness = setHours(setMinutes(result, 0), businessEnd);
         if (isAfter(result, endOfBusiness)) {
             result = addDays(result, 1);
-            result = setHours(setMinutes(result, 0), BUSINESS_HOURS_START);
+            result = setHours(setMinutes(result, 0), businessStart);
             continue;
         }
 
@@ -1220,7 +1300,7 @@ function calculateBusinessTime(fromDate: Date, minutesToAdd: number): Date {
         } else {
             remainingMinutes -= minutesUntilEndOfBusiness;
             result = addDays(result, 1);
-            result = setHours(setMinutes(result, 0), BUSINESS_HOURS_START);
+            result = setHours(setMinutes(result, 0), businessStart);
         }
     }
 

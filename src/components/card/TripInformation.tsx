@@ -16,7 +16,7 @@ import { Checkbox } from '../ui/checkbox'
 
 import type { EpocaViagem } from '../pipeline/fields/FlexibleDateField'
 import type { DuracaoViagem } from '../pipeline/fields/FlexibleDurationField'
-import type { OrcamentoViagem } from '../pipeline/fields/SmartBudgetField'
+import SmartBudgetField, { type OrcamentoViagem } from '../pipeline/fields/SmartBudgetField'
 
 interface TripsProdutoData {
     // New flexible types
@@ -590,8 +590,9 @@ export default function TripInformation({ card }: TripInformationProps) {
             </EditModal>
 
             {/* Modal de Edição Genérico via UniversalFieldRenderer */}
+            {/* Exclui campos que têm modais específicos: motivo, destinos, orcamento, taxa_planejamento */}
             <EditModal
-                isOpen={!!editingField && editingField !== 'orcamento' && editingField !== 'destinos'}
+                isOpen={!!editingField && !['motivo', 'destinos', 'orcamento', 'taxa_planejamento'].includes(editingField)}
                 onClose={handleCloseModal}
                 onSave={handleFieldSave}
                 title={visibleFields.find(f => f.key === editingField)?.label || 'Editar Campo'}
@@ -616,100 +617,12 @@ export default function TripInformation({ card }: TripInformationProps) {
                 isSaving={updateCardMutation.isPending}
                 isCorrection={correctionMode}
             >
-                <div className="space-y-4">
-                    {/* Traveler Count Display/Edit for Context */}
-                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-2">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-indigo-800 uppercase tracking-wide">Viajantes</label>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="number"
-                                    value={editedData.quantidade_viajantes || ''}
-                                    onChange={(e) => {
-                                        const qtd = parseInt(e.target.value) || 0
-                                        setEditedData(prev => {
-                                            const newData = { ...prev, quantidade_viajantes: qtd }
-                                            // Recalculate Total if Per Person exists
-                                            const orcamento = prev.orcamento as any
-                                            if (orcamento && orcamento.por_pessoa) {
-                                                newData.orcamento = {
-                                                    ...orcamento,
-                                                    total: orcamento.por_pessoa * qtd
-                                                }
-                                            }
-                                            return newData
-                                        })
-                                    }}
-                                    className="w-20 h-8 text-right bg-white border-indigo-200 focus:border-indigo-500"
-                                    placeholder="0"
-                                />
-                                <span className="text-sm text-indigo-600 font-medium">pessoas</span>
-                            </div>
-                        </div>
-                        <p className="text-[10px] text-indigo-600 mt-1">
-                            Usado para calcular automaticamente os valores abaixo.
-                        </p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento Total (R$)</label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                            <Input
-                                type="number"
-                                value={(editedData.orcamento as any)?.total || ''}
-                                onChange={(e) => {
-                                    const newTotal = parseFloat(e.target.value) || 0
-                                    setEditedData(prev => {
-                                        const qtd = prev.quantidade_viajantes || 0
-                                        const orcamento = prev.orcamento as any
-                                        const newData = {
-                                            ...prev,
-                                            orcamento: {
-                                                ...(orcamento || {}),
-                                                total: newTotal,
-                                                // Auto-calculate per person if travelers > 0
-                                                por_pessoa: qtd > 0 ? newTotal / qtd : orcamento?.por_pessoa
-                                            }
-                                        }
-                                        return newData
-                                    })
-                                }}
-                                className="pl-12"
-                                placeholder="0,00"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento por Pessoa (R$)</label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                            <Input
-                                type="number"
-                                value={(editedData.orcamento as any)?.por_pessoa || ''}
-                                onChange={(e) => {
-                                    const newPorPessoa = parseFloat(e.target.value) || 0
-                                    setEditedData(prev => {
-                                        const qtd = prev.quantidade_viajantes || 0
-                                        const orcamento = prev.orcamento as any
-                                        const newData = {
-                                            ...prev,
-                                            orcamento: {
-                                                ...(orcamento || {}),
-                                                por_pessoa: newPorPessoa,
-                                                // Auto-calculate total if travelers > 0
-                                                total: qtd > 0 ? newPorPessoa * qtd : orcamento?.total
-                                            }
-                                        }
-                                        return newData
-                                    })
-                                }}
-                                className="pl-12"
-                                placeholder="0,00"
-                            />
-                        </div>
-                    </div>
-                </div>
+                <SmartBudgetField
+                    label=""
+                    value={editedData.orcamento}
+                    onChange={(val: OrcamentoViagem) => setEditedData({ ...editedData, orcamento: val })}
+                    quantidadeViajantes={editedData.quantidade_viajantes || 0}
+                />
             </EditModal>
 
             <EditModal

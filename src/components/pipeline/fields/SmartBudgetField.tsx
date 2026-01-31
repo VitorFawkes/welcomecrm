@@ -267,7 +267,7 @@ export default function SmartBudgetField({
                     </button>
 
                     {showTypeDropdown && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
                             {TIPOS.map(tipo => (
                                 <button
                                     key={tipo.value}

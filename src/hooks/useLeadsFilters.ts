@@ -14,6 +14,17 @@ export interface LeadsFilterState {
     prioridade?: string[]
     sortBy: SortBy
     sortDirection: SortDirection
+    // New filters
+    pipelineIds?: string[]
+    dataViagemStart?: string
+    dataViagemEnd?: string
+    valorMin?: number
+    valorMax?: number
+    diasSemContatoMin?: number
+    diasSemContatoMax?: number
+    // Pagination
+    page: number
+    pageSize: number
 }
 
 interface LeadsFiltersStore {
@@ -24,26 +35,32 @@ interface LeadsFiltersStore {
     toggleStage: (stageId: string) => void
     toggleStatus: (status: string) => void
     togglePrioridade: (prioridade: string) => void
+    togglePipeline: (pipelineId: string) => void
+    setPage: (page: number) => void
+    setPageSize: (pageSize: number) => void
     clearFilters: () => void
     reset: () => void
+    hasActiveFilters: () => boolean
 }
 
 const initialFilters: LeadsFilterState = {
     sortBy: 'created_at',
-    sortDirection: 'desc'
+    sortDirection: 'desc',
+    page: 1,
+    pageSize: 50
 }
 
 export const useLeadsFilters = create<LeadsFiltersStore>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             filters: initialFilters,
 
             setFilters: (newFilters) => set((state) => ({
-                filters: { ...state.filters, ...newFilters }
+                filters: { ...state.filters, ...newFilters, page: 1 }
             })),
 
             setSearch: (search) => set((state) => ({
-                filters: { ...state.filters, search }
+                filters: { ...state.filters, search, page: 1 }
             })),
 
             toggleOwner: (ownerId) => set((state) => {
@@ -51,7 +68,7 @@ export const useLeadsFilters = create<LeadsFiltersStore>()(
                 const updated = current.includes(ownerId)
                     ? current.filter(id => id !== ownerId)
                     : [...current, ownerId]
-                return { filters: { ...state.filters, ownerIds: updated } }
+                return { filters: { ...state.filters, ownerIds: updated, page: 1 } }
             }),
 
             toggleStage: (stageId) => set((state) => {
@@ -59,7 +76,7 @@ export const useLeadsFilters = create<LeadsFiltersStore>()(
                 const updated = current.includes(stageId)
                     ? current.filter(id => id !== stageId)
                     : [...current, stageId]
-                return { filters: { ...state.filters, stageIds: updated } }
+                return { filters: { ...state.filters, stageIds: updated, page: 1 } }
             }),
 
             toggleStatus: (status) => set((state) => {
@@ -67,7 +84,7 @@ export const useLeadsFilters = create<LeadsFiltersStore>()(
                 const updated = current.includes(status)
                     ? current.filter(s => s !== status)
                     : [...current, status]
-                return { filters: { ...state.filters, statusComercial: updated } }
+                return { filters: { ...state.filters, statusComercial: updated, page: 1 } }
             }),
 
             togglePrioridade: (prioridade) => set((state) => {
@@ -75,12 +92,48 @@ export const useLeadsFilters = create<LeadsFiltersStore>()(
                 const updated = current.includes(prioridade)
                     ? current.filter(p => p !== prioridade)
                     : [...current, prioridade]
-                return { filters: { ...state.filters, prioridade: updated } }
+                return { filters: { ...state.filters, prioridade: updated, page: 1 } }
             }),
+
+            togglePipeline: (pipelineId) => set((state) => {
+                const current = state.filters.pipelineIds || []
+                const updated = current.includes(pipelineId)
+                    ? current.filter(id => id !== pipelineId)
+                    : [...current, pipelineId]
+                return { filters: { ...state.filters, pipelineIds: updated, page: 1 } }
+            }),
+
+            setPage: (page) => set((state) => ({
+                filters: { ...state.filters, page }
+            })),
+
+            setPageSize: (pageSize) => set((state) => ({
+                filters: { ...state.filters, pageSize, page: 1 }
+            })),
 
             clearFilters: () => set({ filters: initialFilters }),
 
-            reset: () => set({ filters: initialFilters })
+            reset: () => set({ filters: initialFilters }),
+
+            hasActiveFilters: (): boolean => {
+                const { filters } = get()
+                return Boolean(
+                    filters.search ||
+                    filters.creationStartDate ||
+                    filters.creationEndDate ||
+                    (filters.ownerIds?.length ?? 0) > 0 ||
+                    (filters.stageIds?.length ?? 0) > 0 ||
+                    (filters.statusComercial?.length ?? 0) > 0 ||
+                    (filters.prioridade?.length ?? 0) > 0 ||
+                    (filters.pipelineIds?.length ?? 0) > 0 ||
+                    filters.dataViagemStart ||
+                    filters.dataViagemEnd ||
+                    filters.valorMin !== undefined ||
+                    filters.valorMax !== undefined ||
+                    filters.diasSemContatoMin !== undefined ||
+                    filters.diasSemContatoMax !== undefined
+                )
+            }
         }),
         {
             name: 'leads-filters-storage',

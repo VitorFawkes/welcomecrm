@@ -88,13 +88,13 @@ export default function GovernanceConsole() {
         }
     })
 
-    // 2.5 Fetch System Fields
+    // 2.5 Fetch System Fields (with section for grouping)
     const { data: systemFields } = useQuery({
         queryKey: ['system-fields-governance'],
         queryFn: async () => {
             const { data } = await supabase
                 .from('system_fields')
-                .select('key, label, type')
+                .select('key, label, type, section')
                 .eq('active', true)
                 .order('label')
             return data || []

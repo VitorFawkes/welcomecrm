@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, X, ChevronDown, Calendar, User, Flag, Layers } from 'lucide-react'
+import { Search, X, ChevronDown, Calendar, User, Flag, Layers, SlidersHorizontal } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useLeadsFilters } from '../../hooks/useLeadsFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
@@ -12,6 +12,8 @@ import {
 } from '../ui/popover'
 import { Checkbox } from '../ui/checkbox'
 import { Input } from '../ui/Input'
+import { LeadsFilterDrawer } from './LeadsFilterDrawer'
+import LeadsActiveFilters from './LeadsActiveFilters'
 
 const STATUS_OPTIONS = [
     { value: 'aberto', label: 'Aberto' },
@@ -26,7 +28,7 @@ const PRIORIDADE_OPTIONS = [
 ]
 
 export default function LeadsFilters() {
-    const { filters, setFilters, setSearch, toggleOwner, toggleStage, toggleStatus, togglePrioridade, clearFilters } = useLeadsFilters()
+    const { filters, setFilters, setSearch, toggleOwner, toggleStage, toggleStatus, togglePrioridade, clearFilters, hasActiveFilters } = useLeadsFilters()
     const { data: options } = useFilterOptions()
     const { data: stages } = usePipelineStages()
 
@@ -34,6 +36,7 @@ export default function LeadsFilters() {
 
     const [ownerSearch, setOwnerSearch] = useState('')
     const [stageSearch, setStageSearch] = useState('')
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
     const filteredProfiles = profiles.filter(p =>
         (p.full_name?.toLowerCase() || '').includes(ownerSearch.toLowerCase()) ||
@@ -42,16 +45,6 @@ export default function LeadsFilters() {
 
     const filteredStages = (stages || []).filter(s =>
         s.nome.toLowerCase().includes(stageSearch.toLowerCase())
-    )
-
-    const hasActiveFilters = Boolean(
-        filters.search ||
-        filters.creationStartDate ||
-        filters.creationEndDate ||
-        (filters.ownerIds?.length ?? 0) > 0 ||
-        (filters.stageIds?.length ?? 0) > 0 ||
-        (filters.statusComercial?.length ?? 0) > 0 ||
-        (filters.prioridade?.length ?? 0) > 0
     )
 
     const getSelectedOwnersLabel = () => {
@@ -73,6 +66,7 @@ export default function LeadsFilters() {
     }
 
     return (
+    <>
         <div className="flex flex-wrap items-center gap-3 p-4 bg-white border-b border-gray-200">
             {/* Search */}
             <div className="relative flex-1 min-w-[250px] max-w-md">
@@ -296,8 +290,22 @@ export default function LeadsFilters() {
                 </PopoverContent>
             </Popover>
 
+            {/* Advanced Filters Button */}
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDrawerOpen(true)}
+                className={cn(
+                    "h-9 gap-2",
+                    hasActiveFilters() && "border-primary text-primary"
+                )}
+            >
+                <SlidersHorizontal className="h-4 w-4" />
+                Filtros Avançados
+            </Button>
+
             {/* Clear Filters */}
-            {hasActiveFilters && (
+            {hasActiveFilters() && (
                 <Button
                     variant="ghost"
                     size="sm"
@@ -308,6 +316,18 @@ export default function LeadsFilters() {
                     Limpar
                 </Button>
             )}
+
+            {/* Filter Drawer */}
+            <LeadsFilterDrawer
+                isOpen={isDrawerOpen}
+                onClose={() => setIsDrawerOpen(false)}
+                filters={filters}
+                setFilters={setFilters}
+            />
         </div>
+
+        {/* Active Filters Chips */}
+        <LeadsActiveFilters filters={filters} setFilters={setFilters} />
+    </>
     )
 }

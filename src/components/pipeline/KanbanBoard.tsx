@@ -47,7 +47,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const queryClient = useQueryClient()
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
-    const { validateMoveSync } = useQualityGate()
+    const { validateMove } = useQualityGate()
 
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
@@ -198,6 +198,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         sdrName?: string,
         targetStageName: string,
         missingFields?: { key: string, label: string }[],
+        missingProposals?: { label: string, min_status: string }[],
+        missingTasks?: { label: string, task_tipo: string }[],
         requiredRole?: string
     } | null>(null)
 
@@ -256,7 +258,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         }
     }
 
-    const handleDragEnd = (event: DragEndEvent) => {
+    const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event
 
         if (over && active.id !== over.id) {
@@ -279,8 +281,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     return
                 }
 
-                // 1. Check Quality Gate (Mandatory Fields & Rules)
-                const validation = validateMoveSync(card, stageId)
+                // 1. Check Quality Gate (Mandatory Fields, Proposals, Tasks & Rules)
+                const validation = await validateMove(card, stageId)
 
                 // Check for Lost Reason Rule
                 if (validation.missingRules?.some(r => r.key === 'lost_reason_required')) {
@@ -299,7 +301,9 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                         cardId,
                         stageId,
                         targetStageName: targetStage?.nome || 'Nova Etapa',
-                        missingFields: validation.missingFields
+                        missingFields: validation.missingFields,
+                        missingProposals: validation.missingProposals,
+                        missingTasks: validation.missingTasks
                     })
                     setQualityGateModalOpen(true)
                     setActiveCard(null) // Reset active card to remove drag overlay
@@ -552,6 +556,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                         cardId={pendingMove.cardId}
                                         targetStageName={pendingMove.targetStageName}
                                         missingFields={pendingMove.missingFields || []}
+                                        missingProposals={pendingMove.missingProposals || []}
+                                        missingTasks={pendingMove.missingTasks || []}
                                         initialData={cards?.find(c => c.id === pendingMove.cardId) as any}
                                     />
 

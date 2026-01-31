@@ -2,15 +2,24 @@ import { useState } from 'react'
 import { Database } from 'lucide-react'
 import { useLeadsFilters } from '../hooks/useLeadsFilters'
 import { useLeadsQuery } from '../hooks/useLeadsQuery'
+import { useLeadsColumns } from '../hooks/useLeadsColumns'
 import LeadsFilters from '../components/leads/LeadsFilters'
 import LeadsTable from '../components/leads/LeadsTable'
 import LeadsBulkActions from '../components/leads/LeadsBulkActions'
 import LeadsExport from '../components/leads/LeadsExport'
+import LeadsPagination from '../components/leads/LeadsPagination'
+import LeadsStatsBar from '../components/leads/LeadsStatsBar'
+import { ColumnManager } from '../components/ui/data-grid/ColumnManager'
 
 export default function Leads() {
-    const { filters } = useLeadsFilters()
-    const { data: leads, isLoading } = useLeadsQuery({ filters })
+    const { filters, setPage, setPageSize } = useLeadsFilters()
+    const { data: queryResult, isLoading } = useLeadsQuery({ filters })
+    const { columns, setColumns } = useLeadsColumns()
     const [selectedIds, setSelectedIds] = useState<string[]>([])
+
+    const leads = queryResult?.data || []
+    const total = queryResult?.total || 0
+    const totalPages = queryResult?.totalPages || 1
 
     const handleSelectAll = (checked: boolean) => {
         if (checked && leads) {
@@ -43,15 +52,24 @@ export default function Leads() {
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">Gestão de Leads</h1>
                         <p className="text-sm text-gray-500">
-                            {isLoading ? 'Carregando...' : `${leads?.length || 0} leads encontrados`}
+                            {isLoading ? 'Carregando...' : `${total} leads encontrados`}
                         </p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <LeadsExport leads={leads || []} selectedIds={selectedIds.length > 0 ? selectedIds : undefined} />
+                    <ColumnManager
+                        columns={columns}
+                        onChange={setColumns}
+                    />
+                    <LeadsExport leads={leads} selectedIds={selectedIds.length > 0 ? selectedIds : undefined} />
                 </div>
             </div>
+
+            {/* Stats Bar */}
+            {leads.length > 0 && (
+                <LeadsStatsBar leads={leads} />
+            )}
 
             {/* Filters */}
             <LeadsFilters />
@@ -69,13 +87,25 @@ export default function Leads() {
             {/* Table */}
             <div className="flex-1 overflow-auto p-6">
                 <LeadsTable
-                    leads={leads || []}
+                    leads={leads}
                     selectedIds={selectedIds}
                     onSelectAll={handleSelectAll}
                     onSelectRow={handleSelectRow}
                     isLoading={isLoading}
                 />
             </div>
+
+            {/* Pagination */}
+            {total > 0 && (
+                <LeadsPagination
+                    page={filters.page}
+                    pageSize={filters.pageSize}
+                    total={total}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                />
+            )}
         </div>
     )
 }

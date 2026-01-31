@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/Input';
 import {
     Plus, Trash2, AlertTriangle, Zap, X, ArrowRight,
-    Pencil, Clock, Play, ListTodo, CalendarDays
+    Pencil, Clock, Play, ListTodo, CalendarDays,
+    Search, ChevronDown, ChevronRight, Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
@@ -149,6 +150,15 @@ export function CadenceEntryRulesTab() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>(emptyFormData);
 
+    // Filter states
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+    const [actionFilter, setActionFilter] = useState<'all' | 'create_task' | 'start_cadence'>('all');
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+        card_created: true,
+        stage_enter: true
+    });
+
     // Fetch existing entry rules
     const { data: rules, isLoading: rulesLoading } = useQuery({
         queryKey: ['cadence-entry-rules'],
@@ -197,6 +207,44 @@ export function CadenceEntryRulesTab() {
     const filteredStages = allStages?.filter(s =>
         formData.pipelineIds.length === 0 || formData.pipelineIds.includes(s.pipeline_id || '')
     ) || [];
+
+    // Filter and group rules
+    const filteredRules = useMemo(() => {
+        return rules?.filter(rule => {
+            if (statusFilter === 'active' && !rule.is_active) return false;
+            if (statusFilter === 'inactive' && rule.is_active) return false;
+            if (actionFilter !== 'all' && rule.action_type !== actionFilter) return false;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                const nameMatch = rule.name?.toLowerCase().includes(term);
+                const templateName = rule.target_template_id
+                    ? templates?.find(t => t.id === rule.target_template_id)?.name || ''
+                    : '';
+                const templateMatch = templateName.toLowerCase().includes(term);
+                const taskMatch = rule.task_config?.titulo?.toLowerCase().includes(term);
+                if (!nameMatch && !templateMatch && !taskMatch) return false;
+            }
+            return true;
+        }) || [];
+    }, [rules, statusFilter, actionFilter, searchTerm, templates]);
+
+    const groupedRules = useMemo(() => ({
+        card_created: filteredRules.filter(r => r.event_type === 'card_created'),
+        stage_enter: filteredRules.filter(r => r.event_type === 'stage_enter')
+    }), [filteredRules]);
+
+    // Stats
+    const stats = useMemo(() => ({
+        total: rules?.length || 0,
+        active: rules?.filter(r => r.is_active).length || 0,
+        tasks: rules?.filter(r => r.action_type === 'create_task').length || 0,
+        cadences: rules?.filter(r => r.action_type === 'start_cadence').length || 0,
+        filteredTotal: filteredRules.length
+    }), [rules, filteredRules]);
+
+    const toggleSection = (section: string) => {
+        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
 
     // Create mutation
     const createMutation = useMutation({
@@ -357,6 +405,126 @@ export function CadenceEntryRulesTab() {
         if (minutes < 1440) return `${Math.round(minutes / 60)}h`;
         return `${Math.round(minutes / 1440)} dia(s)`;
     };
+
+    // Render individual rule card
+    const renderRuleCard = (rule: EntryRule) => (
+        <div
+            key={rule.id}
+            className={`p-4 rounded-lg border-l-4 transition-colors ${
+                editingId === rule.id
+                    ? 'bg-amber-50 border-amber-300 border-l-amber-500'
+                    : rule.action_type === 'create_task'
+                        ? rule.is_active
+                            ? 'bg-white border border-slate-200 border-l-purple-400'
+                            : 'bg-slate-50 border border-slate-100 border-l-purple-200 opacity-60'
+                        : rule.is_active
+                            ? 'bg-white border border-slate-200 border-l-indigo-400'
+                            : 'bg-slate-50 border border-slate-100 border-l-indigo-200 opacity-60'
+            }`}
+        >
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4 flex-1">
+                    <Switch
+                        checked={rule.is_active}
+                        onCheckedChange={(checked) => toggleMutation.mutate({ id: rule.id, isActive: checked })}
+                        disabled={editingId === rule.id}
+                    />
+                    <div className="flex-1 min-w-0">
+                        {/* Name */}
+                        {rule.name && (
+                            <p className="font-semibold text-slate-800 mb-2">{rule.name}</p>
+                        )}
+
+                        {/* Stages */}
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <span className="text-xs text-slate-500">Stages:</span>
+                            <div className="flex flex-wrap gap-1">
+                                {rule.applicable_stage_ids?.length ? (
+                                    rule.applicable_stage_ids.map(id => (
+                                        <Badge key={id} variant="secondary" className="text-xs">
+                                            {getStageName(id)}
+                                        </Badge>
+                                    ))
+                                ) : (
+                                    <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                                        Qualquer Stage
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Action */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-slate-500">Ação:</span>
+                            {rule.action_type === 'create_task' ? (
+                                <>
+                                    <Badge className="text-xs bg-purple-100 text-purple-700">
+                                        <ListTodo className="w-3 h-3 mr-1" />
+                                        Criar Tarefa
+                                    </Badge>
+                                    {rule.task_config?.titulo && (
+                                        <span className="text-sm text-slate-600">"{rule.task_config.titulo}"</span>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <Badge className="text-xs bg-indigo-100 text-indigo-700">
+                                        <CalendarDays className="w-3 h-3 mr-1" />
+                                        Iniciar Cadência
+                                    </Badge>
+                                    {rule.target_template_id && (
+                                        <span className="text-sm text-slate-600">"{getTemplateName(rule.target_template_id)}"</span>
+                                    )}
+                                </>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {formatDelay(rule.delay_minutes, rule.delay_type)}
+                                {rule.delay_type === 'business' && ' (útil)'}
+                            </Badge>
+                        </div>
+
+                        {/* Business Hours Details */}
+                        {rule.delay_type === 'business' && (
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs text-slate-400">Horário:</span>
+                                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                    {rule.business_hours_start ?? 9}h às {rule.business_hours_end ?? 18}h
+                                </Badge>
+                                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                    {formatWeekdays(rule.allowed_weekdays || [1, 2, 3, 4, 5])}
+                                </Badge>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                        onClick={() => startEditing(rule)}
+                        disabled={isFormOpen && editingId !== rule.id}
+                    >
+                        <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                            if (confirm('Remover esta regra?')) {
+                                deleteMutation.mutate(rule.id);
+                            }
+                        }}
+                        disabled={editingId === rule.id}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
 
     // Render form
     const renderForm = () => (
@@ -755,11 +923,11 @@ export function CadenceEntryRulesTab() {
                 </CardContent>
             </Card>
 
-            {/* Status + Add Button */}
+            {/* Stats + Filters + Add Button */}
             <Card className="bg-white border-slate-200 shadow-sm">
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">Regras Ativas</CardTitle>
+                        <CardTitle className="text-lg">Regras Configuradas</CardTitle>
                         <Button
                             variant="outline"
                             size="sm"
@@ -772,7 +940,7 @@ export function CadenceEntryRulesTab() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                     {rulesLoading ? (
                         <div className="text-muted-foreground text-sm">Carregando...</div>
                     ) : !rules?.length ? (
@@ -784,9 +952,134 @@ export function CadenceEntryRulesTab() {
                             </p>
                         </div>
                     ) : (
-                        <div className="text-sm text-slate-600">
-                            <strong>{rules.filter(r => r.is_active).length}</strong> regra(s) ativa(s) de <strong>{rules.length}</strong> total
-                        </div>
+                        <>
+                            {/* Stats Bar */}
+                            <div className="flex flex-wrap gap-4 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-slate-500">Total:</span>
+                                    <span className="font-semibold text-slate-700">{stats.total}</span>
+                                </div>
+                                <div className="w-px h-4 bg-slate-200 self-center" />
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-slate-500">Ativas:</span>
+                                    <span className="font-semibold text-emerald-600">{stats.active}</span>
+                                </div>
+                                <div className="w-px h-4 bg-slate-200 self-center" />
+                                <div className="flex items-center gap-2">
+                                    <ListTodo className="w-3 h-3 text-purple-500" />
+                                    <span className="text-xs text-slate-500">Tarefas:</span>
+                                    <span className="font-semibold text-purple-600">{stats.tasks}</span>
+                                </div>
+                                <div className="w-px h-4 bg-slate-200 self-center" />
+                                <div className="flex items-center gap-2">
+                                    <CalendarDays className="w-3 h-3 text-indigo-500" />
+                                    <span className="text-xs text-slate-500">Cadências:</span>
+                                    <span className="font-semibold text-indigo-600">{stats.cadences}</span>
+                                </div>
+                            </div>
+
+                            {/* Filters Bar */}
+                            <div className="flex flex-wrap items-center gap-3">
+                                {/* Search */}
+                                <div className="relative flex-1 min-w-[200px]">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <Input
+                                        placeholder="Buscar por nome, título ou template..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="pl-9 h-9"
+                                    />
+                                </div>
+
+                                {/* Status Filter */}
+                                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                                    <button
+                                        onClick={() => setStatusFilter('all')}
+                                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                                            statusFilter === 'all'
+                                                ? 'bg-white text-slate-800 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        Todas
+                                    </button>
+                                    <button
+                                        onClick={() => setStatusFilter('active')}
+                                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                                            statusFilter === 'active'
+                                                ? 'bg-emerald-500 text-white shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        Ativas
+                                    </button>
+                                    <button
+                                        onClick={() => setStatusFilter('inactive')}
+                                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                                            statusFilter === 'inactive'
+                                                ? 'bg-slate-500 text-white shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        Inativas
+                                    </button>
+                                </div>
+
+                                {/* Action Type Filter */}
+                                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                                    <button
+                                        onClick={() => setActionFilter('all')}
+                                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                                            actionFilter === 'all'
+                                                ? 'bg-white text-slate-800 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        Todas
+                                    </button>
+                                    <button
+                                        onClick={() => setActionFilter('create_task')}
+                                        className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
+                                            actionFilter === 'create_task'
+                                                ? 'bg-purple-500 text-white shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        <ListTodo className="w-3 h-3" />
+                                        Tarefas
+                                    </button>
+                                    <button
+                                        onClick={() => setActionFilter('start_cadence')}
+                                        className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
+                                            actionFilter === 'start_cadence'
+                                                ? 'bg-indigo-500 text-white shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        <CalendarDays className="w-3 h-3" />
+                                        Cadências
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Filter indicator */}
+                            {(searchTerm || statusFilter !== 'all' || actionFilter !== 'all') && (
+                                <div className="flex items-center gap-2 text-sm text-slate-500">
+                                    <Filter className="w-4 h-4" />
+                                    <span>Mostrando {stats.filteredTotal} de {stats.total} regras</span>
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setStatusFilter('all');
+                                            setActionFilter('all');
+                                        }}
+                                        className="text-blue-500 hover:text-blue-700 underline text-xs"
+                                    >
+                                        Limpar filtros
+                                    </button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </CardContent>
             </Card>
@@ -794,125 +1087,89 @@ export function CadenceEntryRulesTab() {
             {/* Add/Edit Form */}
             {isFormOpen && renderForm()}
 
-            {/* List of Rules */}
+            {/* Grouped Rules List */}
             {rules && rules.length > 0 && (
-                <Card className="bg-white border-slate-200 shadow-sm">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-lg">Regras Configuradas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            {rules.map(rule => (
-                                <div
-                                    key={rule.id}
-                                    className={`p-4 rounded-lg border transition-colors ${
-                                        editingId === rule.id
-                                            ? 'bg-amber-50 border-amber-300'
-                                            : rule.is_active
-                                                ? 'bg-white border-slate-200'
-                                                : 'bg-slate-50 border-slate-100 opacity-60'
-                                    }`}
+                <div className="space-y-4">
+                    {/* Card Created Section */}
+                    {(groupedRules.card_created.length > 0 || !searchTerm && !statusFilter && !actionFilter) && (
+                        <Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-green-400">
+                            <CardHeader className="pb-2">
+                                <button
+                                    onClick={() => toggleSection('card_created')}
+                                    className="flex items-center justify-between w-full text-left"
                                 >
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex items-start gap-4 flex-1">
-                                            <Switch
-                                                checked={rule.is_active}
-                                                onCheckedChange={(checked) => toggleMutation.mutate({ id: rule.id, isActive: checked })}
-                                                disabled={editingId === rule.id}
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                {/* Name */}
-                                                {rule.name && (
-                                                    <p className="font-semibold text-slate-800 mb-2">{rule.name}</p>
-                                                )}
-
-                                                {/* QUANDO */}
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="text-xs font-medium text-amber-600 uppercase">QUANDO:</span>
-                                                        <Badge variant="outline" className={`text-xs ${rule.event_type === 'card_created' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                                                            {rule.event_type === 'card_created' ? '🆕 Card Criado' : '➡️ Card Movido'}
-                                                        </Badge>
-                                                        <span className="text-slate-400">em</span>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {rule.applicable_stage_ids?.length ? (
-                                                                rule.applicable_stage_ids.map(id => (
-                                                                    <Badge key={id} variant="secondary" className="text-xs">
-                                                                        {getStageName(id)}
-                                                                    </Badge>
-                                                                ))
-                                                            ) : (
-                                                                <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                                                                    Qualquer Stage
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* ENTÃO */}
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="text-xs font-medium text-blue-600 uppercase">ENTÃO:</span>
-                                                        {rule.action_type === 'create_task' ? (
-                                                            <>
-                                                                <Badge className="text-xs bg-purple-100 text-purple-700">
-                                                                    <ListTodo className="w-3 h-3 mr-1" />
-                                                                    Criar Tarefa
-                                                                </Badge>
-                                                                {rule.task_config?.titulo && (
-                                                                    <span className="text-sm text-slate-600">"{rule.task_config.titulo}"</span>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Badge className="text-xs bg-indigo-100 text-indigo-700">
-                                                                    <CalendarDays className="w-3 h-3 mr-1" />
-                                                                    Iniciar Cadência
-                                                                </Badge>
-                                                                {rule.target_template_id && (
-                                                                    <span className="text-sm text-slate-600">"{getTemplateName(rule.target_template_id)}"</span>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                        <span className="text-slate-400">em</span>
-                                                        <Badge variant="outline" className="text-xs">
-                                                            <Clock className="w-3 h-3 mr-1" />
-                                                            {formatDelay(rule.delay_minutes, rule.delay_type)}
-                                                            {rule.delay_type === 'business' && ' (útil)'}
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                    <div className="flex items-center gap-3">
+                                        {expandedSections.card_created ? (
+                                            <ChevronDown className="w-5 h-5 text-slate-400" />
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-slate-400" />
+                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">📥</span>
+                                            <CardTitle className="text-base">Card Criado</CardTitle>
                                         </div>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                                                onClick={() => startEditing(rule)}
-                                                disabled={isFormOpen && editingId !== rule.id}
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                onClick={() => {
-                                                    if (confirm('Remover esta regra?')) {
-                                                        deleteMutation.mutate(rule.id);
-                                                    }
-                                                }}
-                                                disabled={editingId === rule.id}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
+                                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                            {groupedRules.card_created.length} regra(s)
+                                        </Badge>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+                                </button>
+                            </CardHeader>
+                            {expandedSections.card_created && (
+                                <CardContent className="pt-0">
+                                    {groupedRules.card_created.length === 0 ? (
+                                        <div className="text-sm text-slate-500 italic py-4 text-center">
+                                            Nenhuma regra para "Card Criado" {searchTerm || statusFilter !== 'all' || actionFilter !== 'all' ? 'com os filtros atuais' : ''}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {groupedRules.card_created.map(rule => renderRuleCard(rule))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            )}
+                        </Card>
+                    )}
+
+                    {/* Stage Enter Section */}
+                    {(groupedRules.stage_enter.length > 0 || !searchTerm && !statusFilter && !actionFilter) && (
+                        <Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-blue-400">
+                            <CardHeader className="pb-2">
+                                <button
+                                    onClick={() => toggleSection('stage_enter')}
+                                    className="flex items-center justify-between w-full text-left"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {expandedSections.stage_enter ? (
+                                            <ChevronDown className="w-5 h-5 text-slate-400" />
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-slate-400" />
+                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">➡️</span>
+                                            <CardTitle className="text-base">Card Movido para Stage</CardTitle>
+                                        </div>
+                                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                            {groupedRules.stage_enter.length} regra(s)
+                                        </Badge>
+                                    </div>
+                                </button>
+                            </CardHeader>
+                            {expandedSections.stage_enter && (
+                                <CardContent className="pt-0">
+                                    {groupedRules.stage_enter.length === 0 ? (
+                                        <div className="text-sm text-slate-500 italic py-4 text-center">
+                                            Nenhuma regra para "Card Movido" {searchTerm || statusFilter !== 'all' || actionFilter !== 'all' ? 'com os filtros atuais' : ''}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {groupedRules.stage_enter.map(rule => renderRuleCard(rule))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            )}
+                        </Card>
+                    )}
+                </div>
             )}
         </div>
     );
