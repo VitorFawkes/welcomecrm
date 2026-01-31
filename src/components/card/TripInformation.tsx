@@ -286,10 +286,13 @@ export default function TripInformation({ card }: TripInformationProps) {
                             updates.data_viagem_inicio = null
                             updates.data_viagem_fim = null
                         }
-                    } else if ('inicio' in epoca) {
-                        // Legacy format
-                        updates.data_viagem_inicio = epoca.inicio || null
-                        updates.data_viagem_fim = epoca.fim || null
+                    } else {
+                        // Legacy fallback
+                        const legacy = epoca as any
+                        if (legacy.inicio || legacy.fim) {
+                            updates.data_viagem_inicio = legacy.inicio || null
+                            updates.data_viagem_fim = legacy.fim || null
+                        }
                     }
                 }
 
@@ -627,10 +630,11 @@ export default function TripInformation({ card }: TripInformationProps) {
                                         setEditedData(prev => {
                                             const newData = { ...prev, quantidade_viajantes: qtd }
                                             // Recalculate Total if Per Person exists
-                                            if (prev.orcamento?.por_pessoa) {
+                                            const orcamento = prev.orcamento as any
+                                            if (orcamento && orcamento.por_pessoa) {
                                                 newData.orcamento = {
-                                                    ...prev.orcamento,
-                                                    total: prev.orcamento.por_pessoa * qtd
+                                                    ...orcamento,
+                                                    total: orcamento.por_pessoa * qtd
                                                 }
                                             }
                                             return newData
@@ -653,18 +657,19 @@ export default function TripInformation({ card }: TripInformationProps) {
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                             <Input
                                 type="number"
-                                value={editedData.orcamento?.total || ''}
+                                value={(editedData.orcamento as any)?.total || ''}
                                 onChange={(e) => {
                                     const newTotal = parseFloat(e.target.value) || 0
                                     setEditedData(prev => {
                                         const qtd = prev.quantidade_viajantes || 0
+                                        const orcamento = prev.orcamento as any
                                         const newData = {
                                             ...prev,
                                             orcamento: {
-                                                ...prev.orcamento,
+                                                ...(orcamento || {}),
                                                 total: newTotal,
                                                 // Auto-calculate per person if travelers > 0
-                                                por_pessoa: qtd > 0 ? newTotal / qtd : prev.orcamento?.por_pessoa
+                                                por_pessoa: qtd > 0 ? newTotal / qtd : orcamento?.por_pessoa
                                             }
                                         }
                                         return newData
@@ -681,18 +686,19 @@ export default function TripInformation({ card }: TripInformationProps) {
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                             <Input
                                 type="number"
-                                value={editedData.orcamento?.por_pessoa || ''}
+                                value={(editedData.orcamento as any)?.por_pessoa || ''}
                                 onChange={(e) => {
                                     const newPorPessoa = parseFloat(e.target.value) || 0
                                     setEditedData(prev => {
                                         const qtd = prev.quantidade_viajantes || 0
+                                        const orcamento = prev.orcamento as any
                                         const newData = {
                                             ...prev,
                                             orcamento: {
-                                                ...prev.orcamento,
+                                                ...(orcamento || {}),
                                                 por_pessoa: newPorPessoa,
                                                 // Auto-calculate total if travelers > 0
-                                                total: qtd > 0 ? newPorPessoa * qtd : prev.orcamento?.total
+                                                total: qtd > 0 ? newPorPessoa * qtd : orcamento?.total
                                             }
                                         }
                                         return newData

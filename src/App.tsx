@@ -8,6 +8,7 @@ import InvitePage from './pages/InvitePage'
 import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
 import Cards from './pages/Cards'
+import Leads from './pages/Leads'
 import People from './pages/People'
 import GroupsPage from './pages/GroupsPage'
 import ProposalBuilderElite from './pages/ProposalBuilderElite'
@@ -69,8 +70,10 @@ function App() {
                   <Route path="/" element={<Navigate to="/dashboard" />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/pipeline" element={<Pipeline />} />
+                  <Route path="/leads" element={<Leads />} />
                   <Route path="/groups" element={<GroupsPage />} />
-                  <Route path="/cards" element={<Cards />} />
+                  <Route path="/trips" element={<Cards />} />
+                  <Route path="/cards" element={<Navigate to="/trips" replace />} />
                   <Route path="/cards/:id" element={<CardDetail />} />
                   <Route path="/people" element={<People />} />
                   <Route path="/proposals" element={<ProposalsPage />} />

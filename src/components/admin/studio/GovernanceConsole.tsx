@@ -7,7 +7,6 @@ import {
     CheckCircle2,
     AlertCircle,
     Trash2,
-    ArrowRight,
     LayoutList,
     Copy,
     X,
@@ -141,18 +140,6 @@ export default function GovernanceConsole() {
         }
     })
 
-    // 4. Fetch Active Workflows
-    const { data: activeWorkflows } = useQuery({
-        queryKey: ['active-workflows-context'],
-        queryFn: async () => {
-            const { data } = await supabase
-                .from('workflows')
-                .select('id, name, trigger_config, is_active')
-                .eq('is_active', true)
-            return data || []
-        }
-    })
-
     // Mutations
     const insertMutation = useMutation({
         mutationFn: async (req: ActionRequirement) => {
@@ -236,10 +223,6 @@ export default function GovernanceConsole() {
     const stageRules = selectedStageId === 'all'
         ? requirements || []
         : requirements?.filter(r => r.stage_id === selectedStageId) || []
-
-    const stageWorkflows = selectedStageId === 'all'
-        ? []
-        : activeWorkflows?.filter(w => (w.trigger_config as any)?.stage_id === selectedStageId) || []
 
     // Hydrate Rules (Self-Healing)
     const hydratedRules = useMemo(() => {
@@ -433,27 +416,6 @@ export default function GovernanceConsole() {
                             )}
                         </div>
 
-                        {/* Context: Active Workflows - Hide in All mode */}
-                        {selectedStageId !== 'all' && (
-                            <div className="mb-8 bg-blue-50/50 border border-blue-100 rounded-xl p-5">
-                                <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                                    <ActivityIcon className="w-4 h-4" />
-                                    Automações Ativas (Contexto)
-                                </h4>
-                                {stageWorkflows.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {stageWorkflows.map(w => (
-                                            <div key={w.id} className="flex items-center gap-2 text-sm text-blue-700 bg-white/60 px-3 py-2 rounded-lg border border-blue-100/50">
-                                                <ArrowRight className="w-3 h-3" />
-                                                {w.name}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-blue-400 italic">Nenhum workflow automático configurado para iniciar nesta etapa.</p>
-                                )}
-                            </div>
-                        )}
 
                         {/* Rules List - Grouped */}
                         <div className="space-y-8">
@@ -616,7 +578,6 @@ export default function GovernanceConsole() {
                         <p>Selecione uma etapa ao lado para começar</p>
                     </div>
                 )}
-
             </div>
 
             {/* Bulk Actions Floating Bar - Fixed relative to the main container */}
@@ -694,6 +655,7 @@ export default function GovernanceConsole() {
     )
 }
 
+
 function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any, stageName?: string, selected: boolean, onToggle: () => void, onDelete: () => void }) {
     return (
         <div className={cn(
@@ -753,24 +715,5 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any
                 <Trash2 className="w-4 h-4" />
             </Button>
         </div>
-    )
-}
-
-function ActivityIcon(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-        </svg>
     )
 }

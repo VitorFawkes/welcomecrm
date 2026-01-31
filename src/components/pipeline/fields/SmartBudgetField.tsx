@@ -33,12 +33,6 @@ function formatCurrency(value: number | undefined): string {
     }).format(value)
 }
 
-function parseCurrency(str: string): number {
-    // Remove R$, dots as thousands separator, replace comma with dot for decimals
-    const cleaned = str.replace(/[R$\s.]/g, '').replace(',', '.')
-    return parseFloat(cleaned) || 0
-}
-
 function buildDisplay(data: Partial<OrcamentoViagem>): string {
     const { tipo, valor, valor_min, valor_max, quantidade_viajantes } = data
 
@@ -169,15 +163,11 @@ export default function SmartBudgetField({
     })
 
     const [showTypeDropdown, setShowTypeDropdown] = useState(false)
-    const [inputValue, setInputValue] = useState('')
 
     useEffect(() => {
         const parsed = parseExistingValue(value, quantidadeViajantes)
         if (parsed) {
             setLocalData(parsed)
-            if (parsed.valor) {
-                setInputValue(String(parsed.valor))
-            }
         }
     }, [value, quantidadeViajantes])
 
@@ -215,13 +205,11 @@ export default function SmartBudgetField({
         const calculated = calculateValues(newData)
         const final = { ...newData, ...calculated, display: buildDisplay({ ...newData, ...calculated }) }
         setLocalData(final)
-        setInputValue(newData.valor ? String(newData.valor) : '')
         onChange?.(final)
         setShowTypeDropdown(false)
     }
 
     const handleValueChange = (newValue: number) => {
-        setInputValue(String(newValue))
         updateData({ valor: newValue })
     }
 
