@@ -500,6 +500,588 @@ export type Database = {
         }
         Relationships: []
       }
+      cadence_dead_letter: {
+        Row: {
+          error_details: Json | null
+          error_message: string
+          failed_at: string | null
+          id: string
+          instance_id: string | null
+          original_queue_id: string | null
+          resolution_action: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          step_id: string | null
+        }
+        Insert: {
+          error_details?: Json | null
+          error_message: string
+          failed_at?: string | null
+          id?: string
+          instance_id?: string | null
+          original_queue_id?: string | null
+          resolution_action?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          step_id?: string | null
+        }
+        Update: {
+          error_details?: Json | null
+          error_message?: string
+          failed_at?: string | null
+          id?: string
+          instance_id?: string | null
+          original_queue_id?: string | null
+          resolution_action?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          step_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_dead_letter_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_dead_letter_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_entry_queue: {
+        Row: {
+          attempts: number | null
+          card_id: string
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          execute_at: string
+          id: string
+          last_error: string | null
+          max_attempts: number | null
+          processed_at: string | null
+          status: string | null
+          trigger_id: string
+        }
+        Insert: {
+          attempts?: number | null
+          card_id: string
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          execute_at: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number | null
+          processed_at?: string | null
+          status?: string | null
+          trigger_id: string
+        }
+        Update: {
+          attempts?: number | null
+          card_id?: string
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          execute_at?: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number | null
+          processed_at?: string | null
+          status?: string | null
+          trigger_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_entry_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_entry_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_entry_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "cadence_entry_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_entry_queue_trigger_id_fkey"
+            columns: ["trigger_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_event_triggers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_event_log: {
+        Row: {
+          action_result: Json | null
+          action_taken: string | null
+          card_id: string | null
+          created_at: string | null
+          event_data: Json | null
+          event_source: string
+          event_type: string
+          id: string
+          instance_id: string | null
+        }
+        Insert: {
+          action_result?: Json | null
+          action_taken?: string | null
+          card_id?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_source: string
+          event_type: string
+          id?: string
+          instance_id?: string | null
+        }
+        Update: {
+          action_result?: Json | null
+          action_taken?: string | null
+          card_id?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_source?: string
+          event_type?: string
+          id?: string
+          instance_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_event_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_event_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_event_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "cadence_event_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_event_log_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_event_triggers: {
+        Row: {
+          action_config: Json | null
+          action_type: string
+          allowed_weekdays: number[] | null
+          applicable_pipeline_ids: string[] | null
+          applicable_stage_ids: string[] | null
+          business_hours_end: number | null
+          business_hours_start: number | null
+          conditions: Json | null
+          created_at: string | null
+          delay_minutes: number | null
+          delay_type: string | null
+          event_config: Json | null
+          event_type: string
+          id: string
+          is_active: boolean | null
+          is_global: boolean | null
+          name: string | null
+          priority: number | null
+          target_template_id: string | null
+          task_config: Json | null
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_config?: Json | null
+          action_type: string
+          allowed_weekdays?: number[] | null
+          applicable_pipeline_ids?: string[] | null
+          applicable_stage_ids?: string[] | null
+          business_hours_end?: number | null
+          business_hours_start?: number | null
+          conditions?: Json | null
+          created_at?: string | null
+          delay_minutes?: number | null
+          delay_type?: string | null
+          event_config?: Json | null
+          event_type: string
+          id?: string
+          is_active?: boolean | null
+          is_global?: boolean | null
+          name?: string | null
+          priority?: number | null
+          target_template_id?: string | null
+          task_config?: Json | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_config?: Json | null
+          action_type?: string
+          allowed_weekdays?: number[] | null
+          applicable_pipeline_ids?: string[] | null
+          applicable_stage_ids?: string[] | null
+          business_hours_end?: number | null
+          business_hours_start?: number | null
+          conditions?: Json | null
+          created_at?: string | null
+          delay_minutes?: number | null
+          delay_type?: string | null
+          event_config?: Json | null
+          event_type?: string
+          id?: string
+          is_active?: boolean | null
+          is_global?: boolean | null
+          name?: string | null
+          priority?: number | null
+          target_template_id?: string | null
+          task_config?: Json | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_event_triggers_target_template_id_fkey"
+            columns: ["target_template_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_event_triggers_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_instances: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_reason: string | null
+          card_id: string
+          completed_at: string | null
+          context: Json | null
+          created_by: string | null
+          current_step_id: string | null
+          id: string
+          paused_at: string | null
+          started_at: string | null
+          status: string | null
+          successful_contacts: number | null
+          template_id: string
+          total_contacts_attempted: number | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          card_id: string
+          completed_at?: string | null
+          context?: Json | null
+          created_by?: string | null
+          current_step_id?: string | null
+          id?: string
+          paused_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          successful_contacts?: number | null
+          template_id: string
+          total_contacts_attempted?: number | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          card_id?: string
+          completed_at?: string | null
+          context?: Json | null
+          created_by?: string | null
+          current_step_id?: string | null
+          id?: string
+          paused_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          successful_contacts?: number | null
+          template_id?: string
+          total_contacts_attempted?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "cadence_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_instances_current_step_id_fkey"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_instances_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_queue: {
+        Row: {
+          attempts: number | null
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string | null
+          execute_at: string
+          id: string
+          instance_id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          max_attempts: number | null
+          priority: number | null
+          status: string | null
+          step_id: string
+        }
+        Insert: {
+          attempts?: number | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string | null
+          execute_at: string
+          id?: string
+          instance_id: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          max_attempts?: number | null
+          priority?: number | null
+          status?: string | null
+          step_id: string
+        }
+        Update: {
+          attempts?: number | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string | null
+          execute_at?: string
+          id?: string
+          instance_id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          max_attempts?: number | null
+          priority?: number | null
+          status?: string | null
+          step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_queue_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadence_queue_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_steps: {
+        Row: {
+          branch_config: Json | null
+          created_at: string | null
+          day_offset: number | null
+          end_config: Json | null
+          id: string
+          next_step_key: string | null
+          requires_previous_completed: boolean | null
+          step_key: string
+          step_order: number
+          step_type: string
+          task_config: Json | null
+          template_id: string
+          time_of_day_minutes: number | null
+          visibility_conditions: Json | null
+          wait_config: Json | null
+        }
+        Insert: {
+          branch_config?: Json | null
+          created_at?: string | null
+          day_offset?: number | null
+          end_config?: Json | null
+          id?: string
+          next_step_key?: string | null
+          requires_previous_completed?: boolean | null
+          step_key: string
+          step_order: number
+          step_type: string
+          task_config?: Json | null
+          template_id: string
+          time_of_day_minutes?: number | null
+          visibility_conditions?: Json | null
+          wait_config?: Json | null
+        }
+        Update: {
+          branch_config?: Json | null
+          created_at?: string | null
+          day_offset?: number | null
+          end_config?: Json | null
+          id?: string
+          next_step_key?: string | null
+          requires_previous_completed?: boolean | null
+          step_key?: string
+          step_order?: number
+          step_type?: string
+          task_config?: Json | null
+          template_id?: string
+          time_of_day_minutes?: number | null
+          visibility_conditions?: Json | null
+          wait_config?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_steps_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cadence_templates: {
+        Row: {
+          allowed_weekdays: number[] | null
+          applicable_stages: string[] | null
+          auto_cancel_on_stage_change: boolean | null
+          business_hours_end: number | null
+          business_hours_start: number | null
+          created_at: string | null
+          created_by: string | null
+          day_pattern: Json | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          require_completion_for_next: boolean | null
+          respect_business_hours: boolean | null
+          schedule_mode: string | null
+          soft_break_after_days: number | null
+          target_audience: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          allowed_weekdays?: number[] | null
+          applicable_stages?: string[] | null
+          auto_cancel_on_stage_change?: boolean | null
+          business_hours_end?: number | null
+          business_hours_start?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          day_pattern?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          require_completion_for_next?: boolean | null
+          respect_business_hours?: boolean | null
+          schedule_mode?: string | null
+          soft_break_after_days?: number | null
+          target_audience?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          allowed_weekdays?: number[] | null
+          applicable_stages?: string[] | null
+          auto_cancel_on_stage_change?: boolean | null
+          business_hours_end?: number | null
+          business_hours_start?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          day_pattern?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          require_completion_for_next?: boolean | null
+          respect_business_hours?: boolean | null
+          schedule_mode?: string | null
+          soft_break_after_days?: number | null
+          target_audience?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       card_auto_creation_rules: {
         Row: {
           copy_contacts: boolean | null
@@ -688,7 +1270,7 @@ export type Database = {
           ended_at: string | null
           fase: string
           id: string
-          owner_id: string
+          owner_id: string | null
           started_at: string
           transfer_reason: string | null
           transferred_by: string | null
@@ -699,7 +1281,7 @@ export type Database = {
           ended_at?: string | null
           fase: string
           id?: string
-          owner_id: string
+          owner_id?: string | null
           started_at?: string
           transfer_reason?: string | null
           transferred_by?: string | null
@@ -710,7 +1292,7 @@ export type Database = {
           ended_at?: string | null
           fase?: string
           id?: string
-          owner_id?: string
+          owner_id?: string | null
           started_at?: string
           transfer_reason?: string | null
           transferred_by?: string | null
@@ -806,6 +1388,12 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           dono_atual_id: string | null
+          duracao_dias_max: number | null
+          duracao_dias_min: number | null
+          epoca_ano: number | null
+          epoca_mes_fim: number | null
+          epoca_mes_inicio: number | null
+          epoca_tipo: string | null
           estado_operacional: string | null
           external_id: string | null
           external_source: string | null
@@ -871,6 +1459,12 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           dono_atual_id?: string | null
+          duracao_dias_max?: number | null
+          duracao_dias_min?: number | null
+          epoca_ano?: number | null
+          epoca_mes_fim?: number | null
+          epoca_mes_inicio?: number | null
+          epoca_tipo?: string | null
           estado_operacional?: string | null
           external_id?: string | null
           external_source?: string | null
@@ -936,6 +1530,12 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           dono_atual_id?: string | null
+          duracao_dias_max?: number | null
+          duracao_dias_min?: number | null
+          epoca_ano?: number | null
+          epoca_mes_fim?: number | null
+          epoca_mes_inicio?: number | null
+          epoca_tipo?: string | null
           estado_operacional?: string | null
           external_id?: string | null
           external_source?: string | null
@@ -1982,11 +2582,17 @@ export type Database = {
           created_at: string
           description: string | null
           entity_types: string[]
+          external_owner_ids: string[] | null
           external_pipeline_id: string
+          external_pipeline_ids: string[] | null
           external_stage_id: string
+          external_stage_ids: string[] | null
           id: string
           integration_id: string
           is_active: boolean
+          name: string | null
+          target_pipeline_id: string | null
+          target_stage_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1994,11 +2600,17 @@ export type Database = {
           created_at?: string
           description?: string | null
           entity_types?: string[]
+          external_owner_ids?: string[] | null
           external_pipeline_id: string
+          external_pipeline_ids?: string[] | null
           external_stage_id: string
+          external_stage_ids?: string[] | null
           id?: string
           integration_id: string
           is_active?: boolean
+          name?: string | null
+          target_pipeline_id?: string | null
+          target_stage_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2006,11 +2618,17 @@ export type Database = {
           created_at?: string
           description?: string | null
           entity_types?: string[]
+          external_owner_ids?: string[] | null
           external_pipeline_id?: string
+          external_pipeline_ids?: string[] | null
           external_stage_id?: string
+          external_stage_ids?: string[] | null
           id?: string
           integration_id?: string
           is_active?: boolean
+          name?: string | null
+          target_pipeline_id?: string | null
+          target_stage_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2019,6 +2637,20 @@ export type Database = {
             columns: ["integration_id"]
             isOneToOne: false
             referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_inbound_triggers_target_pipeline_id_fkey"
+            columns: ["target_pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_inbound_triggers_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
         ]
@@ -3579,7 +4211,7 @@ export type Database = {
           check_out_time: string | null
           content: Json
           created_at: string | null
-          created_by: string
+          created_by: string | null
           currency: string | null
           destination: string | null
           gallery_urls: string[] | null
@@ -3608,7 +4240,7 @@ export type Database = {
           check_out_time?: string | null
           content?: Json
           created_at?: string | null
-          created_by: string
+          created_by?: string | null
           currency?: string | null
           destination?: string | null
           gallery_urls?: string[] | null
@@ -3637,7 +4269,7 @@ export type Database = {
           check_out_time?: string | null
           content?: Json
           created_at?: string | null
-          created_by?: string
+          created_by?: string | null
           currency?: string | null
           destination?: string | null
           gallery_urls?: string[] | null
@@ -3833,7 +4465,7 @@ export type Database = {
         Row: {
           change_summary: string | null
           created_at: string | null
-          created_by: string
+          created_by: string | null
           id: string
           metadata: Json | null
           proposal_id: string
@@ -3843,7 +4475,7 @@ export type Database = {
         Insert: {
           change_summary?: string | null
           created_at?: string | null
-          created_by: string
+          created_by?: string | null
           id?: string
           metadata?: Json | null
           proposal_id: string
@@ -3853,7 +4485,7 @@ export type Database = {
         Update: {
           change_summary?: string | null
           created_at?: string | null
-          created_by?: string
+          created_by?: string | null
           id?: string
           metadata?: Json | null
           proposal_id?: string
@@ -4455,7 +5087,7 @@ export type Database = {
           prioridade: string | null
           rescheduled_from_id: string | null
           rescheduled_to_id: string | null
-          responsavel_id: string
+          responsavel_id: string | null
           resultado: string | null
           started_at: string | null
           status: string | null
@@ -4483,7 +5115,7 @@ export type Database = {
           prioridade?: string | null
           rescheduled_from_id?: string | null
           rescheduled_to_id?: string | null
-          responsavel_id: string
+          responsavel_id?: string | null
           resultado?: string | null
           started_at?: string | null
           status?: string | null
@@ -4511,7 +5143,7 @@ export type Database = {
           prioridade?: string | null
           rescheduled_from_id?: string | null
           rescheduled_to_id?: string | null
-          responsavel_id?: string
+          responsavel_id?: string | null
           resultado?: string | null
           started_at?: string | null
           status?: string | null
@@ -5526,436 +6158,6 @@ export type Database = {
           },
         ]
       }
-      workflow_edges: {
-        Row: {
-          condition: Json | null
-          created_at: string | null
-          edge_order: number | null
-          id: string
-          label: string | null
-          source_node_id: string
-          target_node_id: string
-          workflow_id: string
-        }
-        Insert: {
-          condition?: Json | null
-          created_at?: string | null
-          edge_order?: number | null
-          id?: string
-          label?: string | null
-          source_node_id: string
-          target_node_id: string
-          workflow_id: string
-        }
-        Update: {
-          condition?: Json | null
-          created_at?: string | null
-          edge_order?: number | null
-          id?: string
-          label?: string | null
-          source_node_id?: string
-          target_node_id?: string
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_edges_source_node_id_fkey"
-            columns: ["source_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_edges_target_node_id_fkey"
-            columns: ["target_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_edges_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_instances: {
-        Row: {
-          card_id: string
-          completed_at: string | null
-          context: Json | null
-          current_node_id: string | null
-          error_message: string | null
-          id: string
-          resume_at: string | null
-          started_at: string | null
-          status: string | null
-          waiting_for: string | null
-          waiting_task_id: string | null
-          workflow_id: string
-        }
-        Insert: {
-          card_id: string
-          completed_at?: string | null
-          context?: Json | null
-          current_node_id?: string | null
-          error_message?: string | null
-          id?: string
-          resume_at?: string | null
-          started_at?: string | null
-          status?: string | null
-          waiting_for?: string | null
-          waiting_task_id?: string | null
-          workflow_id: string
-        }
-        Update: {
-          card_id?: string
-          completed_at?: string | null
-          context?: Json | null
-          current_node_id?: string | null
-          error_message?: string | null
-          id?: string
-          resume_at?: string | null
-          started_at?: string | null
-          status?: string | null
-          waiting_for?: string | null
-          waiting_task_id?: string | null
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_instances_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "cards"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_instances_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "view_cards_acoes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_instances_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "view_cards_contatos_summary"
-            referencedColumns: ["card_id"]
-          },
-          {
-            foreignKeyName: "workflow_instances_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "view_deleted_cards"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_instances_current_node_id_fkey"
-            columns: ["current_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_instances_waiting_task_id_fkey"
-            columns: ["waiting_task_id"]
-            isOneToOne: false
-            referencedRelation: "tarefas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_instances_waiting_task_id_fkey"
-            columns: ["waiting_task_id"]
-            isOneToOne: false
-            referencedRelation: "view_agenda"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_instances_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_log: {
-        Row: {
-          card_id: string | null
-          created_at: string | null
-          duration_ms: number | null
-          error_message: string | null
-          event_type: string
-          id: string
-          input_data: Json | null
-          instance_id: string | null
-          node_id: string | null
-          output_data: Json | null
-          workflow_id: string | null
-        }
-        Insert: {
-          card_id?: string | null
-          created_at?: string | null
-          duration_ms?: number | null
-          error_message?: string | null
-          event_type: string
-          id?: string
-          input_data?: Json | null
-          instance_id?: string | null
-          node_id?: string | null
-          output_data?: Json | null
-          workflow_id?: string | null
-        }
-        Update: {
-          card_id?: string | null
-          created_at?: string | null
-          duration_ms?: number | null
-          error_message?: string | null
-          event_type?: string
-          id?: string
-          input_data?: Json | null
-          instance_id?: string | null
-          node_id?: string | null
-          output_data?: Json | null
-          workflow_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_log_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "cards"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_log_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "view_cards_acoes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_log_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "view_cards_contatos_summary"
-            referencedColumns: ["card_id"]
-          },
-          {
-            foreignKeyName: "workflow_log_card_id_fkey"
-            columns: ["card_id"]
-            isOneToOne: false
-            referencedRelation: "view_deleted_cards"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_log_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_instances"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_log_node_id_fkey"
-            columns: ["node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_log_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_nodes: {
-        Row: {
-          action_config: Json | null
-          action_type: string | null
-          condition_config: Json | null
-          created_at: string | null
-          id: string
-          node_key: string
-          node_type: string
-          position_x: number | null
-          position_y: number | null
-          wait_config: Json | null
-          workflow_id: string
-        }
-        Insert: {
-          action_config?: Json | null
-          action_type?: string | null
-          condition_config?: Json | null
-          created_at?: string | null
-          id?: string
-          node_key: string
-          node_type: string
-          position_x?: number | null
-          position_y?: number | null
-          wait_config?: Json | null
-          workflow_id: string
-        }
-        Update: {
-          action_config?: Json | null
-          action_type?: string | null
-          condition_config?: Json | null
-          created_at?: string | null
-          id?: string
-          node_key?: string
-          node_type?: string
-          position_x?: number | null
-          position_y?: number | null
-          wait_config?: Json | null
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_nodes_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_queue: {
-        Row: {
-          action_payload: Json | null
-          attempts: number | null
-          created_at: string | null
-          execute_at: string
-          id: string
-          instance_id: string
-          last_error: string | null
-          max_attempts: number | null
-          node_id: string | null
-          priority: number | null
-          processed_at: string | null
-          status: string | null
-        }
-        Insert: {
-          action_payload?: Json | null
-          attempts?: number | null
-          created_at?: string | null
-          execute_at: string
-          id?: string
-          instance_id: string
-          last_error?: string | null
-          max_attempts?: number | null
-          node_id?: string | null
-          priority?: number | null
-          processed_at?: string | null
-          status?: string | null
-        }
-        Update: {
-          action_payload?: Json | null
-          attempts?: number | null
-          created_at?: string | null
-          execute_at?: string
-          id?: string
-          instance_id?: string
-          last_error?: string | null
-          max_attempts?: number | null
-          node_id?: string | null
-          priority?: number | null
-          processed_at?: string | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_queue_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_instances"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_queue_node_id_fkey"
-            columns: ["node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflows: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          is_draft: boolean | null
-          name: string
-          pipeline_id: string | null
-          trigger_config: Json
-          trigger_type: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_draft?: boolean | null
-          name: string
-          pipeline_id?: string | null
-          trigger_config?: Json
-          trigger_type: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_draft?: boolean | null
-          name?: string
-          pipeline_id?: string | null
-          trigger_config?: Json
-          trigger_type?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "v_team_proposal_performance"
-            referencedColumns: ["consultant_id"]
-          },
-          {
-            foreignKeyName: "workflows_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "view_profiles_complete"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflows_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "pipelines"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       v_contact_proposals: {
@@ -6129,10 +6331,10 @@ export type Database = {
           orcamento: Json | null
           origem: string | null
           parent_card_id: string | null
-          pessoa_nome: string | null
-          pessoa_telefone: string | null
           pessoa_email: string | null
+          pessoa_nome: string | null
           pessoa_principal_id: string | null
+          pessoa_telefone: string | null
           pipeline_id: string | null
           pipeline_nome: string | null
           pipeline_stage_id: string | null
@@ -6379,6 +6581,10 @@ export type Database = {
         }[]
       }
       exec_sql: { Args: { query: string }; Returns: Json }
+      execute_cadence_entry_rule_immediate: {
+        Args: { p_card_id: string; p_trigger_id: string }
+        Returns: Json
+      }
       f_unaccent: { Args: { "": string }; Returns: string }
       find_contact_by_whatsapp: {
         Args: { p_convo_id: string; p_phone: string }
@@ -6503,6 +6709,10 @@ export type Database = {
             Returns: undefined
           }
       normalize_phone: { Args: { phone_number: string }; Returns: string }
+      normalize_phone_brazil: {
+        Args: { phone_number: string }
+        Returns: string
+      }
       normalize_phone_robust: { Args: { p_phone: string }; Returns: string[] }
       process_all_pending_whatsapp_events: { Args: never; Returns: Json }
       process_pending_whatsapp_events: { Args: never; Returns: Json }
@@ -6510,6 +6720,10 @@ export type Database = {
       process_whatsapp_raw_event: { Args: { event_id: string }; Returns: Json }
       process_whatsapp_raw_event_v2: {
         Args: { event_id: string }
+        Returns: Json
+      }
+      reprocess_pending_whatsapp_events: {
+        Args: { batch_size?: number }
         Returns: Json
       }
       revoke_api_key: { Args: { p_key_id: string }; Returns: boolean }
@@ -6520,19 +6734,6 @@ export type Database = {
           p_function_name: string
         }
         Returns: undefined
-      }
-      save_workflow_definition: {
-        Args: {
-          p_description: string
-          p_edges: Json
-          p_is_active: boolean
-          p_name: string
-          p_nodes: Json
-          p_trigger_config: Json
-          p_trigger_type: string
-          p_workflow_id: string
-        }
-        Returns: string
       }
       search_proposal_library: {
         Args: {
