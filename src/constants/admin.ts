@@ -15,18 +15,34 @@ export const SECTIONS = [
 export const GOVERNABLE_SECTIONS = ['trip_info', 'observacoes_criticas'] as const
 
 export const FIELD_TYPES = [
+    // Básicos
     { value: 'text', label: 'Texto Simples' },
     { value: 'textarea', label: 'Texto Longo (Área)' },
     { value: 'number', label: 'Número' },
+    { value: 'boolean', label: 'Sim/Não' },
+
+    // Datas
     { value: 'date', label: 'Data' },
+    { value: 'datetime', label: 'Data e Hora' },
     { value: 'date_range', label: 'Período de Data (Início e Fim)' },
+
+    // Valores
     { value: 'currency', label: 'Moeda' },
     { value: 'currency_range', label: 'Faixa de Valor (Range de Moeda)' },
+
+    // Seleção
     { value: 'select', label: 'Seleção Única' },
     { value: 'multiselect', label: 'Múltipla Seleção' },
     { value: 'checklist', label: 'Checklist (Lista de Marcação)' },
-    { value: 'boolean', label: 'Sim/Não' },
-    { value: 'json', label: 'JSON (Avançado)' }
+
+    // Flexíveis (Viagem)
+    { value: 'flexible_date', label: '📅 Época Flexível (mês, range, ou data exata)' },
+    { value: 'flexible_duration', label: '⏱️ Duração Flexível (dias fixos ou range)' },
+    { value: 'smart_budget', label: '💰 Orçamento Inteligente (total, por pessoa, ou range)' },
+
+    // Avançados
+    { value: 'json', label: 'JSON (Avançado)' },
+    { value: 'loss_reason_selector', label: 'Motivo de Perda (Sistema)' }
 ] as const
 
 /**
