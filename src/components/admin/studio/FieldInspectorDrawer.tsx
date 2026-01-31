@@ -158,6 +158,34 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                     case 'textarea':
                                         previewValue = 'Texto de exemplo com múltiplas linhas...'
                                         break
+                                    case 'flexible_date':
+                                        previewValue = {
+                                            tipo: 'range_meses',
+                                            mes_inicio: 8,
+                                            mes_fim: 11,
+                                            ano: 2025,
+                                            display: 'Agosto a Novembro 2025',
+                                            flexivel: true
+                                        }
+                                        break
+                                    case 'flexible_duration':
+                                        previewValue = {
+                                            tipo: 'range',
+                                            dias_min: 5,
+                                            dias_max: 7,
+                                            display: '5 a 7 dias'
+                                        }
+                                        break
+                                    case 'smart_budget':
+                                        previewValue = {
+                                            tipo: 'por_pessoa',
+                                            valor: 3000,
+                                            quantidade_viajantes: 4,
+                                            total_calculado: 12000,
+                                            por_pessoa_calculado: 3000,
+                                            display: 'R$ 3.000/pessoa (R$ 12.000 total)'
+                                        }
+                                        break
                                     default:
                                         previewValue = 'Valor de Exemplo'
                                 }
