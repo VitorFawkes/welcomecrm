@@ -32,6 +32,7 @@ import {
     Sparkles,
     Car,
     Ship,
+    Shield,
 } from 'lucide-react'
 import type { ProposalItemWithOptions, ProposalOption } from '@/types/proposals'
 import type { Json } from '@/database.types'
@@ -40,6 +41,7 @@ import { HotelEditor, type HotelData } from './hotels'
 import { ExperienceEditor, type ExperienceData } from './experiences'
 import { TransferEditor, type TransferData } from './transfers'
 import { CruiseEditor, type CruiseData } from './cruises'
+import { InsuranceEditor, type InsuranceData } from './insurance'
 
 interface ItemEditorCardProps {
     item: ProposalItemWithOptions
@@ -126,6 +128,21 @@ export function ItemEditorCard({
     if (richContent.cruise) {
         return (
             <CruiseItemCard
+                item={item}
+                richContent={richContent}
+                onUpdate={onUpdate}
+                onRemove={onRemove}
+            />
+        )
+    }
+
+    // ===========================================
+    // LAYOUT ESPECÍFICO PARA SEGUROS
+    // (detecta pelo item_type ou richContent.insurance)
+    // ===========================================
+    if (item.item_type === 'insurance' || richContent.insurance) {
+        return (
+            <InsuranceItemCard
                 item={item}
                 richContent={richContent}
                 onUpdate={onUpdate}
@@ -528,6 +545,81 @@ function CruiseItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCar
                     data={(richContent.cruise as CruiseData) || null}
                     onChange={(cruise: CruiseData) => onUpdate({
                         rich_content: { ...richContent, cruise } as unknown as Json
+                    })}
+                    itemId={item.id}
+                />
+            </div>
+        </div>
+    )
+}
+
+// ===========================================
+// CARD DE SEGURO - LAYOUT DIRETO SEM WRAPPER
+// ===========================================
+
+function InsuranceItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCardProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: item.id })
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    }
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={cn(
+                "bg-white rounded-xl border border-slate-200 shadow-sm",
+                "transition-all duration-200",
+                isDragging && "opacity-50 shadow-lg ring-2 ring-amber-500"
+            )}
+        >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
+                <button
+                    {...attributes}
+                    {...listeners}
+                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-slate-100 transition-colors"
+                >
+                    <GripVertical className="h-4 w-4 text-slate-400" />
+                </button>
+
+                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <Shield className="h-4 w-4 text-amber-600" />
+                </div>
+
+                <input
+                    type="text"
+                    value={item.title}
+                    onChange={(e) => onUpdate({ title: e.target.value })}
+                    className="flex-1 text-sm font-semibold text-slate-900 bg-transparent border-none outline-none focus:ring-0 p-0 placeholder:text-slate-400"
+                    placeholder="Seguro Viagem"
+                />
+
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => { e.stopPropagation(); onRemove() }}
+                    className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </div>
+
+            {/* Editor de seguro - DIRETAMENTE VISIVEL */}
+            <div className="p-4">
+                <InsuranceEditor
+                    data={(richContent.insurance as InsuranceData) || null}
+                    onChange={(insurance: InsuranceData) => onUpdate({
+                        rich_content: { ...richContent, insurance } as unknown as Json
                     })}
                     itemId={item.id}
                 />

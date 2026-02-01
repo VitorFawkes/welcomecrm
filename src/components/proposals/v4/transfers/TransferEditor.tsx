@@ -1,16 +1,18 @@
 /**
  * TransferEditor - Editor dedicado para transfers
  *
- * Layout direto sem expand/collapse
- * Campos: imagem, origin/destination, location types, vehicle, date/time, preco, descricao, notes
+ * Layout direto com seções condicionais
+ * Campos podem ser habilitados/desabilitados conforme necessário
  */
 
 import { useCallback, useMemo } from 'react'
-import { Plus, ArrowRight, Calendar, Clock, Users, Plane, Building2, Ship, MapPin, Car, FileText } from 'lucide-react'
+import { Plus, ArrowRight, Calendar, Clock, Users, Plane, Building2, Ship, MapPin, Car, FileText, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import { useProposalBuilder } from '@/hooks/useProposalBuilder'
 import { ItemImageUploader } from '@/components/proposals/builder/ItemImageUploader'
+import { PriceField, InlinePriceField } from '../shared/PriceField'
+import { SortableOptionsContainer } from '../shared/SortableOptionsContainer'
+import { SortableOptionItem } from '../shared/SortableOptionItem'
 import {
     type TransferData,
     type TransferOption,
@@ -18,13 +20,8 @@ import {
     type VehicleType,
     LOCATION_TYPE_LABELS,
     VEHICLE_TYPE_LABELS,
-    CURRENCY_SYMBOLS,
     createInitialTransferData,
 } from './types'
-import { validateTransfer } from '../validation'
-import { ValidationFeedback } from '../ValidationFeedback'
-import { SortableOptionsContainer } from '../shared/SortableOptionsContainer'
-import { SortableOptionItem } from '../shared/SortableOptionItem'
 
 interface TransferEditorProps {
     data: TransferData | null
@@ -40,13 +37,7 @@ const LOCATION_ICONS: Record<LocationType, React.ElementType> = {
 }
 
 export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) {
-    const transferData = data || createInitialTransferData()
-    const { getCurrency } = useProposalBuilder()
-    const currency = getCurrency()
-    const currencySymbol = CURRENCY_SYMBOLS[currency] || 'R$'
-
-    // Validação
-    const validation = useMemo(() => validateTransfer(transferData), [transferData])
+    const transferData = useMemo(() => data || createInitialTransferData(), [data])
 
     const updateField = useCallback(<K extends keyof TransferData>(
         field: K,
@@ -55,11 +46,12 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
         onChange({ ...transferData, [field]: value })
     }, [transferData, onChange])
 
+    // Option handlers
     const addOption = useCallback(() => {
         const newOption: TransferOption = {
             id: crypto.randomUUID(),
             vehicle: 'sedan' as VehicleType,
-            label: 'Nova opcao',
+            label: 'Nova opção',
             price: 0,
             is_recommended: false,
             enabled: true,
@@ -71,7 +63,7 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
         })
     }, [transferData, onChange])
 
-    const updateOption = useCallback((id: string, updates: Partial<TransferData['options'][0]>) => {
+    const updateOption = useCallback((id: string, updates: Partial<TransferOption>) => {
         onChange({
             ...transferData,
             options: transferData.options.map(opt =>
@@ -113,11 +105,42 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
         })
     }, [transferData, onChange])
 
+    // Configuração de campos visíveis
+    const showRoute = transferData.show_route !== false
+    const showDatetime = transferData.show_datetime !== false
+    const showVehicle = transferData.show_vehicle !== false
+    const showPassengers = transferData.show_passengers !== false
+
     const OriginIcon = LOCATION_ICONS[transferData.origin_type]
     const DestIcon = LOCATION_ICONS[transferData.destination_type]
 
     return (
         <div className="space-y-4">
+            {/* Toggles de Campos - Barra de configuração */}
+            <div className="flex items-center gap-2 flex-wrap p-2 bg-slate-50 rounded-lg border border-slate-200">
+                <span className="text-xs font-medium text-slate-500 mr-2">Mostrar:</span>
+                <FieldToggle
+                    label="Rota"
+                    enabled={showRoute}
+                    onToggle={(v) => updateField('show_route', v)}
+                />
+                <FieldToggle
+                    label="Data/Hora"
+                    enabled={showDatetime}
+                    onToggle={(v) => updateField('show_datetime', v)}
+                />
+                <FieldToggle
+                    label="Veículo"
+                    enabled={showVehicle}
+                    onToggle={(v) => updateField('show_vehicle', v)}
+                />
+                <FieldToggle
+                    label="Passageiros"
+                    enabled={showPassengers}
+                    onToggle={(v) => updateField('show_passengers', v)}
+                />
+            </div>
+
             {/* Imagem do Transfer */}
             <div>
                 <label className="text-xs font-medium text-slate-500 mb-2 block">
@@ -130,122 +153,132 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
                 />
             </div>
 
-            {/* Origin -> Destination Row */}
-            <div className="flex items-start gap-3">
-                {/* Origin */}
-                <div className="flex-1">
-                    <label className="text-xs font-medium text-slate-500 mb-1 block">De</label>
-                    <div className="flex gap-2">
-                        <select
-                            value={transferData.origin_type}
-                            onChange={(e) => updateField('origin_type', e.target.value as LocationType)}
-                            className="w-auto px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
-                        >
-                            {Object.entries(LOCATION_TYPE_LABELS).map(([value, label]) => (
-                                <option key={value} value={value}>{label}</option>
-                            ))}
-                        </select>
-                        <input
-                            type="text"
-                            value={transferData.origin}
-                            onChange={(e) => updateField('origin', e.target.value)}
-                            placeholder="Nome do local"
-                            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        />
-                    </div>
-                </div>
+            {/* Origin -> Destination Row (condicional) */}
+            {showRoute && (
+                <div className="p-3 bg-teal-50/50 rounded-lg border border-teal-100">
+                    <div className="flex items-start gap-3">
+                        {/* Origin */}
+                        <div className="flex-1">
+                            <label className="text-xs font-medium text-teal-700 mb-1 block">De</label>
+                            <div className="flex gap-2">
+                                <select
+                                    value={transferData.origin_type}
+                                    onChange={(e) => updateField('origin_type', e.target.value as LocationType)}
+                                    className="w-auto px-2 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
+                                >
+                                    {Object.entries(LOCATION_TYPE_LABELS).map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="text"
+                                    value={transferData.origin}
+                                    onChange={(e) => updateField('origin', e.target.value)}
+                                    placeholder="Nome do local"
+                                    className="flex-1 px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                />
+                            </div>
+                        </div>
 
-                {/* Arrow */}
-                <div className="flex items-center justify-center pt-6">
-                    <ArrowRight className="h-5 w-5 text-slate-400" />
-                </div>
+                        {/* Arrow */}
+                        <div className="flex items-center justify-center pt-6">
+                            <ArrowRight className="h-5 w-5 text-teal-400" />
+                        </div>
 
-                {/* Destination */}
-                <div className="flex-1">
-                    <label className="text-xs font-medium text-slate-500 mb-1 block">Para</label>
-                    <div className="flex gap-2">
-                        <select
-                            value={transferData.destination_type}
-                            onChange={(e) => updateField('destination_type', e.target.value as LocationType)}
-                            className="w-auto px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
-                        >
-                            {Object.entries(LOCATION_TYPE_LABELS).map(([value, label]) => (
-                                <option key={value} value={value}>{label}</option>
-                            ))}
-                        </select>
-                        <input
-                            type="text"
-                            value={transferData.destination}
-                            onChange={(e) => updateField('destination', e.target.value)}
-                            placeholder="Nome do local"
-                            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        />
+                        {/* Destination */}
+                        <div className="flex-1">
+                            <label className="text-xs font-medium text-teal-700 mb-1 block">Para</label>
+                            <div className="flex gap-2">
+                                <select
+                                    value={transferData.destination_type}
+                                    onChange={(e) => updateField('destination_type', e.target.value as LocationType)}
+                                    className="w-auto px-2 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
+                                >
+                                    {Object.entries(LOCATION_TYPE_LABELS).map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="text"
+                                    value={transferData.destination}
+                                    onChange={(e) => updateField('destination', e.target.value)}
+                                    placeholder="Nome do local"
+                                    className="flex-1 px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                                />
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            {/* Visual Route Summary */}
-            {(transferData.origin || transferData.destination) && (
-                <div className="flex items-center justify-center gap-3 py-2 px-4 bg-slate-50 rounded-lg">
-                    <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                        <OriginIcon className="h-4 w-4 text-teal-600" />
-                        <span>{transferData.origin || '...'}</span>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400" />
-                    <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                        <DestIcon className="h-4 w-4 text-teal-600" />
-                        <span>{transferData.destination || '...'}</span>
-                    </div>
+                    {/* Visual Route Summary */}
+                    {(transferData.origin || transferData.destination) && (
+                        <div className="flex items-center justify-center gap-3 mt-3 py-2 px-4 bg-white rounded-lg border border-teal-200">
+                            <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                                <OriginIcon className="h-4 w-4 text-teal-600" />
+                                <span>{transferData.origin || '...'}</span>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-slate-400" />
+                            <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                                <DestIcon className="h-4 w-4 text-teal-600" />
+                                <span>{transferData.destination || '...'}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Date, Time, Passengers Row */}
+            {/* Date, Time, Passengers Row (condicionais) */}
             <div className="grid grid-cols-3 gap-3">
-                <div>
-                    <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Data
-                    </label>
-                    <input
-                        type="date"
-                        value={transferData.date}
-                        onChange={(e) => updateField('date', e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    />
-                </div>
-                <div>
-                    <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Horario
-                    </label>
-                    <input
-                        type="time"
-                        value={transferData.time}
-                        onChange={(e) => updateField('time', e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    />
-                </div>
-                <div>
-                    <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        Passageiros
-                    </label>
-                    <input
-                        type="number"
-                        value={transferData.passengers}
-                        onChange={(e) => updateField('passengers', parseInt(e.target.value) || 1)}
-                        min={1}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                    />
-                </div>
+                {showDatetime && (
+                    <>
+                        <div>
+                            <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Data
+                            </label>
+                            <input
+                                type="date"
+                                value={transferData.date}
+                                onChange={(e) => updateField('date', e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Horário
+                            </label>
+                            <input
+                                type="time"
+                                value={transferData.time}
+                                onChange={(e) => updateField('time', e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            />
+                        </div>
+                    </>
+                )}
+                {showPassengers && (
+                    <div className={cn(!showDatetime && "col-span-3")}>
+                        <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            Passageiros
+                        </label>
+                        <input
+                            type="number"
+                            value={transferData.passengers}
+                            onChange={(e) => updateField('passengers', parseInt(e.target.value) || 1)}
+                            min={1}
+                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        />
+                    </div>
+                )}
             </div>
 
-            {/* Vehicle & Price Row */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Vehicle (condicional) */}
+            {showVehicle && (
                 <div>
                     <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
                         <Car className="h-3 w-3" />
-                        Veiculo
+                        Veículo
                     </label>
                     <select
                         value={transferData.vehicle_type}
@@ -257,33 +290,26 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
                         ))}
                     </select>
                 </div>
-                <div>
-                    <label className="text-xs font-medium text-slate-500 mb-1 block">Preco</label>
-                    <div className="flex items-center gap-2 p-2 bg-teal-50 rounded-lg border border-teal-200">
-                        <span className="text-sm font-medium text-teal-700">{currencySymbol}</span>
-                        <input
-                            type="number"
-                            value={transferData.price || ''}
-                            onChange={(e) => updateField('price', parseFloat(e.target.value) || 0)}
-                            placeholder="0,00"
-                            step="0.01"
-                            className="flex-1 text-sm font-semibold text-teal-800 bg-white border border-teal-200 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-teal-500 text-right"
-                        />
-                    </div>
-                </div>
-            </div>
+            )}
 
-            {/* Descricao */}
+            {/* Preço - Sempre visível, usando componente padronizado */}
+            <PriceField
+                price={transferData.price}
+                onChange={(price) => updateField('price', price)}
+                accentColor="teal"
+            />
+
+            {/* Descrição */}
             <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
                     <FileText className="h-3 w-3" />
-                    Descricao (opcional)
+                    Descrição (opcional)
                 </label>
                 <textarea
                     value={transferData.description || ''}
                     onChange={(e) => updateField('description', e.target.value)}
                     placeholder="Detalhes adicionais sobre o transfer, veículo, motorista..."
-                    rows={3}
+                    rows={2}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
                 />
             </div>
@@ -291,27 +317,21 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
             {/* Notas Internas */}
             <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 block">
-                    Observacoes Internas (nao aparece para cliente)
+                    Observações Internas (não aparece para cliente)
                 </label>
                 <input
                     type="text"
                     value={transferData.notes}
                     onChange={(e) => updateField('notes', e.target.value)}
-                    placeholder="ex: Voo G3 1100, chega as 14h30"
+                    placeholder="ex: Voo G3 1100, chega às 14h30"
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-amber-50"
                 />
             </div>
 
-            {/* Validation Feedback */}
-            <ValidationFeedback
-                errors={validation.errors}
-                warnings={validation.warnings}
-            />
-
             {/* Options (Vehicle Upgrades) */}
             <div className="border-t border-slate-200 pt-4">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-slate-600">Opcoes de Veiculo</span>
+                    <span className="text-xs font-medium text-slate-600">Opções de Veículo</span>
                     <Button
                         variant="ghost"
                         size="sm"
@@ -360,24 +380,18 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
                                                 type="text"
                                                 value={option.label}
                                                 onChange={(e) => updateOption(option.id, { label: e.target.value })}
-                                                placeholder="Descricao"
+                                                placeholder="Descrição"
                                                 className={cn(
                                                     "flex-1 text-sm bg-transparent border-none outline-none",
                                                     !option.enabled && "text-slate-400"
                                                 )}
                                             />
 
-                                            <div className="flex items-center gap-1 text-sm text-slate-500">
-                                                <span>{currencySymbol}</span>
-                                                <input
-                                                    type="number"
-                                                    value={option.price || ''}
-                                                    onChange={(e) => updateOption(option.id, { price: parseFloat(e.target.value) || 0 })}
-                                                    className="w-20 text-right bg-transparent border-none outline-none"
-                                                    placeholder="0"
-                                                    step="0.01"
-                                                />
-                                            </div>
+                                            <InlinePriceField
+                                                price={option.price}
+                                                onChange={(price) => updateOption(option.id, { price })}
+                                                disabled={!option.enabled}
+                                            />
                                         </div>
                                     </SortableOptionItem>
                                 ))}
@@ -387,11 +401,40 @@ export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) 
 
                 {transferData.options.length === 0 && (
                     <p className="text-xs text-slate-400 text-center py-2">
-                        Nenhuma opcao de veiculo adicionada
+                        Nenhuma opção de veículo adicionada
                     </p>
                 )}
             </div>
         </div>
+    )
+}
+
+/**
+ * FieldToggle - Mini toggle para habilitar/desabilitar campo
+ */
+function FieldToggle({
+    label,
+    enabled,
+    onToggle,
+}: {
+    label: string
+    enabled: boolean
+    onToggle: (enabled: boolean) => void
+}) {
+    return (
+        <button
+            type="button"
+            onClick={() => onToggle(!enabled)}
+            className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                enabled
+                    ? "bg-teal-100 text-teal-700 border border-teal-200"
+                    : "bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200"
+            )}
+        >
+            {enabled ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+            {label}
+        </button>
     )
 }
 

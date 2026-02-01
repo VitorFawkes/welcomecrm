@@ -19,6 +19,12 @@ export interface TransferData {
     // Campos adicionais
     image_url?: string | null
     description?: string | null
+
+    // Configuração de campos visíveis (flexibilidade)
+    show_route?: boolean      // Mostrar origem/destino
+    show_datetime?: boolean   // Mostrar data/hora
+    show_vehicle?: boolean    // Mostrar tipo de veículo
+    show_passengers?: boolean // Mostrar número de passageiros
 }
 
 export type LocationType = 'airport' | 'hotel' | 'port' | 'address'
@@ -78,5 +84,10 @@ export function createInitialTransferData(): TransferData {
         options: [],
         image_url: null,
         description: null,
+        // Campos visíveis por padrão
+        show_route: true,
+        show_datetime: true,
+        show_vehicle: true,
+        show_passengers: true,
     }
 }
