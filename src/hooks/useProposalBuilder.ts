@@ -38,18 +38,20 @@ interface ProposalBuilderState {
     updateSubtitle: (subtitle: string) => void
     updateCoverImage: (url: string | null) => void
     updateNarrative: (narrative: string) => void
+    updateCurrency: (currency: 'BRL' | 'USD' | 'EUR') => void
+    getCurrency: () => 'BRL' | 'USD' | 'EUR'
     updateWelcomeMessage: (message: string) => void
 
     // Section actions
-    addSection: (type: ProposalSectionType, title?: string) => void
-    insertSectionAt: (index: number, type: ProposalSectionType, title?: string) => void
+    addSection: (type: ProposalSectionType, title?: string) => string
+    insertSectionAt: (index: number, type: ProposalSectionType, title?: string) => string
     removeSection: (sectionId: string) => void
     updateSection: (sectionId: string, updates: Partial<ProposalSection>) => void
     reorderSections: (orderedIds: string[]) => void
     selectSection: (sectionId: string | null) => void
 
     // Item actions
-    addItem: (sectionId: string, type: ProposalItemType, title: string) => void
+    addItem: (sectionId: string, type: ProposalItemType, title: string) => string
     addItemFromLibrary: (sectionId: string, libraryItem: LibrarySearchResult) => void
     duplicateItem: (itemId: string) => void
     removeItem: (itemId: string) => void
@@ -157,6 +159,26 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
         })
     },
 
+    updateCurrency: (currency: 'BRL' | 'USD' | 'EUR') => {
+        const { version } = get()
+        if (!version) return
+        const currentMetadata = (version.metadata as Record<string, unknown>) || {}
+        set({
+            version: {
+                ...version,
+                metadata: { ...currentMetadata, currency }
+            },
+            isDirty: true,
+        })
+    },
+
+    getCurrency: () => {
+        const { version } = get()
+        if (!version) return 'BRL'
+        const metadata = (version.metadata as Record<string, unknown>) || {}
+        return (metadata.currency as 'BRL' | 'USD' | 'EUR') || 'BRL'
+    },
+
     updateWelcomeMessage: (message: string) => {
         set({
             welcomeMessage: message,
@@ -188,6 +210,8 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             isDirty: true,
             selectedSectionId: newSection.id,
         })
+
+        return newSection.id
     },
 
     insertSectionAt: (index, type, title) => {
@@ -218,6 +242,8 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             isDirty: true,
             selectedSectionId: newSection.id,
         })
+
+        return newSection.id
     },
 
     removeSection: (sectionId) => {
@@ -289,6 +315,8 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             isDirty: true,
             selectedItemId: newItem.id,
         })
+
+        return newItem.id
     },
 
     addItemFromLibrary: (sectionId, libraryItem) => {

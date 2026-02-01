@@ -149,6 +149,7 @@ export default function ProposalBuilderV4() {
     }, [])
 
     // Handle drag end - block dropped on canvas
+    // Refactored: No more setTimeout race conditions - uses sync returns from Zustand
     const handleDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event
         setActiveBlockType(null)
@@ -163,167 +164,63 @@ export default function ProposalBuilderV4() {
         let insertIndex = sections.length // default: end
 
         if (overId.startsWith('drop-zone-')) {
-            // Extract index from drop zone ID (e.g., "drop-zone-2" => 2)
             insertIndex = parseInt(overId.replace('drop-zone-', ''), 10)
         }
 
-        // SPECIAL: Text blocks create a special section with inline editing
-        if (blockType === 'text') {
-            const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
-            insertSectionAt(insertIndex, sectionType, '')
+        const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
+        const { addItem, updateItem } = useProposalBuilder.getState()
 
-            // Add a text block item to the section
-            setTimeout(() => {
-                const updatedSections = useProposalBuilder.getState().sections
-                const newSection = updatedSections[insertIndex]
-                if (newSection) {
-                    const { addItem, updateItem } = useProposalBuilder.getState()
-                    addItem(newSection.id, 'custom', 'Texto')
-
-                    // Mark as text block in rich_content
-                    const latestSections = useProposalBuilder.getState().sections
-                    const latestSection = latestSections[insertIndex]
-                    const item = latestSection?.items[0]
-                    if (item) {
-                        updateItem(item.id, {
-                            title: '',
-                            rich_content: { is_text_block: true, content: '' },
-                        })
-                    }
-                }
-            }, 0)
-            return
+        // Helper: Create section and add item with rich_content in one sync flow
+        const createBlockWithContent = (
+            title: string,
+            richContent: Record<string, unknown>
+        ) => {
+            const sectionId = insertSectionAt(insertIndex, sectionType, '')
+            const itemId = addItem(sectionId, 'custom', title)
+            updateItem(itemId, {
+                title: (richContent.title as string) || '',
+                rich_content: richContent as any, // Json type from Supabase
+            })
         }
 
-        // SPECIAL: Title blocks create a special section for headings
-        if (blockType === 'title') {
-            const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
-            insertSectionAt(insertIndex, sectionType, '')
+        // Content blocks - create section + item immediately
+        switch (blockType) {
+            case 'text':
+                createBlockWithContent('Texto', { is_text_block: true, content: '' })
+                return
 
-            setTimeout(() => {
-                const updatedSections = useProposalBuilder.getState().sections
-                const newSection = updatedSections[insertIndex]
-                if (newSection) {
-                    const { addItem, updateItem } = useProposalBuilder.getState()
-                    addItem(newSection.id, 'custom', 'Título')
+            case 'title':
+                createBlockWithContent('Título', { is_title_block: true, title: 'Novo Título' })
+                return
 
-                    const latestSections = useProposalBuilder.getState().sections
-                    const latestSection = latestSections[insertIndex]
-                    const item = latestSection?.items[0]
-                    if (item) {
-                        updateItem(item.id, {
-                            title: 'Novo Título',
-                            rich_content: { is_title_block: true },
-                        })
-                    }
-                }
-            }, 0)
-            return
+            case 'divider':
+                createBlockWithContent('Divisor', { is_divider_block: true })
+                return
+
+            case 'image':
+                createBlockWithContent('Imagem', { is_image_block: true, image_url: '' })
+                return
+
+            case 'video':
+                createBlockWithContent('Vídeo', { is_video_block: true, video_url: '' })
+                return
         }
 
-        // SPECIAL: Divider blocks create a visual separator
-        if (blockType === 'divider') {
-            const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
-            insertSectionAt(insertIndex, sectionType, '')
-
-            setTimeout(() => {
-                const updatedSections = useProposalBuilder.getState().sections
-                const newSection = updatedSections[insertIndex]
-                if (newSection) {
-                    const { addItem, updateItem } = useProposalBuilder.getState()
-                    addItem(newSection.id, 'custom', 'Divisor')
-
-                    const latestSections = useProposalBuilder.getState().sections
-                    const latestSection = latestSections[insertIndex]
-                    const item = latestSection?.items[0]
-                    if (item) {
-                        updateItem(item.id, {
-                            title: '',
-                            rich_content: { is_divider_block: true },
-                        })
-                    }
-                }
-            }, 0)
-            return
-        }
-
-        // SPECIAL: Image blocks create a media section
-        if (blockType === 'image') {
-            const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
-            insertSectionAt(insertIndex, sectionType, '')
-
-            setTimeout(() => {
-                const updatedSections = useProposalBuilder.getState().sections
-                const newSection = updatedSections[insertIndex]
-                if (newSection) {
-                    const { addItem, updateItem } = useProposalBuilder.getState()
-                    addItem(newSection.id, 'custom', 'Imagem')
-
-                    const latestSections = useProposalBuilder.getState().sections
-                    const latestSection = latestSections[insertIndex]
-                    const item = latestSection?.items[0]
-                    if (item) {
-                        updateItem(item.id, {
-                            title: '',
-                            rich_content: { is_image_block: true, image_url: '' },
-                        })
-                    }
-                }
-            }, 0)
-            return
-        }
-
-        // SPECIAL: Video blocks create a media section
-        if (blockType === 'video') {
-            const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
-            insertSectionAt(insertIndex, sectionType, '')
-
-            setTimeout(() => {
-                const updatedSections = useProposalBuilder.getState().sections
-                const newSection = updatedSections[insertIndex]
-                if (newSection) {
-                    const { addItem, updateItem } = useProposalBuilder.getState()
-                    addItem(newSection.id, 'custom', 'Vídeo')
-
-                    const latestSections = useProposalBuilder.getState().sections
-                    const latestSection = latestSections[insertIndex]
-                    const item = latestSection?.items[0]
-                    if (item) {
-                        updateItem(item.id, {
-                            title: '',
-                            rich_content: { is_video_block: true, video_url: '' },
-                        })
-                    }
-                }
-            }, 0)
-            return
-        }
-
-        // Check if this block type requires library search
+        // Searchable blocks - create section then open drawer
         if (SEARCHABLE_BLOCKS.includes(blockType)) {
-            // Create a section at the specified position
-            const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
-            insertSectionAt(insertIndex, sectionType)
+            const sectionId = insertSectionAt(insertIndex, sectionType)
 
-            // Get the newly created section ID (it's at the insertIndex)
-            // We need to wait for the state to update, so using setTimeout
-            setTimeout(() => {
-                const updatedSections = useProposalBuilder.getState().sections
-                const newSectionId = updatedSections[insertIndex]?.id
-
-                // Open search drawer
-                setSearchDrawer({
-                    isOpen: true,
-                    blockType,
-                    sectionId: newSectionId || null,
-                })
-            }, 0)
-        } else {
-            // For other non-searchable blocks (table, etc.)
-            // Add directly with default content
-            const sectionType = BLOCK_TO_SECTION_TYPE[blockType]
-            insertSectionAt(insertIndex, sectionType, getDefaultTitle(blockType))
+            // Open search drawer with the section ID (no setTimeout needed)
+            setSearchDrawer({
+                isOpen: true,
+                blockType,
+                sectionId,
+            })
+            return
         }
+
+        // Other blocks - just create section with default title
+        insertSectionAt(insertIndex, sectionType, getDefaultTitle(blockType))
     }, [insertSectionAt, sections])
 
     // Close search drawer

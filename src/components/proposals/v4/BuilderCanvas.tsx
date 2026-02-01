@@ -391,8 +391,8 @@ function TextBlockSection({ section }: TextBlockSectionProps) {
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
-            {/* Minimal Header - Only drag handle and delete */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Header - Always visible */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100">
                 <button
                     {...attributes}
                     {...listeners}
@@ -400,28 +400,33 @@ function TextBlockSection({ section }: TextBlockSectionProps) {
                 >
                     <GripVertical className="h-4 w-4 text-slate-400" />
                 </button>
-                <div className="flex-1 flex items-center gap-1.5 text-slate-400">
+                <div className="flex-1 flex items-center gap-1.5 text-slate-500">
                     <FileText className="h-4 w-4" />
                     <span className="text-xs font-medium">Bloco de Texto</span>
                 </div>
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
                 </Button>
             </div>
 
-            {/* Text Editor */}
+            {/* Text Editor - Larger */}
             <div className="p-4">
                 <Textarea
                     value={textContent}
                     onChange={handleTextChange}
                     placeholder="Digite seu texto aqui..."
-                    className="min-h-[120px] resize-none border-none shadow-none focus:ring-0 p-0 text-slate-700"
+                    className="min-h-[180px] resize-y border border-slate-200 rounded-lg shadow-none focus:ring-2 focus:ring-blue-500 focus:border-transparent p-3 text-slate-700"
                 />
+                <div className="flex justify-end mt-2">
+                    <span className="text-xs text-slate-400">
+                        {textContent.length} caracteres
+                    </span>
+                </div>
             </div>
         </div>
     )
@@ -430,9 +435,21 @@ function TextBlockSection({ section }: TextBlockSectionProps) {
 // ============================================
 // Title Block Section (for headings)
 // ============================================
+type TitleSize = 'h1' | 'h2' | 'h3'
+type TitleAlign = 'left' | 'center' | 'right'
+
+const TITLE_SIZES: Record<TitleSize, string> = {
+    h1: 'text-3xl font-bold',
+    h2: 'text-2xl font-bold',
+    h3: 'text-xl font-semibold',
+}
+
 function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
     const { removeSection, updateItem } = useProposalBuilder()
     const item = section.items[0]
+    const richContent = (item?.rich_content as Record<string, any>) || {}
+    const titleSize = (richContent.title_size as TitleSize) || 'h2'
+    const titleAlign = (richContent.title_align as TitleAlign) || 'left'
 
     const {
         attributes,
@@ -454,6 +471,22 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
         }
     }, [item, updateItem])
 
+    const handleSizeChange = useCallback((size: TitleSize) => {
+        if (item) {
+            updateItem(item.id, {
+                rich_content: { ...richContent, title_size: size, is_title_block: true }
+            })
+        }
+    }, [item, richContent, updateItem])
+
+    const handleAlignChange = useCallback((align: TitleAlign) => {
+        if (item) {
+            updateItem(item.id, {
+                rich_content: { ...richContent, title_align: align, is_title_block: true }
+            })
+        }
+    }, [item, richContent, updateItem])
+
     return (
         <div
             ref={setNodeRef}
@@ -464,7 +497,7 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100 transition-opacity">
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100">
                 <button
                     {...attributes}
                     {...listeners}
@@ -472,14 +505,75 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 >
                     <GripVertical className="h-4 w-4 text-slate-400" />
                 </button>
-                <div className="flex-1 flex items-center gap-1.5 text-slate-400">
+                <div className="flex items-center gap-1.5 text-slate-500">
                     <Type className="h-4 w-4" />
                     <span className="text-xs font-medium">Título</span>
                 </div>
+
+                {/* Size selector */}
+                <div className="flex items-center gap-1 ml-2 border-l border-slate-200 pl-2">
+                    {(['h1', 'h2', 'h3'] as TitleSize[]).map((size) => (
+                        <button
+                            key={size}
+                            onClick={(e) => { e.stopPropagation(); handleSizeChange(size) }}
+                            className={cn(
+                                "px-2 py-0.5 text-xs rounded transition-colors",
+                                titleSize === size
+                                    ? "bg-blue-100 text-blue-700 font-medium"
+                                    : "text-slate-500 hover:bg-slate-100"
+                            )}
+                        >
+                            {size.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Alignment selector */}
+                <div className="flex items-center gap-0.5 ml-2 border-l border-slate-200 pl-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleAlignChange('left') }}
+                        className={cn(
+                            "p-1 rounded transition-colors",
+                            titleAlign === 'left' ? "bg-blue-100 text-blue-700" : "text-slate-400 hover:bg-slate-100"
+                        )}
+                        title="Alinhar à esquerda"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h14" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleAlignChange('center') }}
+                        className={cn(
+                            "p-1 rounded transition-colors",
+                            titleAlign === 'center' ? "bg-blue-100 text-blue-700" : "text-slate-400 hover:bg-slate-100"
+                        )}
+                        title="Centralizar"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M7 12h10M5 18h14" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleAlignChange('right') }}
+                        className={cn(
+                            "p-1 rounded transition-colors",
+                            titleAlign === 'right' ? "bg-blue-100 text-blue-700" : "text-slate-400 hover:bg-slate-100"
+                        )}
+                        title="Alinhar à direita"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M10 12h10M6 18h14" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="flex-1" />
+
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -491,7 +585,12 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
                     value={item?.title || ''}
                     onChange={handleTitleChange}
                     placeholder="Digite o título..."
-                    className="w-full text-2xl font-bold text-slate-900 bg-transparent border-none outline-none focus:ring-0 p-0"
+                    className={cn(
+                        "w-full text-slate-900 bg-transparent border-none outline-none focus:ring-0 p-0",
+                        TITLE_SIZES[titleSize],
+                        titleAlign === 'center' && 'text-center',
+                        titleAlign === 'right' && 'text-right'
+                    )}
                 />
             </div>
         </div>
@@ -541,7 +640,7 @@ function DividerBlockSection({ section }: { section: ProposalSectionWithItems })
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -675,7 +774,7 @@ function ImageBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -729,13 +828,104 @@ function ImageBlockSection({ section }: { section: ProposalSectionWithItems }) {
 }
 
 // ============================================
-// Video Block Section (TODO: add embed)
+// Video Block Content (URL input + preview)
+// ============================================
+interface VideoBlockContentProps {
+    richContent: Record<string, any>
+    onUpdate: (updates: Partial<ProposalItemWithOptions>) => void
+}
+
+function VideoBlockContent({ richContent, onUpdate }: VideoBlockContentProps) {
+    const videoUrl = richContent.video_url || ''
+
+    // Parse YouTube/Vimeo URL to get embed URL
+    const getEmbedUrl = (url: string): string | null => {
+        if (!url) return null
+
+        // YouTube
+        const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        if (ytMatch) {
+            return `https://www.youtube.com/embed/${ytMatch[1]}`
+        }
+
+        // Vimeo
+        const vimeoMatch = url.match(/vimeo\.com\/(\d+)/)
+        if (vimeoMatch) {
+            return `https://player.vimeo.com/video/${vimeoMatch[1]}`
+        }
+
+        return null
+    }
+
+    // Get thumbnail URL for YouTube
+    const getThumbnailUrl = (url: string): string | null => {
+        const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        if (ytMatch) {
+            return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`
+        }
+        return null
+    }
+
+    const embedUrl = getEmbedUrl(videoUrl)
+    const thumbnailUrl = getThumbnailUrl(videoUrl)
+
+    return (
+        <div className="p-4 space-y-3">
+            {/* URL Input */}
+            <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">
+                    URL do vídeo (YouTube ou Vimeo)
+                </label>
+                <input
+                    type="url"
+                    value={videoUrl}
+                    onChange={(e) => onUpdate({
+                        rich_content: { ...richContent, video_url: e.target.value, is_video_block: true }
+                    })}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+            </div>
+
+            {/* Preview */}
+            {embedUrl ? (
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                    <iframe
+                        src={embedUrl}
+                        className="w-full h-full"
+                        allowFullScreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    />
+                </div>
+            ) : thumbnailUrl ? (
+                <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden relative">
+                    <img src={thumbnailUrl} alt="Video thumbnail" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
+                            <div className="w-0 h-0 border-l-[20px] border-l-slate-800 border-y-[12px] border-y-transparent ml-1" />
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="aspect-video bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400">
+                    <svg className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm">Cole a URL de um vídeo acima</span>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ============================================
+// Video Block Section
 // ============================================
 function VideoBlockSection({ section }: { section: ProposalSectionWithItems }) {
-    const { removeSection } = useProposalBuilder()
+    const { removeSection, updateItem } = useProposalBuilder()
     const item = section.items[0]
     const richContent = (item?.rich_content as Record<string, any>) || {}
-    const videoUrl = richContent.video_url || ''
 
     const {
         attributes,
@@ -761,7 +951,8 @@ function VideoBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Header - Always visible */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100">
                 <button
                     {...attributes}
                     {...listeners}
@@ -769,29 +960,26 @@ function VideoBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 >
                     <GripVertical className="h-4 w-4 text-slate-400" />
                 </button>
-                <div className="flex-1 flex items-center gap-1.5 text-slate-400">
-                    <span className="text-xs font-medium">🎬 Vídeo</span>
+                <div className="flex-1 flex items-center gap-1.5 text-slate-500">
+                    <span className="text-xs font-medium">Video</span>
                 </div>
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
                 </Button>
             </div>
-            <div className="p-4">
-                {videoUrl ? (
-                    <div className="aspect-video bg-black rounded-lg">
-                        <iframe src={videoUrl} className="w-full h-full rounded-lg" allowFullScreen />
-                    </div>
-                ) : (
-                    <div className="flex items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 text-slate-400">
-                        <span className="text-sm">Clique para adicionar vídeo</span>
-                    </div>
-                )}
-            </div>
+            <VideoBlockContent
+                richContent={richContent}
+                onUpdate={(updates) => {
+                    if (item) {
+                        updateItem(item.id, updates)
+                    }
+                }}
+            />
         </div>
     )
 }
@@ -939,7 +1127,7 @@ function SortableSection({ section }: SortableSectionProps) {
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />

@@ -1,11 +1,11 @@
 /**
- * BlockSearchDrawer - Slide-in drawer for searching library items OR extracting via AI
- * 
- * Features:
- * - Search input for library
- * - Results with thumbnails
- * - "Create New" button
- * - AI Tab for flight extraction from images
+ * BlockSearchDrawer - Slide-in drawer for adding items
+ *
+ * REDESIGNED for better UX:
+ * - Shows "Create Empty" option first (most common action)
+ * - Library search is secondary
+ * - AI extraction for flights
+ * - Clear loading/error states
  */
 
 import { useState, useCallback } from 'react'
@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useLibrarySearch, type LibrarySearchResult, type LibraryCategory } from '@/hooks/useLibrary'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
-import { ItemCreatorDrawer } from '@/components/proposals/builder/ItemCreatorDrawer'
 import { AIImageExtractor } from '@/components/proposals/AIImageExtractor'
 import type { ExtractedItem } from '@/hooks/useAIExtract'
 import {
@@ -31,6 +30,13 @@ import {
     Sparkles,
     Loader2,
     Library,
+    FileText,
+    Image as ImageIcon,
+    Video,
+    Minus,
+    Table,
+    Type,
+    AlertCircle,
 } from 'lucide-react'
 import type { BlockType } from '@/pages/ProposalBuilderV4'
 import type { ProposalItemType } from '@/types/proposals'
@@ -61,18 +67,18 @@ const BLOCK_LABELS: Record<BlockType, string> = {
     cruise: 'Cruzeiro',
     car: 'Carro',
     transfer: 'Transfer',
-    experience: 'Experiência',
+    experience: 'Experiencia',
     insurance: 'Seguro',
-    custom: 'Outros',
-    title: 'Título',
+    custom: 'Item',
+    title: 'Titulo',
     text: 'Texto',
     image: 'Imagem',
-    video: 'Vídeo',
+    video: 'Video',
     divider: 'Divisor',
     table: 'Tabela',
 }
 
-// Block type icons
+// Block type icons - FIXED: proper icons for each type
 const BLOCK_ICONS: Record<BlockType, React.ElementType> = {
     hotel: Building2,
     flight: Plane,
@@ -82,12 +88,30 @@ const BLOCK_ICONS: Record<BlockType, React.ElementType> = {
     experience: Sparkles,
     insurance: Shield,
     custom: Star,
-    title: Building2,
-    text: Building2,
-    image: Building2,
-    video: Building2,
-    divider: Building2,
-    table: Building2,
+    title: Type,
+    text: FileText,
+    image: ImageIcon,
+    video: Video,
+    divider: Minus,
+    table: Table,
+}
+
+// Block type colors
+const BLOCK_COLORS: Record<BlockType, { bg: string; text: string; border: string }> = {
+    hotel: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+    flight: { bg: 'bg-sky-50', text: 'text-sky-600', border: 'border-sky-200' },
+    cruise: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+    car: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
+    transfer: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
+    experience: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
+    insurance: { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' },
+    custom: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
+    title: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
+    text: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
+    image: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
+    video: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
+    divider: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
+    table: { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' },
 }
 
 // Block to item type
@@ -111,7 +135,10 @@ const BLOCK_TO_ITEM: Record<BlockType, ProposalItemType> = {
 // Blocks that support AI extraction
 const AI_ENABLED_BLOCKS: BlockType[] = ['flight']
 
-type TabType = 'library' | 'ai'
+// Blocks that support library search
+const LIBRARY_ENABLED_BLOCKS: BlockType[] = ['hotel', 'flight', 'experience', 'transfer', 'insurance']
+
+type TabType = 'create' | 'library' | 'ai'
 
 export function BlockSearchDrawer({
     isOpen,
@@ -120,26 +147,39 @@ export function BlockSearchDrawer({
     onClose,
 }: BlockSearchDrawerProps) {
     const [search, setSearch] = useState('')
-    const [showCreator, setShowCreator] = useState(false)
-    const [activeTab, setActiveTab] = useState<TabType>('library')
+    const [activeTab, setActiveTab] = useState<TabType>('create')
+    const [isCreating, setIsCreating] = useState(false)
     const { addItemFromLibrary, addItem, updateItem } = useProposalBuilder()
 
-    // Check if AI is available for this block type
+    // Check features for this block type
     const hasAISupport = blockType && AI_ENABLED_BLOCKS.includes(blockType)
+    const hasLibrarySupport = blockType && LIBRARY_ENABLED_BLOCKS.includes(blockType)
 
     // Get library category for this block type
     const libraryCategory = blockType ? BLOCK_TO_LIBRARY_CATEGORY[blockType] : undefined
 
-    // Search library
-    const { data: results = [], isLoading } = useLibrarySearch(
-        {
-            search,
-            category: libraryCategory,
-        },
-        isOpen && search.length >= 2 && activeTab === 'library'
+    // Search library (only when on library tab and has 2+ chars)
+    const { data: results = [], isLoading, error } = useLibrarySearch(
+        { search, category: libraryCategory },
+        isOpen && search.length >= 2 && activeTab === 'library' && !!hasLibrarySupport
     )
 
-    // Handle selecting a result
+    // Handle creating empty item
+    const handleCreateEmpty = useCallback(async () => {
+        if (!sectionId || !blockType) return
+
+        setIsCreating(true)
+        try {
+            const itemType = BLOCK_TO_ITEM[blockType]
+            const label = BLOCK_LABELS[blockType]
+            addItem(sectionId, itemType, `Novo ${label}`)
+            onClose()
+        } finally {
+            setIsCreating(false)
+        }
+    }, [sectionId, blockType, addItem, onClose])
+
+    // Handle selecting a library result
     const handleSelect = useCallback((item: LibrarySearchResult) => {
         if (sectionId) {
             addItemFromLibrary(sectionId, item)
@@ -151,13 +191,10 @@ export function BlockSearchDrawer({
     const handleAIExtractComplete = useCallback((extractedItems: ExtractedItem[]) => {
         if (!sectionId || !blockType) return
 
-        // Add each extracted item to the section
         for (const extracted of extractedItems) {
-            // Create the item
             const itemType = BLOCK_TO_ITEM[blockType] || 'flight'
             addItem(sectionId, itemType, extracted.title)
 
-            // Get the newly added item and update with extracted data
             const sections = useProposalBuilder.getState().sections
             const section = sections.find(s => s.id === sectionId)
             if (section && section.items.length > 0) {
@@ -179,21 +216,10 @@ export function BlockSearchDrawer({
         onClose()
     }, [sectionId, blockType, addItem, updateItem, onClose])
 
-    // Handle create new
-    const handleCreateNew = useCallback(() => {
-        setShowCreator(true)
-    }, [])
-
-    // Handle creator close
-    const handleCreatorClose = useCallback(() => {
-        setShowCreator(false)
-        onClose()
-    }, [onClose])
-
-    // Close drawer
+    // Close drawer and reset
     const handleClose = useCallback(() => {
         setSearch('')
-        setActiveTab('library')
+        setActiveTab('create')
         onClose()
     }, [onClose])
 
@@ -201,13 +227,16 @@ export function BlockSearchDrawer({
 
     const Icon = BLOCK_ICONS[blockType] || Building2
     const label = BLOCK_LABELS[blockType]
-    const itemType = BLOCK_TO_ITEM[blockType]
+    const colors = BLOCK_COLORS[blockType] || BLOCK_COLORS.custom
+
+    // Count available tabs
+    const tabCount = 1 + (hasLibrarySupport ? 1 : 0) + (hasAISupport ? 1 : 0)
 
     return (
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-black/20 z-40 transition-opacity"
+                className="fixed inset-0 bg-black/30 z-40 transition-opacity backdrop-blur-sm"
                 onClick={handleClose}
             />
 
@@ -222,17 +251,20 @@ export function BlockSearchDrawer({
                 )}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-4 border-b border-slate-200">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                            <Icon className="h-5 w-5" />
+                        <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center",
+                            colors.bg, colors.text
+                        )}>
+                            <Icon className="h-6 w-6" />
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold text-slate-900">
                                 Adicionar {label}
                             </h2>
                             <p className="text-sm text-slate-500">
-                                {hasAISupport ? 'Busque na biblioteca ou extraia com IA' : 'Busque na biblioteca ou crie novo'}
+                                {tabCount > 1 ? 'Escolha como adicionar' : 'Preencha os dados'}
                             </p>
                         </div>
                     </div>
@@ -240,181 +272,296 @@ export function BlockSearchDrawer({
                         variant="ghost"
                         size="icon"
                         onClick={handleClose}
-                        className="h-10 w-10"
+                        className="h-10 w-10 rounded-full hover:bg-slate-100"
                     >
                         <X className="h-5 w-5" />
                     </Button>
                 </div>
 
-                {/* Tabs - Only show if AI is available */}
-                {hasAISupport && (
-                    <div className="flex border-b border-slate-200">
+                {/* Tabs - Only show if more than one option */}
+                {tabCount > 1 && (
+                    <div className="flex border-b border-slate-200 px-2">
+                        {/* Create Tab - Always first */}
                         <button
-                            onClick={() => setActiveTab('library')}
+                            onClick={() => setActiveTab('create')}
                             className={cn(
-                                'flex-1 py-3 px-4 text-sm font-medium transition-colors',
-                                'flex items-center justify-center gap-2',
-                                activeTab === 'library'
-                                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                                'flex-1 py-3 px-3 text-sm font-medium transition-all',
+                                'flex items-center justify-center gap-2 rounded-t-lg mx-1',
+                                activeTab === 'create'
+                                    ? cn('text-white', colors.bg.replace('50', '600'), 'shadow-sm')
                                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                             )}
+                            style={activeTab === 'create' ? {
+                                backgroundColor: colors.text.includes('emerald') ? '#059669' :
+                                    colors.text.includes('sky') ? '#0284c7' :
+                                    colors.text.includes('orange') ? '#ea580c' :
+                                    colors.text.includes('teal') ? '#0d9488' : '#475569'
+                            } : undefined}
                         >
-                            <Library className="h-4 w-4" />
-                            Biblioteca
+                            <Plus className="h-4 w-4" />
+                            Criar Novo
                         </button>
-                        <button
-                            onClick={() => setActiveTab('ai')}
-                            className={cn(
-                                'flex-1 py-3 px-4 text-sm font-medium transition-colors',
-                                'flex items-center justify-center gap-2',
-                                activeTab === 'ai'
-                                    ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50'
-                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                            )}
-                        >
-                            <Sparkles className="h-4 w-4" />
-                            Extrair com IA
-                        </button>
+
+                        {/* Library Tab */}
+                        {hasLibrarySupport && (
+                            <button
+                                onClick={() => setActiveTab('library')}
+                                className={cn(
+                                    'flex-1 py-3 px-3 text-sm font-medium transition-all',
+                                    'flex items-center justify-center gap-2 rounded-t-lg mx-1',
+                                    activeTab === 'library'
+                                        ? 'text-blue-700 bg-blue-100'
+                                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                                )}
+                            >
+                                <Library className="h-4 w-4" />
+                                Biblioteca
+                            </button>
+                        )}
+
+                        {/* AI Tab */}
+                        {hasAISupport && (
+                            <button
+                                onClick={() => setActiveTab('ai')}
+                                className={cn(
+                                    'flex-1 py-3 px-3 text-sm font-medium transition-all',
+                                    'flex items-center justify-center gap-2 rounded-t-lg mx-1',
+                                    activeTab === 'ai'
+                                        ? 'text-purple-700 bg-purple-100'
+                                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                                )}
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                IA
+                            </button>
+                        )}
                     </div>
                 )}
 
-                {/* Content based on active tab */}
-                {activeTab === 'ai' && hasAISupport ? (
-                    /* AI Extraction Tab */
-                    <div className="flex-1 overflow-y-auto p-4">
-                        <AIImageExtractor
-                            onExtractComplete={handleAIExtractComplete}
-                            onCancel={handleClose}
-                        />
-                    </div>
-                ) : (
-                    /* Library Search Tab */
-                    <>
-                        {/* Search */}
-                        <div className="px-4 py-3 border-b border-slate-200">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                <Input
-                                    placeholder={`Buscar ${label.toLowerCase()}...`}
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-9"
-                                    autoFocus={activeTab === 'library'}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Results */}
-                        <div className="flex-1 overflow-y-auto">
-                            {isLoading ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto">
+                    {/* CREATE TAB - Default, most common action */}
+                    {activeTab === 'create' && (
+                        <div className="p-6">
+                            <div className={cn(
+                                "rounded-2xl border-2 border-dashed p-8 text-center transition-all",
+                                colors.border, colors.bg
+                            )}>
+                                <div className={cn(
+                                    "w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center",
+                                    colors.text,
+                                    colors.bg.replace('50', '100')
+                                )}>
+                                    <Icon className="h-8 w-8" />
                                 </div>
-                            ) : search.length < 2 ? (
-                                <div className="p-6 text-center">
-                                    <Library className="h-12 w-12 mx-auto text-slate-300 mb-3" />
-                                    <p className="text-sm text-slate-500">
-                                        Digite pelo menos 2 caracteres para buscar
-                                    </p>
-                                </div>
-                            ) : results.length === 0 ? (
-                                <div className="p-6 text-center">
-                                    <Search className="h-12 w-12 mx-auto text-slate-300 mb-3" />
-                                    <p className="text-sm text-slate-500 mb-4">
-                                        Nenhum resultado para "{search}"
-                                    </p>
-                                    <Button onClick={handleCreateNew}>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Criar Novo {label}
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-slate-100">
-                                    {results.map((item) => (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => handleSelect(item)}
-                                            className="w-full px-4 py-3 flex items-start gap-3 hover:bg-blue-50 transition-colors text-left"
-                                        >
-                                            {/* Thumbnail */}
-                                            <div className="w-16 h-16 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden">
-                                                {item.thumbnail_url ? (
-                                                    <img
-                                                        src={item.thumbnail_url}
-                                                        alt={item.name}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-slate-400">
-                                                        <Icon className="h-6 w-6" />
-                                                    </div>
-                                                )}
-                                            </div>
 
-                                            {/* Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-slate-900 truncate">
-                                                    {item.name}
-                                                </p>
-                                                {item.location_city && (
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {item.location_city}
-                                                        {item.location_country && `, ${item.location_country}`}
-                                                    </p>
-                                                )}
-                                                {item.star_rating && (
-                                                    <div className="flex items-center gap-0.5 mt-1">
-                                                        {Array.from({ length: item.star_rating }).map((_, i) => (
-                                                            <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                                    Criar {label} em Branco
+                                </h3>
+                                <p className="text-sm text-slate-500 mb-6 max-w-xs mx-auto">
+                                    Adicione um novo {label.toLowerCase()} e preencha os dados manualmente
+                                </p>
 
-                                            {/* Price */}
-                                            {item.base_price && Number(item.base_price) > 0 && (
-                                                <div className="text-right flex-shrink-0">
-                                                    <p className="text-sm font-semibold text-emerald-600">
-                                                        {new Intl.NumberFormat('pt-BR', {
-                                                            style: 'currency',
-                                                            currency: item.currency || 'BRL',
-                                                        }).format(Number(item.base_price))}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        {results.length > 0 && (
-                            <div className="p-4 border-t border-slate-200">
                                 <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    onClick={handleCreateNew}
+                                    onClick={handleCreateEmpty}
+                                    disabled={isCreating}
+                                    size="lg"
+                                    className={cn(
+                                        "px-8",
+                                        colors.text.includes('emerald') && 'bg-emerald-600 hover:bg-emerald-700',
+                                        colors.text.includes('sky') && 'bg-sky-600 hover:bg-sky-700',
+                                        colors.text.includes('orange') && 'bg-orange-600 hover:bg-orange-700',
+                                        colors.text.includes('teal') && 'bg-teal-600 hover:bg-teal-700',
+                                    )}
                                 >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Criar Novo {label}
+                                    {isCreating ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Criando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Criar {label}
+                                        </>
+                                    )}
                                 </Button>
                             </div>
-                        )}
-                    </>
-                )}
-            </div>
 
-            {/* Item Creator Drawer */}
-            {showCreator && sectionId && (
-                <ItemCreatorDrawer
-                    isOpen={showCreator}
-                    onClose={handleCreatorClose}
-                    sectionId={sectionId}
-                    itemType={itemType}
-                    defaultTitle={search}
-                />
-            )}
+                            {/* Quick tips */}
+                            {hasLibrarySupport && (
+                                <div className="mt-6 p-4 bg-slate-50 rounded-xl">
+                                    <p className="text-xs text-slate-500">
+                                        <strong className="text-slate-700">Dica:</strong> Use a aba "Biblioteca" para buscar itens que voce ja cadastrou anteriormente.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* LIBRARY TAB */}
+                    {activeTab === 'library' && hasLibrarySupport && (
+                        <>
+                            {/* Search Input */}
+                            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <Input
+                                        placeholder={`Buscar ${label.toLowerCase()} na biblioteca...`}
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-10 h-11 bg-white"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Results Area */}
+                            <div className="p-4">
+                                {/* Error State */}
+                                {error && (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                                            <AlertCircle className="h-7 w-7 text-red-500" />
+                                        </div>
+                                        <p className="text-sm font-medium text-slate-900 mb-1">
+                                            Erro ao buscar
+                                        </p>
+                                        <p className="text-xs text-slate-500 mb-4">
+                                            Nao foi possivel carregar a biblioteca
+                                        </p>
+                                        <Button variant="outline" size="sm" onClick={() => setSearch('')}>
+                                            Tentar novamente
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Loading State */}
+                                {isLoading && !error && (
+                                    <div className="flex flex-col items-center justify-center py-12">
+                                        <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-3" />
+                                        <p className="text-sm text-slate-500">
+                                            Buscando "{search}"...
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Empty Search State */}
+                                {!isLoading && !error && search.length < 2 && (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                                            <Library className="h-7 w-7 text-slate-400" />
+                                        </div>
+                                        <p className="text-sm font-medium text-slate-700 mb-1">
+                                            Buscar na biblioteca
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            Digite pelo menos 2 caracteres para buscar
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* No Results */}
+                                {!isLoading && !error && search.length >= 2 && results.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                                            <Search className="h-7 w-7 text-slate-400" />
+                                        </div>
+                                        <p className="text-sm font-medium text-slate-700 mb-1">
+                                            Nenhum resultado
+                                        </p>
+                                        <p className="text-xs text-slate-500 mb-4">
+                                            Nao encontramos "{search}" na biblioteca
+                                        </p>
+                                        <Button onClick={() => setActiveTab('create')}>
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Criar Novo
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Results List */}
+                                {!isLoading && !error && results.length > 0 && (
+                                    <div className="space-y-2">
+                                        {results.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => handleSelect(item)}
+                                                className="w-full p-3 flex items-center gap-3 bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all text-left group"
+                                            >
+                                                {/* Thumbnail */}
+                                                <div className="w-14 h-14 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden">
+                                                    {item.thumbnail_url ? (
+                                                        <img
+                                                            src={item.thumbnail_url}
+                                                            alt={item.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className={cn(
+                                                            "w-full h-full flex items-center justify-center",
+                                                            colors.bg, colors.text
+                                                        )}>
+                                                            <Icon className="h-5 w-5" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-slate-900 truncate group-hover:text-blue-700">
+                                                        {item.name}
+                                                    </p>
+                                                    {item.location_city && (
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {item.location_city}
+                                                            {item.location_country && `, ${item.location_country}`}
+                                                        </p>
+                                                    )}
+                                                    {item.star_rating && (
+                                                        <div className="flex items-center gap-0.5 mt-1">
+                                                            {Array.from({ length: item.star_rating }).map((_, i) => (
+                                                                <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Price */}
+                                                {item.base_price && Number(item.base_price) > 0 && (
+                                                    <div className="text-right flex-shrink-0">
+                                                        <p className="text-sm font-semibold text-emerald-600">
+                                                            {new Intl.NumberFormat('pt-BR', {
+                                                                style: 'currency',
+                                                                currency: item.currency || 'BRL',
+                                                            }).format(Number(item.base_price))}
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Arrow */}
+                                                <div className="text-slate-300 group-hover:text-blue-500 transition-colors">
+                                                    <Plus className="h-5 w-5" />
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+
+                    {/* AI TAB */}
+                    {activeTab === 'ai' && hasAISupport && (
+                        <div className="p-4">
+                            <AIImageExtractor
+                                onExtractComplete={handleAIExtractComplete}
+                                onCancel={handleClose}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
         </>
     )
 }
