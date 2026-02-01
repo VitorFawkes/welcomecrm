@@ -23,7 +23,7 @@ interface SortableOptionItemProps {
     onRemove: () => void
     children: ReactNode
     className?: string
-    accentColor?: 'emerald' | 'orange' | 'teal' | 'sky'
+    accentColor?: 'emerald' | 'orange' | 'teal' | 'sky' | 'indigo'
 }
 
 const ACCENT_COLORS = {
@@ -54,6 +54,13 @@ const ACCENT_COLORS = {
         default: 'border-slate-200 bg-slate-50',
         starActive: 'text-sky-600',
         starInactive: 'text-slate-400 hover:text-sky-500',
+    },
+    indigo: {
+        recommended: 'border-indigo-300 bg-indigo-50',
+        disabled: 'border-slate-200 bg-slate-100 opacity-60',
+        default: 'border-slate-200 bg-slate-50',
+        starActive: 'text-indigo-600',
+        starInactive: 'text-slate-400 hover:text-indigo-500',
     },
 }
 

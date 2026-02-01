@@ -31,6 +31,7 @@ import {
     Building2,
     Sparkles,
     Car,
+    Ship,
 } from 'lucide-react'
 import type { ProposalItemWithOptions, ProposalOption } from '@/types/proposals'
 import type { Json } from '@/database.types'
@@ -38,6 +39,7 @@ import { FlightEditor, type FlightsData } from './flights'
 import { HotelEditor, type HotelData } from './hotels'
 import { ExperienceEditor, type ExperienceData } from './experiences'
 import { TransferEditor, type TransferData } from './transfers'
+import { CruiseEditor, type CruiseData } from './cruises'
 
 interface ItemEditorCardProps {
     item: ProposalItemWithOptions
@@ -109,6 +111,21 @@ export function ItemEditorCard({
     if (item.item_type === 'transfer') {
         return (
             <TransferItemCard
+                item={item}
+                richContent={richContent}
+                onUpdate={onUpdate}
+                onRemove={onRemove}
+            />
+        )
+    }
+
+    // ===========================================
+    // LAYOUT ESPECÍFICO PARA CRUZEIROS
+    // (detecta pelo richContent.cruise pois item_type é 'custom')
+    // ===========================================
+    if (richContent.cruise) {
+        return (
+            <CruiseItemCard
                 item={item}
                 richContent={richContent}
                 onUpdate={onUpdate}
@@ -445,6 +462,81 @@ function TransferItemCard({ item, richContent, onUpdate, onRemove }: FlightItemC
 }
 
 // ===========================================
+// CARD DE CRUZEIRO - LAYOUT DIRETO SEM WRAPPER
+// ===========================================
+
+function CruiseItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCardProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: item.id })
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    }
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={cn(
+                "bg-white rounded-xl border border-slate-200 shadow-sm",
+                "transition-all duration-200",
+                isDragging && "opacity-50 shadow-lg ring-2 ring-indigo-500"
+            )}
+        >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
+                <button
+                    {...attributes}
+                    {...listeners}
+                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-slate-100 transition-colors"
+                >
+                    <GripVertical className="h-4 w-4 text-slate-400" />
+                </button>
+
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <Ship className="h-4 w-4 text-indigo-600" />
+                </div>
+
+                <input
+                    type="text"
+                    value={item.title}
+                    onChange={(e) => onUpdate({ title: e.target.value })}
+                    className="flex-1 text-sm font-semibold text-slate-900 bg-transparent border-none outline-none focus:ring-0 p-0 placeholder:text-slate-400"
+                    placeholder="Cruzeiro"
+                />
+
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => { e.stopPropagation(); onRemove() }}
+                    className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </div>
+
+            {/* Editor de cruzeiro - DIRETAMENTE VISIVEL */}
+            <div className="p-4">
+                <CruiseEditor
+                    data={(richContent.cruise as CruiseData) || null}
+                    onChange={(cruise: CruiseData) => onUpdate({
+                        rich_content: { ...richContent, cruise } as unknown as Json
+                    })}
+                    itemId={item.id}
+                />
+            </div>
+        </div>
+    )
+}
+
+// ===========================================
 // CARD GENERICO - PARA SERVICOS, FEES, ETC
 // ===========================================
 
@@ -515,25 +607,25 @@ function GenericItemCard({
             ref={setNodeRef}
             style={style}
             className={cn(
-                "bg-white rounded-lg border border-slate-200 shadow-sm",
+                "bg-white rounded-xl border border-slate-200 shadow-sm",
                 "transition-all duration-200",
-                isDragging && "opacity-50 shadow-lg ring-2 ring-blue-500"
+                isDragging && "opacity-50 shadow-lg ring-2 ring-violet-500"
             )}
         >
             {/* Header Row */}
-            <div className="flex items-start gap-3 p-4">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
                 {/* Drag Handle */}
                 <button
                     {...attributes}
                     {...listeners}
-                    className="mt-1 cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-slate-100 transition-colors flex-shrink-0"
+                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-slate-100 transition-colors flex-shrink-0"
                 >
                     <GripVertical className="h-4 w-4 text-slate-400" />
                 </button>
 
-                {/* Image Thumbnail */}
+                {/* Image Thumbnail or Icon */}
                 {item.image_url ? (
-                    <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
                         <img
                             src={item.image_url}
                             alt={item.title}
@@ -541,8 +633,8 @@ function GenericItemCard({
                         />
                     </div>
                 ) : (
-                    <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                        <ImageIcon className="h-5 w-5 text-slate-300" />
+                    <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+                        <ImageIcon className="h-5 w-5 text-violet-600" />
                     </div>
                 )}
 
@@ -556,40 +648,34 @@ function GenericItemCard({
                         placeholder="Título do item"
                     />
 
-                    {item.description && !isExpanded && (
-                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                            {item.description}
-                        </p>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         {item.is_optional && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                                 Opcional
                             </span>
                         )}
                         {(richContent.quantity_adjustable as boolean) && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                                 Qtd. ajustável
                             </span>
                         )}
                         {item.options.length > 0 && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                                 {item.options.length} opções
                             </span>
                         )}
                     </div>
                 </div>
 
-                {/* Price */}
+                {/* Price - Highlighted */}
                 <div className="flex-shrink-0">
-                    <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50">
+                    <div className="flex items-center gap-1 border border-violet-200 rounded-lg px-3 py-2 bg-violet-50">
                         <select
                             value={(richContent.currency as string) || 'BRL'}
                             onChange={(e) => onUpdate({
                                 rich_content: { ...richContent, currency: e.target.value }
                             })}
-                            className="text-xs font-medium text-slate-600 bg-transparent border-none outline-none cursor-pointer"
+                            className="text-xs font-medium text-violet-700 bg-transparent border-none outline-none cursor-pointer"
                         >
                             <option value="BRL">R$</option>
                             <option value="USD">US$</option>
@@ -599,7 +685,7 @@ function GenericItemCard({
                             type="number"
                             value={item.base_price || ''}
                             onChange={(e) => onUpdate({ base_price: parseFloat(e.target.value) || 0 })}
-                            className="w-20 text-sm font-semibold text-slate-900 text-right bg-transparent border-none outline-none focus:ring-0 p-0"
+                            className="w-20 text-base font-bold text-violet-700 text-right bg-transparent border-none outline-none focus:ring-0 p-0"
                             placeholder="0,00"
                             step="0.01"
                         />

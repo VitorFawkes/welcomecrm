@@ -208,7 +208,7 @@ export default function ProposalBuilderV4() {
 
         // Searchable blocks - create section then open drawer
         if (SEARCHABLE_BLOCKS.includes(blockType)) {
-            const sectionId = insertSectionAt(insertIndex, sectionType)
+            const sectionId = insertSectionAt(insertIndex, sectionType, getDefaultTitle(blockType))
 
             // Open search drawer with the section ID (no setTimeout needed)
             setSearchDrawer({

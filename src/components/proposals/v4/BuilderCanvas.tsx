@@ -36,6 +36,7 @@ import {
     Pencil,
     Image as ImageIcon,
     Loader2,
+    Check,
 } from 'lucide-react'
 import type { ProposalSectionWithItems, ProposalItemWithOptions } from '@/types/proposals'
 
@@ -46,6 +47,15 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
     transfers: Car,
     experiences: Sparkles,
     custom: Type,
+}
+
+// Section colors - consistent color coding
+const SECTION_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+    flights: { bg: 'bg-sky-50', text: 'text-sky-600', border: 'border-l-sky-500' },
+    hotels: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-l-emerald-500' },
+    experiences: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-l-orange-500' },
+    transfers: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-l-teal-500' },
+    custom: { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-l-violet-500' },
 }
 
 // Clean title - remove emojis
@@ -1022,6 +1032,7 @@ function SortableSection({ section }: SortableSectionProps) {
 
     const Icon = SECTION_ICONS[section.section_type] || Type
     const cleanedTitle = cleanTitle(section.title)
+    const sectionColor = SECTION_COLORS[section.section_type] || SECTION_COLORS.custom
 
     // Item handlers
     const handleUpdateItem = useCallback((itemId: string, updates: Partial<ProposalItemWithOptions>) => {
@@ -1038,7 +1049,8 @@ function SortableSection({ section }: SortableSectionProps) {
             style={style}
             className={cn(
                 'bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden',
-                'transition-all duration-200',
+                'transition-all duration-200 border-l-4',
+                sectionColor.border,
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
@@ -1050,11 +1062,15 @@ function SortableSection({ section }: SortableSectionProps) {
                     {...listeners}
                     className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-slate-200 transition-colors"
                 >
-                    <GripVertical className="h-4 w-4 text-slate-400" />
+                    <GripVertical className="h-5 w-5 text-slate-400" />
                 </button>
 
-                {/* Icon */}
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                {/* Icon - color coded */}
+                <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                    sectionColor.bg,
+                    sectionColor.text
+                )}>
                     <Icon className="h-4 w-4" />
                 </div>
 
@@ -1095,7 +1111,7 @@ function SortableSection({ section }: SortableSectionProps) {
                             })
                         }}
                         className={cn(
-                            "px-2 py-1 text-xs rounded-md border transition-all",
+                            "flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border transition-all",
                             ((section.config as Record<string, any>)?.selection_mode === 'multiple')
                                 ? "bg-purple-100 text-purple-700 border-purple-300"
                                 : "bg-slate-100 text-slate-500 border-slate-200 hover:border-slate-300"
@@ -1105,10 +1121,22 @@ function SortableSection({ section }: SortableSectionProps) {
                             : "Clique para permitir múltipla escolha"
                         }
                     >
-                        {((section.config as Record<string, any>)?.selection_mode === 'multiple')
-                            ? "☑️ Múltipla"
-                            : "○ Exclusiva"
-                        }
+                        <div className={cn(
+                            "w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors",
+                            ((section.config as Record<string, any>)?.selection_mode === 'multiple')
+                                ? "bg-purple-600 border-purple-600"
+                                : "border-slate-400"
+                        )}>
+                            {((section.config as Record<string, any>)?.selection_mode === 'multiple') && (
+                                <Check className="h-2.5 w-2.5 text-white" />
+                            )}
+                        </div>
+                        <span>
+                            {((section.config as Record<string, any>)?.selection_mode === 'multiple')
+                                ? "Múltipla"
+                                : "Única"
+                            }
+                        </span>
                     </button>
                 )}
 
