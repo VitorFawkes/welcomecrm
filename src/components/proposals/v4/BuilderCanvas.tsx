@@ -58,6 +58,24 @@ const SECTION_COLORS: Record<string, { bg: string; text: string; border: string 
     custom: { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-l-violet-500' },
 }
 
+// Section type -> Item type mapping
+const SECTION_TO_ITEM_TYPE: Record<string, string> = {
+    flights: 'flight',
+    hotels: 'hotel',
+    experiences: 'experience',
+    transfers: 'transfer',
+    custom: 'custom',
+}
+
+// Default titles per item type
+const ITEM_TYPE_DEFAULT_TITLES: Record<string, string> = {
+    flight: 'Novo Voo',
+    hotel: 'Novo Hotel',
+    experience: 'Nova Experiência',
+    transfer: 'Novo Transfer',
+    custom: 'Novo Item',
+}
+
 // Clean title - remove emojis
 function cleanTitle(title: string): string {
     return title
@@ -1040,8 +1058,10 @@ function SortableSection({ section }: SortableSectionProps) {
     }, [updateItem])
 
     const handleAddItem = useCallback(() => {
-        addItem(section.id, 'custom', 'Novo Item')
-    }, [section.id, addItem])
+        const itemType = SECTION_TO_ITEM_TYPE[section.section_type] || 'custom'
+        const defaultTitle = ITEM_TYPE_DEFAULT_TITLES[itemType] || 'Novo Item'
+        addItem(section.id, itemType as any, defaultTitle)
+    }, [section.id, section.section_type, addItem])
 
     return (
         <div
