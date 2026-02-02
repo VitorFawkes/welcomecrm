@@ -1399,11 +1399,18 @@ export type Database = {
           external_id: string | null
           external_source: string | null
           forma_pagamento: string | null
+          ganho_planner: boolean | null
+          ganho_planner_at: string | null
+          ganho_pos: boolean | null
+          ganho_pos_at: string | null
+          ganho_sdr: boolean | null
+          ganho_sdr_at: string | null
           group_capacity: number | null
           group_total_pax: number | null
           group_total_revenue: number | null
           id: string
           is_group_parent: boolean | null
+          locked_fields: Json | null
           marketing_data: Json | null
           merge_metadata: Json | null
           merged_at: string | null
@@ -1476,11 +1483,18 @@ export type Database = {
           external_id?: string | null
           external_source?: string | null
           forma_pagamento?: string | null
+          ganho_planner?: boolean | null
+          ganho_planner_at?: string | null
+          ganho_pos?: boolean | null
+          ganho_pos_at?: string | null
+          ganho_sdr?: boolean | null
+          ganho_sdr_at?: string | null
           group_capacity?: number | null
           group_total_pax?: number | null
           group_total_revenue?: number | null
           id?: string
           is_group_parent?: boolean | null
+          locked_fields?: Json | null
           marketing_data?: Json | null
           merge_metadata?: Json | null
           merged_at?: string | null
@@ -1553,11 +1567,18 @@ export type Database = {
           external_id?: string | null
           external_source?: string | null
           forma_pagamento?: string | null
+          ganho_planner?: boolean | null
+          ganho_planner_at?: string | null
+          ganho_pos?: boolean | null
+          ganho_pos_at?: string | null
+          ganho_sdr?: boolean | null
+          ganho_sdr_at?: string | null
           group_capacity?: number | null
           group_total_pax?: number | null
           group_total_revenue?: number | null
           id?: string
           is_group_parent?: boolean | null
+          locked_fields?: Json | null
           marketing_data?: Json | null
           merge_metadata?: Json | null
           merged_at?: string | null
@@ -1629,6 +1650,27 @@ export type Database = {
             columns: ["pipeline_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_merged_by_fkey"
+            columns: ["merged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_merged_by_fkey"
+            columns: ["merged_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "cards_merged_by_fkey"
+            columns: ["merged_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
             referencedColumns: ["id"]
           },
           {
@@ -2420,6 +2462,128 @@ export type Database = {
           },
         ]
       }
+      integration_conflict_log: {
+        Row: {
+          actual_stage_id: string | null
+          card_id: string | null
+          conflict_type: string
+          created_at: string | null
+          event_id: string | null
+          id: string
+          integration_id: string | null
+          missing_requirements: Json
+          notes: string | null
+          resolution: string
+          resolved_at: string | null
+          resolved_by: string | null
+          target_stage_id: string | null
+          trigger_id: string | null
+        }
+        Insert: {
+          actual_stage_id?: string | null
+          card_id?: string | null
+          conflict_type: string
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          integration_id?: string | null
+          missing_requirements?: Json
+          notes?: string | null
+          resolution: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_stage_id?: string | null
+          trigger_id?: string | null
+        }
+        Update: {
+          actual_stage_id?: string | null
+          card_id?: string | null
+          conflict_type?: string
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          integration_id?: string | null
+          missing_requirements?: Json
+          notes?: string | null
+          resolution?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          target_stage_id?: string | null
+          trigger_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_conflict_log_actual_stage_id_fkey"
+            columns: ["actual_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "integration_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "view_integration_classification"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_trigger_id_fkey"
+            columns: ["trigger_id"]
+            isOneToOne: false
+            referencedRelation: "integration_inbound_triggers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_events: {
         Row: {
           attempts: number
@@ -2597,6 +2761,7 @@ export type Database = {
       integration_inbound_triggers: {
         Row: {
           action_type: string
+          bypass_validation: boolean | null
           created_at: string
           description: string | null
           entity_types: string[]
@@ -2609,12 +2774,16 @@ export type Database = {
           integration_id: string
           is_active: boolean
           name: string | null
+          quarantine_mode: string | null
+          quarantine_stage_id: string | null
           target_pipeline_id: string | null
           target_stage_id: string | null
           updated_at: string
+          validation_level: string | null
         }
         Insert: {
           action_type?: string
+          bypass_validation?: boolean | null
           created_at?: string
           description?: string | null
           entity_types?: string[]
@@ -2627,12 +2796,16 @@ export type Database = {
           integration_id: string
           is_active?: boolean
           name?: string | null
+          quarantine_mode?: string | null
+          quarantine_stage_id?: string | null
           target_pipeline_id?: string | null
           target_stage_id?: string | null
           updated_at?: string
+          validation_level?: string | null
         }
         Update: {
           action_type?: string
+          bypass_validation?: boolean | null
           created_at?: string
           description?: string | null
           entity_types?: string[]
@@ -2645,9 +2818,12 @@ export type Database = {
           integration_id?: string
           is_active?: boolean
           name?: string | null
+          quarantine_mode?: string | null
+          quarantine_stage_id?: string | null
           target_pipeline_id?: string | null
           target_stage_id?: string | null
           updated_at?: string
+          validation_level?: string | null
         }
         Relationships: [
           {
@@ -2655,6 +2831,13 @@ export type Database = {
             columns: ["integration_id"]
             isOneToOne: false
             referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_inbound_triggers_quarantine_stage_id_fkey"
+            columns: ["quarantine_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
           {
@@ -4685,6 +4868,8 @@ export type Database = {
           sdr_responsavel_id: string | null
           status: string | null
           titulo: string
+          transcricao: string | null
+          transcricao_metadata: Json | null
         }
         Insert: {
           card_id: string
@@ -4703,6 +4888,8 @@ export type Database = {
           sdr_responsavel_id?: string | null
           status?: string | null
           titulo: string
+          transcricao?: string | null
+          transcricao_metadata?: Json | null
         }
         Update: {
           card_id?: string
@@ -4721,6 +4908,8 @@ export type Database = {
           sdr_responsavel_id?: string | null
           status?: string | null
           titulo?: string
+          transcricao?: string | null
+          transcricao_metadata?: Json | null
         }
         Relationships: [
           {
@@ -4871,6 +5060,7 @@ export type Database = {
       }
       stage_field_config: {
         Row: {
+          bypass_sources: string[] | null
           created_at: string | null
           custom_label: string | null
           description: string | null
@@ -4890,6 +5080,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          bypass_sources?: string[] | null
           created_at?: string | null
           custom_label?: string | null
           description?: string | null
@@ -4909,6 +5100,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          bypass_sources?: string[] | null
           created_at?: string | null
           custom_label?: string | null
           description?: string | null
@@ -5044,6 +5236,120 @@ export type Database = {
             columns: ["target_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_card_sync_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          parent_card_id: string
+          sub_card_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          parent_card_id: string
+          sub_card_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          parent_card_id?: string
+          sub_card_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_card_sync_log_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_parent_card_id_fkey"
+            columns: ["parent_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_sub_card_id_fkey"
+            columns: ["sub_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_sub_card_id_fkey"
+            columns: ["sub_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_sub_card_id_fkey"
+            columns: ["sub_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "sub_card_sync_log_sub_card_id_fkey"
+            columns: ["sub_card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
             referencedColumns: ["id"]
           },
         ]
@@ -6187,6 +6493,79 @@ export type Database = {
       }
     }
     Views: {
+      integration_conflicts_summary: {
+        Row: {
+          actual_stage_id: string | null
+          actual_stage_name: string | null
+          card_id: string | null
+          card_titulo: string | null
+          conflict_type: string | null
+          created_at: string | null
+          id: string | null
+          integration_id: string | null
+          integration_name: string | null
+          missing_count: number | null
+          missing_requirements: Json | null
+          notes: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          resolved_by_name: string | null
+          target_stage_id: string | null
+          target_stage_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_conflict_log_actual_stage_id_fkey"
+            columns: ["actual_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_contact_proposals: {
         Row: {
           accepted_at: string | null
@@ -6332,13 +6711,11 @@ export type Database = {
       }
       view_cards_acoes: {
         Row: {
-          briefing_inicial: Json | null
           campaign_id: string | null
           cliente_recorrente: boolean | null
           concierge_owner_id: string | null
           condicoes_pagamento: string | null
           created_at: string | null
-          data_fechamento: string | null
           data_viagem_inicio: string | null
           destinos: Json | null
           dias_ate_viagem: number | null
@@ -6351,17 +6728,17 @@ export type Database = {
           external_id: string | null
           fase: string | null
           forma_pagamento: string | null
+          group_capacity: number | null
+          group_total_pax: number | null
+          group_total_revenue: number | null
           id: string | null
           is_group_parent: boolean | null
-          marketing_data: Json | null
           moeda: string | null
           orcamento: Json | null
           origem: string | null
           parent_card_id: string | null
-          pessoa_email: string | null
           pessoa_nome: string | null
           pessoa_principal_id: string | null
-          pessoa_telefone: string | null
           pipeline_id: string | null
           pipeline_nome: string | null
           pipeline_stage_id: string | null
@@ -6598,6 +6975,29 @@ export type Database = {
     }
     Functions: {
       auto_expire_proposals: { Args: never; Returns: number }
+      calculate_business_due_date: {
+        Args: {
+          p_allowed_weekdays?: number[]
+          p_business_end?: number
+          p_business_start?: number
+          p_delay_minutes: number
+          p_from_date: string
+        }
+        Returns: string
+      }
+      cancelar_sub_card: {
+        Args: { p_motivo?: string; p_sub_card_id: string }
+        Returns: Json
+      }
+      criar_sub_card: {
+        Args: {
+          p_descricao: string
+          p_mode?: string
+          p_parent_id: string
+          p_titulo: string
+        }
+        Returns: Json
+      }
       delete_user: { Args: { user_id: string }; Returns: undefined }
       describe_table: {
         Args: { p_table: string }
@@ -6627,6 +7027,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      fix_orphan_conversations: { Args: never; Returns: Json }
       generate_api_key: {
         Args: {
           p_expires_at?: string
@@ -6650,6 +7051,8 @@ export type Database = {
       }
       generate_proposal_public_token: { Args: never; Returns: string }
       get_invite_details: { Args: { token_input: string }; Returns: Json }
+      get_outbound_setting: { Args: { p_key: string }; Returns: string }
+      get_sub_cards: { Args: { p_parent_id: string }; Returns: Json }
       get_travel_history:
         | {
             Args: { contact_id_param: string }
@@ -6678,6 +7081,24 @@ export type Database = {
               valor: number
             }[]
           }
+      get_trigger_with_validation_config: {
+        Args: {
+          p_integration_id: string
+          p_owner_id?: string
+          p_pipeline_id: string
+          p_stage_id: string
+        }
+        Returns: {
+          action_type: string
+          bypass_validation: boolean
+          quarantine_mode: string
+          quarantine_stage_id: string
+          target_pipeline_id: string
+          target_stage_id: string
+          trigger_id: string
+          validation_level: string
+        }[]
+      }
       get_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -6717,24 +7138,19 @@ export type Database = {
           similarity: number
         }[]
       }
-      mover_card:
-        | {
-            Args: {
-              p_card_id: string
-              p_motivo_perda_id?: string
-              p_nova_etapa_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_card_id: string
-              p_motivo_perda_comentario?: string
-              p_motivo_perda_id?: string
-              p_nova_etapa_id: string
-            }
-            Returns: undefined
-          }
+      merge_sub_card: {
+        Args: { p_options?: Json; p_sub_card_id: string }
+        Returns: Json
+      }
+      mover_card: {
+        Args: {
+          p_card_id: string
+          p_motivo_perda_comentario?: string
+          p_motivo_perda_id?: string
+          p_nova_etapa_id: string
+        }
+        Returns: undefined
+      }
       normalize_phone: { Args: { phone_number: string }; Returns: string }
       normalize_phone_brazil: {
         Args: { phone_number: string }
@@ -6813,6 +7229,19 @@ export type Database = {
           rate_limit: number
         }[]
       }
+      validate_integration_gate: {
+        Args: {
+          p_card_data: Json
+          p_source?: string
+          p_target_stage_id: string
+          p_validation_level?: string
+        }
+        Returns: {
+          can_bypass: boolean
+          missing_requirements: Json
+          valid: boolean
+        }[]
+      }
       validate_transition: {
         Args: { p_card_id: string; p_target_stage_id: string }
         Returns: boolean
@@ -6856,6 +7285,7 @@ export type Database = {
         | "accepted"
         | "rejected"
         | "expired"
+      requirement_type_enum: "field" | "proposal" | "task"
       tipo_pessoa_enum: "adulto" | "crianca"
       tipo_viajante_enum: "titular" | "acompanhante"
     }
@@ -7030,6 +7460,7 @@ export const Constants = {
         "rejected",
         "expired",
       ],
+      requirement_type_enum: ["field", "proposal", "task"],
       tipo_pessoa_enum: ["adulto", "crianca"],
       tipo_viajante_enum: ["titular", "acompanhante"],
     },

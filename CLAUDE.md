@@ -11,7 +11,7 @@
 
 Quando o usuário digitar **"modo antigravity"**, **EXECUTE IMEDIATAMENTE**:
 
-1. **Configurar Git:**
+1. **Configurar Git local:**
 ```bash
 PAT=$(cat .claude/secrets.json 2>/dev/null | grep github_pat | cut -d'"' -f4)
 git remote set-url origin "https://${PAT}@github.com/VitorFawkes/welcomecrm.git"
@@ -19,9 +19,19 @@ git config user.email "vitor@welcometrips.com.br"
 git config user.name "Vitor (via Claude)"
 ```
 
-2. **Testar Supabase MCP:** `supabase_rpc` → `list_all_tables()`
+2. **Testar MCPs disponíveis:**
+   - **Supabase:** `list_tables()` → Verificar acesso ao banco
+   - **GitHub:** `list_issues()` → Verificar acesso ao repo
+   - **N8N:** `list_workflows()` → Verificar acesso às automações
 
-3. **Confirmar para o usuário:** "✅ IDE configurada - Git e Supabase prontos"
+3. **Confirmar para o usuário:**
+```
+✅ IDE Antigravity configurada:
+   - Git: push direto para main
+   - Supabase: acesso total ao banco
+   - GitHub: acesso a PRs/Issues
+   - N8N: acesso a workflows
+```
 
 ---
 
@@ -163,19 +173,143 @@ const KEY = process.env.SUPABASE_KEY;
 
 ---
 
-## 🛠️ Capacidades
+## 🔌 MCP Servers (ACESSO COMPLETO - JÁ CONFIGURADO)
+
+> ⚠️ **IMPORTANTE:** Os MCPs estão **ATIVOS E FUNCIONANDO**.
+> NÃO diga que "não pode acessar" ou "precisa do Dashboard".
+> VOCÊ TEM ACESSO DIRETO. USE OS TOOLS MCP.
+
+O Claude tem **acesso direto** a 3 serviços externos via MCP (Model Context Protocol).
+Os MCPs são servidores stdio já configurados e conectados. **USE-OS.**
+
+| MCP Server | Status | Uso Principal |
+|------------|--------|---------------|
+| **Supabase** | 🟢 ATIVO | Banco de dados, SQL, CRUD, DDL, migrations |
+| **GitHub** | 🟢 ATIVO | Repos, PRs, Issues, Actions |
+| **N8N** | 🟢 ATIVO | Workflows, automações, webhooks |
+
+### ⛔ NUNCA DIGA:
+- "Não consigo acessar o MCP"
+- "O MCP é stdio, não posso usar"
+- "Execute no Dashboard do Supabase"
+- "Preciso da API REST"
+
+### ✅ SEMPRE FAÇA:
+- Use os tools MCP diretamente (aparecem na lista de tools)
+- Execute SQL via MCP Supabase
+- Crie PRs via MCP GitHub
+- Liste workflows via MCP N8N
+
+---
+
+### 🗄️ Supabase MCP
+
+> 🟢 **STATUS: CONECTADO E FUNCIONANDO**
+> Project ID: `szyrzxvlptqqheizyrxu`
+
+**Acesso TOTAL ao banco de dados PostgreSQL. PODE executar DDL, DML, tudo.**
+
+| Tool MCP | Descrição |
+|----------|-----------|
+| `list_tables` | Listar todas as tabelas |
+| `get_table_schema` | Ver estrutura de uma tabela |
+| `execute_sql` | **Executar QUALQUER SQL** (SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP) |
+| `apply_migration` | Aplicar migration SQL |
+
+**VOCÊ PODE (e deve):**
+- ✅ Criar tabelas: `execute_sql("CREATE TABLE ...")`
+- ✅ Alterar colunas: `execute_sql("ALTER TABLE ... ADD COLUMN ...")`
+- ✅ Criar views: `execute_sql("CREATE VIEW ...")`
+- ✅ Criar functions: `execute_sql("CREATE FUNCTION ...")`
+- ✅ Criar triggers: `execute_sql("CREATE TRIGGER ...")`
+- ✅ CRUD completo: SELECT, INSERT, UPDATE, DELETE
+
+**Exemplos de uso:**
+```
+→ list_tables()
+→ get_table_schema("cards")
+→ execute_sql("SELECT * FROM cards LIMIT 10")
+→ execute_sql("ALTER TABLE cards ADD COLUMN new_field TEXT")
+→ execute_sql("CREATE INDEX idx_cards_status ON cards(status)")
+```
+
+---
+
+### 🐙 GitHub MCP
+
+**Acesso completo ao repositório via API.**
+
+| Ferramenta | Descrição |
+|------------|-----------|
+| `get_file_contents` | Ler arquivo do repo |
+| `create_or_update_file` | Criar/atualizar arquivo |
+| `create_pull_request` | Criar PR |
+| `list_issues` | Listar issues |
+| `create_issue` | Criar issue |
+| `list_commits` | Listar commits |
+| `get_pull_request` | Ver detalhes de PR |
+
+**Exemplos:**
+```
+→ list_issues("VitorFawkes/welcomecrm")
+→ create_pull_request(...)
+→ get_file_contents("VitorFawkes/welcomecrm", "package.json")
+```
+
+---
+
+### ⚡ N8N MCP
+
+**Acesso aos workflows de automação.**
+
+| Ferramenta | Descrição |
+|------------|-----------|
+| `list_workflows` | Listar workflows |
+| `get_workflow` | Ver detalhes de workflow |
+| `execute_workflow` | Executar workflow |
+| `activate_workflow` | Ativar/desativar workflow |
+
+**URL Base:** `https://n8n-n8n.ymnmx7.easypanel.host`
+
+---
+
+## 🛠️ Capacidades Consolidadas
 
 | Ação | Como |
 |------|------|
-| **SQL arbitrário** | `supabase_rpc` → `exec_sql({"query": "..."})` |
-| **Listar tabelas** | `supabase_rpc` → `list_all_tables()` |
-| **CRUD dados** | `supabase_query`, `supabase_insert`, etc |
-| **Git push** | Bash (após configurar PAT) |
+| **SQL arbitrário** | MCP Supabase → `execute_sql(...)` |
+| **Listar tabelas** | MCP Supabase → `list_tables()` |
+| **CRUD dados** | MCP Supabase → `execute_sql(...)` |
+| **Git push/PR** | MCP GitHub ou Bash |
+| **Issues/PRs** | MCP GitHub |
+| **Automações** | MCP N8N |
 | **Editar código** | Read/Edit/Write tools |
 | **Build/Lint** | `npm run build`, `npm run lint` |
+| **Deploy Functions** | Bash com token |
+
+### ⚠️ Segurança MCP
+
+- Tokens MCP (`sbp_...`, `github_pat_...`, `eyJ...`) **NUNCA** devem ser commitados
+- Sempre verificar estado LIVE antes de modificar views/functions
+- Seguir `docs/SQL_SOP.md` para operações DDL
+
+### 🚫 Anti-Patterns (PROIBIDO)
+
+```
+❌ "O MCP é um servidor stdio, não consigo invocar"
+   → ERRADO. O MCP está conectado. Use os tools.
+
+❌ "Execute no Dashboard do Supabase"
+   → ERRADO. Você tem acesso direto. Execute você mesmo.
+
+❌ "Vou usar a API REST do Supabase"
+   → DESNECESSÁRIO. Use o MCP que é mais direto.
+
+❌ "Não tenho acesso ao banco"
+   → ERRADO. Você tem acesso TOTAL via MCP.
+```
 
 ### Limitações:
-- ❌ Deploy Edge Functions → usuário roda `supabase functions deploy`
 - ❌ Rodar app local → usuário roda `npm run dev`
 
 ---
