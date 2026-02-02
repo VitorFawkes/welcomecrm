@@ -14,6 +14,7 @@ import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { OutboundLogsTab } from './OutboundLogsTab';
 import { ACFieldManager } from './ACFieldManager';
 import { InboundTriggerRulesTab } from './InboundTriggerRulesTab';
+import { OutboundTriggerRulesTab } from './OutboundTriggerRulesTab';
 
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -177,8 +178,11 @@ export function IntegrationsPage() {
 
                     {/* Tab 5: Outbound */}
                     <TabsContent value="outbound" className="space-y-6">
-                        <Tabs defaultValue="logs" className="space-y-4">
+                        <Tabs defaultValue="rules" className="space-y-4">
                             <TabsList className="bg-slate-50">
+                                <TabsTrigger value="rules" className="text-sm">
+                                    Regras de Saida
+                                </TabsTrigger>
                                 <TabsTrigger value="logs" className="text-sm">
                                     Fila de Eventos
                                 </TabsTrigger>
@@ -186,6 +190,10 @@ export function IntegrationsPage() {
                                     Mapeamento de Etapas
                                 </TabsTrigger>
                             </TabsList>
+
+                            <TabsContent value="rules">
+                                <OutboundTriggerRulesTab integrationId={AC_INTEGRATION_ID} />
+                            </TabsContent>
 
                             <TabsContent value="logs">
                                 <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />

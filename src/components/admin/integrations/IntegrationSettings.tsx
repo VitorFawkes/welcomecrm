@@ -25,6 +25,7 @@ export function IntegrationSettings() {
     });
     const [credentialsLoaded, setCredentialsLoaded] = useState(false);
     const [ownerId, setOwnerId] = useState('');
+    const [dispatching, setDispatching] = useState(false);
 
     const { data: settings, isLoading } = useQuery({
         queryKey: ['integration-settings'],
@@ -142,7 +143,6 @@ export function IntegrationSettings() {
     const hasCredentials = credentials.apiUrl && credentials.apiKey;
 
     // Outbound dispatch mutation
-    const [dispatching, setDispatching] = useState(false);
     const handleDispatchOutbound = async () => {
         setDispatching(true);
         const toastId = toast.loading('Processando fila de eventos outbound...');
