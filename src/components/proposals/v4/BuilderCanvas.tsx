@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
 import { CoverEditor } from './CoverEditor'
 import { ItemEditorCard } from './ItemEditorCard'
+import { FlightImageExtractor } from './flights/FlightImageExtractor'
+import type { FlightLeg } from './flights/types'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
@@ -1022,6 +1024,9 @@ interface SortableSectionProps {
 function SortableSection({ section }: SortableSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true)
     const [isTitleFocused, setIsTitleFocused] = useState(false)
+    const [isProcessingAI, setIsProcessingAI] = useState(false)
+    const [showFlightAIExtractor, setShowFlightAIExtractor] = useState(false)
+    const aiFileInputRef = React.useRef<HTMLInputElement>(null)
     const {
         removeSection,
         updateSection,
@@ -1032,6 +1037,7 @@ function SortableSection({ section }: SortableSectionProps) {
         updateOption,
         removeOption,
         addItem,
+        addItemFromLibrary,
     } = useProposalBuilder()
 
     const {
@@ -1062,6 +1068,140 @@ function SortableSection({ section }: SortableSectionProps) {
         const defaultTitle = ITEM_TYPE_DEFAULT_TITLES[itemType] || 'Novo Item'
         addItem(section.id, itemType as any, defaultTitle)
     }, [section.id, section.section_type, addItem])
+
+    // AI Image Processing
+    const processAIImage = useCallback(async (file: File) => {
+        setIsProcessingAI(true)
+        try {
+            // Convert to base64
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => {
+                    const result = reader.result as string
+                    const base64Data = result.split(',')[1]
+                    resolve(base64Data)
+                }
+                reader.onerror = reject
+                reader.readAsDataURL(file)
+            })
+
+            // Call AI extraction
+            const { data, error } = await supabase.functions.invoke('ai-extract-image', {
+                body: { image: base64 }
+            })
+
+            if (error) throw error
+
+            if (data?.success && data?.items?.length > 0) {
+                data.items.forEach((item: any) => {
+                    const details = item.details || {}
+                    const segments = details.segments || []
+
+                    const richContent: Record<string, unknown> = {
+                        description: item.description || '',
+                        location: item.location,
+                        dates: item.dates,
+                    }
+
+                    if (item.category === 'flight' && segments.length > 0) {
+                        richContent.segments = segments.map((seg: any, idx: number) => ({
+                            id: `seg-${Date.now()}-${idx}`,
+                            segment_order: seg.segment_order || idx + 1,
+                            airline_code: seg.airline_code || '',
+                            airline_name: seg.airline_name || '',
+                            flight_number: seg.flight_number || '',
+                            departure_date: seg.departure_date || '',
+                            departure_time: seg.departure_time || '',
+                            departure_airport: seg.departure_airport || '',
+                            departure_city: seg.departure_city || '',
+                            arrival_date: seg.arrival_date || '',
+                            arrival_time: seg.arrival_time || '',
+                            arrival_airport: seg.arrival_airport || '',
+                            arrival_city: seg.arrival_city || '',
+                            cabin_class: seg.cabin_class || 'Economy',
+                            baggage_included: seg.baggage_included || '',
+                        }))
+                    }
+
+                    addItemFromLibrary(section.id, {
+                        id: crypto.randomUUID(),
+                        name: item.title,
+                        category: item.category || 'custom',
+                        base_price: item.price || 0,
+                        currency: item.currency || 'BRL',
+                        content: richContent,
+                    } as any)
+                })
+
+                // Show success toast
+                const toast = document.createElement('div')
+                toast.className = 'fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in fade-in slide-in-from-bottom-4'
+                toast.textContent = `${data.items.length} item(s) extraído(s) da imagem!`
+                document.body.appendChild(toast)
+                setTimeout(() => toast.remove(), 3000)
+            }
+        } catch (err) {
+            console.error('Error processing AI image:', err)
+            // Show error toast
+            const toast = document.createElement('div')
+            toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in fade-in slide-in-from-bottom-4'
+            toast.textContent = 'Erro ao processar imagem. Tente novamente.'
+            document.body.appendChild(toast)
+            setTimeout(() => toast.remove(), 3000)
+        } finally {
+            setIsProcessingAI(false)
+            if (aiFileInputRef.current) aiFileInputRef.current.value = ''
+        }
+    }, [section.id, addItemFromLibrary])
+
+    const handleAIFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            processAIImage(file)
+        }
+    }, [processAIImage])
+
+    // Handle extracted flight legs from FlightImageExtractor
+    const handleExtractedFlightLegs = useCallback((extractedLegs: FlightLeg[]) => {
+        if (extractedLegs.length === 0) return
+
+        // Create a new flight item with the extracted legs
+        const richContent = {
+            flights: {
+                legs: extractedLegs,
+                show_prices: true,
+                allow_mix_airlines: true,
+                default_selections: {}
+            }
+        }
+
+        addItemFromLibrary(section.id, {
+            id: crypto.randomUUID(),
+            name: 'Voos Extraídos',
+            category: 'flight',
+            base_price: 0,
+            currency: 'BRL',
+            content: richContent,
+        } as any)
+
+        setShowFlightAIExtractor(false)
+
+        // Show success toast
+        const toast = document.createElement('div')
+        toast.className = 'fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in fade-in slide-in-from-bottom-4'
+        toast.textContent = `${extractedLegs.length} trecho(s) de voo extraído(s)!`
+        document.body.appendChild(toast)
+        setTimeout(() => toast.remove(), 3000)
+    }, [section.id, addItemFromLibrary])
+
+    // Handle AI button click - show extractor for flights, upload for others
+    const handleAIButtonClick = useCallback(() => {
+        if (section.section_type === 'flights') {
+            setShowFlightAIExtractor(true)
+        } else {
+            aiFileInputRef.current?.click()
+        }
+    }, [section.section_type])
 
     return (
         <div
@@ -1212,14 +1352,46 @@ function SortableSection({ section }: SortableSectionProps) {
                                 ))}
 
                                 {/* Add Item Button */}
-                                <Button
-                                    variant="ghost"
-                                    className="w-full border-2 border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                    onClick={handleAddItem}
-                                >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Adicionar Item
-                                </Button>
+                                <div className="flex gap-2">
+                                    {/* Hidden file input for AI */}
+                                    <input
+                                        ref={aiFileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleAIFileSelect}
+                                        className="hidden"
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        className="flex-1 border-2 border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                        onClick={handleAddItem}
+                                        disabled={isProcessingAI}
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Adicionar Item
+                                    </Button>
+                                    <button
+                                        onClick={handleAIButtonClick}
+                                        disabled={isProcessingAI || showFlightAIExtractor}
+                                        className="px-4 py-2 border-2 border-dashed border-sky-200 rounded-lg text-sky-500 hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Extrair dados de uma imagem com IA"
+                                    >
+                                        {isProcessingAI ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Sparkles className="h-4 w-4" />
+                                        )}
+                                        <span className="hidden sm:inline">IA</span>
+                                    </button>
+                                </div>
+
+                                {/* Flight AI Extractor */}
+                                {showFlightAIExtractor && section.section_type === 'flights' && (
+                                    <FlightImageExtractor
+                                        onExtractLegs={handleExtractedFlightLegs}
+                                        onCancel={() => setShowFlightAIExtractor(false)}
+                                    />
+                                )}
                             </>
                         )}
                     </SortableContext>

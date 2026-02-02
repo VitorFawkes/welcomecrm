@@ -288,23 +288,43 @@ function LegBlock({
 
                 {/* Rota */}
                 <div className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={leg.origin_code}
-                        onChange={(e) => onUpdate({ origin_code: e.target.value.toUpperCase() })}
-                        placeholder="GRU"
-                        maxLength={3}
-                        className="w-14 px-2 py-1 text-sm font-bold text-center bg-white border border-slate-200 rounded uppercase"
-                    />
+                    {/* Origem */}
+                    <div className="flex items-center gap-1">
+                        <input
+                            type="text"
+                            value={leg.origin_code}
+                            onChange={(e) => onUpdate({ origin_code: e.target.value.toUpperCase() })}
+                            placeholder="GRU"
+                            maxLength={3}
+                            className="w-14 px-2 py-1 text-sm font-bold text-center bg-white border border-slate-200 rounded uppercase"
+                        />
+                        <input
+                            type="text"
+                            value={leg.origin_city || ''}
+                            onChange={(e) => onUpdate({ origin_city: e.target.value })}
+                            placeholder="São Paulo"
+                            className="w-24 px-2 py-1 text-xs bg-white border border-slate-200 rounded text-slate-600"
+                        />
+                    </div>
                     <span className="text-slate-400">→</span>
-                    <input
-                        type="text"
-                        value={leg.destination_code}
-                        onChange={(e) => onUpdate({ destination_code: e.target.value.toUpperCase() })}
-                        placeholder="MIA"
-                        maxLength={3}
-                        className="w-14 px-2 py-1 text-sm font-bold text-center bg-white border border-slate-200 rounded uppercase"
-                    />
+                    {/* Destino */}
+                    <div className="flex items-center gap-1">
+                        <input
+                            type="text"
+                            value={leg.destination_code}
+                            onChange={(e) => onUpdate({ destination_code: e.target.value.toUpperCase() })}
+                            placeholder="MIA"
+                            maxLength={3}
+                            className="w-14 px-2 py-1 text-sm font-bold text-center bg-white border border-slate-200 rounded uppercase"
+                        />
+                        <input
+                            type="text"
+                            value={leg.destination_city || ''}
+                            onChange={(e) => onUpdate({ destination_city: e.target.value })}
+                            placeholder="Miami"
+                            className="w-24 px-2 py-1 text-xs bg-white border border-slate-200 rounded text-slate-600"
+                        />
+                    </div>
                 </div>
 
                 {/* Data */}
@@ -429,34 +449,40 @@ function FlightRow({ option, onUpdate, onRemove, onSetRecommended }: FlightRowPr
                 <Star className={cn("h-4 w-4", option.is_recommended && "fill-amber-500")} />
             </button>
 
-            {/* Companhia */}
-            <span className={cn(
-                "px-2 py-0.5 rounded text-xs font-bold",
-                AIRLINES.find(a => a.code === option.airline_code)?.color || "bg-slate-100 text-slate-700"
-            )}>
-                {option.airline_code}
-            </span>
+            {/* Companhia + Voo */}
+            <div className="flex items-center gap-1">
+                <span className="text-sm font-semibold text-slate-700">
+                    {option.airline_name || AIRLINES.find(a => a.code === option.airline_code)?.name || option.airline_code}
+                </span>
+                <span className={cn(
+                    "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                    AIRLINES.find(a => a.code === option.airline_code)?.color || "bg-slate-100 text-slate-700"
+                )}>
+                    {option.airline_code}
+                </span>
+                <span className="font-mono text-sm text-slate-600">
+                    {option.flight_number || '----'}
+                </span>
+            </div>
 
-            {/* Número do voo */}
-            <span className="font-mono text-sm w-12">
-                {option.flight_number || '----'}
-            </span>
+            {/* Separador */}
+            <span className="text-slate-300">|</span>
 
             {/* Horários */}
-            <span className="text-sm font-medium">
-                {option.departure_time || '--:--'}
-            </span>
-            <span className="text-slate-400 text-xs">→</span>
-            <span className="text-sm font-medium">
-                {option.arrival_time || '--:--'}
-            </span>
-
-            {/* Duração */}
-            {duration && (
-                <span className="text-xs text-slate-400">
-                    {duration}
+            <div className="flex items-center gap-1">
+                <span className="text-sm font-medium">
+                    {option.departure_time || '--:--'}
                 </span>
-            )}
+                <span className="text-slate-400 text-xs">→</span>
+                <span className="text-sm font-medium">
+                    {option.arrival_time || '--:--'}
+                </span>
+                {duration && (
+                    <span className="text-xs text-slate-400 ml-1">
+                        ({duration})
+                    </span>
+                )}
+            </div>
 
             {/* Spacer */}
             <div className="flex-1" />

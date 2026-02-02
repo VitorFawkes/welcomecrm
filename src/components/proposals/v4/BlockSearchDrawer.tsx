@@ -40,6 +40,8 @@ import {
 } from 'lucide-react'
 import type { BlockType } from '@/pages/ProposalBuilderV4'
 import type { ProposalItemType } from '@/types/proposals'
+import { createInitialCruiseData } from './cruises/types'
+import { createInitialInsuranceData } from './insurance/types'
 
 interface BlockSearchDrawerProps {
     isOpen: boolean
@@ -172,12 +174,24 @@ export function BlockSearchDrawer({
         try {
             const itemType = BLOCK_TO_ITEM[blockType]
             const label = BLOCK_LABELS[blockType]
-            addItem(sectionId, itemType, `Novo ${label}`)
+            const itemId = addItem(sectionId, itemType, `Novo ${label}`)
+
+            // Initialize rich_content for specific block types
+            if (blockType === 'cruise') {
+                updateItem(itemId, {
+                    rich_content: { cruise: createInitialCruiseData() } as any
+                })
+            } else if (blockType === 'insurance') {
+                updateItem(itemId, {
+                    rich_content: { insurance: createInitialInsuranceData() } as any
+                })
+            }
+
             onClose()
         } finally {
             setIsCreating(false)
         }
-    }, [sectionId, blockType, addItem, onClose])
+    }, [sectionId, blockType, addItem, updateItem, onClose])
 
     // Handle selecting a library result
     const handleSelect = useCallback((item: LibrarySearchResult) => {
