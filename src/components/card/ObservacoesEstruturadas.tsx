@@ -9,6 +9,7 @@ import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { SystemPhase } from '../../types/pipeline'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
+import { FieldLockButton } from './FieldLockButton'
 
 type Card = Database['public']['Tables']['cards']['Row'] & {
     briefing_inicial?: any | null
@@ -378,6 +379,12 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                                                     field.key === 'sensibilidades' ? "bg-yellow-500" : "bg-gray-400"
                                         )} />
                                         {field.label}
+                                        {/* Lock Button - Sempre visível ao lado do nome */}
+                                        <FieldLockButton
+                                            fieldKey={field.key}
+                                            cardId={card.id}
+                                            size="sm"
+                                        />
                                     </label>
                                     {renderFieldInput(field)}
                                 </div>

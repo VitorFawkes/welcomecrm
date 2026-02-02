@@ -128,17 +128,8 @@ const FieldCard = ({
         >
             <div className={cn(
                 "absolute top-3 right-3 flex items-center gap-1.5 transition-opacity duration-300",
-                correctionMode ? "opacity-100" : (isLocked ? "opacity-100" : "opacity-0 group-hover:opacity-100")
+                correctionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}>
-                {/* Lock Button - Mostra antes do ícone de edição */}
-                {showLockButton && cardId && fieldKey && !correctionMode && (
-                    <FieldLockButton
-                        fieldKey={fieldKey}
-                        cardId={cardId}
-                        size="sm"
-                    />
-                )}
-
                 {correctionMode ? (
                     <div className="flex items-center gap-1 text-amber-600 bg-amber-100 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
                         <Eraser className="h-3 w-3" /> Corrigir
@@ -173,6 +164,14 @@ const FieldCard = ({
                     )}>
                         {label}
                         {status === 'blocking' && <span className="text-[10px] text-red-600 font-bold font-sans bg-red-50 px-1.5 py-0.5 rounded-full">Obrigatório</span>}
+                        {/* Lock Button - Sempre visível ao lado do nome */}
+                        {showLockButton && cardId && fieldKey && !correctionMode && (
+                            <FieldLockButton
+                                fieldKey={fieldKey}
+                                cardId={cardId}
+                                size="sm"
+                            />
+                        )}
                     </p>
 
                     {/* Main Value */}
