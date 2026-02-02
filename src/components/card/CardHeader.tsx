@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock } from 'lucide-react'
+import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
@@ -346,7 +346,33 @@ export default function CardHeader({ card }: CardHeaderProps) {
     }
 
     const handleLossConfirm = async (motivoId: string, comentario: string) => {
-        if (pendingLossMove) {
+        // Check if we're just editing the loss reason (card already in perdido)
+        const isJustEditingReason = card.status_comercial === 'perdido' &&
+            pendingLossMove?.stageId === card.pipeline_stage_id
+
+        if (isJustEditingReason) {
+            // Just update the loss reason fields directly
+            const { error } = await supabase
+                .from('cards')
+                .update({
+                    motivo_perda_id: motivoId || null,
+                    motivo_perda_comentario: comentario || null
+                })
+                .eq('id', card.id)
+
+            if (error) {
+                console.error('Failed to update loss reason:', error)
+                alert('Erro ao atualizar motivo: ' + error.message)
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
+                queryClient.invalidateQueries({ queryKey: ['card', card.id] })
+                queryClient.invalidateQueries({ queryKey: ['cards'] })
+                queryClient.invalidateQueries({ queryKey: ['loss-reason', motivoId] })
+            }
+
+            setPendingLossMove(null)
+            setLossReasonModalOpen(false)
+        } else if (pendingLossMove) {
             // Move to lost stage via RPC (trigger will set status_comercial='perdido')
             const { error } = await supabase.rpc('mover_card', {
                 p_card_id: card.id,
@@ -627,6 +653,13 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 <LossReasonBadge
                                     motivoId={(card as any).motivo_perda_id}
                                     comentario={(card as any).motivo_perda_comentario}
+                                    onClick={() => {
+                                        setPendingLossMove({
+                                            stageId: card.pipeline_stage_id || '',
+                                            stageName: currentStage?.nome || 'Perdido'
+                                        })
+                                        setLossReasonModalOpen(true)
+                                    }}
                                 />
                             )}
 
@@ -834,12 +867,15 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 onConfirm={handleLossConfirm}
                 targetStageId={pendingLossMove?.stageId || card.pipeline_stage_id || ''}
                 targetStageName={pendingLossMove?.stageName || 'Perdido'}
+                initialMotivoId={(card as any).motivo_perda_id}
+                initialComentario={(card as any).motivo_perda_comentario}
+                isEditing={card.status_comercial === 'perdido'}
             />
         </>
     )
 }
 
-function LossReasonBadge({ motivoId, comentario }: { motivoId?: string | null, comentario?: string | null }) {
+function LossReasonBadge({ motivoId, comentario, onClick }: { motivoId?: string | null, comentario?: string | null, onClick?: () => void }) {
     const { data: motivo } = useQuery({
         queryKey: ['loss-reason', motivoId],
         queryFn: async () => {
@@ -856,36 +892,36 @@ function LossReasonBadge({ motivoId, comentario }: { motivoId?: string | null, c
         staleTime: 1000 * 60 * 60 // 1 hour cache
     })
 
+    const baseClasses = "flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-medium transition-all"
+    const clickableClasses = onClick ? "cursor-pointer hover:bg-red-100 hover:border-red-300 hover:shadow-sm" : ""
+
     if (!motivoId && !comentario) {
         return (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+            <button
+                onClick={onClick}
+                className={`${baseClasses} ${clickableClasses}`}
+                title="Clique para informar o motivo da perda"
+            >
                 <AlertCircle className="h-3 w-3" />
-                Sem motivo informado
-            </div>
+                <span>Sem motivo informado</span>
+                {onClick && <Pencil className="h-3 w-3 ml-0.5 opacity-60" />}
+            </button>
         )
     }
 
+    const displayText = motivo?.nome || comentario
+    const tooltipText = comentario && motivo?.nome ? `Comentário: ${comentario}` : (comentario || 'Clique para editar')
+
     return (
-        <div className="flex items-center gap-2">
-            {motivo?.nome && (
-                <div
-                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-medium max-w-[200px]"
-                    title={comentario || undefined}
-                >
-                    <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate">{motivo.nome}</span>
-                </div>
-            )}
-            {comentario && !motivo?.nome && (
-                <div
-                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-medium max-w-[200px]"
-                    title={comentario}
-                >
-                    <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate">{comentario}</span>
-                </div>
-            )}
-        </div>
+        <button
+            onClick={onClick}
+            className={`${baseClasses} ${clickableClasses} max-w-[200px]`}
+            title={tooltipText}
+        >
+            <AlertCircle className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{displayText}</span>
+            {onClick && <Pencil className="h-3 w-3 ml-0.5 opacity-60 flex-shrink-0" />}
+        </button>
     )
 }
 
