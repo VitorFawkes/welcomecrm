@@ -112,6 +112,9 @@ export function ColumnManager({ columns, onChange }: ColumnManagerProps) {
         onChange(newColumns)
     }
 
+    const visibleCount = columns.filter(c => c.isVisible).length
+    const totalCount = columns.length
+
     return (
         <Popover>
             <PopoverTrigger asChild>
@@ -122,6 +125,9 @@ export function ColumnManager({ columns, onChange }: ColumnManagerProps) {
                 >
                     <Columns className="mr-2 h-4 w-4 text-gray-500" />
                     Colunas
+                    <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 rounded">
+                        {visibleCount}/{totalCount}
+                    </span>
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[280px] p-0">

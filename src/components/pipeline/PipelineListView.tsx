@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowUpDown, Calendar, Clock, AlertCircle, User as UserIcon, Trash2, Edit, Phone, Mail, MoreHorizontal, CheckCircle2, Plane, AlertTriangle } from 'lucide-react'
+import { ArrowUpDown, Calendar, Clock, AlertCircle, User as UserIcon, Trash2, Edit, Phone, Mail, MoreHorizontal, CheckCircle2, Plane, AlertTriangle, Archive } from 'lucide-react'
 import { usePipelineCards } from '../../hooks/usePipelineCards'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
@@ -12,10 +12,11 @@ import { Avatar, AvatarFallback } from '../ui/avatar'
 import { Checkbox } from '../ui/checkbox'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
-import { ColumnToggle } from '../ui/data-grid/ColumnToggle'
+import { ColumnManager, type ColumnConfig } from '../ui/data-grid/ColumnManager'
 import { BulkActions } from '../ui/data-grid/BulkActions'
 import { BulkEditModal, type BulkEditField } from '../ui/data-grid/BulkEditModal'
 import { useDeleteCard } from '../../hooks/useDeleteCard'
+import { useArchiveCard } from '../../hooks/useArchiveCard'
 import DeleteCardModal from '../card/DeleteCardModal'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
@@ -37,7 +38,7 @@ interface PipelineListViewProps {
 
 export default function PipelineListView({ productFilter, viewMode, subView, filters }: PipelineListViewProps) {
     const queryClient = useQueryClient()
-    const { groupFilters } = usePipelineFilters()
+    const { groupFilters, setFilters } = usePipelineFilters()
 
     const { data: cards, isLoading } = usePipelineCards({
         productFilter,
@@ -56,62 +57,53 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
     const [selectedCards, setSelectedCards] = useState<string[]>([])
 
-    // Type for visible columns
-    type VisibleColumnsState = {
-        select: boolean
-        atencao: boolean
-        titulo: boolean
-        etapa_nome: boolean
-        valor_estimado: boolean
-        prioridade: boolean
-        proxima_tarefa: boolean
-        dono_atual_nome: boolean
-        data_viagem_inicio: boolean
-        created_at: boolean
-        updated_at: boolean
-        origem: boolean
-        produto: boolean
-        sdr_nome: boolean
-        vendas_nome: boolean
-        tempo_etapa_dias: boolean
-        acoes: boolean
-    }
+    // Default column configuration with order
+    const defaultColumns: ColumnConfig[] = [
+        { id: 'atencao', label: 'Atenção', isVisible: true },
+        { id: 'titulo', label: 'Negócio', isVisible: true },
+        { id: 'etapa_nome', label: 'Etapa', isVisible: true },
+        { id: 'valor_estimado', label: 'Valor', isVisible: true },
+        { id: 'prioridade', label: 'Prioridade', isVisible: true },
+        { id: 'proxima_tarefa', label: 'Próxima Tarefa', isVisible: true },
+        { id: 'dono_atual_nome', label: 'Responsável', isVisible: true },
+        { id: 'data_viagem_inicio', label: 'Data Viagem', isVisible: false },
+        { id: 'created_at', label: 'Data Criação', isVisible: false },
+        { id: 'updated_at', label: 'Última Atualização', isVisible: false },
+        { id: 'origem', label: 'Origem', isVisible: false },
+        { id: 'produto', label: 'Produto', isVisible: false },
+        { id: 'sdr_nome', label: 'SDR', isVisible: false },
+        { id: 'vendas_nome', label: 'Closer', isVisible: false },
+        { id: 'tempo_etapa_dias', label: 'Dias na Etapa', isVisible: false },
+        { id: 'acoes', label: 'Ações', isVisible: true },
+    ]
 
-    // Load saved column preferences from localStorage
-    const [visibleColumns, setVisibleColumns] = useState<VisibleColumnsState>(() => {
-        const saved = localStorage.getItem('pipeline_list_columns')
+    // Load saved column preferences from localStorage (supports new format with order)
+    const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+        const saved = localStorage.getItem('pipeline_list_columns_v2')
         if (saved) {
             try {
-                return JSON.parse(saved)
+                const parsed = JSON.parse(saved) as ColumnConfig[]
+                // Merge with defaults to handle new columns that might have been added
+                const savedIds = new Set(parsed.map(c => c.id))
+                const mergedColumns = [...parsed]
+                // Add any new columns that weren't in saved config
+                defaultColumns.forEach(col => {
+                    if (!savedIds.has(col.id)) {
+                        mergedColumns.push(col)
+                    }
+                })
+                return mergedColumns
             } catch {
                 // fallback to defaults
             }
         }
-        return {
-            select: true,
-            atencao: true, // Nova coluna de atenção
-            titulo: true,
-            etapa_nome: true,
-            valor_estimado: true,
-            prioridade: true,
-            proxima_tarefa: true,
-            dono_atual_nome: true,
-            data_viagem_inicio: false,
-            created_at: false,
-            updated_at: false,
-            origem: false,
-            produto: false,
-            sdr_nome: false,
-            vendas_nome: false,
-            tempo_etapa_dias: false,
-            acoes: true // Coluna de ações rápidas
-        }
+        return defaultColumns
     })
 
     // Persist column preferences
     useEffect(() => {
-        localStorage.setItem('pipeline_list_columns', JSON.stringify(visibleColumns))
-    }, [visibleColumns])
+        localStorage.setItem('pipeline_list_columns_v2', JSON.stringify(columns))
+    }, [columns])
 
     // Quick Filters state
     type QuickFilterType = 'overdue' | 'trip_soon' | 'sla' | 'no_task' | 'high_priority'
@@ -137,6 +129,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const { softDelete, isDeleting } = useDeleteCard()
+    const { archiveBulk } = useArchiveCard()
 
     // Mutation para marcar tarefa como concluída
     const completeTaskMutation = useMutation({
@@ -186,8 +179,8 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
         }
     }
 
-    const handleColumnToggle = (columnId: string, isVisible: boolean) => {
-        setVisibleColumns(prev => ({ ...prev, [columnId]: isVisible }))
+    const handleColumnsChange = (newColumns: ColumnConfig[]) => {
+        setColumns(newColumns)
     }
 
     const handleBulkDelete = () => {
@@ -281,24 +274,6 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
         return <div className="p-8 text-center text-gray-500">Carregando lista...</div>
     }
 
-    const columnsConfig = [
-        { id: 'atencao', label: 'Atenção', isVisible: visibleColumns.atencao },
-        { id: 'titulo', label: 'Negócio', isVisible: visibleColumns.titulo },
-        { id: 'etapa_nome', label: 'Etapa', isVisible: visibleColumns.etapa_nome },
-        { id: 'valor_estimado', label: 'Valor', isVisible: visibleColumns.valor_estimado },
-        { id: 'prioridade', label: 'Prioridade', isVisible: visibleColumns.prioridade },
-        { id: 'proxima_tarefa', label: 'Próxima Tarefa', isVisible: visibleColumns.proxima_tarefa },
-        { id: 'dono_atual_nome', label: 'Responsável', isVisible: visibleColumns.dono_atual_nome },
-        { id: 'data_viagem_inicio', label: 'Data Viagem', isVisible: visibleColumns.data_viagem_inicio },
-        { id: 'created_at', label: 'Data Criação', isVisible: visibleColumns.created_at },
-        { id: 'updated_at', label: 'Última Atualização', isVisible: visibleColumns.updated_at },
-        { id: 'origem', label: 'Origem', isVisible: visibleColumns.origem },
-        { id: 'produto', label: 'Produto', isVisible: visibleColumns.produto },
-        { id: 'sdr_nome', label: 'SDR', isVisible: visibleColumns.sdr_nome },
-        { id: 'vendas_nome', label: 'Closer', isVisible: visibleColumns.vendas_nome },
-        { id: 'tempo_etapa_dias', label: 'Dias na Etapa', isVisible: visibleColumns.tempo_etapa_dias },
-        { id: 'acoes', label: 'Ações', isVisible: visibleColumns.acoes },
-    ]
 
     // Helper: Check if card needs attention
     const getAttentionIndicators = (card: Card) => {
@@ -326,6 +301,348 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
 
         return indicators
     }
+
+    // Configuração de renderização para cada coluna (header e cell)
+    const columnRenderers: Record<string, {
+        width: string
+        headerClass?: string
+        sortKey?: keyof Card | 'proxima_tarefa'
+        renderHeader: () => React.ReactNode
+        renderCell: (card: Card) => React.ReactNode
+    }> = {
+        atencao: {
+            width: 'w-[80px]',
+            headerClass: 'text-center',
+            renderHeader: () => <span className="sr-only">Atenção</span>,
+            renderCell: (card) => {
+                const indicators = getAttentionIndicators(card)
+                if (indicators.length === 0) return null
+                return (
+                    <div className="flex items-center justify-center gap-1" title={indicators.map(i => i.label).join('\n')}>
+                        {indicators.some(i => i.type === 'overdue') && (
+                            <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                            </span>
+                        )}
+                        {indicators.some(i => i.type === 'trip_soon') && <Plane className="h-3.5 w-3.5 text-orange-500" />}
+                        {indicators.some(i => i.type === 'sla') && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                        {indicators.some(i => i.type === 'no_task') && !indicators.some(i => i.type === 'overdue') && (
+                            <span className="h-2 w-2 rounded-full bg-gray-300"></span>
+                        )}
+                    </div>
+                )
+            }
+        },
+        titulo: {
+            width: 'w-[300px]',
+            sortKey: 'titulo',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Negócio / Cliente
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <div className="flex flex-col">
+                    <a href={`/cards/${card.id}`} className="text-gray-900 hover:text-primary hover:underline decoration-primary/30 underline-offset-2 transition-all font-semibold">
+                        {card.titulo}
+                    </a>
+                    <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                        <UserIcon className="h-3 w-3" />
+                        {card.pessoa_nome || 'Sem cliente'}
+                    </span>
+                </div>
+            )
+        },
+        etapa_nome: {
+            width: 'w-[150px]',
+            sortKey: 'etapa_nome',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Etapa
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200 font-normal">
+                    {card.etapa_nome}
+                </Badge>
+            )
+        },
+        valor_estimado: {
+            width: 'w-[120px]',
+            headerClass: 'text-right',
+            sortKey: 'valor_estimado',
+            renderHeader: () => (
+                <div className="flex items-center justify-end gap-1">
+                    Valor
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <span className="text-right font-mono text-gray-700 block">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_estimado || 0)}
+                </span>
+            )
+        },
+        prioridade: {
+            width: 'w-[100px]',
+            sortKey: 'prioridade',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Prioridade
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <>
+                    {card.prioridade === 'alta' && <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200">Alta</Badge>}
+                    {card.prioridade === 'media' && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200">Média</Badge>}
+                    {card.prioridade === 'baixa' && <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200">Baixa</Badge>}
+                </>
+            )
+        },
+        proxima_tarefa: {
+            width: 'w-[200px]',
+            sortKey: 'proxima_tarefa',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Próxima Tarefa
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => card.proxima_tarefa ? (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2 group/task">
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        completeTaskMutation.mutate((card.proxima_tarefa as any).id)
+                                    }}
+                                    disabled={completeTaskMutation.isPending}
+                                    className="opacity-0 group-hover/task:opacity-100 transition-opacity p-1 rounded hover:bg-green-100"
+                                    title="Marcar como concluída"
+                                >
+                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                </button>
+                                <div className="flex flex-col text-sm">
+                                    <span className={cn(
+                                        "font-medium flex items-center gap-1.5",
+                                        new Date((card.proxima_tarefa as any).data_vencimento) < new Date() ? "text-red-600" : "text-gray-700"
+                                    )}>
+                                        {(card.proxima_tarefa as any).tipo === 'ligacao' && <Phone className="h-3.5 w-3.5" />}
+                                        {(card.proxima_tarefa as any).tipo === 'email' && <Mail className="h-3.5 w-3.5" />}
+                                        {(card.proxima_tarefa as any).tipo === 'reuniao' && <Calendar className="h-3.5 w-3.5" />}
+                                        {!(card.proxima_tarefa as any).tipo && (
+                                            new Date((card.proxima_tarefa as any).data_vencimento) < new Date()
+                                                ? <AlertCircle className="h-3.5 w-3.5" />
+                                                : <Clock className="h-3.5 w-3.5" />
+                                        )}
+                                        {format(new Date((card.proxima_tarefa as any).data_vencimento), "dd/MM HH:mm", { locale: ptBR })}
+                                    </span>
+                                    <span className="text-xs text-gray-500 truncate max-w-[150px]">
+                                        {(card.proxima_tarefa as any).titulo}
+                                    </span>
+                                </div>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                            <div className="text-xs space-y-1">
+                                <p className="font-medium">{(card.proxima_tarefa as any).titulo}</p>
+                                <p className="text-gray-400">Tipo: {(card.proxima_tarefa as any).tipo || 'Tarefa'}</p>
+                                <p className="text-gray-400">Vencimento: {format(new Date((card.proxima_tarefa as any).data_vencimento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                            </div>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            ) : <span className="text-gray-400 text-xs italic">Sem tarefas</span>
+        },
+        dono_atual_nome: {
+            width: 'w-[150px]',
+            sortKey: 'dono_atual_nome',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Responsável
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px] bg-blue-50 text-blue-700">
+                            {card.dono_atual_nome?.substring(0, 2).toUpperCase() || 'U'}
+                        </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm text-gray-600 truncate max-w-[100px]">
+                        {card.dono_atual_nome?.split(' ')[0]}
+                    </span>
+                </div>
+            )
+        },
+        data_viagem_inicio: {
+            width: 'w-[120px]',
+            sortKey: 'data_viagem_inicio',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Data Viagem
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => card.data_viagem_inicio ? (
+                <div className="flex items-center gap-1.5 text-gray-600">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                    <span>{format(new Date(card.data_viagem_inicio), "dd/MM/yy")}</span>
+                </div>
+            ) : <span>-</span>
+        },
+        created_at: {
+            width: 'w-[120px]',
+            sortKey: 'created_at',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Criação
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <span className="text-gray-600 text-xs">
+                    {card.created_at ? format(new Date(card.created_at), "dd/MM/yy HH:mm") : '-'}
+                </span>
+            )
+        },
+        updated_at: {
+            width: 'w-[120px]',
+            sortKey: 'updated_at',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Atualização
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <span className="text-gray-600 text-xs">
+                    {card.updated_at ? format(new Date(card.updated_at), "dd/MM/yy HH:mm") : '-'}
+                </span>
+            )
+        },
+        origem: {
+            width: 'w-[100px]',
+            sortKey: 'origem',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Origem
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <span className="text-gray-600 text-sm capitalize">{card.origem || '-'}</span>
+            )
+        },
+        produto: {
+            width: 'w-[100px]',
+            sortKey: 'produto',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Produto
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <span className="text-gray-600 text-sm capitalize">{card.produto || '-'}</span>
+            )
+        },
+        sdr_nome: {
+            width: 'w-[120px]',
+            sortKey: 'sdr_owner_nome',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    SDR
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <span className="text-gray-600 text-sm">{card.sdr_owner_nome?.split(' ')[0] || '-'}</span>
+            )
+        },
+        vendas_nome: {
+            width: 'w-[120px]',
+            sortKey: 'vendas_nome',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Closer
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => (
+                <span className="text-gray-600 text-sm">{card.vendas_nome?.split(' ')[0] || '-'}</span>
+            )
+        },
+        tempo_etapa_dias: {
+            width: 'w-[100px]',
+            sortKey: 'tempo_etapa_dias',
+            renderHeader: () => (
+                <div className="flex items-center gap-1">
+                    Dias Etapa
+                    <ArrowUpDown className="h-3 w-3 text-gray-400" />
+                </div>
+            ),
+            renderCell: (card) => card.tempo_etapa_dias !== null ? (
+                <Badge variant="outline" className={cn(
+                    "font-mono",
+                    (card.tempo_etapa_dias || 0) > 7 ? "text-red-600 border-red-200 bg-red-50" : "text-gray-600"
+                )}>
+                    {card.tempo_etapa_dias}d
+                </Badge>
+            ) : <span>-</span>
+        },
+        acoes: {
+            width: 'w-[60px]',
+            headerClass: 'text-center',
+            renderHeader: () => <span className="sr-only">Ações</span>,
+            renderCell: (card) => (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Ações</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        {card.pessoa_telefone && (
+                            <DropdownMenuItem asChild>
+                                <a href={`https://wa.me/${card.pessoa_telefone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                    <Phone className="h-4 w-4 text-green-600" />
+                                    WhatsApp
+                                </a>
+                            </DropdownMenuItem>
+                        )}
+                        {card.pessoa_email && (
+                            <DropdownMenuItem asChild>
+                                <a href={`mailto:${card.pessoa_email}`} className="flex items-center gap-2">
+                                    <Mail className="h-4 w-4 text-blue-600" />
+                                    Enviar Email
+                                </a>
+                            </DropdownMenuItem>
+                        )}
+                        {(card.pessoa_telefone || card.pessoa_email) && <DropdownMenuSeparator />}
+                        <DropdownMenuItem asChild>
+                            <a href={`/cards/${card.id}`} className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4" />
+                                Ver Detalhes
+                            </a>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )
+        }
+    }
+
+    // Colunas visíveis na ordem correta
+    const visibleColumnsOrdered = columns.filter(col => col.isVisible && columnRenderers[col.id])
 
     const bulkEditFields: BulkEditField[] = [
         {
@@ -375,6 +692,15 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                 variant: 'outline'
                             },
                             {
+                                label: 'Arquivar',
+                                icon: Archive,
+                                onClick: () => {
+                                    archiveBulk(selectedCards)
+                                    setSelectedCards([])
+                                },
+                                variant: 'outline'
+                            },
+                            {
                                 label: 'Excluir',
                                 icon: Trash2,
                                 onClick: handleBulkDelete,
@@ -383,9 +709,9 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                         ]}
                     />
                 </div>
-                <ColumnToggle
-                    columns={columnsConfig}
-                    onToggle={handleColumnToggle}
+                <ColumnManager
+                    columns={columns}
+                    onChange={handleColumnsChange}
                 />
             </div>
 
@@ -490,6 +816,23 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                     </span>
                 </button>
 
+                {/* Divider */}
+                <div className="h-4 w-px bg-gray-200 mx-1" />
+
+                {/* Toggle Arquivados */}
+                <button
+                    onClick={() => setFilters({ ...filters, showArchived: !filters.showArchived })}
+                    className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                        filters.showArchived
+                            ? "bg-slate-200 text-slate-700 border border-slate-300"
+                            : "bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
+                    )}
+                >
+                    <Archive className="h-3 w-3" />
+                    {filters.showArchived ? 'Mostrando Arquivados' : 'Ver Arquivados'}
+                </button>
+
                 {activeQuickFilters.length > 0 && (
                     <button
                         onClick={() => setActiveQuickFilters([])}
@@ -547,149 +890,30 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                 />
                             </TableHead>
 
-                            {visibleColumns.atencao && (
-                                <TableHead className="w-[80px] text-center">
-                                    <span className="sr-only">Atenção</span>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.titulo && (
-                                <TableHead className="w-[300px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('titulo')}>
-                                    <div className="flex items-center gap-1">
-                                        Negócio / Cliente
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.etapa_nome && (
-                                <TableHead className="w-[150px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('etapa_nome')}>
-                                    <div className="flex items-center gap-1">
-                                        Etapa
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.valor_estimado && (
-                                <TableHead className="w-[120px] text-right cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('valor_estimado')}>
-                                    <div className="flex items-center justify-end gap-1">
-                                        Valor
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.prioridade && (
-                                <TableHead className="w-[100px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('prioridade')}>
-                                    <div className="flex items-center gap-1">
-                                        Prioridade
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.proxima_tarefa && (
-                                <TableHead className="w-[200px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('proxima_tarefa')}>
-                                    <div className="flex items-center gap-1">
-                                        Próxima Tarefa
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.dono_atual_nome && (
-                                <TableHead className="w-[150px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('dono_atual_nome')}>
-                                    <div className="flex items-center gap-1">
-                                        Responsável
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.data_viagem_inicio && (
-                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('data_viagem_inicio')}>
-                                    <div className="flex items-center gap-1">
-                                        Data Viagem
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.created_at && (
-                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('created_at')}>
-                                    <div className="flex items-center gap-1">
-                                        Criação
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.updated_at && (
-                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('updated_at')}>
-                                    <div className="flex items-center gap-1">
-                                        Atualização
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.origem && (
-                                <TableHead className="w-[100px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('origem')}>
-                                    <div className="flex items-center gap-1">
-                                        Origem
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.produto && (
-                                <TableHead className="w-[100px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('produto')}>
-                                    <div className="flex items-center gap-1">
-                                        Produto
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.sdr_nome && (
-                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('sdr_nome')}>
-                                    <div className="flex items-center gap-1">
-                                        SDR
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.vendas_nome && (
-                                <TableHead className="w-[120px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('vendas_nome')}>
-                                    <div className="flex items-center gap-1">
-                                        Closer
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.tempo_etapa_dias && (
-                                <TableHead className="w-[100px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort('tempo_etapa_dias')}>
-                                    <div className="flex items-center gap-1">
-                                        Dias Etapa
-                                        <ArrowUpDown className="h-3 w-3 text-gray-400" />
-                                    </div>
-                                </TableHead>
-                            )}
-
-                            {visibleColumns.acoes && (
-                                <TableHead className="w-[60px] text-center">
-                                    <span className="sr-only">Ações</span>
-                                </TableHead>
-                            )}
+                            {/* Colunas renderizadas dinamicamente na ordem definida */}
+                            {visibleColumnsOrdered.map((col) => {
+                                const renderer = columnRenderers[col.id]
+                                if (!renderer) return null
+                                return (
+                                    <TableHead
+                                        key={col.id}
+                                        className={cn(
+                                            renderer.width,
+                                            renderer.headerClass,
+                                            renderer.sortKey && "cursor-pointer hover:bg-gray-100 transition-colors"
+                                        )}
+                                        onClick={renderer.sortKey ? () => handleSort(renderer.sortKey!) : undefined}
+                                    >
+                                        {renderer.renderHeader()}
+                                    </TableHead>
+                                )
+                            })}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {sortedCards.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} className="h-24 text-center text-gray-500">
+                                <TableCell colSpan={visibleColumnsOrdered.length + 1} className="h-24 text-center text-gray-500">
                                     Nenhum card encontrado.
                                 </TableCell>
                             </TableRow>
@@ -714,262 +938,16 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                         />
                                     </TableCell>
 
-                                    {visibleColumns.atencao && (
-                                        <TableCell className="text-center">
-                                            {(() => {
-                                                const indicators = getAttentionIndicators(card)
-                                                if (indicators.length === 0) return null
-
-                                                return (
-                                                    <div className="flex items-center justify-center gap-1" title={indicators.map(i => i.label).join('\n')}>
-                                                        {indicators.some(i => i.type === 'overdue') && (
-                                                            <span className="relative flex h-2.5 w-2.5">
-                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                                                            </span>
-                                                        )}
-                                                        {indicators.some(i => i.type === 'trip_soon') && (
-                                                            <Plane className="h-3.5 w-3.5 text-orange-500" />
-                                                        )}
-                                                        {indicators.some(i => i.type === 'sla') && (
-                                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                                                        )}
-                                                        {indicators.some(i => i.type === 'no_task') && !indicators.some(i => i.type === 'overdue') && (
-                                                            <span className="h-2 w-2 rounded-full bg-gray-300"></span>
-                                                        )}
-                                                    </div>
-                                                )
-                                            })()}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.titulo && (
-                                        <TableCell className="font-medium">
-                                            <div className="flex flex-col">
-                                                <a href={`/cards/${card.id}`} className="text-gray-900 hover:text-primary hover:underline decoration-primary/30 underline-offset-2 transition-all font-semibold">
-                                                    {card.titulo}
-                                                </a>
-                                                <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                                    <UserIcon className="h-3 w-3" />
-                                                    {card.pessoa_nome || 'Sem cliente'}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.etapa_nome && (
-                                        <TableCell>
-                                            <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200 font-normal">
-                                                {card.etapa_nome}
-                                            </Badge>
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.valor_estimado && (
-                                        <TableCell className="text-right font-mono text-gray-700">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_estimado || 0)}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.prioridade && (
-                                        <TableCell>
-                                            {card.prioridade === 'alta' && <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200">Alta</Badge>}
-                                            {card.prioridade === 'media' && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200">Média</Badge>}
-                                            {card.prioridade === 'baixa' && <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200">Baixa</Badge>}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.proxima_tarefa && (
-                                        <TableCell>
-                                            {card.proxima_tarefa ? (
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center gap-2 group/task">
-                                                                {/* Botão de concluir */}
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault()
-                                                                        e.stopPropagation()
-                                                                        completeTaskMutation.mutate((card.proxima_tarefa as any).id)
-                                                                    }}
-                                                                    disabled={completeTaskMutation.isPending}
-                                                                    className="opacity-0 group-hover/task:opacity-100 transition-opacity p-1 rounded hover:bg-green-100"
-                                                                    title="Marcar como concluída"
-                                                                >
-                                                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                                                </button>
-                                                                <div className="flex flex-col text-sm">
-                                                                    <span className={cn(
-                                                                        "font-medium flex items-center gap-1.5",
-                                                                        new Date((card.proxima_tarefa as any).data_vencimento) < new Date() ? "text-red-600" : "text-gray-700"
-                                                                    )}>
-                                                                        {/* Ícone baseado no tipo */}
-                                                                        {(card.proxima_tarefa as any).tipo === 'ligacao' && <Phone className="h-3.5 w-3.5" />}
-                                                                        {(card.proxima_tarefa as any).tipo === 'email' && <Mail className="h-3.5 w-3.5" />}
-                                                                        {(card.proxima_tarefa as any).tipo === 'reuniao' && <Calendar className="h-3.5 w-3.5" />}
-                                                                        {!(card.proxima_tarefa as any).tipo && (
-                                                                            new Date((card.proxima_tarefa as any).data_vencimento) < new Date()
-                                                                                ? <AlertCircle className="h-3.5 w-3.5" />
-                                                                                : <Clock className="h-3.5 w-3.5" />
-                                                                        )}
-                                                                        {format(new Date((card.proxima_tarefa as any).data_vencimento), "dd/MM HH:mm", { locale: ptBR })}
-                                                                    </span>
-                                                                    <span className="text-xs text-gray-500 truncate max-w-[150px]">
-                                                                        {(card.proxima_tarefa as any).titulo}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent side="top" className="max-w-xs">
-                                                            <div className="text-xs space-y-1">
-                                                                <p className="font-medium">{(card.proxima_tarefa as any).titulo}</p>
-                                                                <p className="text-gray-400">
-                                                                    Tipo: {(card.proxima_tarefa as any).tipo || 'Tarefa'}
-                                                                </p>
-                                                                <p className="text-gray-400">
-                                                                    Vencimento: {format(new Date((card.proxima_tarefa as any).data_vencimento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                                                                </p>
-                                                            </div>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            ) : (
-                                                <span className="text-gray-400 text-xs italic">Sem tarefas</span>
-                                            )}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.dono_atual_nome && (
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <Avatar className="h-6 w-6">
-                                                    <AvatarFallback className="text-[10px] bg-blue-50 text-blue-700">
-                                                        {card.dono_atual_nome?.substring(0, 2).toUpperCase() || 'U'}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-sm text-gray-600 truncate max-w-[100px]">
-                                                    {card.dono_atual_nome?.split(' ')[0]}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.data_viagem_inicio && (
-                                        <TableCell>
-                                            {card.data_viagem_inicio ? (
-                                                <div className="flex items-center gap-1.5 text-gray-600">
-                                                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                                                    <span>{format(new Date(card.data_viagem_inicio), "dd/MM/yy")}</span>
-                                                </div>
-                                            ) : '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.created_at && (
-                                        <TableCell className="text-gray-600 text-xs">
-                                            {card.created_at ? format(new Date(card.created_at), "dd/MM/yy HH:mm") : '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.updated_at && (
-                                        <TableCell className="text-gray-600 text-xs">
-                                            {card.updated_at ? format(new Date(card.updated_at), "dd/MM/yy HH:mm") : '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.origem && (
-                                        <TableCell className="text-gray-600 text-sm capitalize">
-                                            {card.origem || '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.produto && (
-                                        <TableCell className="text-gray-600 text-sm capitalize">
-                                            {card.produto || '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.sdr_nome && (
-                                        <TableCell className="text-gray-600 text-sm">
-                                            {card.sdr_nome?.split(' ')[0] || '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.vendas_nome && (
-                                        <TableCell className="text-gray-600 text-sm">
-                                            {card.vendas_nome?.split(' ')[0] || '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.tempo_etapa_dias && (
-                                        <TableCell className="text-gray-600 text-sm text-center">
-                                            {card.tempo_etapa_dias !== null ? (
-                                                <Badge variant="outline" className={cn(
-                                                    "font-mono",
-                                                    (card.tempo_etapa_dias || 0) > 7 ? "text-red-600 border-red-200 bg-red-50" : "text-gray-600"
-                                                )}>
-                                                    {card.tempo_etapa_dias}d
-                                                </Badge>
-                                            ) : '-'}
-                                        </TableCell>
-                                    )}
-
-                                    {visibleColumns.acoes && (
-                                        <TableCell className="text-center">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    >
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Ações</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
-                                                    {/* Contato */}
-                                                    {card.pessoa_telefone && (
-                                                        <DropdownMenuItem asChild>
-                                                            <a
-                                                                href={`https://wa.me/${card.pessoa_telefone.replace(/\D/g, '')}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="flex items-center gap-2"
-                                                            >
-                                                                <Phone className="h-4 w-4 text-green-600" />
-                                                                WhatsApp
-                                                            </a>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {card.pessoa_email && (
-                                                        <DropdownMenuItem asChild>
-                                                            <a
-                                                                href={`mailto:${card.pessoa_email}`}
-                                                                className="flex items-center gap-2"
-                                                            >
-                                                                <Mail className="h-4 w-4 text-blue-600" />
-                                                                Enviar Email
-                                                            </a>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {(card.pessoa_telefone || card.pessoa_email) && <DropdownMenuSeparator />}
-
-                                                    {/* Ver detalhes */}
-                                                    <DropdownMenuItem asChild>
-                                                        <a
-                                                            href={`/cards/${card.id}`}
-                                                            className="flex items-center gap-2"
-                                                        >
-                                                            <ArrowUpDown className="h-4 w-4" />
-                                                            Ver Detalhes
-                                                        </a>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    )}
+                                    {/* Colunas renderizadas dinamicamente na ordem definida */}
+                                    {visibleColumnsOrdered.map((col) => {
+                                        const renderer = columnRenderers[col.id]
+                                        if (!renderer) return null
+                                        return (
+                                            <TableCell key={col.id} className={renderer.headerClass}>
+                                                {renderer.renderCell(card)}
+                                            </TableCell>
+                                        )
+                                    })}
                                 </TableRow>
                             )})
                         )}

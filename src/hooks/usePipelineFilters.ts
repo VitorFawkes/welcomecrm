@@ -21,6 +21,7 @@ export interface FilterState {
     departmentIds?: string[]
     sortBy?: SortBy
     sortDirection?: SortDirection
+    showArchived?: boolean // Mostrar cards arquivados
 }
 
 export interface GroupFilters {
