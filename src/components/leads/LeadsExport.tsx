@@ -22,8 +22,8 @@ interface LeadsExportProps {
 const EXPORT_COLUMNS: Record<string, { label: string, getValue: (lead: LeadCard) => string }> = {
     titulo: { label: 'Título', getValue: (l) => l.titulo || '' },
     pessoa_nome: { label: 'Cliente', getValue: (l) => l.pessoa_nome || '' },
-    pessoa_email: { label: 'Email', getValue: (l) => (l as any).pessoa_email || '' },
-    pessoa_telefone: { label: 'Telefone', getValue: (l) => (l as any).pessoa_telefone || '' },
+    pessoa_email: { label: 'Email', getValue: (l) => l.pessoa_email || '' },
+    pessoa_telefone: { label: 'Telefone', getValue: (l) => l.pessoa_telefone || '' },
     etapa_nome: { label: 'Etapa', getValue: (l) => l.etapa_nome || '' },
     pipeline_nome: { label: 'Pipeline', getValue: (l) => l.pipeline_nome || '' },
     dono_atual_nome: { label: 'Responsável', getValue: (l) => l.dono_atual_nome || '' },

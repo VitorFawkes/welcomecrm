@@ -6711,11 +6711,13 @@ export type Database = {
       }
       view_cards_acoes: {
         Row: {
+          briefing_inicial: Json | null
           campaign_id: string | null
           cliente_recorrente: boolean | null
           concierge_owner_id: string | null
           condicoes_pagamento: string | null
           created_at: string | null
+          data_fechamento: string | null
           data_viagem_inicio: string | null
           destinos: Json | null
           dias_ate_viagem: number | null
@@ -6728,17 +6730,17 @@ export type Database = {
           external_id: string | null
           fase: string | null
           forma_pagamento: string | null
-          group_capacity: number | null
-          group_total_pax: number | null
-          group_total_revenue: number | null
           id: string | null
           is_group_parent: boolean | null
+          marketing_data: Json | null
           moeda: string | null
           orcamento: Json | null
           origem: string | null
           parent_card_id: string | null
+          pessoa_email: string | null
           pessoa_nome: string | null
           pessoa_principal_id: string | null
+          pessoa_telefone: string | null
           pipeline_id: string | null
           pipeline_nome: string | null
           pipeline_stage_id: string | null

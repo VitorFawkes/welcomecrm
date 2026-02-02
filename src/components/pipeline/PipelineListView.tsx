@@ -930,10 +930,10 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
                                                     {/* Contato */}
-                                                    {(card as any).pessoa_telefone && (
+                                                    {card.pessoa_telefone && (
                                                         <DropdownMenuItem asChild>
                                                             <a
-                                                                href={`https://wa.me/${((card as any).pessoa_telefone as string).replace(/\D/g, '')}`}
+                                                                href={`https://wa.me/${card.pessoa_telefone.replace(/\D/g, '')}`}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="flex items-center gap-2"
@@ -943,10 +943,10 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                                             </a>
                                                         </DropdownMenuItem>
                                                     )}
-                                                    {(card as any).pessoa_email && (
+                                                    {card.pessoa_email && (
                                                         <DropdownMenuItem asChild>
                                                             <a
-                                                                href={`mailto:${(card as any).pessoa_email}`}
+                                                                href={`mailto:${card.pessoa_email}`}
                                                                 className="flex items-center gap-2"
                                                             >
                                                                 <Mail className="h-4 w-4 text-blue-600" />
@@ -954,7 +954,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                                             </a>
                                                         </DropdownMenuItem>
                                                     )}
-                                                    {((card as any).pessoa_telefone || (card as any).pessoa_email) && <DropdownMenuSeparator />}
+                                                    {(card.pessoa_telefone || card.pessoa_email) && <DropdownMenuSeparator />}
 
                                                     {/* Ver detalhes */}
                                                     <DropdownMenuItem asChild>

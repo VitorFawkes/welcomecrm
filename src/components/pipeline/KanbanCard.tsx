@@ -261,12 +261,12 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         <Clock className="mr-1.5 h-3 w-3 flex-shrink-0 text-blue-600" />
                         <span className="truncate block flex-1 text-gray-700">
-                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                            {String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '')}
                         </span>
                     </div>
                 )
             case 'mkt_hospedagem_contratada':
-                const hasHotel = String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '').toLowerCase()
+                const hasHotel = String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '').toLowerCase()
                 const isYes = hasHotel.includes('sim')
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
@@ -281,7 +281,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         <Users className="mr-1.5 h-3 w-3 flex-shrink-0 text-purple-600" />
                         <span className="truncate block flex-1 text-gray-700">
-                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                            {String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '')}
                         </span>
                     </div>
                 )
@@ -290,7 +290,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />
                         <span className="truncate block flex-1 font-medium text-gray-700">
-                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                            {String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '')}
                         </span>
                     </div>
                 )
@@ -307,11 +307,11 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             value = produtoData?.[fieldId]
         }
         if (value === undefined || value === null) {
-            const marketingData = (card as any).marketing_data as any
+            const marketingData = card.marketing_data as any
             value = marketingData?.[fieldId]
         }
         if (value === undefined || value === null) {
-            const briefingData = (card as any).briefing_inicial as any
+            const briefingData = card.briefing_inicial as any
             value = briefingData?.[fieldId]
         }
 
