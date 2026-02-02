@@ -26,6 +26,28 @@ import { MultiSelectEmail } from '@/components/ui/MultiSelectEmail';
 
 const N8N_WEBHOOK_URL = 'https://n8n-n8n.ymnmx7.easypanel.host/webhook/transcript-process';
 
+// Helper para formatar nomes de campos extraídos pela IA
+const formatCampoLabel = (campo: string): string => {
+    const labels: Record<string, string> = {
+        destinos: 'Destinos',
+        epoca_viagem: 'Época da viagem',
+        motivo: 'Motivo',
+        duracao_viagem: 'Duração',
+        orcamento: 'Orçamento',
+        quantidade_viajantes: 'Viajantes',
+        servico_contratado: 'Serviço contratado',
+        qual_servio_contratado: 'Qual serviço',
+        momento_viagem: 'Momento especial',
+        prioridade_viagem: 'Prioridades',
+        o_que_e_importante: 'O que é importante',
+        algo_especial_viagem: 'Algo especial',
+        receio_ou_medo: 'Receios/medos',
+        frequencia_viagem: 'Frequência de viagem',
+        usa_agencia: 'Usa agência'
+    };
+    return labels[campo] || campo;
+};
+
 interface SmartTaskModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -90,6 +112,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
     const [transcricao, setTranscricao] = useState('');
     const [isProcessingAI, setIsProcessingAI] = useState(false);
     const [aiProcessResult, setAiProcessResult] = useState<{ status: string; campos_extraidos?: string[] } | null>(null);
+    const [processWithAI, setProcessWithAI] = useState(true); // Toggle para processar com IA
 
     // Refs for native pickers
     const dateInputRef = useRef<HTMLInputElement>(null);
@@ -103,6 +126,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
     const [metadata, setMetadata] = useState<any>({});
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'processing_ai' | 'done'>('idle');
     const queryClient = useQueryClient();
 
     // Fetch profiles for responsible selection
@@ -196,6 +220,8 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 setTranscricao(initialData?.transcricao || '');
                 setAiProcessResult(null);
                 setIsProcessingAI(false);
+                setProcessWithAI(true); // Default: processar com IA
+                setSubmitPhase('idle');
 
                 if (initialData?.data_vencimento && mode !== 'reschedule') {
                     const dt = new Date(initialData.data_vencimento);
@@ -238,6 +264,8 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 setTranscricao('');
                 setAiProcessResult(null);
                 setIsProcessingAI(false);
+                setProcessWithAI(true); // Default: processar com IA
+                setSubmitPhase('idle');
 
                 // Defaults: Today + Now (rounded to next 15 min)
                 const now = new Date();
@@ -333,11 +361,32 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             const result = await response.json();
             setAiProcessResult(result);
 
-            if (result.status === 'success') {
-                toast.success(`IA extraiu ${result.campos_extraidos?.length || 0} campos da transcrição!`);
+            if (result.status === 'success' && result.campos_extraidos?.length > 0) {
+                toast.success(
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-lg">✨</span>
+                            <p className="font-semibold">IA atualizou {result.campos_extraidos.length} campos!</p>
+                        </div>
+                        <div className="bg-white/20 rounded-lg p-2">
+                            <ul className="text-xs space-y-0.5">
+                                {result.campos_extraidos.slice(0, 6).map((campo: string) => (
+                                    <li key={campo} className="flex items-center gap-1.5">
+                                        <span className="text-green-300">✓</span>
+                                        {formatCampoLabel(campo)}
+                                    </li>
+                                ))}
+                                {result.campos_extraidos.length > 6 && (
+                                    <li className="text-white/70 pl-4">+{result.campos_extraidos.length - 6} campos</li>
+                                )}
+                            </ul>
+                        </div>
+                    </div>,
+                    { duration: 6000 }
+                );
                 queryClient.invalidateQueries({ queryKey: ['card', cardId] });
                 queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] });
-            } else if (result.status === 'no_update') {
+            } else if (result.status === 'no_update' || !result.campos_extraidos?.length) {
                 toast.info('IA não encontrou novas informações na transcrição');
             }
 
@@ -354,6 +403,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        setSubmitPhase('saving');
 
         try {
             // Combine date and time
@@ -385,12 +435,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                     finalResponsibleId = user?.id || '';
                 }
 
-                if (meetingStatus === 'realizada' && (!meetingResult || !meetingFeedback)) {
-                    throw new Error("Para reuniões realizadas, Resultado e Feedback são obrigatórios.");
-                }
-                if (meetingStatus === 'cancelada' && !cancellationReason) {
-                    throw new Error("Para reuniões canceladas, o Motivo do Cancelamento é obrigatório.");
-                }
+                // Apenas validação de reagendamento (precisa de nova data/hora)
                 if (meetingStatus === 'reagendada' && (!rescheduleDate || !rescheduleTime)) {
                     throw new Error("Para reagendar, é necessário informar a nova data e hora.");
                 }
@@ -539,16 +584,26 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
 
             if (error) throw error;
 
-            // Process transcription with AI if meeting is realized and has transcription (only if not already processed)
+            // Process transcription with AI if meeting is realized, has transcription, AND toggle is ON
             const taskId = initialData?.id || newMeetingId;
-            if (type === 'reuniao' && meetingStatus === 'realizada' && transcricao && transcricao.trim().length >= 50 && taskId && !aiProcessResult) {
-                // Don't await - let it process in background, don't show toast since we already have one
-                processTranscriptionWithAI(taskId, transcricao, false);
+            const shouldProcessAI = type === 'reuniao' && meetingStatus === 'realizada' && transcricao && transcricao.trim().length >= 50 && taskId && processWithAI && !aiProcessResult;
+
+            if (shouldProcessAI) {
+                // AGUARDA a IA terminar - não processa em background
+                setSubmitPhase('processing_ai');
+                const aiResult = await processTranscriptionWithAI(taskId, transcricao, false); // false = não mostrar toast aqui
+
+                if (aiResult?.status === 'success' && aiResult.campos_extraidos?.length > 0) {
+                    setSubmitPhase('done');
+                    // Mostra resultado por 2 segundos antes de fechar
+                    await new Promise(resolve => setTimeout(resolve, 2500));
+                }
             }
 
             if (mode === 'reschedule') {
                 toast.success("Re-agendamento confirmado!");
-            } else {
+            } else if (!shouldProcessAI) {
+                // Só mostra toast se não processou com IA (IA tem seu próprio feedback)
                 toast.success(initialData ? "Item atualizado!" : "Item criado!");
             }
 
@@ -575,6 +630,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             toast.error(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setIsSubmitting(false);
+            setSubmitPhase('idle');
         }
     };
 
@@ -748,12 +804,45 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                                 placeholder="Cole aqui a transcrição completa da reunião para extração automática de dados..."
                                                 className="min-h-[150px] text-sm"
                                             />
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between flex-wrap gap-2">
                                                 <p className="text-xs text-gray-500">
                                                     {transcricao.length > 0
                                                         ? `${transcricao.length} caracteres ${transcricao.length >= 50 ? '✓' : '(mínimo 50 para IA)'}`
                                                         : 'Cole a transcrição para extração automática via IA'}
                                                 </p>
+
+                                                {/* Toggle para processar com IA ao salvar */}
+                                                {transcricao.length >= 50 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setProcessWithAI(!processWithAI)}
+                                                        disabled={isProcessingAI}
+                                                        className={`
+                                                            flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all
+                                                            ${isProcessingAI
+                                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                : processWithAI
+                                                                    ? 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 ring-2 ring-purple-300 shadow-sm'
+                                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                            }
+                                                        `}
+                                                    >
+                                                        {/* Toggle switch visual */}
+                                                        <div className={`
+                                                            relative w-8 h-4 rounded-full transition-colors
+                                                            ${processWithAI ? 'bg-purple-500' : 'bg-gray-300'}
+                                                        `}>
+                                                            <div className={`
+                                                                absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all
+                                                                ${processWithAI ? 'left-[18px]' : 'left-0.5'}
+                                                            `} />
+                                                        </div>
+                                                        <Sparkles className={`h-3.5 w-3.5 ${processWithAI ? 'text-purple-600' : 'text-gray-400'}`} />
+                                                        <span>{processWithAI ? 'Extrair com IA ao salvar' : 'IA desativada'}</span>
+                                                    </button>
+                                                )}
+
+                                                {/* Botão para reprocessar quando já tem ID (modo edição) */}
                                                 {transcricao.length >= 50 && initialData?.id && (
                                                     <Button
                                                         type="button"
@@ -771,16 +860,10 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                                         ) : (
                                                             <>
                                                                 <Sparkles className="h-3 w-3 mr-1" />
-                                                                Processar com IA
+                                                                Reprocessar agora
                                                             </>
                                                         )}
                                                     </Button>
-                                                )}
-                                                {transcricao.length >= 50 && !initialData?.id && (
-                                                    <div className="flex items-center gap-1 text-xs text-purple-600">
-                                                        <Sparkles className="h-3 w-3" />
-                                                        <span>Salve para processar com IA</span>
-                                                    </div>
                                                 )}
                                             </div>
 
@@ -936,11 +1019,101 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                             />
                         </div>
 
+                        {/* Feedback visual de processamento da IA */}
+                        {isSubmitting && submitPhase !== 'idle' && (
+                            <div className="mb-4 p-4 rounded-lg border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+                                {submitPhase === 'saving' && (
+                                    <div className="flex items-center gap-3">
+                                        <RefreshCw className="h-5 w-5 text-purple-600 animate-spin" />
+                                        <div>
+                                            <p className="font-medium text-purple-900">Salvando reunião...</p>
+                                            <p className="text-xs text-purple-600">Aguarde um momento</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {submitPhase === 'processing_ai' && (
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                            <Sparkles className="h-5 w-5 text-purple-600 animate-pulse" />
+                                            <div className="absolute inset-0 animate-ping">
+                                                <Sparkles className="h-5 w-5 text-purple-400 opacity-50" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-purple-900">IA analisando transcrição...</p>
+                                            <p className="text-xs text-purple-600">Extraindo informações da reunião</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {submitPhase === 'done' && aiProcessResult && (
+                                    <div className="space-y-3">
+                                        {aiProcessResult.status === 'success' && (aiProcessResult.campos_extraidos?.length ?? 0) > 0 ? (
+                                            <>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="p-1.5 rounded-full bg-green-100">
+                                                        <Check className="h-4 w-4 text-green-600" />
+                                                    </div>
+                                                    <p className="font-semibold text-green-800">
+                                                        IA extraiu {aiProcessResult.campos_extraidos?.length ?? 0} campos!
+                                                    </p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {(aiProcessResult.campos_extraidos ?? []).map((campo: string) => (
+                                                        <div key={campo} className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-green-200">
+                                                            <span className="text-green-500 text-xs">✓</span>
+                                                            <span className="text-xs text-gray-700">{formatCampoLabel(campo)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <p className="text-xs text-gray-500 text-center">Fechando automaticamente...</p>
+                                            </>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 rounded-full bg-amber-100">
+                                                    <Check className="h-4 w-4 text-amber-600" />
+                                                </div>
+                                                <p className="font-medium text-amber-800">
+                                                    Nenhuma nova informação identificada
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Salvando...' : (mode === 'reschedule' ? 'Confirmar Re-agendamento' : 'Salvar Item')}
+                            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                                Cancelar
                             </Button>
+                            {/* Botão com feedback visual de IA */}
+                            {type === 'reuniao' && meetingStatus === 'realizada' && transcricao.length >= 50 && processWithAI ? (
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md min-w-[180px]"
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                            {submitPhase === 'saving' && 'Salvando...'}
+                                            {submitPhase === 'processing_ai' && 'Processando IA...'}
+                                            {submitPhase === 'done' && 'Concluído!'}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="h-4 w-4 mr-2" />
+                                            Salvar e Extrair com IA
+                                        </>
+                                    )}
+                                </Button>
+                            ) : (
+                                <Button type="submit" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Salvando...' : (mode === 'reschedule' ? 'Confirmar Re-agendamento' : 'Salvar Item')}
+                                </Button>
+                            )}
                         </DialogFooter>
                     </form>
                 )}
