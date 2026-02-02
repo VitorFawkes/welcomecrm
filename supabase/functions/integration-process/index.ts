@@ -786,9 +786,10 @@ Deno.serve(async (req) => {
                     }
 
                     // UPSERT CARD
+                    // Fetch all fields including locked_fields for field protection
                     const { data: existingCard } = await supabase
                         .from('cards')
-                        .select('*') // Fetch all fields to check for existing values
+                        .select('*, locked_fields') // Include locked_fields for user-level field protection
                         .eq('external_id', dealId)
                         .eq('external_source', 'active_campaign')
                         .single();
@@ -806,7 +807,21 @@ Deno.serve(async (req) => {
 
                         // Check if we should skip this update
                         let shouldSkip = false;
-                        if (isProtected && existingCard) {
+
+                        // ═══════════════════════════════════════════════════════════════════
+                        // PRIORITY 1: USER-LEVEL FIELD LOCK (locked_fields)
+                        // If user locked this field, ALWAYS skip update regardless of other rules
+                        // ═══════════════════════════════════════════════════════════════════
+                        const lockedFields = existingCard?.locked_fields as Record<string, boolean> | null;
+                        if (lockedFields && lockedFields[key] === true) {
+                            shouldSkip = true;
+                            console.log(`[FIELD_LOCK] Field "${key}" is locked by user, skipping update`);
+                        }
+
+                        // ═══════════════════════════════════════════════════════════════════
+                        // PRIORITY 2: MAPPING-LEVEL PROTECTION (sync_always = false)
+                        // ═══════════════════════════════════════════════════════════════════
+                        if (!shouldSkip && isProtected && existingCard) {
                             // Check if existing card has a value for this key
                             // The key could be a top-level column OR inside marketing_data
                             let existingValue = existingCard[key];
@@ -915,6 +930,101 @@ Deno.serve(async (req) => {
                     if (isTitleProtected) delete cardPayload.titulo;
                     if (isValueProtected) delete cardPayload.valor_estimado;
 
+                    // ═══════════════════════════════════════════════════════════════════
+                    // QUALITY GATE VALIDATION - Validate against stage requirements
+                    // ═══════════════════════════════════════════════════════════════════
+                    if (targetStageId && matchedTrigger && !matchedTrigger.bypass_validation) {
+                        const validationLevel = matchedTrigger.validation_level || 'fields_only';
+
+                        if (validationLevel !== 'none') {
+                            // Build card data for validation
+                            const cardDataForValidation = {
+                                ...cardPayload,
+                                briefing_inicial: cardPayload_briefingInicial,
+                                produto_data: cardPayload_produtoData
+                            };
+
+                            // Call validation function
+                            const { data: validationResult, error: valError } = await supabase.rpc(
+                                'validate_integration_gate',
+                                {
+                                    p_card_data: cardDataForValidation,
+                                    p_target_stage_id: targetStageId,
+                                    p_source: 'active_campaign',
+                                    p_validation_level: validationLevel
+                                }
+                            );
+
+                            if (valError) {
+                                console.error('Quality Gate validation error:', valError);
+                                // Fail-open: Continue processing on validation error
+                            } else {
+                                const validation = validationResult?.[0];
+
+                                if (validation && !validation.valid && !validation.can_bypass) {
+                                    // REQUIREMENTS NOT MET
+                                    const quarantineMode = matchedTrigger.quarantine_mode || 'stage';
+                                    const missingReqs = validation.missing_requirements || [];
+
+                                    if (quarantineMode === 'reject') {
+                                        // REJECT: Don't create card, log conflict
+                                        await supabase.from('integration_conflict_log').insert({
+                                            integration_id: event.integration_id,
+                                            event_id: event.id,
+                                            trigger_id: matchedTrigger.id,
+                                            conflict_type: 'missing_field',
+                                            target_stage_id: targetStageId,
+                                            missing_requirements: missingReqs,
+                                            resolution: 'rejected'
+                                        });
+
+                                        stats.blocked++;
+                                        await updateEventStatus(event.id, 'blocked',
+                                            `Quality Gate rejected: ${missingReqs.length} requirements not met`);
+                                        results.push({ id: event.id, status: 'blocked', missing: missingReqs });
+                                        continue; // Skip to next event
+                                    }
+
+                                    if (quarantineMode === 'stage' && matchedTrigger.quarantine_stage_id) {
+                                        // QUARANTINE: Redirect to quarantine stage
+                                        const originalTargetStage = targetStageId;
+                                        targetStageId = matchedTrigger.quarantine_stage_id;
+                                        topology = resolveTopology(targetStageId);
+
+                                        await supabase.from('integration_conflict_log').insert({
+                                            integration_id: event.integration_id,
+                                            event_id: event.id,
+                                            trigger_id: matchedTrigger.id,
+                                            conflict_type: 'missing_field',
+                                            target_stage_id: originalTargetStage,
+                                            actual_stage_id: targetStageId,
+                                            missing_requirements: missingReqs,
+                                            resolution: 'quarantined'
+                                        });
+
+                                        log += ` [QUARANTINE: ${missingReqs.length} requirements missing]`;
+                                    }
+
+                                    if (quarantineMode === 'force') {
+                                        // FORCE: Create anyway, just log the conflict
+                                        await supabase.from('integration_conflict_log').insert({
+                                            integration_id: event.integration_id,
+                                            event_id: event.id,
+                                            trigger_id: matchedTrigger.id,
+                                            conflict_type: 'missing_field',
+                                            target_stage_id: targetStageId,
+                                            actual_stage_id: targetStageId,
+                                            missing_requirements: missingReqs,
+                                            resolution: 'forced'
+                                        });
+
+                                        log += ` [FORCED: ${missingReqs.length} requirements bypassed]`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // ═══════════════════════════════════════════════════════════════════
 
                     if (targetStageId && topology) {
                         cardPayload.pipeline_stage_id = targetStageId;

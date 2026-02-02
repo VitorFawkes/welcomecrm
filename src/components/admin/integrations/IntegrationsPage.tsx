@@ -10,6 +10,8 @@ import { SyncGovernancePanel } from './SyncGovernancePanel';
 import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
 import { InboundFieldMappingTab } from './InboundFieldMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
+import { OutboundStageMappingTab } from './OutboundStageMappingTab';
+import { OutboundLogsTab } from './OutboundLogsTab';
 import { ACFieldManager } from './ACFieldManager';
 import { InboundTriggerRulesTab } from './InboundTriggerRulesTab';
 
@@ -23,7 +25,8 @@ import {
     FileText,
     Settings,
     Zap,
-    Sparkles
+    Sparkles,
+    ArrowUpRight
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
@@ -100,6 +103,13 @@ export function IntegrationsPage() {
                             Regras de Criação
                         </TabsTrigger>
                         <TabsTrigger
+                            value="outbound"
+                            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
+                        >
+                            <ArrowUpRight className="w-4 h-4" />
+                            Saída (CRM → AC)
+                        </TabsTrigger>
+                        <TabsTrigger
                             value="settings"
                             className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                         >
@@ -165,7 +175,29 @@ export function IntegrationsPage() {
                         <InboundTriggerRulesTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 5: Settings */}
+                    {/* Tab 5: Outbound */}
+                    <TabsContent value="outbound" className="space-y-6">
+                        <Tabs defaultValue="logs" className="space-y-4">
+                            <TabsList className="bg-slate-50">
+                                <TabsTrigger value="logs" className="text-sm">
+                                    Fila de Eventos
+                                </TabsTrigger>
+                                <TabsTrigger value="stages" className="text-sm">
+                                    Mapeamento de Etapas
+                                </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="logs">
+                                <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />
+                            </TabsContent>
+
+                            <TabsContent value="stages">
+                                <OutboundStageMappingTab integrationId={AC_INTEGRATION_ID} />
+                            </TabsContent>
+                        </Tabs>
+                    </TabsContent>
+
+                    {/* Tab 6: Settings */}
                     <TabsContent value="settings">
                         <IntegrationSettings />
                     </TabsContent>

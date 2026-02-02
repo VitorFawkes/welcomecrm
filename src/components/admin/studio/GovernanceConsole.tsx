@@ -42,7 +42,18 @@ interface ActionRequirement {
     task_tipo?: string
     task_require_completed?: boolean
     field_key?: string
+    // Fontes que podem ignorar este requisito específico
+    bypass_sources?: string[]
 }
+
+// Opções de fontes de bypass (para uso futuro em edição de regras)
+// TODO: Implementar UI de edição de bypass_sources por regra
+// const BYPASS_SOURCE_OPTIONS = [
+//     { value: 'active_campaign', label: 'ActiveCampaign' },
+//     { value: 'manual_sync', label: 'Sync Manual' },
+//     { value: 'import', label: 'Importação' },
+//     { value: 'api', label: 'API Externa' }
+// ]
 
 export const SPECIAL_RULES = [
     { key: 'lost_reason_required', label: 'Motivo de Perda Obrigatório', icon: ShieldAlert }
@@ -688,7 +699,7 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any
                         {rule._label}
                         {rule._isInvalid && <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full no-underline">Inválido</span>}
                     </h4>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <p className="text-xs text-gray-500 flex items-center gap-1 flex-wrap">
                         {stageName && (
                             <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">
                                 {stageName}
@@ -700,6 +711,11 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any
                                 Bloqueia Avanço
                             </span>
                         ) : "Apenas Aviso"}
+                        {rule.bypass_sources && rule.bypass_sources.length > 0 && (
+                            <span className="ml-2 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-medium" title={`Bypass: ${rule.bypass_sources.join(', ')}`}>
+                                🔓 {rule.bypass_sources.length} bypass
+                            </span>
+                        )}
                     </p>
                 </div>
             </div>

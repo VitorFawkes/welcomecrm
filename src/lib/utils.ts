@@ -42,21 +42,47 @@ export function looksLikePhone(str: string): boolean {
 }
 
 /**
+ * Verifica se a string contém dígitos suficientes para busca parcial de telefone
+ * (pelo menos 3 dígitos consecutivos)
+ */
+export function hasPhoneDigits(str: string): boolean {
+    const digits = str.replace(/\D/g, '')
+    return digits.length >= 3
+}
+
+/**
  * Prepara termos de busca inteligente
  * Retorna o termo original + versão normalizada se for telefone
+ * Também retorna digitsOnly para busca parcial de telefone
  */
-export function prepareSearchTerms(searchInput: string): { original: string; normalized: string | null } {
+export function prepareSearchTerms(searchInput: string): {
+    original: string;
+    normalized: string | null;
+    digitsOnly: string | null;
+} {
     const trimmed = searchInput.trim()
+    const digits = trimmed.replace(/\D/g, '')
 
     if (looksLikePhone(trimmed)) {
         return {
             original: trimmed,
-            normalized: normalizePhone(trimmed)
+            normalized: normalizePhone(trimmed),
+            digitsOnly: digits
+        }
+    }
+
+    // Se tem pelo menos 3 dígitos, permite busca parcial por telefone
+    if (hasPhoneDigits(trimmed)) {
+        return {
+            original: trimmed,
+            normalized: null,
+            digitsOnly: digits
         }
     }
 
     return {
         original: trimmed,
-        normalized: null
+        normalized: null,
+        digitsOnly: null
     }
 }

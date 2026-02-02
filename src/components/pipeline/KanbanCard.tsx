@@ -19,6 +19,7 @@ interface KanbanCardProps {
 
 
 import { GroupBadge } from './GroupBadge'
+import SubCardBadge from './SubCardBadge'
 
 export default function KanbanCard({ card }: KanbanCardProps) {
     const navigate = useNavigate()
@@ -506,6 +507,24 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <Building className="h-3 w-3" />
                     <span>Grupo</span>
                 </div>
+            )}
+
+            {/* Sub-Card Badges */}
+            {(card as any).card_type === 'sub_card' && (card as any).sub_card_mode && (
+                <SubCardBadge
+                    mode={(card as any).sub_card_mode}
+                    status={(card as any).sub_card_status}
+                    variant="small"
+                />
+            )}
+
+            {/* Active Sub-Cards Count (for parent cards) */}
+            {(card as any).active_sub_cards_count > 0 && (card as any).card_type !== 'sub_card' && (
+                <SubCardBadge
+                    mode="incremental"
+                    activeCount={(card as any).active_sub_cards_count}
+                    variant="small"
+                />
             )}
 
             {/* SLA Badge */}

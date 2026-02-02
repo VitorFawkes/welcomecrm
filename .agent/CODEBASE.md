@@ -5,9 +5,9 @@
 > Use o workflow `/new-module` Phase 5 para manter sincronizado.
 
 > **Purpose:** Source of Truth for the AI Agent. Read this BEFORE any implementation.
-> **Last Updated:** 2026-01-30
+> **Last Updated:** 2026-02-01
 > **Trigger:** ALWAYS ON
-> **Stats:** 93 tabelas | 30 páginas | 38 hooks | 13 views
+> **Stats:** 94 tabelas | 30 páginas | 40 hooks | 13 views
 
 ---
 
@@ -25,10 +25,11 @@ All tables must FK to at least one of these:
 - `activities` (21.974) → cards, profiles
 - `arquivos` → cards
 - `tarefas` (19.009) → cards, profiles
-- `proposals` (6) + `proposal_versions` (54) + `proposal_sections` (246) + `proposal_items` (583)
+- `proposals` ecosystem: `proposals`, `versions`, `sections`, `items`, `library`, `templates`, `comments`, `flights`
 - `automation_rules` → cards
 - `api_keys` → profiles
 - `api_request_logs` → api_keys
+- `text_blocks` → profiles
 
 **Integration System (12 tabelas):**
 - `integrations` (19) - Configurações de integrações
@@ -139,6 +140,31 @@ All tables must FK to at least one of these:
 - `cards.duracao_dias_min`, `cards.duracao_dias_max`
 - `cards.valor_estimado` (sincronizado de smart_budget.total_calculado)
 
+#### Field Lock System (Bloqueio de Atualização Automática)
+
+**Coluna:** `cards.locked_fields` (JSONB)
+
+Permite bloquear campos individuais para impedir atualizações automáticas via integrações (n8n/ActiveCampaign).
+
+**Estrutura:**
+```json
+{
+  "destinos": true,      // Campo bloqueado
+  "orcamento": true,     // Campo bloqueado
+  "epoca_viagem": false  // Campo liberado (ou ausente)
+}
+```
+
+**Componentes:**
+| Componente | Path | Função |
+|------------|------|--------|
+| `FieldLockButton` | `src/components/card/FieldLockButton.tsx` | Botão de cadeado para lock/unlock |
+| `useFieldLock` | `src/hooks/useFieldLock.ts` | Hook para gerenciar estado de lock |
+
+**Integração com Backend:**
+- `integration-process/index.ts` verifica `locked_fields` antes de atualizar cada campo
+- Se `locked_fields[fieldKey] === true`, a atualização é ignorada
+
 ---
 
 ### 2.4 Frontend Hooks (COMPLETE - 38 hooks)
@@ -168,6 +194,9 @@ All tables must FK to at least one of these:
 | `useFilterOptions()` | `useFilterOptions.ts` | Filter options for pipeline |
 | `useTrips()` | `useTrips.ts` | Query de viagens ganhas |
 | `useTripsFilters()` | `useTripsFilters.ts` | Zustand store para filtros de viagens |
+| `useSubCards()` | `useSubCards.ts` | **Sub-cards CRUD (change requests)** |
+| `useSubCardParent()` | `useSubCards.ts` | Get parent info for sub-cards |
+| `useFieldLock()` | `useFieldLock.ts` | **Gerencia bloqueio de campos (locked_fields)** |
 
 #### Proposals
 | Hook | File | Purpose |
@@ -474,6 +503,52 @@ npm run build
 - **Cores:** Task=blue, Wait=amber, End=green/red
 - **Timing:** Mostra "Dia X" ou "+Xh" baseado no schedule_mode
 - **Summary:** Conta tarefas, pausas, dias total
+
+### Sub-Cards System (Change Requests)
+
+**Purpose:** Allow change requests during Pós-venda without losing control of the main card.
+
+#### Database Schema
+| Column | Type | Description |
+|--------|------|-------------|
+| `card_type` | TEXT | 'standard', 'group_child', 'sub_card' |
+| `sub_card_mode` | TEXT | 'incremental' (soma) ou 'complete' (substitui) |
+| `sub_card_status` | TEXT | 'active', 'merged', 'cancelled' |
+| `merged_at` | TIMESTAMPTZ | Data do merge |
+| `merged_by` | UUID | Quem fez o merge |
+| `merge_metadata` | JSONB | Detalhes do merge |
+
+#### Tables
+| Table | Purpose |
+|-------|---------|
+| `sub_card_sync_log` | Auditoria de sincronizações |
+
+#### RPCs
+| Function | Description |
+|----------|-------------|
+| `criar_sub_card(parent_id, titulo, descricao, mode)` | Cria sub-card vinculado |
+| `merge_sub_card(sub_card_id, options)` | Integra sub-card ao pai |
+| `cancelar_sub_card(sub_card_id, motivo)` | Cancela sem merge |
+| `get_sub_cards(parent_id)` | Lista sub-cards do pai |
+
+#### Components
+| Component | Path | Function |
+|-----------|------|----------|
+| `CreateSubCardModal` | `src/components/card/CreateSubCardModal.tsx` | Modal de criação |
+| `SubCardBadge` | `src/components/pipeline/SubCardBadge.tsx` | Badge no KanbanCard |
+| `SubCardsList` | `src/components/card/SubCardsList.tsx` | Lista no CardDetail |
+| `MergeSubCardModal` | `src/components/card/MergeSubCardModal.tsx` | Modal de merge |
+
+#### Business Rules
+1. **Criação:** Apenas de cards em Pós-venda
+2. **Modos:**
+   - `incremental`: Valor começa ZERADO, merge SOMA ao pai
+   - `complete`: Copia TUDO, merge SUBSTITUI o pai
+3. **Nascimento:** Sub-card nasce na primeira etapa da fase Planner
+4. **Taxa:** Sub-cards ignoram validação de taxa (já paga no pai)
+5. **Kanban:** Sub-cards ativos aparecem no Kanban, merged/cancelled não
+6. **Card pai perdido:** Cancela sub-cards ativos automaticamente
+7. **Tarefa:** Cria tarefa `tipo='solicitacao_mudanca'` no card pai
 
 ---
 

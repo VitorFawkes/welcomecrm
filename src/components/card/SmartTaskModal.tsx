@@ -431,10 +431,33 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             } else {
                 // Normal Save (Create or Update)
                 if (initialData?.id) {
+                    // Validar se o ID existe antes de atualizar
+                    const taskId = initialData.id;
+                    if (!taskId || typeof taskId !== 'string' || taskId.trim() === '') {
+                        throw new Error('ID da tarefa inválido');
+                    }
+
+                    // Verificar se a tarefa existe
+                    const { data: existing, error: checkError } = await supabase
+                        .from('tarefas')
+                        .select('id')
+                        .eq('id', taskId)
+                        .maybeSingle();
+
+                    if (checkError) {
+                        console.error('Erro ao verificar tarefa:', checkError);
+                        throw new Error('Erro ao verificar tarefa: ' + checkError.message);
+                    }
+
+                    if (!existing) {
+                        console.error('Tarefa não encontrada:', taskId);
+                        throw new Error('Tarefa não encontrada. Ela pode ter sido excluída. Por favor, feche e reabra o modal.');
+                    }
+
                     const { error: updateError } = await supabase
                         .from('tarefas')
                         .update(payload)
-                        .eq('id', initialData.id);
+                        .eq('id', taskId);
                     error = updateError;
                 } else {
                     const { error: insertError } = await supabase

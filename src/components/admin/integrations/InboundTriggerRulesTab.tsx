@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/Input';
-import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, ArrowRight, User, Target, Pencil, RefreshCw, FileWarning, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, ArrowRight, User, Target, Pencil, RefreshCw, FileWarning, Clock, ChevronDown, ChevronUp, ShieldAlert, ShieldOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 
@@ -34,6 +34,11 @@ interface Trigger {
     is_active: boolean;
     description: string | null;
     created_at: string;
+    // Quality Gate validation fields
+    bypass_validation: boolean;
+    validation_level: 'none' | 'fields_only' | 'full';
+    quarantine_mode: 'stage' | 'reject' | 'force';
+    quarantine_stage_id: string | null;
 }
 
 interface CatalogItem {
@@ -68,6 +73,11 @@ interface TriggerFormData {
     targetPipelineId: string;
     targetStageId: string;
     actionType: 'create_only' | 'all' | 'update_only';
+    // Quality Gate
+    bypassValidation: boolean;
+    validationLevel: 'none' | 'fields_only' | 'full';
+    quarantineMode: 'stage' | 'reject' | 'force';
+    quarantineStageId: string;
 }
 
 const emptyFormData: TriggerFormData = {
@@ -77,7 +87,12 @@ const emptyFormData: TriggerFormData = {
     ownerIds: [],
     targetPipelineId: '',
     targetStageId: '',
-    actionType: 'create_only'
+    actionType: 'create_only',
+    // Quality Gate defaults
+    bypassValidation: false,
+    validationLevel: 'fields_only',
+    quarantineMode: 'stage',
+    quarantineStageId: ''
 };
 
 export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTabProps) {
@@ -233,7 +248,12 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                 target_stage_id: formData.actionType !== 'update_only' ? (formData.targetStageId || null) : null,
                 action_type: formData.actionType,
                 entity_types: ['deal', 'contact'],
-                is_active: true
+                is_active: true,
+                // Quality Gate validation
+                bypass_validation: formData.bypassValidation,
+                validation_level: formData.validationLevel,
+                quarantine_mode: formData.quarantineMode,
+                quarantine_stage_id: formData.quarantineStageId || null
             };
 
             const { error } = await (supabase
@@ -267,7 +287,12 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                 // Target - não precisa para update_only
                 target_pipeline_id: formData.actionType !== 'update_only' ? (formData.targetPipelineId || null) : null,
                 target_stage_id: formData.actionType !== 'update_only' ? (formData.targetStageId || null) : null,
-                action_type: formData.actionType
+                action_type: formData.actionType,
+                // Quality Gate validation
+                bypass_validation: formData.bypassValidation,
+                validation_level: formData.validationLevel,
+                quarantine_mode: formData.quarantineMode,
+                quarantine_stage_id: formData.quarantineStageId || null
             };
 
             const { error } = await (supabase
@@ -373,7 +398,12 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
             ownerIds: getTriggerOwners(trigger),
             targetPipelineId,
             targetStageId,
-            actionType: trigger.action_type || 'create_only'
+            actionType: trigger.action_type || 'create_only',
+            // Quality Gate fields
+            bypassValidation: trigger.bypass_validation ?? false,
+            validationLevel: trigger.validation_level || 'fields_only',
+            quarantineMode: trigger.quarantine_mode || 'stage',
+            quarantineStageId: trigger.quarantine_stage_id || ''
         });
     };
 
@@ -648,6 +678,115 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                         </div>
                     </div>
                 )}
+
+                {/* Quality Gate Configuration */}
+                <div className="space-y-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <h4 className="font-medium text-amber-800 flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-amber-600" />
+                        Validação de Requisitos (Quality Gate)
+                    </h4>
+                    <p className="text-sm text-amber-700">
+                        Configure como a integração deve lidar com requisitos obrigatórios de stage (campos, propostas, tarefas).
+                    </p>
+
+                    {/* Bypass Toggle */}
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                        <div className="flex items-center gap-3">
+                            <ShieldOff className="w-5 h-5 text-slate-400" />
+                            <div>
+                                <label className="text-sm font-medium">Ignorar todas as validações</label>
+                                <p className="text-xs text-slate-500">
+                                    Cards serão criados mesmo sem atender requisitos obrigatórios
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={formData.bypassValidation}
+                            onCheckedChange={(v) => setFormData(prev => ({ ...prev, bypassValidation: v }))}
+                        />
+                    </div>
+
+                    {/* Validation Options (only show if bypass is off) */}
+                    {!formData.bypassValidation && (
+                        <div className="space-y-4 pl-4 border-l-2 border-amber-300">
+                            {/* Validation Level */}
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">Nível de Validação</label>
+                                <Select
+                                    value={formData.validationLevel}
+                                    onChange={(v) => setFormData(prev => ({
+                                        ...prev,
+                                        validationLevel: v as 'none' | 'fields_only' | 'full'
+                                    }))}
+                                    options={[
+                                        { value: 'none', label: '🚫 Sem validação' },
+                                        { value: 'fields_only', label: '📋 Apenas campos obrigatórios' },
+                                        { value: 'full', label: '✅ Completa (campos + propostas + tarefas)' }
+                                    ]}
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {formData.validationLevel === 'none'
+                                        ? 'Não verifica nenhum requisito'
+                                        : formData.validationLevel === 'fields_only'
+                                            ? 'Verifica apenas campos obrigatórios configurados no stage'
+                                            : 'Verifica campos, propostas e tarefas obrigatórias'
+                                    }
+                                </p>
+                            </div>
+
+                            {/* Quarantine Mode */}
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">Ação quando requisitos não são atendidos</label>
+                                <Select
+                                    value={formData.quarantineMode}
+                                    onChange={(v) => setFormData(prev => ({
+                                        ...prev,
+                                        quarantineMode: v as 'stage' | 'reject' | 'force'
+                                    }))}
+                                    options={[
+                                        { value: 'stage', label: '📦 Enviar para etapa de quarentena' },
+                                        { value: 'reject', label: '🚫 Rejeitar evento (não criar card)' },
+                                        { value: 'force', label: '⚠️ Criar mesmo assim (apenas logar conflito)' }
+                                    ]}
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {formData.quarantineMode === 'stage'
+                                        ? 'Card é criado em uma etapa especial para revisão manual'
+                                        : formData.quarantineMode === 'reject'
+                                            ? 'Evento é bloqueado e registrado como erro'
+                                            : 'Card é criado normalmente, mas conflito é registrado para auditoria'
+                                    }
+                                </p>
+                            </div>
+
+                            {/* Quarantine Stage (only if mode is 'stage') */}
+                            {formData.quarantineMode === 'stage' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                                            Etapa de Quarentena
+                                        </label>
+                                        <Select
+                                            value={formData.quarantineStageId}
+                                            onChange={(v) => setFormData(prev => ({ ...prev, quarantineStageId: v }))}
+                                            options={[
+                                                { value: '', label: 'Selecione a etapa de quarentena...' },
+                                                ...(crmStages?.map(s => ({
+                                                    value: s.id,
+                                                    label: `${getCrmPipelineName(s.pipeline_id)} → ${s.nome}`
+                                                })) || [])
+                                            ]}
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Cards com requisitos faltantes serão criados nesta etapa
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 {/* Actions */}
                 <div className="flex items-center gap-3 pt-2 border-t">

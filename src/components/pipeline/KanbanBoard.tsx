@@ -270,7 +270,12 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
             if (stageId !== currentStageId) {
                 // 0. Check Loss Reason (Is Lost Stage?)
-                if (targetStage?.is_lost) {
+                // Verifica tanto a flag is_lost quanto o nome da stage (fallback)
+                const isLostStage = targetStage?.is_lost === true ||
+                    targetStage?.nome?.toLowerCase().includes('perdido') ||
+                    targetStage?.nome?.toLowerCase().includes('lost')
+
+                if (isLostStage) {
                     setPendingMove({
                         cardId,
                         stageId,

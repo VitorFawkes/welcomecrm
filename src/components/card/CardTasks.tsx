@@ -98,19 +98,49 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     // Mutations
     const updateTaskMutation = useMutation({
         mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
-            const { error } = await supabase
+            // Validar ID antes de tentar atualizar
+            if (!id || typeof id !== 'string' || id.trim() === '') {
+                throw new Error('ID da tarefa inválido ou não fornecido')
+            }
+
+            // Verificar se a tarefa existe antes de atualizar
+            const { data: existing, error: checkError } = await supabase
+                .from('tarefas')
+                .select('id')
+                .eq('id', id)
+                .maybeSingle()
+
+            if (checkError) {
+                console.error('Erro ao verificar tarefa:', checkError)
+                throw new Error('Erro ao verificar tarefa: ' + checkError.message)
+            }
+
+            if (!existing) {
+                console.error('Tarefa não encontrada:', id)
+                throw new Error('Tarefa não encontrada. Ela pode ter sido excluída.')
+            }
+
+            const { error, count } = await supabase
                 .from('tarefas')
                 .update(updates)
                 .eq('id', id)
-            if (error) throw error
+
+            if (error) {
+                console.error('Erro ao atualizar tarefa:', error, { id, updates })
+                throw error
+            }
+
+            // Log para debug
+            console.log('Tarefa atualizada com sucesso:', { id, updates, count })
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] })
             queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] }) // Update header counts
             queryClient.invalidateQueries({ queryKey: ['card-tasks-completed', cardId] }) // Update requirements
         },
-        onError: () => {
-            toast.error('Erro ao atualizar tarefa')
+        onError: (error: Error) => {
+            console.error('Mutation error:', error)
+            toast.error(error.message || 'Erro ao atualizar tarefa')
         }
     })
 

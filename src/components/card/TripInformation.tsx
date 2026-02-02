@@ -482,6 +482,8 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 onEdit={() => handleFieldEdit(field.key)}
                                 correctionMode={correctionMode}
                                 isPlanner={viewMode === SystemPhase.PLANNER} // Controls "SDR Original" display
+                                cardId={card.id}
+                                showLockButton={!correctionMode} // Mostra lock quando não está em modo correção
                             />
                         ))}
                     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
-import { X, Save, Eye, EyeOff, CheckSquare, Square } from 'lucide-react';
+import { X, Save, Eye, EyeOff, CheckSquare, Square, Loader2, Check } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases';
 import type { Database } from '../../../database.types';
@@ -54,15 +54,53 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
     const phases = phasesData || [];
 
     // --- Mutations ---
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
     const updateStageMutation = useMutation({
         mutationFn: async (data: Partial<PipelineStage>) => {
-            if (!stage) return;
-            const { error } = await supabase.from('pipeline_stages').update(data).eq('id', stage.id);
-            if (error) throw error;
+            if (!stage) throw new Error('Nenhuma etapa selecionada');
+
+            // Extract only editable fields (exclude id, created_at, etc.)
+            const updatePayload = {
+                nome: data.nome,
+                phase_id: data.phase_id,
+                fase: data.fase,
+                is_won: data.is_won,
+                is_lost: data.is_lost,
+                is_sdr_won: data.is_sdr_won,
+                is_planner_won: data.is_planner_won,
+                is_pos_won: data.is_pos_won
+            };
+
+            console.log('[StageInspector] Saving stage data:', updatePayload);
+            const { data: result, error } = await supabase
+                .from('pipeline_stages')
+                .update(updatePayload)
+                .eq('id', stage.id)
+                .select();
+
+            if (error) {
+                console.error('[StageInspector] Save error:', error);
+                throw error;
+            }
+
+            if (!result || result.length === 0) {
+                console.error('[StageInspector] No rows updated - possible RLS issue');
+                throw new Error('Sem permissão para editar. Verifique se você é admin.');
+            }
+
+            console.log('[StageInspector] Save success, updated:', result);
+            return result;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] });
-            // alert('Etapa atualizada com sucesso!'); // Removed to avoid native prompt
+            queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] });
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2000);
+        },
+        onError: (error: Error) => {
+            console.error('[StageInspector] Mutation error:', error);
+            alert('Erro ao salvar: ' + error.message);
         }
     });
 
@@ -185,12 +223,100 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
                                 </select>
                             </div>
 
+                            {/* Status Final */}
+                            <div className="border-t border-gray-200 pt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-3">Status Final</label>
+                                <p className="text-xs text-gray-500 mb-3">Define se esta etapa altera o status comercial do card.</p>
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_won || false}
+                                            onChange={e => setFormData({ ...formData, is_won: e.target.checked, is_lost: e.target.checked ? false : formData.is_lost })}
+                                            className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                        />
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-900">Ganho Total</span>
+                                            <p className="text-xs text-gray-500">Status comercial = "ganho"</p>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_lost || false}
+                                            onChange={e => setFormData({ ...formData, is_lost: e.target.checked, is_won: e.target.checked ? false : formData.is_won })}
+                                            className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                                        />
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-900">Perdido</span>
+                                            <p className="text-xs text-gray-500">Status comercial = "perdido"</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Marcos por Seção */}
+                            <div className="border-t border-gray-200 pt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-3">Marcos de Ganho</label>
+                                <p className="text-xs text-gray-500 mb-3">Badges visuais no card quando passar por esta etapa. Não altera status comercial.</p>
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_sdr_won || false}
+                                            onChange={e => setFormData({ ...formData, is_sdr_won: e.target.checked })}
+                                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-900">Marco: Ganho SDR</span>
+                                            <p className="text-xs text-gray-500">Badge "SDR" aparece no card</p>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_planner_won || false}
+                                            onChange={e => setFormData({ ...formData, is_planner_won: e.target.checked })}
+                                            className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                        />
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-900">Marco: Ganho Planner</span>
+                                            <p className="text-xs text-gray-500">Badge "Planner" aparece no card</p>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_pos_won || false}
+                                            onChange={e => setFormData({ ...formData, is_pos_won: e.target.checked })}
+                                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                        />
+                                        <div>
+                                            <span className="text-sm font-medium text-gray-900">Marco: Ganho Pós-Venda</span>
+                                            <p className="text-xs text-gray-500">Badge "Pós" aparece no card</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
                             <button
                                 onClick={() => updateStageMutation.mutate(formData)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                                disabled={updateStageMutation.isPending || saveSuccess}
+                                className={cn(
+                                    "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:cursor-not-allowed",
+                                    saveSuccess
+                                        ? "bg-green-600 text-white"
+                                        : "bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                                )}
                             >
-                                <Save className="w-4 h-4" />
-                                Salvar Alterações
+                                {saveSuccess ? (
+                                    <Check className="w-4 h-4" />
+                                ) : updateStageMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Save className="w-4 h-4" />
+                                )}
+                                {saveSuccess ? 'Salvo!' : updateStageMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
                             </button>
                         </div>
                     ) : (

@@ -1374,6 +1374,7 @@ export type Database = {
         Row: {
           briefing_inicial: Json | null
           campaign_id: string | null
+          card_type: string | null
           cliente_recorrente: boolean | null
           codigo_cliente_erp: string | null
           codigo_projeto_erp: string | null
@@ -1404,6 +1405,9 @@ export type Database = {
           id: string
           is_group_parent: boolean | null
           marketing_data: Json | null
+          merge_metadata: Json | null
+          merged_at: string | null
+          merged_by: string | null
           mkt_buscando_para_viagem: string | null
           moeda: string | null
           motivo_perda_comentario: string | null
@@ -1423,6 +1427,8 @@ export type Database = {
           sdr_owner_id: string | null
           stage_entered_at: string | null
           status_comercial: string | null
+          sub_card_mode: string | null
+          sub_card_status: string | null
           taxa_alterado_por: string | null
           taxa_ativa: boolean | null
           taxa_codigo_transacao: string | null
@@ -1445,6 +1451,7 @@ export type Database = {
         Insert: {
           briefing_inicial?: Json | null
           campaign_id?: string | null
+          card_type?: string | null
           cliente_recorrente?: boolean | null
           codigo_cliente_erp?: string | null
           codigo_projeto_erp?: string | null
@@ -1475,6 +1482,9 @@ export type Database = {
           id?: string
           is_group_parent?: boolean | null
           marketing_data?: Json | null
+          merge_metadata?: Json | null
+          merged_at?: string | null
+          merged_by?: string | null
           mkt_buscando_para_viagem?: string | null
           moeda?: string | null
           motivo_perda_comentario?: string | null
@@ -1494,6 +1504,8 @@ export type Database = {
           sdr_owner_id?: string | null
           stage_entered_at?: string | null
           status_comercial?: string | null
+          sub_card_mode?: string | null
+          sub_card_status?: string | null
           taxa_alterado_por?: string | null
           taxa_ativa?: boolean | null
           taxa_codigo_transacao?: string | null
@@ -1516,6 +1528,7 @@ export type Database = {
         Update: {
           briefing_inicial?: Json | null
           campaign_id?: string | null
+          card_type?: string | null
           cliente_recorrente?: boolean | null
           codigo_cliente_erp?: string | null
           codigo_projeto_erp?: string | null
@@ -1546,6 +1559,9 @@ export type Database = {
           id?: string
           is_group_parent?: boolean | null
           marketing_data?: Json | null
+          merge_metadata?: Json | null
+          merged_at?: string | null
+          merged_by?: string | null
           mkt_buscando_para_viagem?: string | null
           moeda?: string | null
           motivo_perda_comentario?: string | null
@@ -1565,6 +1581,8 @@ export type Database = {
           sdr_owner_id?: string | null
           stage_entered_at?: string | null
           status_comercial?: string | null
+          sub_card_mode?: string | null
+          sub_card_status?: string | null
           taxa_alterado_por?: string | null
           taxa_ativa?: boolean | null
           taxa_codigo_transacao?: string | null
@@ -3545,6 +3563,9 @@ export type Database = {
           id: string
           is_frozen: boolean | null
           is_lost: boolean | null
+          is_planner_won: boolean | null
+          is_pos_won: boolean | null
+          is_sdr_won: boolean | null
           is_won: boolean | null
           nome: string
           ordem: number
@@ -3561,6 +3582,9 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           is_lost?: boolean | null
+          is_planner_won?: boolean | null
+          is_pos_won?: boolean | null
+          is_sdr_won?: boolean | null
           is_won?: boolean | null
           nome: string
           ordem: number
@@ -3577,6 +3601,9 @@ export type Database = {
           id?: string
           is_frozen?: boolean | null
           is_lost?: boolean | null
+          is_planner_won?: boolean | null
+          is_pos_won?: boolean | null
+          is_sdr_won?: boolean | null
           is_won?: boolean | null
           nome?: string
           ordem?: number

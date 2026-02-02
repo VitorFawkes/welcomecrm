@@ -10,9 +10,10 @@
  */
 
 import { useCallback, useState, useRef, useEffect } from 'react'
-import { Plus, Star, Trash2 } from 'lucide-react'
+import { Plus, Star, Trash2, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { type FlightsData, type FlightLeg, type FlightOption, AIRLINES } from './types'
+import { FlightImageExtractor } from './FlightImageExtractor'
 
 interface FlightEditorProps {
     data: FlightsData | null
@@ -56,6 +57,44 @@ const createInitialData = (): FlightsData => ({
 
 export function FlightEditor({ data, onChange }: FlightEditorProps) {
     const flightsData = data?.legs?.length ? data : createInitialData()
+    const [showAIExtractor, setShowAIExtractor] = useState(false)
+
+    // Callback quando IA extrai trechos
+    const handleExtractedLegs = useCallback((extractedLegs: FlightLeg[]) => {
+        if (extractedLegs.length === 0) return
+
+        // Se os legs atuais estão vazios (sem opções), substituir
+        const currentLegsEmpty = flightsData.legs.every(leg =>
+            leg.options.length === 0 &&
+            !leg.origin_code &&
+            !leg.destination_code
+        )
+
+        if (currentLegsEmpty) {
+            // Substituir todos os legs
+            onChange({
+                ...flightsData,
+                legs: extractedLegs.map((leg, i) => ({
+                    ...leg,
+                    ordem: i
+                }))
+            })
+        } else {
+            // Adicionar aos legs existentes
+            onChange({
+                ...flightsData,
+                legs: [
+                    ...flightsData.legs,
+                    ...extractedLegs.map((leg, i) => ({
+                        ...leg,
+                        ordem: flightsData.legs.length + i
+                    }))
+                ]
+            })
+        }
+
+        setShowAIExtractor(false)
+    }, [flightsData, onChange])
 
     // Atualizar leg
     const updateLeg = useCallback((legId: string, updates: Partial<FlightLeg>) => {
@@ -175,14 +214,34 @@ export function FlightEditor({ data, onChange }: FlightEditorProps) {
                 />
             ))}
 
+            {/* AI Extractor */}
+            {showAIExtractor && (
+                <FlightImageExtractor
+                    onExtractLegs={handleExtractedLegs}
+                    onCancel={() => setShowAIExtractor(false)}
+                />
+            )}
+
             {/* Adicionar Trecho */}
-            <button
-                onClick={addLeg}
-                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-colors flex items-center justify-center gap-2 text-sm"
-            >
-                <Plus className="h-4 w-4" />
-                Adicionar Trecho
-            </button>
+            {!showAIExtractor && (
+                <div className="flex gap-2">
+                    <button
+                        onClick={addLeg}
+                        className="flex-1 py-3 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Adicionar Trecho
+                    </button>
+                    <button
+                        onClick={() => setShowAIExtractor(true)}
+                        className="px-4 py-3 border-2 border-dashed border-sky-200 rounded-lg text-sky-500 hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center gap-2 text-sm"
+                        title="Extrair voos de uma imagem com IA"
+                    >
+                        <Sparkles className="h-4 w-4" />
+                        <span className="hidden sm:inline">IA</span>
+                    </button>
+                </div>
+            )}
         </div>
     )
 }

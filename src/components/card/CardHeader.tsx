@@ -57,6 +57,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
     } | null>(null)
 
     const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false)
+    const [pendingLossMove, setPendingLossMove] = useState<{ stageId: string; stageName: string } | null>(null)
 
     const { missingBlocking } = useStageRequirements(card)
     const { getHeaderFields } = useFieldConfig()
@@ -70,11 +71,13 @@ export default function CardHeader({ card }: CardHeaderProps) {
             const { data, error } = await supabase
                 .from('pipeline_stages')
                 .select(`
-                    id, 
-                    nome, 
-                    ordem, 
+                    id,
+                    nome,
+                    ordem,
                     fase,
                     phase_id,
+                    is_lost,
+                    is_won,
                     pipeline_phases!pipeline_stages_phase_id_fkey(id, name, order_index)
                 `)
                 .eq('ativo', true)
@@ -87,9 +90,17 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 const phaseOrderB = (b.pipeline_phases as any)?.order_index ?? 999
                 if (phaseOrderA !== phaseOrderB) return phaseOrderA - phaseOrderB
                 return a.ordem - b.ordem
-            }) as { id: string; nome: string; ordem: number; fase: string }[]
+            }) as { id: string; nome: string; ordem: number; fase: string; is_lost?: boolean; is_won?: boolean }[]
         }
     })
+
+    // Find lost stage for the "Mark as Lost" button
+    // Verifica tanto a flag is_lost quanto o nome da stage (fallback)
+    const lostStage = stages?.find(s =>
+        s.is_lost === true ||
+        s.nome?.toLowerCase().includes('perdido') ||
+        s.nome?.toLowerCase().includes('lost')
+    )
 
     // Derived fields
     const currentStage = stages?.find(s => s.id === card.pipeline_stage_id)
@@ -334,8 +345,38 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
     }
 
-    const handleLossConfirm = (motivoId: string, comentario: string) => {
-        updateStatusMutation.mutate({ status: 'perdido', motivoId, comentario })
+    const handleLossConfirm = async (motivoId: string, comentario: string) => {
+        if (pendingLossMove) {
+            // Move to lost stage via RPC (trigger will set status_comercial='perdido')
+            const { error } = await supabase.rpc('mover_card', {
+                p_card_id: card.id,
+                p_nova_etapa_id: pendingLossMove.stageId,
+                p_motivo_perda_id: motivoId || undefined,
+                p_motivo_perda_comentario: comentario || undefined
+            })
+
+            if (error) {
+                console.error('Failed to move card to lost stage:', error)
+                alert('Erro ao mover card: ' + error.message)
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['card-detail', card.id] })
+                queryClient.invalidateQueries({ queryKey: ['card', card.id] })
+                queryClient.invalidateQueries({ queryKey: ['cards'] })
+            }
+
+            setPendingLossMove(null)
+            setLossReasonModalOpen(false)
+        } else {
+            // Fallback: just update status (legacy behavior)
+            updateStatusMutation.mutate({ status: 'perdido', motivoId, comentario })
+        }
+    }
+
+    const handleMarkAsLost = () => {
+        if (lostStage) {
+            setPendingLossMove({ stageId: lostStage.id, stageName: lostStage.nome })
+            setLossReasonModalOpen(true)
+        }
     }
 
     const handleConfirmQualityGate = () => {
@@ -554,6 +595,41 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 onSelect={handleStatusSelect}
                             />
 
+                            {/* Section Won Badges */}
+                            {(card as any).ganho_sdr && (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium">
+                                    SDR
+                                </span>
+                            )}
+                            {(card as any).ganho_planner && (
+                                <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-xs font-medium">
+                                    Planner
+                                </span>
+                            )}
+                            {(card as any).ganho_pos && (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium">
+                                    Pós
+                                </span>
+                            )}
+
+                            {/* Mark as Lost Button OR Loss Reason Display */}
+                            {card.status_comercial !== 'perdido' && lostStage && (
+                                <button
+                                    onClick={handleMarkAsLost}
+                                    className="px-2 py-0.5 rounded-md border border-red-200 bg-white text-red-600 text-xs font-medium hover:bg-red-50 transition-colors"
+                                >
+                                    Marcar Perdido
+                                </button>
+                            )}
+
+                            {/* Loss Reason Display - when card is lost */}
+                            {card.status_comercial === 'perdido' && (
+                                <LossReasonBadge
+                                    motivoId={(card as any).motivo_perda_id}
+                                    comentario={(card as any).motivo_perda_comentario}
+                                />
+                            )}
+
                             {/* Divider */}
                             <div className="h-4 w-px bg-gray-300 mx-1" />
 
@@ -751,21 +827,73 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
             <LossReasonModal
                 isOpen={lossReasonModalOpen}
-                onClose={() => setLossReasonModalOpen(false)}
+                onClose={() => {
+                    setLossReasonModalOpen(false)
+                    setPendingLossMove(null)
+                }}
                 onConfirm={handleLossConfirm}
-                targetStageId={card.pipeline_stage_id || ''}
-                targetStageName="Perdido"
+                targetStageId={pendingLossMove?.stageId || card.pipeline_stage_id || ''}
+                targetStageName={pendingLossMove?.stageName || 'Perdido'}
             />
         </>
     )
 }
 
+function LossReasonBadge({ motivoId, comentario }: { motivoId?: string | null, comentario?: string | null }) {
+    const { data: motivo } = useQuery({
+        queryKey: ['loss-reason', motivoId],
+        queryFn: async () => {
+            if (!motivoId) return null
+            const { data, error } = await supabase
+                .from('motivos_perda')
+                .select('nome')
+                .eq('id', motivoId)
+                .single()
+            if (error) return null
+            return data
+        },
+        enabled: !!motivoId,
+        staleTime: 1000 * 60 * 60 // 1 hour cache
+    })
+
+    if (!motivoId && !comentario) {
+        return (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                <AlertCircle className="h-3 w-3" />
+                Sem motivo informado
+            </div>
+        )
+    }
+
+    return (
+        <div className="flex items-center gap-2">
+            {motivo?.nome && (
+                <div
+                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-medium max-w-[200px]"
+                    title={comentario || undefined}
+                >
+                    <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{motivo.nome}</span>
+                </div>
+            )}
+            {comentario && !motivo?.nome && (
+                <div
+                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs font-medium max-w-[200px]"
+                    title={comentario}
+                >
+                    <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{comentario}</span>
+                </div>
+            )}
+        </div>
+    )
+}
+
 function StatusSelector({ currentStatus, onSelect }: { currentStatus: string | null, onSelect: (status: string) => void }) {
     const [isOpen, setIsOpen] = useState(false)
+    // Note: 'perdido' removed - use "Marcar como Perdido" button instead (moves to lost stage)
     const statusOptions = [
         { value: 'aberto', label: 'Em Aberto', color: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200' },
-        { value: 'ganho', label: 'Ganho', color: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200' },
-        { value: 'perdido', label: 'Perdido', color: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200' },
         { value: 'pausado', label: 'Pausado', color: 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200' }
     ]
 
