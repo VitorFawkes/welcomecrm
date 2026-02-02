@@ -96,6 +96,26 @@ const CreateContactSchema = z.object({
     telefone: z.string().optional().openapi({ example: "+5511999999999" }),
 });
 
+const ContactDetailSchema = z.object({
+    id: z.string().uuid(),
+    nome: z.string(),
+    email: z.string().email().nullable(),
+    telefone: z.string().nullable(),
+    last_whatsapp_conversation_id: z.string().nullable().optional(),
+    whatsapp_conversations: z.array(z.object({
+        id: z.string(),
+        status: z.string().nullable(),
+        unread_count: z.number().nullable(),
+        last_message_at: z.string().nullable(),
+    })).optional(),
+    deals: z.array(z.object({
+        id: z.string(),
+        titulo: z.string(),
+        status_comercial: z.string().nullable(),
+        pipeline_stage_id: z.string().nullable(),
+    })).optional(),
+});
+
 // ---- Routes ----
 
 // 1. Health Check
@@ -195,29 +215,64 @@ app.openapi(
         request: {
             query: z.object({
                 search: z.string().optional(),
+                id: z.string().optional(),
                 limit: z.string().optional(),
             }),
         },
         responses: {
             200: {
                 description: "List of contacts",
-                content: { "application/json": { schema: z.array(ContactSchema) } },
+                content: { "application/json": { schema: z.array(ContactDetailSchema) } },
             },
         },
     },
     async (c) => {
         const supabase = c.get("supabase");
         const search = c.req.query("search");
+        const id = c.req.query("id");
         const limit = parseInt(c.req.query("limit") || "50");
 
-        let query = supabase.from("contatos").select("id, nome, email, telefone").limit(limit);
-        if (search) {
+        let query = supabase.from("contatos").select(`
+            id, nome, email, telefone, last_whatsapp_conversation_id,
+            whatsapp_conversations(id, status, unread_count, last_message_at),
+            cards!cards_pessoa_principal_id_fkey(id, titulo, status_comercial, pipeline_stage_id),
+            cards_contatos(
+                cards(id, titulo, status_comercial, pipeline_stage_id)
+            )
+        `).limit(limit);
+
+        if (id) {
+            query = query.eq("id", id);
+        } else if (search) {
             query = query.or(`nome.ilike.%${search}%,email.ilike.%${search}%`);
         }
 
         const { data, error } = await query;
         if (error) return c.json({ error: error.message }, 500);
-        return c.json(data);
+
+        // Transform data to flat structure
+        const enrichedData = data.map((contact: any) => {
+            const directDeals = contact.cards || [];
+            const associatedDeals = (contact.cards_contatos || [])
+                .map((cc: any) => cc.cards)
+                .filter((c: any) => c !== null); // Remove nulls if any
+
+            // Merge and deduplicate deals by ID
+            const allDeals = [...directDeals, ...associatedDeals];
+            const uniqueDeals = Array.from(new Map(allDeals.map((d: any) => [d.id, d])).values());
+
+            return {
+                id: contact.id,
+                nome: contact.nome,
+                email: contact.email,
+                telefone: contact.telefone,
+                last_whatsapp_conversation_id: contact.last_whatsapp_conversation_id,
+                whatsapp_conversations: contact.whatsapp_conversations || [],
+                deals: uniqueDeals
+            };
+        });
+
+        return c.json(enrichedData);
     }
 );
 
