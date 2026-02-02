@@ -447,13 +447,13 @@ export default function CardTasks({ cardId }: CardTasksProps) {
             />
 
             <Dialog open={outcomeModalOpen} onOpenChange={setOutcomeModalOpen}>
-                <DialogContent className="sm:max-w-[500px] p-0 gap-0 max-h-[85vh] flex flex-col">
-                    <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-50 bg-gray-50/30 flex-shrink-0">
-                        <DialogTitle className="text-xl font-semibold text-gray-900">Como foi a reunião?</DialogTitle>
+                <DialogContent className="sm:max-w-[500px] p-0 gap-0">
+                    <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-50 bg-gray-50/30">
+                        <DialogTitle className="text-xl font-semibold text-gray-900">Como foi essa tarefa?</DialogTitle>
                         <p className="text-sm text-gray-500 mt-1">Registre o resultado para manter o histórico atualizado.</p>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-6 overflow-y-auto flex-1 min-h-0">
+                    <div className="p-6 space-y-6 overflow-y-auto max-h-[50vh]">
                         <div className="space-y-3">
                             <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Resultado</Label>
                             <div className="w-full">
@@ -500,7 +500,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                         </div>
                     </div>
 
-                    <DialogFooter className="px-6 py-4 bg-gray-50 border-t border-gray-100 sm:justify-between items-center flex-shrink-0">
+                    <DialogFooter className="px-6 py-4 bg-gray-50 border-t border-gray-100 sm:justify-between items-center">
                         <Button variant="ghost" onClick={() => setOutcomeModalOpen(false)} className="text-gray-500 hover:text-gray-700">
                             Cancelar
                         </Button>
