@@ -7,7 +7,7 @@
 > **Purpose:** Source of Truth for the AI Agent. Read this BEFORE any implementation.
 > **Last Updated:** 2026-02-01
 > **Trigger:** ALWAYS ON
-> **Stats:** 94 tabelas | 30 páginas | 40 hooks | 13 views
+> **Stats:** 94 tabelas | 30 páginas | 40 hooks | 15 views
 
 ---
 
@@ -190,6 +190,7 @@ Permite bloquear campos individuais para impedir atualizações automáticas via
 | `useCardPeople()` | `useCardPeople.ts` | People on a card |
 | `useCardCreationRules()` | `useCardCreationRules.ts` | Who can create cards where |
 | `useDeleteCard()` | `useDeleteCard.ts` | Card deletion logic |
+| `useArchiveCard()` | `useArchiveCard.ts` | **Card archive/unarchive logic** |
 | `useQualityGate()` | `useQualityGate.ts` | Stage transition validation |
 | `useFilterOptions()` | `useFilterOptions.ts` | Filter options for pipeline |
 | `useTrips()` | `useTrips.ts` | Query de viagens ganhas |

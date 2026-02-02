@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Plus } from 'lucide-react';
 import { Badge } from "@/components/ui/Badge";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { supabase } from '@/lib/supabase';
@@ -48,13 +48,12 @@ export function MultiSelectEmail({ value = [], onChange, placeholder }: MultiSel
 
     const addEmail = (email: string) => {
         const trimmed = email.trim();
-        if (trimmed && !value.includes(trimmed)) {
+        if (trimmed && isValidEmail(trimmed) && !value.includes(trimmed)) {
             onChange([...value, trimmed]);
+            setInputValue('');
+            setSuggestions([]);
+            setShowSuggestions(false);
         }
-        setInputValue('');
-        setSuggestions([]);
-        setShowSuggestions(false);
-        inputRef.current?.focus();
     };
 
     const removeEmail = (emailToRemove: string) => {
@@ -64,12 +63,23 @@ export function MultiSelectEmail({ value = [], onChange, placeholder }: MultiSel
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (['Enter', ',', 'Tab'].includes(e.key)) {
             e.preventDefault();
-            if (inputValue && isValidEmail(inputValue)) {
+            if (inputValue) {
                 addEmail(inputValue);
             }
         } else if (e.key === 'Backspace' && !inputValue && value.length > 0) {
             removeEmail(value[value.length - 1]);
         }
+    };
+
+    // Handle blur - auto add email when clicking outside
+    const handleBlur = () => {
+        // Small delay to allow click on suggestions
+        setTimeout(() => {
+            if (inputValue && isValidEmail(inputValue)) {
+                addEmail(inputValue);
+            }
+            setShowSuggestions(false);
+        }, 150);
     };
 
     // Click outside to close suggestions
@@ -83,8 +93,10 @@ export function MultiSelectEmail({ value = [], onChange, placeholder }: MultiSel
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const showAddButton = inputValue && isValidEmail(inputValue);
+
     return (
-        <div className="space-y-2" ref={containerRef}>
+        <div className="space-y-1.5" ref={containerRef}>
             <div className="flex flex-wrap gap-2 p-2 min-h-[42px] bg-white rounded-md border border-input ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
                 {value.map((email) => (
                     <Badge key={email} variant="secondary" className={`gap-1 pr-1 ${!isValidEmail(email) ? 'border-red-500 bg-red-50 text-red-700' : ''}`}>
@@ -98,10 +110,10 @@ export function MultiSelectEmail({ value = [], onChange, placeholder }: MultiSel
                         </button>
                     </Badge>
                 ))}
-                <div className="relative flex-1 min-w-[120px]">
+                <div className="relative flex-1 min-w-[120px] flex items-center gap-1">
                     <input
                         ref={inputRef}
-                        type="text"
+                        type="email"
                         value={inputValue}
                         onChange={(e) => {
                             setInputValue(e.target.value);
@@ -109,9 +121,22 @@ export function MultiSelectEmail({ value = [], onChange, placeholder }: MultiSel
                         }}
                         onKeyDown={handleKeyDown}
                         onFocus={() => setShowSuggestions(true)}
+                        onBlur={handleBlur}
                         className="w-full bg-transparent outline-none text-sm h-6"
-                        placeholder={value.length === 0 ? placeholder : ""}
+                        placeholder={value.length === 0 ? (placeholder || "Digite o e-mail e pressione Enter") : "Adicionar outro..."}
                     />
+
+                    {/* Botão visual para adicionar */}
+                    {showAddButton && (
+                        <button
+                            type="button"
+                            onClick={() => addEmail(inputValue)}
+                            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors whitespace-nowrap"
+                        >
+                            <Plus className="h-3 w-3" />
+                            Adicionar
+                        </button>
+                    )}
 
                     {showSuggestions && suggestions.length > 0 && (
                         <div className="absolute top-full left-0 w-full mt-1 z-50 bg-white rounded-md border shadow-md overflow-hidden">
@@ -138,9 +163,19 @@ export function MultiSelectEmail({ value = [], onChange, placeholder }: MultiSel
                     )}
                 </div>
             </div>
+
+            {/* Feedback contextual */}
             {inputValue && !isValidEmail(inputValue) && (
-                <p className="text-xs text-red-500 animate-in fade-in slide-in-from-top-1">
-                    Digite um e-mail válido e pressione Enter
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <span className="inline-block w-1 h-1 bg-amber-500 rounded-full"></span>
+                    Digite um e-mail válido (ex: nome@empresa.com)
+                </p>
+            )}
+
+            {/* Dica quando campo está vazio */}
+            {!inputValue && value.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                    Digite o e-mail e pressione <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded border">Enter</kbd> para adicionar
                 </p>
             )}
         </div>
