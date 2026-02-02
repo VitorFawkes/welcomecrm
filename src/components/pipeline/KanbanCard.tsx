@@ -529,7 +529,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
 
             {/* SLA Badge */}
             {(() => {
-                if (card.urgencia_tempo_etapa === '1') {
+                if (Number(card.urgencia_tempo_etapa) === 1) {
                     return (
                         <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-100">
                             <Clock className="h-3 w-3" />
