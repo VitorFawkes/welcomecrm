@@ -267,7 +267,7 @@ export default function UniversalFieldRenderer({
                                 onChange?.(newDestinos)
                             }}
                             placeholder="Ex: Paris, Londres, Roma"
-                            className="pl-10 bg-gray-50/50 focus:bg-white transition-colors"
+                            className="pl-10 bg-white border border-gray-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition-colors"
                         />
                     </div>
                     <p className="text-xs text-gray-500">
@@ -283,7 +283,7 @@ export default function UniversalFieldRenderer({
                     <Textarea
                         value={value || ''}
                         onChange={(e) => onChange?.(e.target.value)}
-                        className="min-h-[120px] bg-gray-50/50 focus:bg-white transition-colors"
+                        className="min-h-[120px] bg-white border border-gray-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition-colors"
                         placeholder={field.label || ''}
                     />
                 )
@@ -324,10 +324,8 @@ export default function UniversalFieldRenderer({
 
                 return (
                     <div className="space-y-3">
-                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">Selecione as opções:</label>
-
                         {/* Premium Chip Grid - No internal scroll */}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 p-3 bg-gray-50/80 rounded-lg border border-gray-100">
                             {options.map((opt: any, idx: number) => {
                                 const optValue = typeof opt === 'object' ? opt.value : opt
                                 const optLabel = typeof opt === 'object' ? opt.label : opt

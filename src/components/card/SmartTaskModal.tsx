@@ -18,9 +18,13 @@ import {
     Mail,
     ArrowLeft,
     ChevronDown,
-    Check
+    Check,
+    FileText,
+    Sparkles
 } from 'lucide-react';
 import { MultiSelectEmail } from '@/components/ui/MultiSelectEmail';
+
+const N8N_WEBHOOK_URL = 'https://n8n-n8n.ymnmx7.easypanel.host/webhook/transcript-process';
 
 interface SmartTaskModalProps {
     isOpen: boolean;
@@ -81,6 +85,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
 
     // Meeting Specifics (New)
     const [externalParticipants, setExternalParticipants] = useState<string[]>([]);
+
+    // Transcription for meetings
+    const [transcricao, setTranscricao] = useState('');
+    const [isProcessingAI, setIsProcessingAI] = useState(false);
+    const [aiProcessResult, setAiProcessResult] = useState<{ status: string; campos_extraidos?: string[] } | null>(null);
 
     // Refs for native pickers
     const dateInputRef = useRef<HTMLInputElement>(null);
@@ -184,6 +193,9 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 setCancellationReason(initialData?.motivo_cancelamento || '');
                 setOtherCategory(initialData?.categoria_outro || '');
                 setExternalParticipants(initialData?.participantes_externos || []);
+                setTranscricao(initialData?.transcricao || '');
+                setAiProcessResult(null);
+                setIsProcessingAI(false);
 
                 if (initialData?.data_vencimento && mode !== 'reschedule') {
                     const dt = new Date(initialData.data_vencimento);
@@ -223,6 +235,9 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 setExternalParticipants([]);
                 setRescheduleDate('');
                 setRescheduleTime('');
+                setTranscricao('');
+                setAiProcessResult(null);
+                setIsProcessingAI(false);
 
                 // Defaults: Today + Now (rounded to next 15 min)
                 const now = new Date();
@@ -288,6 +303,54 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
         setShowRescheduleTimeList(false);
     };
 
+    // Process transcription with AI
+    const processTranscriptionWithAI = async (taskId: string | null, transcriptionText: string, showFeedback: boolean = true) => {
+        if (!transcriptionText || transcriptionText.trim().length < 50) {
+            if (showFeedback) {
+                toast.error('Transcrição precisa ter pelo menos 50 caracteres');
+            }
+            return null;
+        }
+
+        setIsProcessingAI(true);
+        setAiProcessResult(null);
+
+        try {
+            const response = await fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    card_id: cardId,
+                    meeting_id: taskId || 'preview', // Use 'preview' if no task ID yet
+                    transcription: transcriptionText
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao processar transcrição');
+            }
+
+            const result = await response.json();
+            setAiProcessResult(result);
+
+            if (result.status === 'success') {
+                toast.success(`IA extraiu ${result.campos_extraidos?.length || 0} campos da transcrição!`);
+                queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+                queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] });
+            } else if (result.status === 'no_update') {
+                toast.info('IA não encontrou novas informações na transcrição');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Erro ao processar com IA:', error);
+            toast.error('Erro ao processar transcrição com IA');
+            return null;
+        } finally {
+            setIsProcessingAI(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -310,18 +373,18 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 finalResponsibleId = user?.id || '';
             }
 
-            // Validation: Meeting requires explicit responsible
-            if (type === 'reuniao' && !finalResponsibleId) {
-                throw new Error("Para reuniões, é obrigatório selecionar um responsável.");
-            }
-
-            if (!finalResponsibleId) {
-                finalResponsibleId = initialData?.responsavel_id || user?.id;
-                if (!finalResponsibleId) throw new Error("Não foi possível identificar o responsável.");
-            }
-
-            // Validations for Meeting Status
+            // Validations for Meeting
             if (type === 'reuniao') {
+                // Participantes externos obrigatórios para reunião
+                if (!externalParticipants || externalParticipants.length === 0) {
+                    throw new Error("Para reuniões, é obrigatório adicionar pelo menos um participante externo.");
+                }
+
+                // Se não tiver responsável, usa o usuário atual
+                if (!finalResponsibleId) {
+                    finalResponsibleId = user?.id || '';
+                }
+
                 if (meetingStatus === 'realizada' && (!meetingResult || !meetingFeedback)) {
                     throw new Error("Para reuniões realizadas, Resultado e Feedback são obrigatórios.");
                 }
@@ -331,6 +394,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 if (meetingStatus === 'reagendada' && (!rescheduleDate || !rescheduleTime)) {
                     throw new Error("Para reagendar, é necessário informar a nova data e hora.");
                 }
+            }
+
+            if (!finalResponsibleId) {
+                finalResponsibleId = initialData?.responsavel_id || user?.id;
+                if (!finalResponsibleId) throw new Error("Não foi possível identificar o responsável.");
             }
 
             // Validation for Change Request
@@ -358,7 +426,9 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 // Map status to outcome for workflow triggering
                 outcome: type === 'reuniao' && ['realizada', 'cancelada', 'nao_compareceu'].includes(meetingStatus)
                     ? meetingStatus
-                    : (type === 'reuniao' && meetingStatus === 'reagendada' ? 'remarcada' : null)
+                    : (type === 'reuniao' && meetingStatus === 'reagendada' ? 'remarcada' : null),
+                // Transcription for meetings
+                transcricao: type === 'reuniao' && meetingStatus === 'realizada' ? (transcricao || null) : null
             };
 
             // Only add participantes_externos if it's a meeting and has values
@@ -469,6 +539,13 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
 
             if (error) throw error;
 
+            // Process transcription with AI if meeting is realized and has transcription (only if not already processed)
+            const taskId = initialData?.id || newMeetingId;
+            if (type === 'reuniao' && meetingStatus === 'realizada' && transcricao && transcricao.trim().length >= 50 && taskId && !aiProcessResult) {
+                // Don't await - let it process in background, don't show toast since we already have one
+                processTranscriptionWithAI(taskId, transcricao, false);
+            }
+
             if (mode === 'reschedule') {
                 toast.success("Re-agendamento confirmado!");
             } else {
@@ -478,6 +555,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] });
             queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] });
             queryClient.invalidateQueries({ queryKey: ['card-tasks-completed', cardId] });
+            queryClient.invalidateQueries({ queryKey: ['reunioes', cardId] }); // Refresh meetings tab
 
             onClose();
         } catch (error: any) {
@@ -545,7 +623,10 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                     <form onSubmit={handleSubmit} className="space-y-4 py-4">
                         {/* Common Fields */}
                         <div className="grid gap-2">
-                            <Label>Título</Label>
+                            <Label className="flex items-center gap-1">
+                                Título
+                                <span className="text-red-500">*</span>
+                            </Label>
                             <Input
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
@@ -599,12 +680,18 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                     />
                                 </div>
                                 <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
-                                    <Label>Participantes Externos (E-mails)</Label>
+                                    <Label className="flex items-center gap-1">
+                                        Participantes Externos (E-mails)
+                                        <span className="text-red-500">*</span>
+                                    </Label>
                                     <MultiSelectEmail
                                         value={externalParticipants}
                                         onChange={setExternalParticipants}
                                         placeholder="Digite o e-mail e pressione Enter..."
                                     />
+                                    {externalParticipants.length === 0 && (
+                                        <p className="text-xs text-amber-600">Adicione pelo menos um participante externo</p>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -647,6 +734,82 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                                 onChange={e => setMeetingFeedback(e.target.value)}
                                                 placeholder="Detalhes do feedback..."
                                             />
+                                        </div>
+
+                                        {/* Transcription Field */}
+                                        <div className="grid gap-2 pt-3 border-t border-purple-200">
+                                            <Label className="flex items-center gap-2 text-purple-700">
+                                                <FileText className="h-4 w-4" />
+                                                Transcrição da Reunião
+                                            </Label>
+                                            <Textarea
+                                                value={transcricao}
+                                                onChange={e => setTranscricao(e.target.value)}
+                                                placeholder="Cole aqui a transcrição completa da reunião para extração automática de dados..."
+                                                className="min-h-[150px] text-sm"
+                                            />
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-xs text-gray-500">
+                                                    {transcricao.length > 0
+                                                        ? `${transcricao.length} caracteres ${transcricao.length >= 50 ? '✓' : '(mínimo 50 para IA)'}`
+                                                        : 'Cole a transcrição para extração automática via IA'}
+                                                </p>
+                                                {transcricao.length >= 50 && initialData?.id && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => processTranscriptionWithAI(initialData.id, transcricao)}
+                                                        disabled={isProcessingAI}
+                                                        className="h-7 px-3 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                                                    >
+                                                        {isProcessingAI ? (
+                                                            <>
+                                                                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                                                                Processando...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Sparkles className="h-3 w-3 mr-1" />
+                                                                Processar com IA
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                )}
+                                                {transcricao.length >= 50 && !initialData?.id && (
+                                                    <div className="flex items-center gap-1 text-xs text-purple-600">
+                                                        <Sparkles className="h-3 w-3" />
+                                                        <span>Salve para processar com IA</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* AI Processing Result */}
+                                            {aiProcessResult && (
+                                                <div className={`mt-2 p-2 rounded-md text-xs ${
+                                                    aiProcessResult.status === 'success'
+                                                        ? 'bg-green-50 border border-green-200 text-green-700'
+                                                        : 'bg-amber-50 border border-amber-200 text-amber-700'
+                                                }`}>
+                                                    {aiProcessResult.status === 'success' ? (
+                                                        <>
+                                                            <div className="font-medium flex items-center gap-1">
+                                                                <Sparkles className="h-3 w-3" />
+                                                                IA extraiu {aiProcessResult.campos_extraidos?.length || 0} campos:
+                                                            </div>
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {aiProcessResult.campos_extraidos?.map((campo: string) => (
+                                                                    <span key={campo} className="px-1.5 py-0.5 bg-green-100 rounded text-green-800">
+                                                                        {campo}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <span>Nenhuma nova informação encontrada na transcrição</span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
