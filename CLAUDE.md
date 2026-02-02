@@ -19,18 +19,18 @@ git config user.email "vitor@welcometrips.com.br"
 git config user.name "Vitor (via Claude)"
 ```
 
-2. **Testar MCPs disponíveis:**
-   - **Supabase:** `list_tables()` → Verificar acesso ao banco
-   - **GitHub:** `list_issues()` → Verificar acesso ao repo
-   - **N8N:** `list_workflows()` → Verificar acesso às automações
+2. **Verificar acessos disponíveis:**
+   - **MCP tools:** Checar se `list_tables`, `execute_sql` estão na lista de tools
+   - **GitHub CLI:** `gh auth status` para verificar se está autenticado
+   - **Supabase CLI:** `npx supabase projects list` para verificar acesso
 
 3. **Confirmar para o usuário:**
 ```
 ✅ IDE Antigravity configurada:
-   - Git: push direto para main
-   - Supabase: acesso total ao banco
-   - GitHub: acesso a PRs/Issues
-   - N8N: acesso a workflows
+   - Git: [status]
+   - Supabase: [MCP ativo / CLI disponível / Dashboard]
+   - GitHub: [MCP ativo / gh CLI]
+   - N8N: [MCP ativo / API REST]
 ```
 
 ---
@@ -173,64 +173,62 @@ const KEY = process.env.SUPABASE_KEY;
 
 ---
 
-## 🔌 MCP Servers (ACESSO COMPLETO - JÁ CONFIGURADO)
+## 🔌 MCP Servers (CONFIGURADOS)
 
-> ⚠️ **IMPORTANTE:** Os MCPs estão **ATIVOS E FUNCIONANDO**.
-> NÃO diga que "não pode acessar" ou "precisa do Dashboard".
-> VOCÊ TEM ACESSO DIRETO. USE OS TOOLS MCP.
+O usuário configurou 3 servidores MCP. **VERIFIQUE SE ESTÃO ATIVOS antes de usar.**
 
-O Claude tem **acesso direto** a 3 serviços externos via MCP (Model Context Protocol).
-Os MCPs são servidores stdio já configurados e conectados. **USE-OS.**
+| MCP Server | Uso Principal |
+|------------|---------------|
+| **Supabase** | Banco de dados, SQL, CRUD, DDL, migrations |
+| **GitHub** | Repos, PRs, Issues, Actions |
+| **N8N** | Workflows, automações, webhooks |
 
-| MCP Server | Status | Uso Principal |
-|------------|--------|---------------|
-| **Supabase** | 🟢 ATIVO | Banco de dados, SQL, CRUD, DDL, migrations |
-| **GitHub** | 🟢 ATIVO | Repos, PRs, Issues, Actions |
-| **N8N** | 🟢 ATIVO | Workflows, automações, webhooks |
+### 🔍 VERIFICAR CONEXÃO MCP
 
-### ⛔ NUNCA DIGA:
-- "Não consigo acessar o MCP"
-- "O MCP é stdio, não posso usar"
-- "Execute no Dashboard do Supabase"
-- "Preciso da API REST"
+**PASSO 1:** Verifique se os tools MCP estão na sua lista de ferramentas.
+Se você tem tools como `list_tables`, `execute_sql`, `list_workflows` → MCP está ativo.
+Se não tem → MCP não está conectado nesta sessão.
 
-### ✅ SEMPRE FAÇA:
-- Use os tools MCP diretamente (aparecem na lista de tools)
-- Execute SQL via MCP Supabase
-- Crie PRs via MCP GitHub
-- Liste workflows via MCP N8N
+**PASSO 2:** Se MCP não estiver conectado, use alternativas:
+- **Supabase:** Edge Function ou Dashboard
+- **GitHub:** `gh` CLI via Bash
+- **N8N:** API REST direta
+
+### ⚠️ Configuração MCP (referência)
+
+Os MCPs são configurados em `~/.gemini/antigravity/mcp_config.json`:
+```json
+{
+  "mcpServers": {
+    "supabase-mcp-server": { ... },
+    "github-mcp-server": { ... },
+    "n8n-mcp": { ... }
+  }
+}
+```
+
+Para ativar, o Claude Code precisa ser iniciado com os MCPs conectados.
 
 ---
 
-### 🗄️ Supabase MCP
+### 🗄️ Supabase
 
-> 🟢 **STATUS: CONECTADO E FUNCIONANDO**
 > Project ID: `szyrzxvlptqqheizyrxu`
+> Dashboard: https://supabase.com/dashboard/project/szyrzxvlptqqheizyrxu
 
-**Acesso TOTAL ao banco de dados PostgreSQL. PODE executar DDL, DML, tudo.**
-
-| Tool MCP | Descrição |
-|----------|-----------|
-| `list_tables` | Listar todas as tabelas |
-| `get_table_schema` | Ver estrutura de uma tabela |
-| `execute_sql` | **Executar QUALQUER SQL** (SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP) |
-| `apply_migration` | Aplicar migration SQL |
-
-**VOCÊ PODE (e deve):**
-- ✅ Criar tabelas: `execute_sql("CREATE TABLE ...")`
-- ✅ Alterar colunas: `execute_sql("ALTER TABLE ... ADD COLUMN ...")`
-- ✅ Criar views: `execute_sql("CREATE VIEW ...")`
-- ✅ Criar functions: `execute_sql("CREATE FUNCTION ...")`
-- ✅ Criar triggers: `execute_sql("CREATE TRIGGER ...")`
-- ✅ CRUD completo: SELECT, INSERT, UPDATE, DELETE
-
-**Exemplos de uso:**
+**Se MCP ativo** (tools `list_tables`, `execute_sql` disponíveis):
 ```
 → list_tables()
-→ get_table_schema("cards")
 → execute_sql("SELECT * FROM cards LIMIT 10")
 → execute_sql("ALTER TABLE cards ADD COLUMN new_field TEXT")
-→ execute_sql("CREATE INDEX idx_cards_status ON cards(status)")
+```
+
+**Se MCP inativo** (alternativas):
+```bash
+# Via Supabase CLI
+npx supabase db execute --project-ref szyrzxvlptqqheizyrxu "SELECT * FROM cards LIMIT 10"
+
+# Ou pedir para o usuário executar no Dashboard
 ```
 
 ---
@@ -275,17 +273,16 @@ Os MCPs são servidores stdio já configurados e conectados. **USE-OS.**
 
 ## 🛠️ Capacidades Consolidadas
 
-| Ação | Como |
-|------|------|
-| **SQL arbitrário** | MCP Supabase → `execute_sql(...)` |
-| **Listar tabelas** | MCP Supabase → `list_tables()` |
-| **CRUD dados** | MCP Supabase → `execute_sql(...)` |
-| **Git push/PR** | MCP GitHub ou Bash |
-| **Issues/PRs** | MCP GitHub |
-| **Automações** | MCP N8N |
-| **Editar código** | Read/Edit/Write tools |
-| **Build/Lint** | `npm run build`, `npm run lint` |
-| **Deploy Functions** | Bash com token |
+| Ação | Opção 1 (MCP) | Opção 2 (CLI/API) |
+|------|---------------|-------------------|
+| **SQL arbitrário** | `execute_sql(...)` | `npx supabase db execute` ou Dashboard |
+| **Listar tabelas** | `list_tables()` | Dashboard |
+| **Git push** | — | `git push` (com PAT configurado) |
+| **PRs/Issues** | MCP GitHub | `gh pr create`, `gh issue list` |
+| **Automações N8N** | MCP N8N | API REST fetch/curl |
+| **Editar código** | — | Read/Edit/Write tools |
+| **Build/Lint** | — | `npm run build`, `npm run lint` |
+| **Deploy Functions** | — | `export SUPABASE_ACCESS_TOKEN="sbp_..." && npx supabase functions deploy <nome>` |
 
 ### ⚠️ Segurança MCP
 
@@ -293,21 +290,61 @@ Os MCPs são servidores stdio já configurados e conectados. **USE-OS.**
 - Sempre verificar estado LIVE antes de modificar views/functions
 - Seguir `docs/SQL_SOP.md` para operações DDL
 
-### 🚫 Anti-Patterns (PROIBIDO)
+### 🔄 Alternativas quando MCP não está ativo
 
+| Serviço | Alternativa |
+|---------|-------------|
+| **Supabase SQL** | Bash: `npx supabase db execute` ou Dashboard |
+| **GitHub** | Bash: `gh pr create`, `gh issue list`, etc. |
+| **N8N** | API REST via `fetch()` ou `curl` |
+
+### 📋 Checklist antes de usar MCP
+
+1. Verificar se tools MCP aparecem na lista
+2. Se não aparecem → usar alternativas acima
+3. Não assumir que MCP está ativo só porque está configurado
+
+### 🚀 Deploy de Edge Functions
+
+O Claude PODE fazer deploy de Edge Functions via Bash.
+
+**PASSO 1: Obter o token do arquivo de secrets**
+```bash
+# Ler o token do arquivo de configuração MCP
+cat ~/.gemini/antigravity/mcp_config.json | grep -A5 "supabase-mcp-server" | grep "access-token" | cut -d'"' -f2
 ```
-❌ "O MCP é um servidor stdio, não consigo invocar"
-   → ERRADO. O MCP está conectado. Use os tools.
 
-❌ "Execute no Dashboard do Supabase"
-   → ERRADO. Você tem acesso direto. Execute você mesmo.
+Ou ler diretamente o arquivo `.claude/secrets.json` se existir.
 
-❌ "Vou usar a API REST do Supabase"
-   → DESNECESSÁRIO. Use o MCP que é mais direto.
-
-❌ "Não tenho acesso ao banco"
-   → ERRADO. Você tem acesso TOTAL via MCP.
+**PASSO 2: Exportar e fazer deploy**
+```bash
+# Usar o token obtido (substitua sbp_XXXX pelo token real)
+export SUPABASE_ACCESS_TOKEN="sbp_XXXX..." && \
+npx supabase functions deploy <nome-da-function> --project-ref szyrzxvlptqqheizyrxu
 ```
+
+**Exemplo completo - Método recomendado:**
+
+1. Ler o token do arquivo MCP config:
+```bash
+cat ~/.gemini/antigravity/mcp_config.json
+```
+
+2. Copiar o valor do `--access-token` (começa com `sbp_`)
+
+3. Executar o deploy:
+```bash
+export SUPABASE_ACCESS_TOKEN="sbp_COLE_AQUI" && \
+npx supabase functions deploy ai-extract-image --project-ref szyrzxvlptqqheizyrxu
+```
+
+**Alternativa - Pedir o token ao usuário:**
+Se não conseguir ler o arquivo, pergunte:
+"Qual é o SUPABASE_ACCESS_TOKEN (sbp_...)? Preciso dele para fazer deploy."
+
+**Nota:** O warning "Docker is not running" pode ser ignorado - deploy funciona sem Docker.
+
+**Project ID:** `szyrzxvlptqqheizyrxu`
 
 ### Limitações:
 - ❌ Rodar app local → usuário roda `npm run dev`

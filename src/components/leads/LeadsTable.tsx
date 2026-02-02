@@ -225,14 +225,14 @@ const columnRenderers: Record<string, (lead: LeadCard) => React.ReactNode> = {
     ),
 
     pessoa_email: (lead) => (
-        <span className="text-gray-600 text-sm truncate max-w-[150px]" title={lead.pessoa_email || ''}>
-            {lead.pessoa_email || '-'}
+        <span className="text-gray-600 text-sm truncate max-w-[150px]" title={(lead as any).pessoa_email || ''}>
+            {(lead as any).pessoa_email || '-'}
         </span>
     ),
 
     pessoa_telefone: (lead) => (
         <span className="text-gray-600 text-sm">
-            {lead.pessoa_telefone || '-'}
+            {(lead as any).pessoa_telefone || '-'}
         </span>
     ),
 

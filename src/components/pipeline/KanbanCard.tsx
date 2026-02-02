@@ -307,11 +307,11 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             value = produtoData?.[fieldId]
         }
         if (value === undefined || value === null) {
-            const marketingData = card.marketing_data as any
+            const marketingData = (card as any).marketing_data as any
             value = marketingData?.[fieldId]
         }
         if (value === undefined || value === null) {
-            const briefingData = card.briefing_inicial as any
+            const briefingData = (card as any).briefing_inicial as any
             value = briefingData?.[fieldId]
         }
 
