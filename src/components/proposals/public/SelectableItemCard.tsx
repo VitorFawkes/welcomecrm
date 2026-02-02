@@ -9,9 +9,10 @@
  * - ALL CONTENT VISIBLE INLINE (no "Ver mais")
  */
 
+import { useState } from 'react'
 import type { ProposalItemWithOptions } from '@/types/proposals'
 import { ITEM_TYPE_CONFIG } from '@/types/proposals'
-import { Check, MapPin, Calendar, Clock, Users, Info } from 'lucide-react'
+import { Check, MapPin, Calendar, Clock, Users, Info, X } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +49,9 @@ export function SelectableItemCard({
     const richContent = item.rich_content as Record<string, any> || {}
     const hasImage = !!item.image_url
 
+    // Image loading state
+    const [imageLoaded, setImageLoaded] = useState(false)
+
     // Format dates helper
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return null
@@ -71,11 +75,19 @@ export function SelectableItemCard({
                     "relative aspect-[16/9] w-full overflow-hidden transition-all",
                     !isSelected && "opacity-60"
                 )}>
+                    {/* Image placeholder */}
+                    {!imageLoaded && (
+                        <div className="absolute inset-0 bg-slate-200 animate-pulse" />
+                    )}
                     <img
                         src={item.image_url!}
                         alt={item.title}
-                        className="w-full h-full object-cover"
+                        className={cn(
+                            "w-full h-full object-cover transition-opacity duration-300",
+                            imageLoaded ? "opacity-100" : "opacity-0"
+                        )}
                         loading="lazy"
+                        onLoad={() => setImageLoaded(true)}
                     />
                     {/* Toggle on image */}
                     <button
@@ -88,9 +100,15 @@ export function SelectableItemCard({
                         aria-label={isSelected ? 'Remover' : 'Adicionar'}
                     >
                         <div className={cn(
-                            "w-6 h-6 rounded-full bg-white shadow-sm transform transition-transform duration-200",
-                            isSelected ? "translate-x-6" : "translate-x-0"
-                        )} />
+                            "w-6 h-6 rounded-full bg-white shadow-sm transform transition-all duration-200 flex items-center justify-center",
+                            isSelected ? "translate-x-6 scale-110" : "translate-x-0 scale-100"
+                        )}>
+                            {isSelected ? (
+                                <Check className="h-3 w-3 text-emerald-600" />
+                            ) : (
+                                <X className="h-3 w-3 text-slate-400" />
+                            )}
+                        </div>
                     </button>
                 </div>
             )}

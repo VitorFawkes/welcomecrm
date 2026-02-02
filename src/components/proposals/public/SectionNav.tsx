@@ -10,7 +10,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { Plane, Building2, Bus, Star, Shield, FileText } from 'lucide-react'
+import { Plane, Building2, Bus, Star, Shield, FileText, Check } from 'lucide-react'
 
 interface Section {
     id: string
@@ -21,6 +21,7 @@ interface Section {
 interface SectionNavProps {
     sections: Section[]
     activeSection?: string
+    completedSections?: string[]
     onSectionClick: (sectionId: string) => void
 }
 
@@ -41,6 +42,7 @@ function cleanTitle(title: string): string {
 export function SectionNav({
     sections,
     activeSection,
+    completedSections = [],
     onSectionClick,
 }: SectionNavProps) {
     const scrollRef = useRef<HTMLDivElement>(null)
@@ -85,18 +87,27 @@ export function SectionNav({
                     {sections.map((section) => {
                         const Icon = SECTION_ICONS[section.section_type] || FileText
                         const isActive = activeSection === section.id
+                        const isCompleted = completedSections.includes(section.id)
 
                         return (
                             <button
                                 key={section.id}
                                 onClick={() => onSectionClick(section.id)}
                                 className={cn(
-                                    "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
+                                    "relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
+                                    "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                                     isActive
                                         ? "bg-slate-900 text-white shadow-sm"
-                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                        : isCompleted
+                                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                 )}
                             >
+                                {isCompleted && !isActive && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                                        <Check className="h-2.5 w-2.5 text-white" />
+                                    </div>
+                                )}
                                 <Icon className="h-4 w-4 flex-shrink-0" />
                                 <span>{cleanTitle(section.title)}</span>
                             </button>

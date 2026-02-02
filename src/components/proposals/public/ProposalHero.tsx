@@ -40,7 +40,7 @@ export function ProposalHero({
 
     return (
         <div
-            className="relative h-[50vh] min-h-[300px] max-h-[400px] w-full"
+            className="relative h-[40vh] min-h-[280px] max-h-[360px] w-full"
             style={backgroundStyle}
         >
             {/* Fallback gradient if no image */}
@@ -85,6 +85,13 @@ export function ProposalHero({
                             )}
                         </div>
                     )}
+                </div>
+
+                {/* Scroll indicator */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-bounce">
+                    <div className="w-6 h-10 rounded-full border-2 border-white/50 flex items-start justify-center p-1.5">
+                        <div className="w-1.5 h-2.5 bg-white/70 rounded-full animate-pulse" />
+                    </div>
                 </div>
             </div>
         </div>

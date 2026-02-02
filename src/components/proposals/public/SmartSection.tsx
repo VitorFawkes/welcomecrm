@@ -24,6 +24,17 @@ function cleanTitle(title: string): string {
     return title.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim()
 }
 
+// Section-specific colors for visual differentiation
+const SECTION_COLORS: Record<string, { bg: string; icon: string }> = {
+    flights: { bg: 'from-sky-50 to-blue-100', icon: 'text-sky-600' },
+    hotels: { bg: 'from-amber-50 to-orange-100', icon: 'text-amber-600' },
+    experiences: { bg: 'from-purple-50 to-pink-100', icon: 'text-purple-600' },
+    transfers: { bg: 'from-emerald-50 to-teal-100', icon: 'text-emerald-600' },
+    insurance: { bg: 'from-slate-50 to-gray-100', icon: 'text-slate-600' },
+    services: { bg: 'from-indigo-50 to-violet-100', icon: 'text-indigo-600' },
+    custom: { bg: 'from-blue-50 to-indigo-100', icon: 'text-blue-600' },
+}
+
 interface Selection {
     selected: boolean
     optionId?: string
@@ -253,6 +264,7 @@ export function SmartSection({
     // Normal section rendering
     const config = SECTION_TYPE_CONFIG[section.section_type]
     const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[config.icon] || LucideIcons.FileText
+    const sectionColors = SECTION_COLORS[section.section_type] || SECTION_COLORS.custom
 
     const displayMode = useMemo(() => detectDisplayMode(section), [section])
     const groups = useMemo(() => groupItems(section), [section])
@@ -262,12 +274,12 @@ export function SmartSection({
     return (
         <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             {/* Section Header */}
-            <header className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <header className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-white lg:sticky lg:top-12 lg:z-10">
                 <div className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center",
-                    "bg-gradient-to-br from-blue-50 to-indigo-100"
+                    `bg-gradient-to-br ${sectionColors.bg}`
                 )}>
-                    <IconComponent className="h-5 w-5 text-blue-600" />
+                    <IconComponent className={cn("h-5 w-5", sectionColors.icon)} />
                 </div>
                 <div className="flex-1">
                     <h2 className="font-semibold text-slate-900">{cleanTitle(section.title)}</h2>
