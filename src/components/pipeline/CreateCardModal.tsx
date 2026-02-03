@@ -206,6 +206,24 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
         }
     }, [isOpen, showContactSelector])
 
+    const { profile } = useAuth()
+
+    // Helper to get initial owner values based on user's role
+    const initialOwners = useMemo(() => {
+        const role = profile?.role
+        const userId = profile?.id || null
+        const userName = profile?.nome || null
+
+        return {
+            sdr_owner_id: role === 'sdr' ? userId : null,
+            sdr_owner_nome: role === 'sdr' ? userName : null,
+            vendas_owner_id: role === 'vendas' ? userId : null,
+            vendas_owner_nome: role === 'vendas' ? userName : null,
+            pos_owner_id: role === 'pos_venda' ? userId : null,
+            pos_owner_nome: role === 'pos_venda' ? userName : null,
+        }
+    }, [profile?.role, profile?.id, profile?.nome])
+
     // Core form data
     const [formData, setFormData] = useState({
         titulo: '',
@@ -214,22 +232,42 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
         pessoa_principal_nome: null as string | null,
         sdr_owner_id: null as string | null,
         sdr_owner_nome: null as string | null,
+        vendas_owner_id: null as string | null,
+        vendas_owner_nome: null as string | null,
+        pos_owner_id: null as string | null,
+        pos_owner_nome: null as string | null,
         selectedStageId: null as string | null
     })
 
     // Dynamic fields stored in briefing_inicial (for future use)
-    const [dynamicFields] = useState<Record<string, any>>({})
+    const [dynamicFields] = useState<Record<string, unknown>>({})
 
     // Get allowed stages for user's team
     const { allowedStages, isLoading: loadingStages, isAdmin } = useAllowedStages(formData.produto)
-    const { profile } = useAuth()
 
-    // Auto-select first allowed stage when stages load
+    // Derived: effective stage ID (user selection or first available)
+    const effectiveStageId = formData.selectedStageId ?? (allowedStages.length > 0 ? allowedStages[0].id : null)
+
+    // Track last isOpen state to detect modal opening
+    const wasOpenRef = useRef(false)
+
+    // Reset form with auto-filled owners when modal opens
     useEffect(() => {
-        if (allowedStages.length > 0 && !formData.selectedStageId) {
-            setFormData(prev => ({ ...prev, selectedStageId: allowedStages[0].id }))
+        if (isOpen && !wasOpenRef.current) {
+            // Modal just opened - reset with initial owners based on user's role
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setFormData({
+                titulo: '',
+                produto: 'TRIPS',
+                pessoa_principal_id: null,
+                pessoa_principal_nome: null,
+                ...initialOwners,
+                selectedStageId: null
+            })
         }
-    }, [allowedStages, formData.selectedStageId])
+        wasOpenRef.current = isOpen
+    }, [isOpen, initialOwners])
+
 
     // Get pipeline ID for the selected product
     const { data: pipeline } = useQuery({
@@ -250,13 +288,19 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
 
 
     // Title and stage are required for card creation
-    const canSubmit = formData.titulo.trim().length > 0 && !!formData.selectedStageId && !!pipeline
+    const canSubmit = formData.titulo.trim().length > 0 && !!effectiveStageId && !!pipeline
 
     const { toast } = useToast()
 
     const createCardMutation = useMutation({
         mutationFn: async () => {
-            if (!pipeline || !formData.selectedStageId) throw new Error('Pipeline or stage not selected')
+            if (!pipeline || !effectiveStageId) throw new Error('Pipeline or stage not selected')
+
+            // Determine current owner based on role hierarchy: SDR > Planner > Pós > logged user
+            const currentOwnerId = formData.sdr_owner_id
+                ?? formData.vendas_owner_id
+                ?? formData.pos_owner_id
+                ?? profile?.id
 
             // Create the card with governance data in briefing_inicial
             const { data: card, error } = await supabase
@@ -266,13 +310,16 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                     produto: formData.produto,
                     pessoa_principal_id: formData.pessoa_principal_id,
                     pipeline_id: pipeline.id,
-                    pipeline_stage_id: formData.selectedStageId,
-                    sdr_owner_id: formData.sdr_owner_id, // Keep null if not selected - important for reporting
-                    dono_atual_id: formData.sdr_owner_id ?? profile?.id, // Current owner can default to logged user
+                    pipeline_stage_id: effectiveStageId,
+                    sdr_owner_id: formData.sdr_owner_id,
+                    vendas_owner_id: formData.vendas_owner_id,
+                    pos_owner_id: formData.pos_owner_id,
+                    dono_atual_id: currentOwnerId,
                     origem: 'manual',
                     status_comercial: 'em_andamento',
                     moeda: 'BRL',
                     briefing_inicial: dynamicFields
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } as any)
                 .select()
                 .single()
@@ -288,14 +335,13 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                 type: "success"
             })
             onClose()
-            // Reset form
+            // Reset form with auto-fill based on user's role
             setFormData({
                 titulo: '',
                 produto: 'TRIPS',
                 pessoa_principal_id: null,
                 pessoa_principal_nome: null,
-                sdr_owner_id: null,
-                sdr_owner_nome: null,
+                ...initialOwners,
                 selectedStageId: null
             })
         },
@@ -413,6 +459,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                                 Atribuição
                             </h3>
 
+                            {/* SDR Responsável */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
                                     SDR Responsável
@@ -426,6 +473,42 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                                     })}
                                     product={formData.produto}
                                     showNoSdrOption={true}
+                                />
+                            </div>
+
+                            {/* Planner Responsável */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    Planner Responsável
+                                </label>
+                                <OwnerSelector
+                                    value={formData.vendas_owner_id}
+                                    onChange={(id, nome) => setFormData({
+                                        ...formData,
+                                        vendas_owner_id: id,
+                                        vendas_owner_nome: nome
+                                    })}
+                                    product={formData.produto}
+                                    showNoSdrOption={true}
+                                    placeholder="Selecionar Planner"
+                                />
+                            </div>
+
+                            {/* Pós Responsável */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    Pós-venda Responsável
+                                </label>
+                                <OwnerSelector
+                                    value={formData.pos_owner_id}
+                                    onChange={(id, nome) => setFormData({
+                                        ...formData,
+                                        pos_owner_id: id,
+                                        pos_owner_nome: nome
+                                    })}
+                                    product={formData.produto}
+                                    showNoSdrOption={true}
+                                    placeholder="Selecionar Pós-venda"
                                 />
                             </div>
                         </section>
@@ -453,7 +536,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                                 ) : (
                                     <QuickStageSelector
                                         stages={allowedStages}
-                                        selectedStageId={formData.selectedStageId}
+                                        selectedStageId={effectiveStageId}
                                         onSelect={(id) => setFormData({ ...formData, selectedStageId: id })}
                                         showMore={showMoreStages}
                                         onToggleMore={() => setShowMoreStages(!showMoreStages)}

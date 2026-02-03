@@ -10,8 +10,11 @@ import { SyncGovernancePanel } from './SyncGovernancePanel';
 import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
 import { InboundFieldMappingTab } from './InboundFieldMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
+import { OutboundStageMappingTab } from './OutboundStageMappingTab';
+import { OutboundLogsTab } from './OutboundLogsTab';
 import { ACFieldManager } from './ACFieldManager';
-import { CardAutoCreationTab } from './CardAutoCreationTab';
+import { InboundTriggerRulesTab } from './InboundTriggerRulesTab';
+import { OutboundTriggerRulesTab } from './OutboundTriggerRulesTab';
 
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -23,14 +26,15 @@ import {
     FileText,
     Settings,
     Zap,
-    Copy
+    Sparkles,
+    ArrowUpRight
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 const AC_INTEGRATION_ID = 'a2141b92-561f-4514-92b4-9412a068d236';
 
 export function IntegrationsPage() {
-    const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer' | 'active_campaign' | 'auto_card_creation' | 'api_keys' | 'api_docs'>('list');
+    const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer' | 'active_campaign' | 'api_keys' | 'api_docs'>('list');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<IntegrationType>('input');
@@ -42,38 +46,11 @@ export function IntegrationsPage() {
             setView('builder');
         } else if (id === 'active_campaign') {
             setView('active_campaign');
-        } else if (id === 'auto_card_creation') {
-            setView('auto_card_creation');
         } else if (id) {
             setSelectedId(id);
             setView('builder');
         }
     };
-
-    // --- Auto Card Creation View ---
-    if (view === 'auto_card_creation') {
-        return (
-            <div className="h-full p-6 space-y-6 pb-20 overflow-y-auto">
-                {/* Header */}
-                <div className="flex items-center gap-4 border-b border-slate-200 pb-4">
-                    <Button variant="ghost" size="icon" onClick={() => setView('list')}>
-                        <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <div className="flex-1">
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            Criação Automática de Cards
-                        </h1>
-                        <p className="text-slate-500 text-sm">
-                            Configure regras para criar cards automaticamente quando um card entrar em determinada etapa.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Content */}
-                <CardAutoCreationTab />
-            </div>
-        );
-    }
 
     // --- Active Campaign Dashboard (Redesigned) ---
     if (view === 'active_campaign') {
@@ -118,6 +95,20 @@ export function IntegrationsPage() {
                         >
                             <FileText className="w-4 h-4" />
                             Campos
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="rules"
+                            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            Regras de Criação
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="outbound"
+                            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
+                        >
+                            <ArrowUpRight className="w-4 h-4" />
+                            Saída (CRM → AC)
                         </TabsTrigger>
                         <TabsTrigger
                             value="settings"
@@ -180,7 +171,41 @@ export function IntegrationsPage() {
                         </Tabs>
                     </TabsContent>
 
-                    {/* Tab 4: Settings */}
+                    {/* Tab 4: Rules */}
+                    <TabsContent value="rules">
+                        <InboundTriggerRulesTab integrationId={AC_INTEGRATION_ID} />
+                    </TabsContent>
+
+                    {/* Tab 5: Outbound */}
+                    <TabsContent value="outbound" className="space-y-6">
+                        <Tabs defaultValue="rules" className="space-y-4">
+                            <TabsList className="bg-slate-50">
+                                <TabsTrigger value="rules" className="text-sm">
+                                    Regras de Saida
+                                </TabsTrigger>
+                                <TabsTrigger value="logs" className="text-sm">
+                                    Fila de Eventos
+                                </TabsTrigger>
+                                <TabsTrigger value="stages" className="text-sm">
+                                    Mapeamento de Etapas
+                                </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="rules">
+                                <OutboundTriggerRulesTab integrationId={AC_INTEGRATION_ID} />
+                            </TabsContent>
+
+                            <TabsContent value="logs">
+                                <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />
+                            </TabsContent>
+
+                            <TabsContent value="stages">
+                                <OutboundStageMappingTab integrationId={AC_INTEGRATION_ID} />
+                            </TabsContent>
+                        </Tabs>
+                    </TabsContent>
+
+                    {/* Tab 6: Settings */}
                     <TabsContent value="settings">
                         <IntegrationSettings />
                     </TabsContent>
@@ -227,25 +252,6 @@ export function IntegrationsPage() {
                                         Sincronização oficial de Deals e Contatos.
                                         <br />
                                         <span className="text-xs text-blue-600 font-medium">Pipeline TRIPS • Bidirecional</span>
-                                    </CardDescription>
-                                </CardHeader>
-                            </Card>
-
-                            <Card
-                                className="hover:bg-purple-50/50 transition-all duration-200 cursor-pointer border-purple-200/50 bg-gradient-to-br from-white to-purple-50/30 shadow-sm hover:shadow-md"
-                                onClick={() => handleSelect('auto_card_creation')}
-                            >
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-slate-900">
-                                        <div className="w-8 h-8 rounded-lg bg-purple-500 flex items-center justify-center">
-                                            <Copy className="w-4 h-4 text-white" />
-                                        </div>
-                                        Criação Automática de Cards
-                                    </CardTitle>
-                                    <CardDescription className="text-slate-500">
-                                        Crie cards automaticamente quando outro card entra em uma etapa.
-                                        <br />
-                                        <span className="text-xs text-purple-600 font-medium">Automação Interna • Multi-pipeline</span>
                                     </CardDescription>
                                 </CardHeader>
                             </Card>

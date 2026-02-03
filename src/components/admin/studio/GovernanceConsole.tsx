@@ -7,7 +7,6 @@ import {
     CheckCircle2,
     AlertCircle,
     Trash2,
-    ArrowRight,
     LayoutList,
     Copy,
     X,
@@ -43,7 +42,18 @@ interface ActionRequirement {
     task_tipo?: string
     task_require_completed?: boolean
     field_key?: string
+    // Fontes que podem ignorar este requisito específico
+    bypass_sources?: string[]
 }
+
+// Opções de fontes de bypass (para uso futuro em edição de regras)
+// TODO: Implementar UI de edição de bypass_sources por regra
+// const BYPASS_SOURCE_OPTIONS = [
+//     { value: 'active_campaign', label: 'ActiveCampaign' },
+//     { value: 'manual_sync', label: 'Sync Manual' },
+//     { value: 'import', label: 'Importação' },
+//     { value: 'api', label: 'API Externa' }
+// ]
 
 export const SPECIAL_RULES = [
     { key: 'lost_reason_required', label: 'Motivo de Perda Obrigatório', icon: ShieldAlert }
@@ -89,13 +99,13 @@ export default function GovernanceConsole() {
         }
     })
 
-    // 2.5 Fetch System Fields
+    // 2.5 Fetch System Fields (with section for grouping)
     const { data: systemFields } = useQuery({
         queryKey: ['system-fields-governance'],
         queryFn: async () => {
             const { data } = await supabase
                 .from('system_fields')
-                .select('key, label, type')
+                .select('key, label, type, section')
                 .eq('active', true)
                 .order('label')
             return data || []
@@ -137,18 +147,6 @@ export default function GovernanceConsole() {
                 .from('sections')
                 .select('key, label, order_index')
                 .order('order_index')
-            return data || []
-        }
-    })
-
-    // 4. Fetch Active Workflows
-    const { data: activeWorkflows } = useQuery({
-        queryKey: ['active-workflows-context'],
-        queryFn: async () => {
-            const { data } = await supabase
-                .from('workflows')
-                .select('id, name, trigger_config, is_active')
-                .eq('is_active', true)
             return data || []
         }
     })
@@ -236,10 +234,6 @@ export default function GovernanceConsole() {
     const stageRules = selectedStageId === 'all'
         ? requirements || []
         : requirements?.filter(r => r.stage_id === selectedStageId) || []
-
-    const stageWorkflows = selectedStageId === 'all'
-        ? []
-        : activeWorkflows?.filter(w => (w.trigger_config as any)?.stage_id === selectedStageId) || []
 
     // Hydrate Rules (Self-Healing)
     const hydratedRules = useMemo(() => {
@@ -433,27 +427,6 @@ export default function GovernanceConsole() {
                             )}
                         </div>
 
-                        {/* Context: Active Workflows - Hide in All mode */}
-                        {selectedStageId !== 'all' && (
-                            <div className="mb-8 bg-blue-50/50 border border-blue-100 rounded-xl p-5">
-                                <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                                    <ActivityIcon className="w-4 h-4" />
-                                    Automações Ativas (Contexto)
-                                </h4>
-                                {stageWorkflows.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {stageWorkflows.map(w => (
-                                            <div key={w.id} className="flex items-center gap-2 text-sm text-blue-700 bg-white/60 px-3 py-2 rounded-lg border border-blue-100/50">
-                                                <ArrowRight className="w-3 h-3" />
-                                                {w.name}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-blue-400 italic">Nenhum workflow automático configurado para iniciar nesta etapa.</p>
-                                )}
-                            </div>
-                        )}
 
                         {/* Rules List - Grouped */}
                         <div className="space-y-8">
@@ -616,7 +589,6 @@ export default function GovernanceConsole() {
                         <p>Selecione uma etapa ao lado para começar</p>
                     </div>
                 )}
-
             </div>
 
             {/* Bulk Actions Floating Bar - Fixed relative to the main container */}
@@ -694,6 +666,7 @@ export default function GovernanceConsole() {
     )
 }
 
+
 function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any, stageName?: string, selected: boolean, onToggle: () => void, onDelete: () => void }) {
     return (
         <div className={cn(
@@ -726,7 +699,7 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any
                         {rule._label}
                         {rule._isInvalid && <span className="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full no-underline">Inválido</span>}
                     </h4>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <p className="text-xs text-gray-500 flex items-center gap-1 flex-wrap">
                         {stageName && (
                             <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium mr-1">
                                 {stageName}
@@ -738,6 +711,11 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any
                                 Bloqueia Avanço
                             </span>
                         ) : "Apenas Aviso"}
+                        {rule.bypass_sources && rule.bypass_sources.length > 0 && (
+                            <span className="ml-2 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-medium" title={`Bypass: ${rule.bypass_sources.join(', ')}`}>
+                                🔓 {rule.bypass_sources.length} bypass
+                            </span>
+                        )}
                     </p>
                 </div>
             </div>
@@ -753,24 +731,5 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any
                 <Trash2 className="w-4 h-4" />
             </Button>
         </div>
-    )
-}
-
-function ActivityIcon(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-        </svg>
     )
 }

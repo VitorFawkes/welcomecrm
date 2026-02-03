@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
-import { AlertTriangle, ExternalLink } from 'lucide-react'
+import { AlertTriangle, ExternalLink, FileText, CheckCircle2, LayoutList } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 interface QualityGateModalProps {
@@ -10,7 +10,16 @@ interface QualityGateModalProps {
     cardId: string
     targetStageName: string
     missingFields: { key: string, label: string }[]
+    missingProposals?: { label: string, min_status: string }[]
+    missingTasks?: { label: string, task_tipo: string }[]
     initialData?: Record<string, any>  // Keep for API compatibility
+}
+
+const PROPOSAL_STATUS_LABELS: Record<string, string> = {
+    'sent': 'Enviada',
+    'viewed': 'Visualizada',
+    'in_progress': 'Em Análise',
+    'accepted': 'Aceita'
 }
 
 export default function QualityGateModal({
@@ -19,6 +28,8 @@ export default function QualityGateModal({
     cardId,
     targetStageName,
     missingFields,
+    missingProposals = [],
+    missingTasks = [],
 }: QualityGateModalProps) {
     const navigate = useNavigate()
 
@@ -27,38 +38,91 @@ export default function QualityGateModal({
         navigate(`/cards/${cardId}`)
     }
 
+    const hasFields = missingFields.length > 0
+    const hasProposals = missingProposals.length > 0
+    const hasTasks = missingTasks.length > 0
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[450px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-amber-600">
                         <AlertTriangle className="h-5 w-5" />
-                        Campos Obrigatórios
+                        Requisitos Obrigatórios
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="py-4 space-y-4">
                     <p className="text-sm text-gray-600">
                         Para mover para a etapa <strong className="text-gray-900">{targetStageName}</strong>,
-                        é necessário preencher os seguintes campos:
+                        é necessário atender os seguintes requisitos:
                     </p>
 
-                    <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
-                        <ul className="space-y-2">
-                            {missingFields.map(field => (
-                                <li
-                                    key={field.key}
-                                    className="flex items-center gap-2 text-sm text-amber-800"
-                                >
-                                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0" />
-                                    {field.label}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                    {/* Campos Obrigatórios */}
+                    {hasFields && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2 text-blue-700 font-medium text-sm">
+                                <LayoutList className="w-4 h-4" />
+                                Campos Obrigatórios
+                            </div>
+                            <ul className="space-y-1.5">
+                                {missingFields.map(field => (
+                                    <li
+                                        key={field.key}
+                                        className="flex items-center gap-2 text-sm text-blue-800"
+                                    >
+                                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                                        {field.label}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {/* Propostas Obrigatórias */}
+                    {hasProposals && (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2 text-emerald-700 font-medium text-sm">
+                                <FileText className="w-4 h-4" />
+                                Propostas Obrigatórias
+                            </div>
+                            <ul className="space-y-1.5">
+                                {missingProposals.map((proposal, idx) => (
+                                    <li
+                                        key={idx}
+                                        className="flex items-center gap-2 text-sm text-emerald-800"
+                                    >
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full flex-shrink-0" />
+                                        Proposta {PROPOSAL_STATUS_LABELS[proposal.min_status] || proposal.min_status}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {/* Tarefas Obrigatórias */}
+                    {hasTasks && (
+                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2 text-purple-700 font-medium text-sm">
+                                <CheckCircle2 className="w-4 h-4" />
+                                Tarefas Obrigatórias
+                            </div>
+                            <ul className="space-y-1.5">
+                                {missingTasks.map((task, idx) => (
+                                    <li
+                                        key={idx}
+                                        className="flex items-center gap-2 text-sm text-purple-800"
+                                    >
+                                        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full flex-shrink-0" />
+                                        {task.label} (concluída)
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     <p className="text-xs text-gray-500">
-                        Acesse a página do card para preencher os campos necessários.
+                        Acesse a página do card para atender os requisitos necessários.
                     </p>
                 </div>
 

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { toast } from 'sonner';
-import { Check, RefreshCw, Settings, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Check, RefreshCw, Settings, ChevronDown, ChevronRight, Loader2, ArrowRightLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSections, useSectionLabelsMap } from '@/hooks/useSections';
 
@@ -71,6 +71,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
     const queryClient = useQueryClient();
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['trip_info', 'observacoes_criticas']));
     const [syncingAC, setSyncingAC] = useState(false);
+    const [syncingMappings, setSyncingMappings] = useState(false);
     const [selectedPipelineId, setSelectedPipelineId] = useState<string>('8');
     const [selectedFase, setSelectedFase] = useState<string>(''); // Empty = show ALL fields
 
@@ -331,6 +332,28 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         }
     };
 
+    // Sync field mappings from inbound to outbound
+    const handleSyncMappings = async () => {
+        setSyncingMappings(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('sync-field-mappings');
+            if (error) throw error;
+
+            const newCount = data?.new_outbound_created || 0;
+            if (newCount === 0) {
+                toast.info('Todos os campos já estão sincronizados!');
+            } else {
+                toast.success(`✅ ${newCount} novos mapeamentos criados a partir do inbound!`);
+            }
+            queryClient.invalidateQueries({ queryKey: ['outbound-field-mappings'] });
+        } catch (e: unknown) {
+            const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
+            toast.error(`Erro ao sincronizar mapeamentos: ${errorMessage}`);
+        } finally {
+            setSyncingMappings(false);
+        }
+    };
+
     const toggleSection = (section: string) => {
         setExpandedSections(prev => {
             const next = new Set(prev);
@@ -371,18 +394,33 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                                 Configure quais campos do CRM sincronizam para o ActiveCampaign.
                             </CardDescription>
                         </div>
-                        <Button
-                            variant="outline"
-                            onClick={handleSyncACFields}
-                            disabled={syncingAC}
-                        >
-                            {syncingAC ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                                <RefreshCw className="w-4 h-4 mr-2" />
-                            )}
-                            Sincronizar Campos AC
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={handleSyncMappings}
+                                disabled={syncingMappings}
+                                title="Copia mapeamentos do Inbound para o Outbound"
+                            >
+                                {syncingMappings ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                    <ArrowRightLeft className="w-4 h-4 mr-2" />
+                                )}
+                                Espelhar do Inbound
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleSyncACFields}
+                                disabled={syncingAC}
+                            >
+                                {syncingAC ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                )}
+                                Sincronizar Campos AC
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
             </Card>

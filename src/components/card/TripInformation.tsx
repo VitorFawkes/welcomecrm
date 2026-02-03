@@ -14,16 +14,24 @@ import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { Checkbox } from '../ui/checkbox'
 
+import type { EpocaViagem } from '../pipeline/fields/FlexibleDateField'
+import type { DuracaoViagem } from '../pipeline/fields/FlexibleDurationField'
+import SmartBudgetField, { type OrcamentoViagem } from '../pipeline/fields/SmartBudgetField'
+
 interface TripsProdutoData {
-    orcamento?: {
+    // New flexible types
+    orcamento?: OrcamentoViagem | {
+        // Legacy format support
         total?: number
         por_pessoa?: number
     }
-    epoca_viagem?: {
+    epoca_viagem?: EpocaViagem | {
+        // Legacy format support
         inicio?: string
         fim?: string
         flexivel?: boolean
     }
+    duracao_viagem?: DuracaoViagem
     destinos?: string[]
     origem?: string
     origem_lead?: string
@@ -246,28 +254,68 @@ export default function TripInformation({ card }: TripInformationProps) {
         mutationFn: async ({ newData, target }: { newData: TripsProdutoData, target: 'produto_data' | 'briefing_inicial' }) => {
             const updates: Record<string, unknown> = { [target]: newData }
 
-            // If updating 'produto_data' (Planner Proposal), sync legacy columns
+            // Helper to sync normalized columns from produto_data
+            const syncNormalizedColumns = (data: TripsProdutoData) => {
+                // Sync orcamento -> valor_estimado
+                const orcamento = data.orcamento as OrcamentoViagem | undefined
+                if (orcamento) {
+                    if ('total_calculado' in orcamento && orcamento.total_calculado) {
+                        updates.valor_estimado = orcamento.total_calculado
+                    } else if ('total' in orcamento && orcamento.total) {
+                        updates.valor_estimado = orcamento.total
+                    } else if ('valor' in orcamento && orcamento.tipo === 'total' && orcamento.valor) {
+                        updates.valor_estimado = orcamento.valor
+                    }
+                }
+
+                // Sync epoca_viagem -> normalized columns
+                const epoca = data.epoca_viagem as EpocaViagem | undefined
+                if (epoca) {
+                    if ('tipo' in epoca) {
+                        // New format
+                        updates.epoca_tipo = epoca.tipo
+                        updates.epoca_mes_inicio = epoca.mes_inicio || null
+                        updates.epoca_mes_fim = epoca.mes_fim || null
+                        updates.epoca_ano = epoca.ano || null
+
+                        // Sync legacy columns for data_exata
+                        if (epoca.tipo === 'data_exata') {
+                            updates.data_viagem_inicio = epoca.data_inicio || null
+                            updates.data_viagem_fim = epoca.data_fim || null
+                        } else {
+                            updates.data_viagem_inicio = null
+                            updates.data_viagem_fim = null
+                        }
+                    } else {
+                        // Legacy fallback
+                        const legacy = epoca as any
+                        if (legacy.inicio || legacy.fim) {
+                            updates.data_viagem_inicio = legacy.inicio || null
+                            updates.data_viagem_fim = legacy.fim || null
+                        }
+                    }
+                }
+
+                // Sync duracao_viagem -> normalized columns
+                const duracao = data.duracao_viagem as DuracaoViagem | undefined
+                if (duracao) {
+                    updates.duracao_dias_min = duracao.dias_min || null
+                    updates.duracao_dias_max = duracao.dias_max || null
+                }
+            }
+
+            // If updating 'produto_data' (Planner Proposal), sync normalized columns
             if (target === 'produto_data') {
-                if (newData.orcamento?.total) updates.valor_estimado = newData.orcamento.total
-                if (newData.epoca_viagem?.inicio) updates.data_viagem_inicio = newData.epoca_viagem.inicio
-                else updates.data_viagem_inicio = null
-                if (newData.epoca_viagem?.fim) updates.data_viagem_fim = newData.epoca_viagem.fim
-                else updates.data_viagem_fim = null
+                syncNormalizedColumns(newData)
             }
             // If updating 'briefing_inicial' (SDR Correction), ALSO sync 'produto_data' IF we are in SDR stage
-            // This keeps them in sync until the Planner starts diverging
             else if (target === 'briefing_inicial') {
                 const sdrPhase = phases?.find(p => p.slug === SystemPhase.SDR)
                 const isSdr = sdrPhase && card.fase === sdrPhase.name
 
                 if (isSdr) {
                     updates.produto_data = newData
-                    // And sync legacy
-                    if (newData.orcamento?.total) updates.valor_estimado = newData.orcamento.total
-                    if (newData.epoca_viagem?.inicio) updates.data_viagem_inicio = newData.epoca_viagem.inicio
-                    else updates.data_viagem_inicio = null
-                    if (newData.epoca_viagem?.fim) updates.data_viagem_fim = newData.epoca_viagem.fim
-                    else updates.data_viagem_fim = null
+                    syncNormalizedColumns(newData)
                 }
             }
 
@@ -434,6 +482,8 @@ export default function TripInformation({ card }: TripInformationProps) {
                                 onEdit={() => handleFieldEdit(field.key)}
                                 correctionMode={correctionMode}
                                 isPlanner={viewMode === SystemPhase.PLANNER} // Controls "SDR Original" display
+                                cardId={card.id}
+                                showLockButton={!correctionMode} // Mostra lock quando não está em modo correção
                             />
                         ))}
                     </div>
@@ -542,8 +592,9 @@ export default function TripInformation({ card }: TripInformationProps) {
             </EditModal>
 
             {/* Modal de Edição Genérico via UniversalFieldRenderer */}
+            {/* Exclui campos que têm modais específicos: motivo, destinos, orcamento, taxa_planejamento */}
             <EditModal
-                isOpen={!!editingField && editingField !== 'orcamento' && editingField !== 'destinos'}
+                isOpen={!!editingField && !['motivo', 'destinos', 'orcamento', 'taxa_planejamento'].includes(editingField)}
                 onClose={handleCloseModal}
                 onSave={handleFieldSave}
                 title={visibleFields.find(f => f.key === editingField)?.label || 'Editar Campo'}
@@ -568,97 +619,12 @@ export default function TripInformation({ card }: TripInformationProps) {
                 isSaving={updateCardMutation.isPending}
                 isCorrection={correctionMode}
             >
-                <div className="space-y-4">
-                    {/* Traveler Count Display/Edit for Context */}
-                    <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 mb-2">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-indigo-800 uppercase tracking-wide">Viajantes</label>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="number"
-                                    value={editedData.quantidade_viajantes || ''}
-                                    onChange={(e) => {
-                                        const qtd = parseInt(e.target.value) || 0
-                                        setEditedData(prev => {
-                                            const newData = { ...prev, quantidade_viajantes: qtd }
-                                            // Recalculate Total if Per Person exists
-                                            if (prev.orcamento?.por_pessoa) {
-                                                newData.orcamento = {
-                                                    ...prev.orcamento,
-                                                    total: prev.orcamento.por_pessoa * qtd
-                                                }
-                                            }
-                                            return newData
-                                        })
-                                    }}
-                                    className="w-20 h-8 text-right bg-white border-indigo-200 focus:border-indigo-500"
-                                    placeholder="0"
-                                />
-                                <span className="text-sm text-indigo-600 font-medium">pessoas</span>
-                            </div>
-                        </div>
-                        <p className="text-[10px] text-indigo-600 mt-1">
-                            Usado para calcular automaticamente os valores abaixo.
-                        </p>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento Total (R$)</label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                            <Input
-                                type="number"
-                                value={editedData.orcamento?.total || ''}
-                                onChange={(e) => {
-                                    const newTotal = parseFloat(e.target.value) || 0
-                                    setEditedData(prev => {
-                                        const qtd = prev.quantidade_viajantes || 0
-                                        const newData = {
-                                            ...prev,
-                                            orcamento: {
-                                                ...prev.orcamento,
-                                                total: newTotal,
-                                                // Auto-calculate per person if travelers > 0
-                                                por_pessoa: qtd > 0 ? newTotal / qtd : prev.orcamento?.por_pessoa
-                                            }
-                                        }
-                                        return newData
-                                    })
-                                }}
-                                className="pl-12"
-                                placeholder="0,00"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Orçamento por Pessoa (R$)</label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                            <Input
-                                type="number"
-                                value={editedData.orcamento?.por_pessoa || ''}
-                                onChange={(e) => {
-                                    const newPorPessoa = parseFloat(e.target.value) || 0
-                                    setEditedData(prev => {
-                                        const qtd = prev.quantidade_viajantes || 0
-                                        const newData = {
-                                            ...prev,
-                                            orcamento: {
-                                                ...prev.orcamento,
-                                                por_pessoa: newPorPessoa,
-                                                // Auto-calculate total if travelers > 0
-                                                total: qtd > 0 ? newPorPessoa * qtd : prev.orcamento?.total
-                                            }
-                                        }
-                                        return newData
-                                    })
-                                }}
-                                className="pl-12"
-                                placeholder="0,00"
-                            />
-                        </div>
-                    </div>
-                </div>
+                <SmartBudgetField
+                    label=""
+                    value={editedData.orcamento}
+                    onChange={(val: OrcamentoViagem) => setEditedData({ ...editedData, orcamento: val })}
+                    quantidadeViajantes={editedData.quantidade_viajantes || 0}
+                />
             </EditModal>
 
             <EditModal

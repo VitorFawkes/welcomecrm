@@ -15,6 +15,53 @@ import { ProposalHero } from './ProposalHero'
 import { SectionNav } from './SectionNav'
 import { SmartSection } from './SmartSection'
 import { AcceptProposalModal } from './AcceptProposalModal'
+import { Plane, Building2, Bus, Star, Shield, Briefcase, FileText } from 'lucide-react'
+
+// Section icons map (reserved for future use)
+// @ts-expect-error Reserved for future use
+const _SECTION_ICONS: Record<string, React.ElementType> = {
+    flights: Plane,
+    hotels: Building2,
+    transfers: Bus,
+    experiences: Star,
+    insurance: Shield,
+    services: Briefcase,
+    custom: FileText,
+}
+
+// Hook for animated number counter
+function useAnimatedNumber(value: number, duration = 300) {
+    const [display, setDisplay] = useState(value)
+    const animationRef = useRef<number | undefined>(undefined)
+
+    useEffect(() => {
+        const start = display
+        const diff = value - start
+        if (Math.abs(diff) < 1) {
+            setDisplay(value)
+            return
+        }
+
+        const startTime = performance.now()
+
+        const tick = (now: number) => {
+            const elapsed = now - startTime
+            const progress = Math.min(elapsed / duration, 1)
+            const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+            setDisplay(start + diff * eased)
+            if (progress < 1) {
+                animationRef.current = requestAnimationFrame(tick)
+            }
+        }
+
+        animationRef.current = requestAnimationFrame(tick)
+        return () => {
+            if (animationRef.current) cancelAnimationFrame(animationRef.current)
+        }
+    }, [value, duration])
+
+    return Math.round(display)
+}
 
 interface ProposalMobileViewerProps {
     proposal: ProposalFull
@@ -121,11 +168,13 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
         return () => container.removeEventListener('scroll', handleScroll)
     }, [])
 
-    // Scroll to section using scrollIntoView
+    // Scroll to section with offset for sticky nav
     const handleSectionClick = useCallback((sectionId: string) => {
         const el = sectionRefs.current[sectionId]
         if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            const offset = 70 // altura do SectionNav sticky
+            const y = el.getBoundingClientRect().top + window.scrollY - offset
+            window.scrollTo({ top: y, behavior: 'smooth' })
         }
     }, [])
 
@@ -239,6 +288,32 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
     // Modal state
     const [showAcceptModal, setShowAcceptModal] = useState(false)
 
+    // Animated total for premium feel
+    const animatedTotal = useAnimatedNumber(totalPrimary)
+
+    // Calculate completed sections (sections where user has made a selection)
+    const completedSections = useMemo(() => {
+        return contentSections
+            .filter(section => {
+                const sectionItems = section.items
+                // For selectable (radio) - check if any item is selected
+                if (sectionItems.length >= 2) {
+                    return sectionItems.some(item => selections[item.id]?.selected)
+                }
+                // For toggleable/optional - always considered "complete" since user can choose none
+                return true
+            })
+            .map(s => s.id)
+    }, [contentSections, selections])
+
+    // Count selected vs total items for progress (reserved for future use)
+    // @ts-expect-error Reserved for future use
+    const _selectedCount = useMemo(() => {
+        return Object.values(selections).filter(s => s.selected).length
+    }, [selections])
+    // @ts-expect-error Reserved for future use
+    const _totalItemCount = Object.keys(selections).length
+
     return (
         <div ref={containerRef} className="h-screen overflow-y-auto bg-slate-50">
             {/* Left content - Main scrollable area */}
@@ -260,6 +335,7 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                         section_type: s.section_type,
                     }))}
                     activeSection={activeSection}
+                    completedSections={completedSections}
                     onSectionClick={handleSectionClick}
                 />
 
@@ -330,7 +406,10 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
             </div>
 
             {/* Mobile Sticky Footer - Hidden on desktop */}
-            <div className="fixed bottom-0 left-0 right-0 lg:hidden z-50">
+            <div
+                className="fixed bottom-0 left-0 right-0 lg:hidden z-50 transform transition-transform duration-300 ease-out"
+                style={{ transform: totalPrimary > 0 ? 'translateY(0)' : 'translateY(100%)' }}
+            >
                 {/* Glass blur backdrop */}
                 <div className="absolute inset-0 bg-white/80 backdrop-blur-lg border-t border-slate-200" />
 
@@ -339,8 +418,8 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-sm font-medium text-slate-600">Total</span>
                         <div className="text-right">
-                            <p className="text-xl font-bold text-slate-900">
-                                {formatCurrency(totalPrimary, primaryCurrency)}
+                            <p className="text-xl font-bold text-slate-900 tabular-nums">
+                                {formatCurrency(animatedTotal, primaryCurrency)}
                             </p>
                             {showSecondary && (
                                 <p className="text-xs text-slate-500">

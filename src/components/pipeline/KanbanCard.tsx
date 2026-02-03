@@ -19,6 +19,7 @@ interface KanbanCardProps {
 
 
 import { GroupBadge } from './GroupBadge'
+import SubCardBadge from './SubCardBadge'
 
 export default function KanbanCard({ card }: KanbanCardProps) {
     const navigate = useNavigate()
@@ -260,12 +261,12 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         <Clock className="mr-1.5 h-3 w-3 flex-shrink-0 text-blue-600" />
                         <span className="truncate block flex-1 text-gray-700">
-                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                            {String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '')}
                         </span>
                     </div>
                 )
             case 'mkt_hospedagem_contratada':
-                const hasHotel = String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '').toLowerCase()
+                const hasHotel = String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '').toLowerCase()
                 const isYes = hasHotel.includes('sim')
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
@@ -280,7 +281,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         <Users className="mr-1.5 h-3 w-3 flex-shrink-0 text-purple-600" />
                         <span className="truncate block flex-1 text-gray-700">
-                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                            {String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '')}
                         </span>
                     </div>
                 )
@@ -289,7 +290,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         <DollarSign className="mr-1.5 h-3 w-3 flex-shrink-0 text-emerald-600" />
                         <span className="truncate block flex-1 font-medium text-gray-700">
-                            {String((card as any).marketing_data?.[fieldId] || (card as any)[fieldId] || '')}
+                            {String((card.marketing_data as any)?.[fieldId] || (card as any)[fieldId] || '')}
                         </span>
                     </div>
                 )
@@ -508,9 +509,27 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 </div>
             )}
 
+            {/* Sub-Card Badges */}
+            {(card as any).card_type === 'sub_card' && (card as any).sub_card_mode && (
+                <SubCardBadge
+                    mode={(card as any).sub_card_mode}
+                    status={(card as any).sub_card_status}
+                    variant="small"
+                />
+            )}
+
+            {/* Active Sub-Cards Count (for parent cards) */}
+            {(card as any).active_sub_cards_count > 0 && (card as any).card_type !== 'sub_card' && (
+                <SubCardBadge
+                    mode="incremental"
+                    activeCount={(card as any).active_sub_cards_count}
+                    variant="small"
+                />
+            )}
+
             {/* SLA Badge */}
             {(() => {
-                if (card.urgencia_tempo_etapa === 1) {
+                if (Number(card.urgencia_tempo_etapa) === 1) {
                     return (
                         <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-100">
                             <Clock className="h-3 w-3" />

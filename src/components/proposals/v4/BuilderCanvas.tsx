@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils'
 import { useProposalBuilder } from '@/hooks/useProposalBuilder'
 import { CoverEditor } from './CoverEditor'
 import { ItemEditorCard } from './ItemEditorCard'
+import { FlightImageExtractor } from './flights/FlightImageExtractor'
+import type { FlightLeg } from './flights/types'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
@@ -36,6 +38,7 @@ import {
     Pencil,
     Image as ImageIcon,
     Loader2,
+    Check,
 } from 'lucide-react'
 import type { ProposalSectionWithItems, ProposalItemWithOptions } from '@/types/proposals'
 
@@ -46,6 +49,33 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
     transfers: Car,
     experiences: Sparkles,
     custom: Type,
+}
+
+// Section colors - consistent color coding
+const SECTION_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+    flights: { bg: 'bg-sky-50', text: 'text-sky-600', border: 'border-l-sky-500' },
+    hotels: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-l-emerald-500' },
+    experiences: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-l-orange-500' },
+    transfers: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-l-teal-500' },
+    custom: { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-l-violet-500' },
+}
+
+// Section type -> Item type mapping
+const SECTION_TO_ITEM_TYPE: Record<string, string> = {
+    flights: 'flight',
+    hotels: 'hotel',
+    experiences: 'experience',
+    transfers: 'transfer',
+    custom: 'custom',
+}
+
+// Default titles per item type
+const ITEM_TYPE_DEFAULT_TITLES: Record<string, string> = {
+    flight: 'Novo Voo',
+    hotel: 'Novo Hotel',
+    experience: 'Nova Experiência',
+    transfer: 'Novo Transfer',
+    custom: 'Novo Item',
 }
 
 // Clean title - remove emojis
@@ -391,8 +421,8 @@ function TextBlockSection({ section }: TextBlockSectionProps) {
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
-            {/* Minimal Header - Only drag handle and delete */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Header - Always visible */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100">
                 <button
                     {...attributes}
                     {...listeners}
@@ -400,28 +430,33 @@ function TextBlockSection({ section }: TextBlockSectionProps) {
                 >
                     <GripVertical className="h-4 w-4 text-slate-400" />
                 </button>
-                <div className="flex-1 flex items-center gap-1.5 text-slate-400">
+                <div className="flex-1 flex items-center gap-1.5 text-slate-500">
                     <FileText className="h-4 w-4" />
                     <span className="text-xs font-medium">Bloco de Texto</span>
                 </div>
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
                 </Button>
             </div>
 
-            {/* Text Editor */}
+            {/* Text Editor - Larger */}
             <div className="p-4">
                 <Textarea
                     value={textContent}
                     onChange={handleTextChange}
                     placeholder="Digite seu texto aqui..."
-                    className="min-h-[120px] resize-none border-none shadow-none focus:ring-0 p-0 text-slate-700"
+                    className="min-h-[180px] resize-y border border-slate-200 rounded-lg shadow-none focus:ring-2 focus:ring-blue-500 focus:border-transparent p-3 text-slate-700"
                 />
+                <div className="flex justify-end mt-2">
+                    <span className="text-xs text-slate-400">
+                        {textContent.length} caracteres
+                    </span>
+                </div>
             </div>
         </div>
     )
@@ -430,9 +465,21 @@ function TextBlockSection({ section }: TextBlockSectionProps) {
 // ============================================
 // Title Block Section (for headings)
 // ============================================
+type TitleSize = 'h1' | 'h2' | 'h3'
+type TitleAlign = 'left' | 'center' | 'right'
+
+const TITLE_SIZES: Record<TitleSize, string> = {
+    h1: 'text-3xl font-bold',
+    h2: 'text-2xl font-bold',
+    h3: 'text-xl font-semibold',
+}
+
 function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
     const { removeSection, updateItem } = useProposalBuilder()
     const item = section.items[0]
+    const richContent = (item?.rich_content as Record<string, any>) || {}
+    const titleSize = (richContent.title_size as TitleSize) || 'h2'
+    const titleAlign = (richContent.title_align as TitleAlign) || 'left'
 
     const {
         attributes,
@@ -454,6 +501,22 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
         }
     }, [item, updateItem])
 
+    const handleSizeChange = useCallback((size: TitleSize) => {
+        if (item) {
+            updateItem(item.id, {
+                rich_content: { ...richContent, title_size: size, is_title_block: true }
+            })
+        }
+    }, [item, richContent, updateItem])
+
+    const handleAlignChange = useCallback((align: TitleAlign) => {
+        if (item) {
+            updateItem(item.id, {
+                rich_content: { ...richContent, title_align: align, is_title_block: true }
+            })
+        }
+    }, [item, richContent, updateItem])
+
     return (
         <div
             ref={setNodeRef}
@@ -464,7 +527,7 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100 transition-opacity">
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100">
                 <button
                     {...attributes}
                     {...listeners}
@@ -472,14 +535,75 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 >
                     <GripVertical className="h-4 w-4 text-slate-400" />
                 </button>
-                <div className="flex-1 flex items-center gap-1.5 text-slate-400">
+                <div className="flex items-center gap-1.5 text-slate-500">
                     <Type className="h-4 w-4" />
                     <span className="text-xs font-medium">Título</span>
                 </div>
+
+                {/* Size selector */}
+                <div className="flex items-center gap-1 ml-2 border-l border-slate-200 pl-2">
+                    {(['h1', 'h2', 'h3'] as TitleSize[]).map((size) => (
+                        <button
+                            key={size}
+                            onClick={(e) => { e.stopPropagation(); handleSizeChange(size) }}
+                            className={cn(
+                                "px-2 py-0.5 text-xs rounded transition-colors",
+                                titleSize === size
+                                    ? "bg-blue-100 text-blue-700 font-medium"
+                                    : "text-slate-500 hover:bg-slate-100"
+                            )}
+                        >
+                            {size.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Alignment selector */}
+                <div className="flex items-center gap-0.5 ml-2 border-l border-slate-200 pl-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleAlignChange('left') }}
+                        className={cn(
+                            "p-1 rounded transition-colors",
+                            titleAlign === 'left' ? "bg-blue-100 text-blue-700" : "text-slate-400 hover:bg-slate-100"
+                        )}
+                        title="Alinhar à esquerda"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h14" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleAlignChange('center') }}
+                        className={cn(
+                            "p-1 rounded transition-colors",
+                            titleAlign === 'center' ? "bg-blue-100 text-blue-700" : "text-slate-400 hover:bg-slate-100"
+                        )}
+                        title="Centralizar"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M7 12h10M5 18h14" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleAlignChange('right') }}
+                        className={cn(
+                            "p-1 rounded transition-colors",
+                            titleAlign === 'right' ? "bg-blue-100 text-blue-700" : "text-slate-400 hover:bg-slate-100"
+                        )}
+                        title="Alinhar à direita"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M10 12h10M6 18h14" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="flex-1" />
+
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -491,7 +615,12 @@ function TitleBlockSection({ section }: { section: ProposalSectionWithItems }) {
                     value={item?.title || ''}
                     onChange={handleTitleChange}
                     placeholder="Digite o título..."
-                    className="w-full text-2xl font-bold text-slate-900 bg-transparent border-none outline-none focus:ring-0 p-0"
+                    className={cn(
+                        "w-full text-slate-900 bg-transparent border-none outline-none focus:ring-0 p-0",
+                        TITLE_SIZES[titleSize],
+                        titleAlign === 'center' && 'text-center',
+                        titleAlign === 'right' && 'text-right'
+                    )}
                 />
             </div>
         </div>
@@ -541,7 +670,7 @@ function DividerBlockSection({ section }: { section: ProposalSectionWithItems })
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -675,7 +804,7 @@ function ImageBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -729,13 +858,104 @@ function ImageBlockSection({ section }: { section: ProposalSectionWithItems }) {
 }
 
 // ============================================
-// Video Block Section (TODO: add embed)
+// Video Block Content (URL input + preview)
+// ============================================
+interface VideoBlockContentProps {
+    richContent: Record<string, any>
+    onUpdate: (updates: Partial<ProposalItemWithOptions>) => void
+}
+
+function VideoBlockContent({ richContent, onUpdate }: VideoBlockContentProps) {
+    const videoUrl = richContent.video_url || ''
+
+    // Parse YouTube/Vimeo URL to get embed URL
+    const getEmbedUrl = (url: string): string | null => {
+        if (!url) return null
+
+        // YouTube
+        const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        if (ytMatch) {
+            return `https://www.youtube.com/embed/${ytMatch[1]}`
+        }
+
+        // Vimeo
+        const vimeoMatch = url.match(/vimeo\.com\/(\d+)/)
+        if (vimeoMatch) {
+            return `https://player.vimeo.com/video/${vimeoMatch[1]}`
+        }
+
+        return null
+    }
+
+    // Get thumbnail URL for YouTube
+    const getThumbnailUrl = (url: string): string | null => {
+        const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+        if (ytMatch) {
+            return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`
+        }
+        return null
+    }
+
+    const embedUrl = getEmbedUrl(videoUrl)
+    const thumbnailUrl = getThumbnailUrl(videoUrl)
+
+    return (
+        <div className="p-4 space-y-3">
+            {/* URL Input */}
+            <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">
+                    URL do vídeo (YouTube ou Vimeo)
+                </label>
+                <input
+                    type="url"
+                    value={videoUrl}
+                    onChange={(e) => onUpdate({
+                        rich_content: { ...richContent, video_url: e.target.value, is_video_block: true }
+                    })}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+            </div>
+
+            {/* Preview */}
+            {embedUrl ? (
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                    <iframe
+                        src={embedUrl}
+                        className="w-full h-full"
+                        allowFullScreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    />
+                </div>
+            ) : thumbnailUrl ? (
+                <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden relative">
+                    <img src={thumbnailUrl} alt="Video thumbnail" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
+                            <div className="w-0 h-0 border-l-[20px] border-l-slate-800 border-y-[12px] border-y-transparent ml-1" />
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="aspect-video bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400">
+                    <svg className="h-12 w-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm">Cole a URL de um vídeo acima</span>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ============================================
+// Video Block Section
 // ============================================
 function VideoBlockSection({ section }: { section: ProposalSectionWithItems }) {
-    const { removeSection } = useProposalBuilder()
+    const { removeSection, updateItem } = useProposalBuilder()
     const item = section.items[0]
     const richContent = (item?.rich_content as Record<string, any>) || {}
-    const videoUrl = richContent.video_url || ''
 
     const {
         attributes,
@@ -761,7 +981,8 @@ function VideoBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Header - Always visible */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 border-b border-slate-100">
                 <button
                     {...attributes}
                     {...listeners}
@@ -769,29 +990,26 @@ function VideoBlockSection({ section }: { section: ProposalSectionWithItems }) {
                 >
                     <GripVertical className="h-4 w-4 text-slate-400" />
                 </button>
-                <div className="flex-1 flex items-center gap-1.5 text-slate-400">
-                    <span className="text-xs font-medium">🎬 Vídeo</span>
+                <div className="flex-1 flex items-center gap-1.5 text-slate-500">
+                    <span className="text-xs font-medium">Video</span>
                 </div>
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
                 </Button>
             </div>
-            <div className="p-4">
-                {videoUrl ? (
-                    <div className="aspect-video bg-black rounded-lg">
-                        <iframe src={videoUrl} className="w-full h-full rounded-lg" allowFullScreen />
-                    </div>
-                ) : (
-                    <div className="flex items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 text-slate-400">
-                        <span className="text-sm">Clique para adicionar vídeo</span>
-                    </div>
-                )}
-            </div>
+            <VideoBlockContent
+                richContent={richContent}
+                onUpdate={(updates) => {
+                    if (item) {
+                        updateItem(item.id, updates)
+                    }
+                }}
+            />
         </div>
     )
 }
@@ -806,6 +1024,9 @@ interface SortableSectionProps {
 function SortableSection({ section }: SortableSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true)
     const [isTitleFocused, setIsTitleFocused] = useState(false)
+    const [isProcessingAI, setIsProcessingAI] = useState(false)
+    const [showFlightAIExtractor, setShowFlightAIExtractor] = useState(false)
+    const aiFileInputRef = React.useRef<HTMLInputElement>(null)
     const {
         removeSection,
         updateSection,
@@ -816,6 +1037,7 @@ function SortableSection({ section }: SortableSectionProps) {
         updateOption,
         removeOption,
         addItem,
+        addItemFromLibrary,
     } = useProposalBuilder()
 
     const {
@@ -834,6 +1056,7 @@ function SortableSection({ section }: SortableSectionProps) {
 
     const Icon = SECTION_ICONS[section.section_type] || Type
     const cleanedTitle = cleanTitle(section.title)
+    const sectionColor = SECTION_COLORS[section.section_type] || SECTION_COLORS.custom
 
     // Item handlers
     const handleUpdateItem = useCallback((itemId: string, updates: Partial<ProposalItemWithOptions>) => {
@@ -841,8 +1064,144 @@ function SortableSection({ section }: SortableSectionProps) {
     }, [updateItem])
 
     const handleAddItem = useCallback(() => {
-        addItem(section.id, 'custom', 'Novo Item')
-    }, [section.id, addItem])
+        const itemType = SECTION_TO_ITEM_TYPE[section.section_type] || 'custom'
+        const defaultTitle = ITEM_TYPE_DEFAULT_TITLES[itemType] || 'Novo Item'
+        addItem(section.id, itemType as any, defaultTitle)
+    }, [section.id, section.section_type, addItem])
+
+    // AI Image Processing
+    const processAIImage = useCallback(async (file: File) => {
+        setIsProcessingAI(true)
+        try {
+            // Convert to base64
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => {
+                    const result = reader.result as string
+                    const base64Data = result.split(',')[1]
+                    resolve(base64Data)
+                }
+                reader.onerror = reject
+                reader.readAsDataURL(file)
+            })
+
+            // Call AI extraction
+            const { data, error } = await supabase.functions.invoke('ai-extract-image', {
+                body: { image: base64 }
+            })
+
+            if (error) throw error
+
+            if (data?.success && data?.items?.length > 0) {
+                data.items.forEach((item: any) => {
+                    const details = item.details || {}
+                    const segments = details.segments || []
+
+                    const richContent: Record<string, unknown> = {
+                        description: item.description || '',
+                        location: item.location,
+                        dates: item.dates,
+                    }
+
+                    if (item.category === 'flight' && segments.length > 0) {
+                        richContent.segments = segments.map((seg: any, idx: number) => ({
+                            id: `seg-${Date.now()}-${idx}`,
+                            segment_order: seg.segment_order || idx + 1,
+                            airline_code: seg.airline_code || '',
+                            airline_name: seg.airline_name || '',
+                            flight_number: seg.flight_number || '',
+                            departure_date: seg.departure_date || '',
+                            departure_time: seg.departure_time || '',
+                            departure_airport: seg.departure_airport || '',
+                            departure_city: seg.departure_city || '',
+                            arrival_date: seg.arrival_date || '',
+                            arrival_time: seg.arrival_time || '',
+                            arrival_airport: seg.arrival_airport || '',
+                            arrival_city: seg.arrival_city || '',
+                            cabin_class: seg.cabin_class || 'Economy',
+                            baggage_included: seg.baggage_included || '',
+                        }))
+                    }
+
+                    addItemFromLibrary(section.id, {
+                        id: crypto.randomUUID(),
+                        name: item.title,
+                        category: item.category || 'custom',
+                        base_price: item.price || 0,
+                        currency: item.currency || 'BRL',
+                        content: richContent,
+                    } as any)
+                })
+
+                // Show success toast
+                const toast = document.createElement('div')
+                toast.className = 'fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in fade-in slide-in-from-bottom-4'
+                toast.textContent = `${data.items.length} item(s) extraído(s) da imagem!`
+                document.body.appendChild(toast)
+                setTimeout(() => toast.remove(), 3000)
+            }
+        } catch (err) {
+            console.error('Error processing AI image:', err)
+            // Show error toast
+            const toast = document.createElement('div')
+            toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in fade-in slide-in-from-bottom-4'
+            toast.textContent = 'Erro ao processar imagem. Tente novamente.'
+            document.body.appendChild(toast)
+            setTimeout(() => toast.remove(), 3000)
+        } finally {
+            setIsProcessingAI(false)
+            if (aiFileInputRef.current) aiFileInputRef.current.value = ''
+        }
+    }, [section.id, addItemFromLibrary])
+
+    const handleAIFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            processAIImage(file)
+        }
+    }, [processAIImage])
+
+    // Handle extracted flight legs from FlightImageExtractor
+    const handleExtractedFlightLegs = useCallback((extractedLegs: FlightLeg[]) => {
+        if (extractedLegs.length === 0) return
+
+        // Create a new flight item with the extracted legs
+        const richContent = {
+            flights: {
+                legs: extractedLegs,
+                show_prices: true,
+                allow_mix_airlines: true,
+                default_selections: {}
+            }
+        }
+
+        addItemFromLibrary(section.id, {
+            id: crypto.randomUUID(),
+            name: 'Voos Extraídos',
+            category: 'flight',
+            base_price: 0,
+            currency: 'BRL',
+            content: richContent,
+        } as any)
+
+        setShowFlightAIExtractor(false)
+
+        // Show success toast
+        const toast = document.createElement('div')
+        toast.className = 'fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in fade-in slide-in-from-bottom-4'
+        toast.textContent = `${extractedLegs.length} trecho(s) de voo extraído(s)!`
+        document.body.appendChild(toast)
+        setTimeout(() => toast.remove(), 3000)
+    }, [section.id, addItemFromLibrary])
+
+    // Handle AI button click - show extractor for flights, upload for others
+    const handleAIButtonClick = useCallback(() => {
+        if (section.section_type === 'flights') {
+            setShowFlightAIExtractor(true)
+        } else {
+            aiFileInputRef.current?.click()
+        }
+    }, [section.section_type])
 
     return (
         <div
@@ -850,7 +1209,8 @@ function SortableSection({ section }: SortableSectionProps) {
             style={style}
             className={cn(
                 'bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden',
-                'transition-all duration-200',
+                'transition-all duration-200 border-l-4',
+                sectionColor.border,
                 isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-500',
             )}
         >
@@ -862,11 +1222,15 @@ function SortableSection({ section }: SortableSectionProps) {
                     {...listeners}
                     className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-slate-200 transition-colors"
                 >
-                    <GripVertical className="h-4 w-4 text-slate-400" />
+                    <GripVertical className="h-5 w-5 text-slate-400" />
                 </button>
 
-                {/* Icon */}
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                {/* Icon - color coded */}
+                <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                    sectionColor.bg,
+                    sectionColor.text
+                )}>
                     <Icon className="h-4 w-4" />
                 </div>
 
@@ -907,7 +1271,7 @@ function SortableSection({ section }: SortableSectionProps) {
                             })
                         }}
                         className={cn(
-                            "px-2 py-1 text-xs rounded-md border transition-all",
+                            "flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border transition-all",
                             ((section.config as Record<string, any>)?.selection_mode === 'multiple')
                                 ? "bg-purple-100 text-purple-700 border-purple-300"
                                 : "bg-slate-100 text-slate-500 border-slate-200 hover:border-slate-300"
@@ -917,10 +1281,22 @@ function SortableSection({ section }: SortableSectionProps) {
                             : "Clique para permitir múltipla escolha"
                         }
                     >
-                        {((section.config as Record<string, any>)?.selection_mode === 'multiple')
-                            ? "☑️ Múltipla"
-                            : "○ Exclusiva"
-                        }
+                        <div className={cn(
+                            "w-3.5 h-3.5 rounded border-2 flex items-center justify-center transition-colors",
+                            ((section.config as Record<string, any>)?.selection_mode === 'multiple')
+                                ? "bg-purple-600 border-purple-600"
+                                : "border-slate-400"
+                        )}>
+                            {((section.config as Record<string, any>)?.selection_mode === 'multiple') && (
+                                <Check className="h-2.5 w-2.5 text-white" />
+                            )}
+                        </div>
+                        <span>
+                            {((section.config as Record<string, any>)?.selection_mode === 'multiple')
+                                ? "Múltipla"
+                                : "Única"
+                            }
+                        </span>
                     </button>
                 )}
 
@@ -939,7 +1315,7 @@ function SortableSection({ section }: SortableSectionProps) {
                 <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeSection(section.id)}
+                    onClick={(e) => { e.stopPropagation(); removeSection(section.id) }}
                     className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -976,14 +1352,46 @@ function SortableSection({ section }: SortableSectionProps) {
                                 ))}
 
                                 {/* Add Item Button */}
-                                <Button
-                                    variant="ghost"
-                                    className="w-full border-2 border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                    onClick={handleAddItem}
-                                >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Adicionar Item
-                                </Button>
+                                <div className="flex gap-2">
+                                    {/* Hidden file input for AI */}
+                                    <input
+                                        ref={aiFileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleAIFileSelect}
+                                        className="hidden"
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        className="flex-1 border-2 border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                        onClick={handleAddItem}
+                                        disabled={isProcessingAI}
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Adicionar Item
+                                    </Button>
+                                    <button
+                                        onClick={handleAIButtonClick}
+                                        disabled={isProcessingAI || showFlightAIExtractor}
+                                        className="px-4 py-2 border-2 border-dashed border-sky-200 rounded-lg text-sky-500 hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Extrair dados de uma imagem com IA"
+                                    >
+                                        {isProcessingAI ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Sparkles className="h-4 w-4" />
+                                        )}
+                                        <span className="hidden sm:inline">IA</span>
+                                    </button>
+                                </div>
+
+                                {/* Flight AI Extractor */}
+                                {showFlightAIExtractor && section.section_type === 'flights' && (
+                                    <FlightImageExtractor
+                                        onExtractLegs={handleExtractedFlightLegs}
+                                        onCancel={() => setShowFlightAIExtractor(false)}
+                                    />
+                                )}
                             </>
                         )}
                     </SortableContext>

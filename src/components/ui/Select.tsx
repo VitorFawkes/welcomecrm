@@ -41,7 +41,7 @@ export function Select({ value, onChange, options, placeholder = 'Select...', cl
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-                className="max-h-[300px] overflow-y-auto min-w-[var(--radix-dropdown-menu-trigger-width)] w-full"
+                className="max-h-[50vh] overflow-y-auto min-w-[var(--radix-dropdown-menu-trigger-width)] w-full"
                 align="start"
             >
                 {options.map((option) => (

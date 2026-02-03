@@ -32,6 +32,19 @@ Deno.serve(async (req) => {
         // 1. Parse payload early to help with detection
         const payload = await req.json();
 
+        // ---- DEBUG LOGGING (Fire and Forget) ----
+        console.log("Incoming Webhook Payload:", JSON.stringify(payload));
+        supabaseClient.from("debug_requests").insert({
+            function_name: "webhook-whatsapp",
+            method: req.method,
+            url: req.url,
+            headers: Object.fromEntries(req.headers.entries()),
+            payload: payload
+        }).then(({ error }) => {
+            if (error) console.error("Failed to log to debug_requests:", error);
+        });
+        // -----------------------------------------
+
         // Handle array payloads (some platforms send batches)
         const payloads = Array.isArray(payload) ? payload : [payload];
 
@@ -131,8 +144,10 @@ Deno.serve(async (req) => {
                 eventType = data.event || data.type || (data.message ? 'message' : 'unknown');
 
                 // Idempotency: Echo sends 'id' for the message itself, or 'whatsapp_message_id' in a status update.
-                // We need a unique key.
-                idempotencyKey = data.id || data.whatsapp_message_id || data.message_id || null;
+                // FIX: Include eventType in idempotencyKey because multiple events (creation, delivery, read) 
+                // share the same message ID but represent different system states.
+                const rawId = data.id || data.whatsapp_message_id || data.message_id;
+                idempotencyKey = rawId ? `${eventType}:${rawId}` : null;
                 origem = null;
             }
 

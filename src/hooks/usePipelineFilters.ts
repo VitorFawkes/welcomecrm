@@ -14,11 +14,14 @@ export interface FilterState {
     creationEndDate?: string
     ownerId?: string // Legacy single select
     ownerIds?: string[] // Multi-select
-    sdrIds?: string[] // Multi-select
+    sdrIds?: string[] // Multi-select SDR
+    plannerIds?: string[] // Multi-select Planner (vendas_owner_id)
+    posIds?: string[] // Multi-select Pós-Venda (pos_owner_id)
     teamIds?: string[]
     departmentIds?: string[]
     sortBy?: SortBy
     sortDirection?: SortDirection
+    showArchived?: boolean // Mostrar cards arquivados
 }
 
 export interface GroupFilters {

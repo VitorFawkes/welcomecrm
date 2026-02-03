@@ -44,6 +44,34 @@ app.use("/*", async (c, next) => {
     c.set("apiKey", keyData);
     c.set("supabase", supabase);
 
+    // ---- DEBUG LOGGING (Fire and Forget) ----
+    try {
+        const clonedReq = c.req.raw.clone();
+        const contentType = clonedReq.headers.get("content-type");
+        let payload = null;
+        if (contentType?.includes("application/json")) {
+            payload = await clonedReq.json();
+        } else if (contentType?.includes("application/x-www-form-urlencoded")) {
+            const text = await clonedReq.text();
+            payload = Object.fromEntries(new URLSearchParams(text));
+        }
+
+        console.log(`[PublicAPI] Incoming ${c.req.method} ${c.req.path}`);
+
+        supabase.from("debug_requests").insert({
+            function_name: "public-api",
+            method: c.req.method,
+            url: c.req.url,
+            headers: Object.fromEntries(c.req.header()),
+            payload: payload
+        }).then(({ error }) => {
+            if (error) console.error("Failed to log to debug_requests:", error);
+        });
+    } catch (e) {
+        console.error("Debug logging failed:", e);
+    }
+    // -----------------------------------------
+
     // Log Request (Async - Fire and Forget)
     const startTime = Date.now();
     await next();
@@ -101,7 +129,8 @@ const ContactDetailSchema = z.object({
     nome: z.string(),
     email: z.string().email().nullable(),
     telefone: z.string().nullable(),
-    last_whatsapp_conversation_id: z.string().nullable().optional(),
+    last_whatsapp_conversation_id: z.string().nullable().optional(), // External ID (Phone)
+    active_conversation_id: z.string().uuid().nullable().optional(), // Internal UUID
     whatsapp_conversations: z.array(z.object({
         id: z.string(),
         status: z.string().nullable(),
@@ -234,7 +263,7 @@ app.openapi(
 
         let query = supabase.from("contatos").select(`
             id, nome, email, telefone, last_whatsapp_conversation_id,
-            whatsapp_conversations(id, status, unread_count, last_message_at),
+            whatsapp_conversations(id, status, unread_count, last_message_at, external_conversation_id),
             cards!cards_pessoa_principal_id_fkey(id, titulo, status_comercial, pipeline_stage_id),
             cards_contatos(
                 cards(id, titulo, status_comercial, pipeline_stage_id)
@@ -261,12 +290,18 @@ app.openapi(
             const allDeals = [...directDeals, ...associatedDeals];
             const uniqueDeals = Array.from(new Map(allDeals.map((d: any) => [d.id, d])).values());
 
+            // Find Active Conversation UUID
+            const activeConv = contact.whatsapp_conversations?.find(
+                (c: any) => c.external_conversation_id === contact.last_whatsapp_conversation_id
+            );
+
             return {
                 id: contact.id,
                 nome: contact.nome,
                 email: contact.email,
                 telefone: contact.telefone,
                 last_whatsapp_conversation_id: contact.last_whatsapp_conversation_id,
+                active_conversation_id: activeConv ? activeConv.id : null,
                 whatsapp_conversations: contact.whatsapp_conversations || [],
                 deals: uniqueDeals
             };

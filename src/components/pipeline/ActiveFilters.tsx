@@ -14,6 +14,8 @@ export function ActiveFilters() {
         filters.search ||
         filters.ownerIds?.length ||
         filters.sdrIds?.length ||
+        filters.plannerIds?.length ||
+        filters.posIds?.length ||
         filters.teamIds?.length ||
         filters.departmentIds?.length ||
         filters.startDate ||
@@ -59,6 +61,18 @@ export function ActiveFilters() {
                 {filters.sdrIds?.map(id => {
                     const name = options?.profiles.find(p => p.id === id)?.full_name || 'SDR'
                     return <Chip key={id} label={`SDR: ${name}`} onRemove={() => removeFilter('sdrIds', id)} />
+                })}
+
+                {/* Planners */}
+                {filters.plannerIds?.map(id => {
+                    const name = options?.profiles.find(p => p.id === id)?.full_name || 'Planner'
+                    return <Chip key={id} label={`Planner: ${name}`} onRemove={() => removeFilter('plannerIds', id)} />
+                })}
+
+                {/* Pós-Venda */}
+                {filters.posIds?.map(id => {
+                    const name = options?.profiles.find(p => p.id === id)?.full_name || 'Pós'
+                    return <Chip key={id} label={`Pós: ${name}`} onRemove={() => removeFilter('posIds', id)} />
                 })}
 
                 {/* Teams */}

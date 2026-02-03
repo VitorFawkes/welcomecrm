@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { MessageSquare, Mail, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { MessageSquare, Mail, ChevronDown, ChevronUp, Sparkles, Video } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import AIChat from './AIChat'
+import { MeetingTimeline } from './MeetingTimeline'
 
 import { WhatsAppHistory } from './WhatsAppHistory'
 
@@ -105,6 +106,19 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                         </button>
 
                         <button
+                            onClick={() => setActiveTab('meetings')}
+                            className={cn(
+                                "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                activeTab === 'meetings'
+                                    ? "border-purple-500 text-purple-700 bg-white"
+                                    : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            )}
+                        >
+                            <Video className="h-4 w-4" />
+                            Reuniões
+                        </button>
+
+                        <button
                             onClick={() => setActiveTab('ai')}
                             className={cn(
                                 "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ml-auto whitespace-nowrap",
@@ -140,6 +154,12 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                                         <p className="text-sm text-gray-600">{item.descricao}</p>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'meetings' && (
+                            <div className="h-[500px]">
+                                <MeetingTimeline cardId={cardId} className="h-full" />
                             </div>
                         )}
 

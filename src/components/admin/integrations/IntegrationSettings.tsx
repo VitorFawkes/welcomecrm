@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { AlertTriangle, Shield, Zap, Key, Eye, EyeOff, Save, TestTube, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Shield, Zap, Key, Eye, EyeOff, Save, TestTube, CheckCircle, ArrowUpRight, Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +25,7 @@ export function IntegrationSettings() {
     });
     const [credentialsLoaded, setCredentialsLoaded] = useState(false);
     const [ownerId, setOwnerId] = useState('');
+    const [dispatching, setDispatching] = useState(false);
 
     const { data: settings, isLoading } = useQuery({
         queryKey: ['integration-settings'],
@@ -137,7 +138,34 @@ export function IntegrationSettings() {
     const inboundEnabled = getSetting('INBOUND_INGEST_ENABLED');
     const shadowModeEnabled = getSetting('SHADOW_MODE_ENABLED');
     const writeModeEnabled = getSetting('WRITE_MODE_ENABLED');
+    const outboundEnabled = getSetting('OUTBOUND_SYNC_ENABLED');
+    const outboundShadowMode = getSetting('OUTBOUND_SHADOW_MODE');
     const hasCredentials = credentials.apiUrl && credentials.apiKey;
+
+    // Outbound dispatch mutation
+    const handleDispatchOutbound = async () => {
+        setDispatching(true);
+        const toastId = toast.loading('Processando fila de eventos outbound...');
+        try {
+            const { data, error } = await supabase.functions.invoke('integration-dispatch');
+            if (error) throw error;
+
+            const sent = data?.sent || 0;
+            const failed = data?.failed || 0;
+            const processed = data?.processed || 0;
+
+            if (processed === 0) {
+                toast.info('Nenhum evento pendente na fila.', { id: toastId });
+            } else {
+                toast.success(`✅ ${sent} eventos enviados, ${failed} falhas`, { id: toastId });
+            }
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+            toast.error('Erro ao processar: ' + errorMessage, { id: toastId });
+        } finally {
+            setDispatching(false);
+        }
+    };
 
     return (
         <div className="space-y-6 max-w-4xl">
@@ -269,6 +297,98 @@ export function IntegrationSettings() {
                                 disabled={shadowModeEnabled} // Cannot enable write if shadow is on (UI enforcement)
                             />
                         </div>
+                    </div>
+                </CardHeader>
+            </Card>
+
+            {/* Divider */}
+            <div className="border-t border-slate-300 pt-6">
+                <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                    <ArrowUpRight className="w-5 h-5 text-emerald-600" />
+                    Sincronização de Saída (CRM → ActiveCampaign)
+                </h2>
+            </div>
+
+            {/* Outbound Sync Control */}
+            <Card className={cn("transition-colors", outboundEnabled ? "bg-emerald-50 border-emerald-200" : "")}>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <CardTitle className="flex items-center gap-2">
+                                <ArrowUpRight className={cn("w-5 h-5", outboundEnabled ? "text-emerald-600" : "text-muted-foreground")} />
+                                Sincronização Outbound
+                            </CardTitle>
+                            <CardDescription>
+                                Quando ativo, mudanças em Cards (etapa, status ganho/perdido, campos mapeados) são enviadas de volta para o ActiveCampaign.
+                            </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {outboundEnabled && <Badge className="bg-emerald-100 text-emerald-700">ATIVO</Badge>}
+                            <Switch
+                                checked={outboundEnabled}
+                                onCheckedChange={() => handleToggle('OUTBOUND_SYNC_ENABLED', outboundEnabled)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+            </Card>
+
+            {/* Outbound Shadow Mode */}
+            <Card className={cn("transition-colors", outboundShadowMode ? "bg-amber-50 border-amber-200" : "")}>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <CardTitle className="flex items-center gap-2">
+                                <Shield className={cn("w-5 h-5", outboundShadowMode ? "text-amber-600" : "text-muted-foreground")} />
+                                Shadow Mode (Outbound)
+                            </CardTitle>
+                            <CardDescription>
+                                Quando ativo, eventos são registrados na fila mas <strong>NÃO</strong> são enviados para o ActiveCampaign.
+                                <br />
+                                Use para testar o mapeamento antes de ativar a sincronização real.
+                            </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {outboundShadowMode && <Badge className="bg-amber-100 text-amber-700">MODO TESTE</Badge>}
+                            <Switch
+                                checked={outboundShadowMode}
+                                onCheckedChange={() => handleToggle('OUTBOUND_SHADOW_MODE', outboundShadowMode)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+            </Card>
+
+            {/* Outbound Dispatch Manual */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                            <CardTitle className="flex items-center gap-2">
+                                <Play className="w-5 h-5 text-blue-500" />
+                                Processar Fila Outbound
+                            </CardTitle>
+                            <CardDescription>
+                                Processa manualmente os eventos pendentes na fila de saída.
+                                {outboundShadowMode && (
+                                    <span className="block text-amber-600 mt-1">
+                                        ⚠️ Shadow Mode ativo - eventos NÃO serão enviados para o AC.
+                                    </span>
+                                )}
+                            </CardDescription>
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={handleDispatchOutbound}
+                            disabled={dispatching || !outboundEnabled}
+                        >
+                            {dispatching ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                                <Play className="w-4 h-4 mr-2" />
+                            )}
+                            {dispatching ? 'Processando...' : 'Processar Agora'}
+                        </Button>
                     </div>
                 </CardHeader>
             </Card>

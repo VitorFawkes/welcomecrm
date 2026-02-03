@@ -204,33 +204,84 @@ Deno.serve(async (req) => {
         };
 
         // Helper: Check Inbound Trigger Rules
-        // Returns true if event should be processed, false if it should be ignored
-        const checkInboundTrigger = (integrationId: string, pipelineId: string, stageId: string, eventType: string, entityType: string): { allowed: boolean; reason: string } => {
+        // Returns trigger if matched, null if no match, or special object if no triggers configured
+        // Now supports:
+        // - Multi-select arrays for pipelines, stages, and owners
+        // - NULL arrays meaning "any" (qualquer)
+        // - action_type: 'create_only', 'update_only', 'all'
+        const checkInboundTrigger = (
+            integrationId: string,
+            pipelineId: string,
+            stageId: string,
+            ownerId: string | null,
+            eventType: string,
+            entityType: string
+        ): { allowed: boolean; reason: string; trigger: any | null } => {
             // Get triggers for this integration
             const triggers = inboundTriggers?.filter(t => t.integration_id === integrationId);
 
             // BACKWARD COMPAT: If no triggers configured, allow all events
             if (!triggers || triggers.length === 0) {
-                return { allowed: true, reason: 'No trigger rules configured (allowing all)' };
+                return { allowed: true, reason: 'No trigger rules configured (allowing all)', trigger: null };
             }
 
-            // Find matching trigger for this pipeline + stage
-            const matchingTrigger = triggers.find(t =>
-                t.external_pipeline_id === pipelineId &&
-                t.external_stage_id === stageId &&
-                t.entity_types.includes(entityType === 'deal' ? 'deal' : 'contact')
-            );
+            // Find matching trigger using array matching
+            // NULL or empty array = "qualquer" (match any)
+            const matchingTrigger = triggers.find(t => {
+                // Check pipeline match: NULL/empty = any, otherwise must be in array
+                const pipelineMatch = !t.external_pipeline_ids || t.external_pipeline_ids.length === 0
+                    ? true  // "Qualquer Pipeline"
+                    : t.external_pipeline_ids.includes(pipelineId);
+
+                // Check stage match: NULL/empty = any, otherwise must be in array
+                const stageMatch = !t.external_stage_ids || t.external_stage_ids.length === 0
+                    ? true  // "Qualquer Etapa"
+                    : t.external_stage_ids.includes(stageId);
+
+                // Check owner match: NULL/empty = any, otherwise must be in array
+                const ownerMatch = !t.external_owner_ids || t.external_owner_ids.length === 0
+                    ? true  // "Qualquer Pessoa"
+                    : ownerId && t.external_owner_ids.includes(ownerId);
+
+                // Check entity type
+                const entityMatch = t.entity_types.includes(entityType === 'deal' ? 'deal' : 'contact');
+
+                return pipelineMatch && stageMatch && ownerMatch && entityMatch;
+            });
 
             if (!matchingTrigger) {
-                return { allowed: false, reason: `No trigger for Pipeline ${pipelineId} + Stage ${stageId}` };
+                return {
+                    allowed: false,
+                    reason: `No trigger for Pipeline ${pipelineId} + Stage ${stageId}${ownerId ? ` + Owner ${ownerId}` : ''}`,
+                    trigger: null
+                };
             }
 
-            // Check action_type: 'create_only' only allows deal_add
+            // Check action_type restrictions:
+            // - 'create_only': only allows deal_add (create new card)
+            // - 'update_only': only allows deal_update and deal_state (update existing card)
+            // - 'all': allows everything
             if (matchingTrigger.action_type === 'create_only' && eventType !== 'deal_add') {
-                return { allowed: false, reason: `Trigger is create_only, but event is ${eventType}` };
+                return {
+                    allowed: false,
+                    reason: `Trigger is create_only, but event is ${eventType}`,
+                    trigger: matchingTrigger
+                };
             }
 
-            return { allowed: true, reason: `Matched trigger: ${matchingTrigger.description || matchingTrigger.id}` };
+            if (matchingTrigger.action_type === 'update_only' && eventType === 'deal_add') {
+                return {
+                    allowed: false,
+                    reason: `Trigger is update_only, but event is deal_add (creates new cards)`,
+                    trigger: matchingTrigger
+                };
+            }
+
+            return {
+                allowed: true,
+                reason: `Matched trigger: ${matchingTrigger.name || matchingTrigger.description || matchingTrigger.id}`,
+                trigger: matchingTrigger
+            };
         };
 
         // 3. Process Events
@@ -494,11 +545,16 @@ Deno.serve(async (req) => {
                 // BYPASS triggers for manual sync operations (import_mode: 'sync' or force_update: true)
                 const isManualSync = importMode === 'sync' || payload.force_update === true;
 
+                // Get AC owner ID for trigger matching
+                const acOwnerId = payload.owner || payload.owner_id || payload['deal[owner]'];
+                let matchedTrigger: any = null;
+
                 if (!isManualSync) {
                     const triggerCheck = checkInboundTrigger(
                         event.integration_id,
                         String(acPipelineId || ''),
                         String(acStageId || ''),
+                        acOwnerId ? String(acOwnerId) : null,
                         event.event_type,
                         entity
                     );
@@ -509,20 +565,32 @@ Deno.serve(async (req) => {
                         results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
                         continue;
                     }
+
+                    matchedTrigger = triggerCheck.trigger;
                 }
 
                 let targetStageId: string | null = null;
+                let targetPipelineIdOverride: string | null = null;
 
-                const map = stageMappings?.find(m =>
-                    m.integration_id === event.integration_id &&
-                    m.external_stage_id === acStageId &&
-                    m.pipeline_id === acPipelineId
-                );
+                // PRIORITY 1: Use trigger's target_stage_id if defined
+                if (matchedTrigger?.target_stage_id) {
+                    targetStageId = matchedTrigger.target_stage_id;
+                    targetPipelineIdOverride = matchedTrigger.target_pipeline_id || null;
+                }
 
-                if (map) {
-                    targetStageId = map.internal_stage_id;
-                } else if (importMode === 'new_lead' && payload.default_stage_id) {
-                    targetStageId = payload.default_stage_id;
+                // PRIORITY 2: Use stage mapping
+                if (!targetStageId) {
+                    const map = stageMappings?.find(m =>
+                        m.integration_id === event.integration_id &&
+                        m.external_stage_id === acStageId &&
+                        m.pipeline_id === acPipelineId
+                    );
+
+                    if (map) {
+                        targetStageId = map.internal_stage_id;
+                    } else if (importMode === 'new_lead' && payload.default_stage_id) {
+                        targetStageId = payload.default_stage_id;
+                    }
                 }
 
                 const isMoveEvent = event.event_type === 'deal_add' || event.event_type === 'deal_update' || event.event_type === 'deal_state';
@@ -532,20 +600,27 @@ Deno.serve(async (req) => {
                 }
 
                 // 3.2 Resolve Topology
-                let topology: { pipelineId: string; pipelineName: string; produto: string; stageName: string } | null = null;
+                let topology: { pipelineId: string; pipelineName: string; produto: string; stageName: string; fase: string | null } | null = null;
                 if (targetStageId) {
                     topology = resolveTopology(targetStageId);
                     if (!topology) {
                         throw new Error(`Topology Error: Could not resolve Pipeline/Product for Stage ${targetStageId}`);
                     }
+                    // Override pipeline if trigger specifies it
+                    if (targetPipelineIdOverride) {
+                        const overridePipeline = pipelines?.find(p => p.id === targetPipelineIdOverride);
+                        if (overridePipeline) {
+                            topology.pipelineId = overridePipeline.id;
+                            topology.pipelineName = overridePipeline.nome;
+                            topology.produto = overridePipeline.produto;
+                        }
+                    }
                 }
 
-                // 3.3 Resolve Owner
-                // Support both flat format (owner) and bracket format (deal[owner])
-                const acOwnerId = payload.owner || payload.owner_id || payload['deal[owner]'];
+                // 3.3 Resolve Owner (acOwnerId already declared above for trigger matching)
                 let targetOwnerId: string | null = null;
                 if (acOwnerId) {
-                    const uMap = userMappings?.find(m => m.external_user_id === acOwnerId && m.integration_id === event.integration_id);
+                    const uMap = userMappings?.find(m => m.external_user_id === String(acOwnerId) && m.integration_id === event.integration_id);
                     if (uMap) targetOwnerId = uMap.internal_user_id;
                 }
 
@@ -711,9 +786,10 @@ Deno.serve(async (req) => {
                     }
 
                     // UPSERT CARD
+                    // Fetch all fields including locked_fields for field protection
                     const { data: existingCard } = await supabase
                         .from('cards')
-                        .select('*') // Fetch all fields to check for existing values
+                        .select('*, locked_fields') // Include locked_fields for user-level field protection
                         .eq('external_id', dealId)
                         .eq('external_source', 'active_campaign')
                         .single();
@@ -731,7 +807,21 @@ Deno.serve(async (req) => {
 
                         // Check if we should skip this update
                         let shouldSkip = false;
-                        if (isProtected && existingCard) {
+
+                        // ═══════════════════════════════════════════════════════════════════
+                        // PRIORITY 1: USER-LEVEL FIELD LOCK (locked_fields)
+                        // If user locked this field, ALWAYS skip update regardless of other rules
+                        // ═══════════════════════════════════════════════════════════════════
+                        const lockedFields = existingCard?.locked_fields as Record<string, boolean> | null;
+                        if (lockedFields && lockedFields[key] === true) {
+                            shouldSkip = true;
+                            console.log(`[FIELD_LOCK] Field "${key}" is locked by user, skipping update`);
+                        }
+
+                        // ═══════════════════════════════════════════════════════════════════
+                        // PRIORITY 2: MAPPING-LEVEL PROTECTION (sync_always = false)
+                        // ═══════════════════════════════════════════════════════════════════
+                        if (!shouldSkip && isProtected && existingCard) {
                             // Check if existing card has a value for this key
                             // The key could be a top-level column OR inside marketing_data
                             let existingValue = existingCard[key];
@@ -840,6 +930,101 @@ Deno.serve(async (req) => {
                     if (isTitleProtected) delete cardPayload.titulo;
                     if (isValueProtected) delete cardPayload.valor_estimado;
 
+                    // ═══════════════════════════════════════════════════════════════════
+                    // QUALITY GATE VALIDATION - Validate against stage requirements
+                    // ═══════════════════════════════════════════════════════════════════
+                    if (targetStageId && matchedTrigger && !matchedTrigger.bypass_validation) {
+                        const validationLevel = matchedTrigger.validation_level || 'fields_only';
+
+                        if (validationLevel !== 'none') {
+                            // Build card data for validation
+                            const cardDataForValidation = {
+                                ...cardPayload,
+                                briefing_inicial: cardPayload_briefingInicial,
+                                produto_data: cardPayload_produtoData
+                            };
+
+                            // Call validation function
+                            const { data: validationResult, error: valError } = await supabase.rpc(
+                                'validate_integration_gate',
+                                {
+                                    p_card_data: cardDataForValidation,
+                                    p_target_stage_id: targetStageId,
+                                    p_source: 'active_campaign',
+                                    p_validation_level: validationLevel
+                                }
+                            );
+
+                            if (valError) {
+                                console.error('Quality Gate validation error:', valError);
+                                // Fail-open: Continue processing on validation error
+                            } else {
+                                const validation = validationResult?.[0];
+
+                                if (validation && !validation.valid && !validation.can_bypass) {
+                                    // REQUIREMENTS NOT MET
+                                    const quarantineMode = matchedTrigger.quarantine_mode || 'stage';
+                                    const missingReqs = validation.missing_requirements || [];
+
+                                    if (quarantineMode === 'reject') {
+                                        // REJECT: Don't create card, log conflict
+                                        await supabase.from('integration_conflict_log').insert({
+                                            integration_id: event.integration_id,
+                                            event_id: event.id,
+                                            trigger_id: matchedTrigger.id,
+                                            conflict_type: 'missing_field',
+                                            target_stage_id: targetStageId,
+                                            missing_requirements: missingReqs,
+                                            resolution: 'rejected'
+                                        });
+
+                                        stats.blocked++;
+                                        await updateEventStatus(event.id, 'blocked',
+                                            `Quality Gate rejected: ${missingReqs.length} requirements not met`);
+                                        results.push({ id: event.id, status: 'blocked', missing: missingReqs });
+                                        continue; // Skip to next event
+                                    }
+
+                                    if (quarantineMode === 'stage' && matchedTrigger.quarantine_stage_id) {
+                                        // QUARANTINE: Redirect to quarantine stage
+                                        const originalTargetStage = targetStageId;
+                                        targetStageId = matchedTrigger.quarantine_stage_id;
+                                        topology = resolveTopology(targetStageId);
+
+                                        await supabase.from('integration_conflict_log').insert({
+                                            integration_id: event.integration_id,
+                                            event_id: event.id,
+                                            trigger_id: matchedTrigger.id,
+                                            conflict_type: 'missing_field',
+                                            target_stage_id: originalTargetStage,
+                                            actual_stage_id: targetStageId,
+                                            missing_requirements: missingReqs,
+                                            resolution: 'quarantined'
+                                        });
+
+                                        log += ` [QUARANTINE: ${missingReqs.length} requirements missing]`;
+                                    }
+
+                                    if (quarantineMode === 'force') {
+                                        // FORCE: Create anyway, just log the conflict
+                                        await supabase.from('integration_conflict_log').insert({
+                                            integration_id: event.integration_id,
+                                            event_id: event.id,
+                                            trigger_id: matchedTrigger.id,
+                                            conflict_type: 'missing_field',
+                                            target_stage_id: targetStageId,
+                                            actual_stage_id: targetStageId,
+                                            missing_requirements: missingReqs,
+                                            resolution: 'forced'
+                                        });
+
+                                        log += ` [FORCED: ${missingReqs.length} requirements bypassed]`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // ═══════════════════════════════════════════════════════════════════
 
                     if (targetStageId && topology) {
                         cardPayload.pipeline_stage_id = targetStageId;

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Kanban, Users, Settings, FileText, ChevronRight, User, BarChart3, Plane, LogOut } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, Settings, FileText, ChevronRight, User, BarChart3, Plane, LogOut, Database } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { ProductSwitcher } from './ProductSwitcher'
 import { useAuth } from '../../contexts/AuthContext'
@@ -9,7 +9,8 @@ import NotificationCenter from './NotificationCenter'
 const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Funil', href: '/pipeline', icon: Kanban },
-    { name: 'Viagens', href: '/cards', icon: Plane },
+    { name: 'Gestão de Leads', href: '/leads', icon: Database },
+    { name: 'Viagens', href: '/trips', icon: Plane },
     { name: 'Propostas', href: '/proposals', icon: FileText },
     { name: 'Grupos', href: '/groups', icon: Users },
     { name: 'Contatos', href: '/people', icon: User },

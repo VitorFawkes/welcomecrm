@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { ChevronDown, User, Zap, Users } from 'lucide-react'
 import { cn } from '../../lib/utils'
-import { ROLES } from '../../constants/admin'
+import { useRoles } from '../../hooks/useRoles'
 import type { Database } from '../../database.types'
 
 type Product = Database['public']['Enums']['app_product']
@@ -15,7 +15,7 @@ interface Profile {
     role: string | null
     produtos: string[] | null
     team_id: string | null
-    teams?: { name: string } | null
+    teams: { name: string } | null
 }
 
 interface OwnerSelectorProps {
@@ -24,7 +24,7 @@ interface OwnerSelectorProps {
     product: Product
     placeholder?: string
     className?: string
-    /** If true, shows "Sem SDR" as default and "Auto-atribuir" as an option */
+    /** If true, shows "Sem responsável" as default and "Auto-atribuir" as an option */
     showNoSdrOption?: boolean
     /** Callback when auto-assign is selected */
     onAutoAssign?: () => void
@@ -43,28 +43,64 @@ export default function OwnerSelector({
     // When showNoSdrOption is true, default to no selection (not auto mode)
     const [autoMode, setAutoMode] = useState(!showNoSdrOption && !value)
 
-    // Fetch eligible users (active users - produtos filter removed as data is not populated)
-    const { data: users = [], isLoading } = useQuery({
-        queryKey: ['eligible-owners', product],
+    // Sync autoMode when value changes externally (e.g., form reset)
+    useEffect(() => {
+        // If value becomes non-null, we're not in auto mode
+        if (value) {
+            setAutoMode(false)
+        }
+        // If value is null and showNoSdrOption is false, we're in auto mode
+        else if (!showNoSdrOption) {
+            setAutoMode(true)
+        }
+        // If value is null and showNoSdrOption is true, stay in "sem responsável" mode (autoMode = false)
+    }, [value, showNoSdrOption])
+
+    // Fetch roles from database for badge display
+    const { roles } = useRoles()
+
+    // Fetch eligible users (all active users)
+    const { data: allUsers = [], isLoading, error: usersError } = useQuery({
+        queryKey: ['eligible-owners'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            // Query profiles without teams join to avoid FK ambiguity issues
+            const { data: profiles, error } = await supabase
                 .from('profiles')
-                .select(`
-          id,
-          nome,
-          email,
-          role,
-          produtos,
-          team_id,
-          teams(name)
-        `)
+                .select('id, nome, email, role, produtos, team_id')
                 .eq('active', true)
                 .order('nome')
 
             if (error) throw error
-            return data as Profile[]
+
+            // Fetch team names separately
+            const teamIds = profiles?.filter(p => p.team_id).map(p => p.team_id as string) ?? []
+            let teamsMap: Record<string, string> = {}
+
+            if (teamIds.length > 0) {
+                const { data: teams } = await supabase
+                    .from('teams')
+                    .select('id, name')
+                    .in('id', teamIds)
+
+                teams?.forEach(t => { teamsMap[t.id] = t.name })
+            }
+
+            // Combine profiles with team names
+            return profiles?.map(p => ({
+                ...p,
+                teams: p.team_id ? { name: teamsMap[p.team_id] || null } : null
+            })) as Profile[] ?? []
         }
     })
+
+    // Filter users by product if they have produtos configured
+    // Users without produtos configured (null or empty) can work on any product
+    const users = useMemo(() => {
+        return allUsers.filter(user => {
+            if (!user.produtos || user.produtos.length === 0) return true
+            return user.produtos.includes(product)
+        })
+    }, [allUsers, product])
 
     // Fetch cards count per user for workload indicator
     const { data: workload = {} } = useQuery({
@@ -96,11 +132,20 @@ export default function OwnerSelector({
     )
 
     const getRoleBadge = (role: string | null) => {
-        const roleConfig = ROLES.find(r => r.value === role)
-        if (!roleConfig) return null
+        if (!role) return null
+        // Try to find role in database roles first
+        const dbRole = roles.find(r => r.name === role)
+        if (dbRole) {
+            return (
+                <span className={cn('text-xs px-1.5 py-0.5 rounded', dbRole.color)}>
+                    {dbRole.display_name}
+                </span>
+            )
+        }
+        // Fallback: capitalize role name
         return (
-            <span className={cn('text-xs px-1.5 py-0.5 rounded', roleConfig.color)}>
-                {roleConfig.label}
+            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+                {role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' ')}
             </span>
         )
     }
@@ -136,7 +181,7 @@ export default function OwnerSelector({
                             </div>
                             <div className="text-left min-w-0">
                                 <p className="text-sm font-medium text-slate-900 truncate">Auto-atribuir</p>
-                                <p className="text-xs text-slate-500 truncate">Round-robin entre SDRs</p>
+                                <p className="text-xs text-slate-500 truncate">Distribuição automática</p>
                             </div>
                         </>
                     ) : selectedUser ? (
@@ -160,7 +205,7 @@ export default function OwnerSelector({
                                 <User className="h-3.5 w-3.5 text-slate-400" />
                             </div>
                             <div className="text-left min-w-0">
-                                <p className="text-sm font-medium text-slate-600 truncate">Sem SDR</p>
+                                <p className="text-sm font-medium text-slate-600 truncate">Sem responsável</p>
                                 <p className="text-xs text-slate-400 truncate">Clique para atribuir</p>
                             </div>
                         </>
@@ -181,7 +226,7 @@ export default function OwnerSelector({
                         onClick={() => setIsOpen(false)}
                     />
                     <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                        {/* "Sem SDR" option - only when showNoSdrOption is true */}
+                        {/* "Sem responsável" option - only when showNoSdrOption is true */}
                         {showNoSdrOption && (
                             <>
                                 <button
@@ -200,7 +245,7 @@ export default function OwnerSelector({
                                         <User className="h-4 w-4 text-slate-400" />
                                     </div>
                                     <div className="text-left">
-                                        <p className="text-sm font-medium text-slate-700">Sem SDR</p>
+                                        <p className="text-sm font-medium text-slate-700">Sem responsável</p>
                                         <p className="text-xs text-slate-500">Card sem responsável definido</p>
                                     </div>
                                 </button>
@@ -227,7 +272,7 @@ export default function OwnerSelector({
                             </div>
                             <div className="text-left">
                                 <p className="text-sm font-medium text-slate-900">Auto-atribuir</p>
-                                <p className="text-xs text-slate-500">Round-robin entre SDRs disponíveis</p>
+                                <p className="text-xs text-slate-500">Distribuição automática por workload</p>
                             </div>
                         </button>
 
@@ -238,9 +283,13 @@ export default function OwnerSelector({
                             <div className="px-3 py-4 text-center text-sm text-slate-500">
                                 Carregando...
                             </div>
+                        ) : usersError ? (
+                            <div className="px-3 py-4 text-center text-sm text-red-500">
+                                Erro ao carregar usuários
+                            </div>
                         ) : users.length === 0 ? (
                             <div className="px-3 py-4 text-center text-sm text-slate-500">
-                                Nenhum usuário disponível para {product}
+                                Nenhum usuário ativo encontrado
                             </div>
                         ) : (
                             users.map(user => (

@@ -176,7 +176,7 @@ export function GlobalSearchModal() {
                 </div>
 
                 {/* Results */}
-                <div className="max-h-80 overflow-y-auto">
+                <div className="max-h-[60vh] overflow-y-auto">
                     {query.length < 2 ? (
                         <div className="p-6 text-center text-slate-400 text-sm">
                             <p>Digite pelo menos 2 caracteres para buscar</p>

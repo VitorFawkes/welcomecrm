@@ -5,9 +5,9 @@
 > Use o workflow `/new-module` Phase 5 para manter sincronizado.
 
 > **Purpose:** Source of Truth for the AI Agent. Read this BEFORE any implementation.
-> **Last Updated:** 2026-01-28
+> **Last Updated:** 2026-02-01
 > **Trigger:** ALWAYS ON
-> **Stats:** 87 tabelas | 28 páginas | 38 hooks | 13 views
+> **Stats:** 94 tabelas | 30 páginas | 40 hooks | 15 views
 
 ---
 
@@ -25,10 +25,11 @@ All tables must FK to at least one of these:
 - `activities` (21.974) → cards, profiles
 - `arquivos` → cards
 - `tarefas` (19.009) → cards, profiles
-- `proposals` (6) + `proposal_versions` (54) + `proposal_sections` (246) + `proposal_items` (583)
+- `proposals` ecosystem: `proposals`, `versions`, `sections`, `items`, `library`, `templates`, `comments`, `flights`
 - `automation_rules` → cards
 - `api_keys` → profiles
 - `api_request_logs` → api_keys
+- `text_blocks` → profiles
 
 **Integration System (12 tabelas):**
 - `integrations` (19) - Configurações de integrações
@@ -60,6 +61,14 @@ All tables must FK to at least one of these:
 - `workflow_queue` (43.106) - Fila de execução
 - `workflow_log` (132.757) - Logs de execução
 
+**Cadence System (6 tabelas):**
+- `cadence_templates` - Templates de cadência com day_pattern, schedule_mode
+- `cadence_steps` - Steps das cadências (task/wait/end) com day_offset
+- `cadence_instances` - Instâncias de cadência por card
+- `cadence_queue` - Fila de execução de steps
+- `cadence_event_triggers` - **Regras de entrada** (quando → então)
+- `cadence_entry_queue` - Fila de processamento de entry triggers
+
 ---
 
 ## 2. Modular Section System
@@ -85,7 +94,80 @@ All tables must FK to at least one of these:
 | `marketing_informacoes_preenchidas` | Marketing & Info Preenchidas | right_column | ✅ | - |
 | `system` | Sistema / Interno | right_column | ❌ | - |
 
-### 2.3 Frontend Hooks (COMPLETE - 38 hooks)
+### 2.3 Field Types (system_fields.type)
+
+| Type | Description | Component | Example |
+|------|-------------|-----------|---------|
+| `text` | Single line text | Input | "Nome do cliente" |
+| `textarea` | Multi-line text | Textarea | "Observações" |
+| `number` | Numeric value | Input[number] | "Quantidade" |
+| `date` | Single date | Input[date] | "Data de nascimento" |
+| `datetime` | Date with time | Input[datetime-local] | "Data da reunião" |
+| `date_range` | Start/end dates | 2x Input[date] | "Período de férias" |
+| `currency` | Money value (BRL) | Input + R$ prefix | "Valor do serviço" |
+| `currency_range` | Min/max values | 2x Input + R$ | "Faixa de preço" |
+| `select` | Single option | Select | "Status" |
+| `multiselect` | Multiple options | Chip buttons | "Interesses" |
+| `checklist` | Checkable items | Checkbox list | "Documentos" |
+| `boolean` | Yes/No | Checkbox | "Confirmado?" |
+| `json` | Raw JSON | Textarea | "Dados customizados" |
+| `loss_reason_selector` | Loss reason picker | Custom select | "Motivo da perda" |
+| **`flexible_date`** | **Flexible date picker** | **FlexibleDateField** | **Época da viagem** |
+| **`flexible_duration`** | **Flexible duration** | **FlexibleDurationField** | **Duração da viagem** |
+| **`smart_budget`** | **Smart budget field** | **SmartBudgetField** | **Orçamento** |
+
+#### New Flexible Types (2026-02)
+
+**flexible_date** - Aceita múltiplos formatos de data:
+- `data_exata`: Datas específicas (ex: 15/06/2025 a 20/06/2025)
+- `mes`: Mês único (ex: Setembro 2025)
+- `range_meses`: Range de meses (ex: Agosto a Novembro 2025)
+- `indefinido`: Cliente não definiu ainda
+
+**flexible_duration** - Aceita múltiplos formatos de duração:
+- `fixo`: Dias fixos (ex: 7 dias)
+- `range`: Range de dias (ex: 5 a 7 dias)
+- `indefinido`: Cliente não definiu ainda
+
+**smart_budget** - Orçamento inteligente com cálculo automático:
+- `total`: Valor total do grupo (ex: R$ 15.000)
+- `por_pessoa`: Valor por viajante (ex: R$ 3.000/pessoa)
+- `range`: Faixa de valor (ex: R$ 10.000 a R$ 15.000)
+- Auto-calcula total ↔ por_pessoa baseado em quantidade_viajantes
+
+**Colunas Normalizadas (para relatórios):**
+- `cards.epoca_mes_inicio`, `cards.epoca_mes_fim`, `cards.epoca_ano`
+- `cards.duracao_dias_min`, `cards.duracao_dias_max`
+- `cards.valor_estimado` (sincronizado de smart_budget.total_calculado)
+
+#### Field Lock System (Bloqueio de Atualização Automática)
+
+**Coluna:** `cards.locked_fields` (JSONB)
+
+Permite bloquear campos individuais para impedir atualizações automáticas via integrações (n8n/ActiveCampaign).
+
+**Estrutura:**
+```json
+{
+  "destinos": true,      // Campo bloqueado
+  "orcamento": true,     // Campo bloqueado
+  "epoca_viagem": false  // Campo liberado (ou ausente)
+}
+```
+
+**Componentes:**
+| Componente | Path | Função |
+|------------|------|--------|
+| `FieldLockButton` | `src/components/card/FieldLockButton.tsx` | Botão de cadeado para lock/unlock |
+| `useFieldLock` | `src/hooks/useFieldLock.ts` | Hook para gerenciar estado de lock |
+
+**Integração com Backend:**
+- `integration-process/index.ts` verifica `locked_fields` antes de atualizar cada campo
+- Se `locked_fields[fieldKey] === true`, a atualização é ignorada
+
+---
+
+### 2.4 Frontend Hooks (COMPLETE - 38 hooks)
 
 #### Section & Field Management
 | Hook | File | Purpose |
@@ -108,10 +190,14 @@ All tables must FK to at least one of these:
 | `useCardPeople()` | `useCardPeople.ts` | People on a card |
 | `useCardCreationRules()` | `useCardCreationRules.ts` | Who can create cards where |
 | `useDeleteCard()` | `useDeleteCard.ts` | Card deletion logic |
+| `useArchiveCard()` | `useArchiveCard.ts` | **Card archive/unarchive logic** |
 | `useQualityGate()` | `useQualityGate.ts` | Stage transition validation |
 | `useFilterOptions()` | `useFilterOptions.ts` | Filter options for pipeline |
 | `useTrips()` | `useTrips.ts` | Query de viagens ganhas |
 | `useTripsFilters()` | `useTripsFilters.ts` | Zustand store para filtros de viagens |
+| `useSubCards()` | `useSubCards.ts` | **Sub-cards CRUD (change requests)** |
+| `useSubCardParent()` | `useSubCards.ts` | Get parent info for sub-cards |
+| `useFieldLock()` | `useFieldLock.ts` | **Gerencia bloqueio de campos (locked_fields)** |
 
 #### Proposals
 | Hook | File | Purpose |
@@ -207,7 +293,7 @@ All tables must FK to at least one of these:
 | `ProposalBuilderElite` | `src/pages/ProposalBuilderElite.tsx` | `/proposals/:id/elite` | Elite builder |
 | `ProposalBuilder` | `src/pages/ProposalBuilder.tsx` | `/proposals/:id/edit` | Original builder |
 
-#### Admin Pages (9)
+#### Admin Pages (11)
 | Page | Path | Route | Description |
 |------|------|-------|-------------|
 | `PipelineStudio` | `src/pages/admin/PipelineStudio.tsx` | `/settings/pipeline/structure` | Pipeline configuration |
@@ -219,6 +305,8 @@ All tables must FK to at least one of these:
 | `LossReasonManagement` | `src/pages/admin/LossReasonManagement.tsx` | `/settings/customization/loss-reasons` | **Motivos de perda** |
 | `WorkflowBuilderPage` | `src/pages/admin/WorkflowBuilderPage.tsx` | `/settings/workflows/builder/:id?` | **Visual workflow builder** |
 | `WorkflowListPage` | `src/pages/admin/WorkflowListPage.tsx` | `/settings/workflows` | **Lista de workflows** |
+| `CadenceListPage` | `src/pages/admin/cadence/CadenceListPage.tsx` | `/settings/cadence` | **Lista de cadências + regras de entrada** |
+| `CadenceBuilderPage` | `src/pages/admin/cadence/CadenceBuilderPage.tsx` | `/settings/cadence/:id` | **Builder de cadências com day patterns** |
 
 #### Developer (1)
 | Page | Path | Route | Description |
@@ -312,6 +400,7 @@ Cards move through stages. Each stage can have:
 | `/deals` | GET, POST | Manage deals |
 | `/contacts` | GET, POST | Manage contacts |
 | `/openapi.json` | GET | OpenAPI 3.0 Spec |
+| `/cadence-engine` | POST | Cadence processing engine (Internal) |
 
 **Authentication:** `X-API-Key` header required for all endpoints (except health/docs).
 
@@ -386,6 +475,81 @@ npm run build
 - **Allowed stages:** Usa `useAllowedStages(product)` baseado no time do usuário
 - **Auto-select:** Primeira etapa permitida é selecionada automaticamente
 - **Owner default:** `dono_atual_id = profile.id` do usuário logado
+
+### Cadence System Components
+
+#### CadenceListPage.tsx
+- **Tabs:** Templates, Regras de Entrada, Monitor Global
+- **URL state:** Tab ativa via `?tab=` query param
+- **Stats cards:** Templates ativos, instâncias ativas, concluídas, na fila
+
+#### CadenceEntryRulesTab.tsx
+- **Padrão:** QUANDO (evento) → ENTÃO (ação)
+- **Eventos:** `card_created`, `stage_enter`
+- **Ações:** `create_task`, `start_cadence`
+- **Filtros:** pipeline_ids/stage_ids null = qualquer
+
+#### CadenceBuilderPage.tsx
+- **Tabs:** Steps, Agendamento, Visualizar
+- **schedule_mode:** `interval` (tradicional) ou `day_pattern`
+- **day_pattern:** `{ days: [1,2,3,5,8], description: "..." }`
+- **requires_previous_completed:** Step só executa se anterior foi concluída
+
+#### DayPatternEditor.tsx
+- **Presets:** "3 dias seguidos", "Dias alternados", "3+1+1 (padrão SDR)"
+- **Click to toggle:** Dias 1-14 clicáveis
+- **Preview:** Mostra timeline visual dos dias
+
+#### CadenceTimeline.tsx
+- **Cores:** Task=blue, Wait=amber, End=green/red
+- **Timing:** Mostra "Dia X" ou "+Xh" baseado no schedule_mode
+- **Summary:** Conta tarefas, pausas, dias total
+
+### Sub-Cards System (Change Requests)
+
+**Purpose:** Allow change requests during Pós-venda without losing control of the main card.
+
+#### Database Schema
+| Column | Type | Description |
+|--------|------|-------------|
+| `card_type` | TEXT | 'standard', 'group_child', 'sub_card' |
+| `sub_card_mode` | TEXT | 'incremental' (soma) ou 'complete' (substitui) |
+| `sub_card_status` | TEXT | 'active', 'merged', 'cancelled' |
+| `merged_at` | TIMESTAMPTZ | Data do merge |
+| `merged_by` | UUID | Quem fez o merge |
+| `merge_metadata` | JSONB | Detalhes do merge |
+
+#### Tables
+| Table | Purpose |
+|-------|---------|
+| `sub_card_sync_log` | Auditoria de sincronizações |
+
+#### RPCs
+| Function | Description |
+|----------|-------------|
+| `criar_sub_card(parent_id, titulo, descricao, mode)` | Cria sub-card vinculado |
+| `merge_sub_card(sub_card_id, options)` | Integra sub-card ao pai |
+| `cancelar_sub_card(sub_card_id, motivo)` | Cancela sem merge |
+| `get_sub_cards(parent_id)` | Lista sub-cards do pai |
+
+#### Components
+| Component | Path | Function |
+|-----------|------|----------|
+| `CreateSubCardModal` | `src/components/card/CreateSubCardModal.tsx` | Modal de criação |
+| `SubCardBadge` | `src/components/pipeline/SubCardBadge.tsx` | Badge no KanbanCard |
+| `SubCardsList` | `src/components/card/SubCardsList.tsx` | Lista no CardDetail |
+| `MergeSubCardModal` | `src/components/card/MergeSubCardModal.tsx` | Modal de merge |
+
+#### Business Rules
+1. **Criação:** Apenas de cards em Pós-venda
+2. **Modos:**
+   - `incremental`: Valor começa ZERADO, merge SOMA ao pai
+   - `complete`: Copia TUDO, merge SUBSTITUI o pai
+3. **Nascimento:** Sub-card nasce na primeira etapa da fase Planner
+4. **Taxa:** Sub-cards ignoram validação de taxa (já paga no pai)
+5. **Kanban:** Sub-cards ativos aparecem no Kanban, merged/cancelled não
+6. **Card pai perdido:** Cancela sub-cards ativos automaticamente
+7. **Tarefa:** Cria tarefa `tipo='solicitacao_mudanca'` no card pai
 
 ---
 

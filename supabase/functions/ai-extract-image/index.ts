@@ -24,6 +24,124 @@ interface ExtractionResult {
     suggestedCategory?: string;
 }
 
+// Tipos de extração de voos
+type ExtractionMode = 'ida_volta' | 'ida_only' | 'volta_only' | 'separate_legs';
+
+// Prompt base para extração genérica
+const GENERIC_PROMPT = `Você é um assistente especializado em extrair informações de orçamentos de viagem de imagens.
+
+Analise a imagem e extraia TODOS os itens de viagem que encontrar (voos, hotéis, transfers, experiências, seguros, etc.).
+
+Para cada item encontrado, retorne um objeto JSON com:
+- title: nome/descrição do item
+- description: detalhes adicionais (opcional)
+- price: valor numérico sem formatação (opcional)
+- currency: moeda (BRL, USD, EUR) (opcional)
+- dates: datas relevantes como string (opcional)
+- location: cidade/local (opcional)
+- category: tipo do item (hotel, flight, transfer, experience, service, insurance, custom)
+- company_name: nome da empresa prestadora (ex: LATAM, Hilton, Localiza)
+- details: objeto com dados extras específicos do tipo (opcional)
+
+⚠️ IMPORTANTE PARA VOOS:
+Se a imagem contém uma TABELA DE VOOS com múltiplos trechos, extraia como UM ÚNICO ITEM com category "flight" e inclua um array "segments" em details.
+
+Cada segment deve ter:
+- segment_order: 1, 2, 3... (ordem dos trechos)
+- airline_code: código IATA (LA, G3, AD, AA, etc.)
+- airline_name: nome completo (LATAM, GOL, Azul, etc.)
+- flight_number: número do voo (ex: "4904")
+- departure_date: data de saída (YYYY-MM-DD)
+- departure_time: hora de saída (HH:MM)
+- departure_airport: código do aeroporto (GRU, CGH, CWB, etc.)
+- departure_city: nome da cidade
+- arrival_date: data de chegada (YYYY-MM-DD)
+- arrival_time: hora de chegada (HH:MM)
+- arrival_airport: código do aeroporto
+- arrival_city: nome da cidade
+- cabin_class: Economy, Business, First (se disponível)
+- baggage_included: informação de bagagem (se disponível)
+- price: valor do voo (se disponível)
+
+Responda APENAS com um JSON válido no formato:
+{
+  "items": [...],
+  "confidence": 0.95,
+  "rawText": "texto extraído da imagem"
+}`;
+
+// Prompt especializado para extração de voos com modo
+function getFlightExtractionPrompt(mode: ExtractionMode): string {
+    const modeInstructions: Record<ExtractionMode, string> = {
+        'ida_volta': `MODO: IDA + VOLTA
+A imagem contém uma TABELA DE VOOS com opções de IDA e VOLTA.
+- Voos com MESMA DATA e MESMA ROTA são OPÇÕES do mesmo trecho
+- Voos com DATA DIFERENTE ou ROTA DIFERENTE são TRECHOS diferentes
+- Geralmente: primeira tabela = opções de IDA, segunda tabela = opções de VOLTA
+
+Agrupe os voos assim:
+- Se data/rota iguais → são opções do mesmo trecho
+- Se data diferente ou rota invertida → são trechos diferentes`,
+
+        'ida_only': `MODO: APENAS IDA
+A imagem contém OPÇÕES DE VOO para um único trecho de IDA.
+TODAS as linhas da tabela são OPÇÕES DIFERENTES para o MESMO trecho.
+Extraia todos os voos como opções de um único trecho de ida.`,
+
+        'volta_only': `MODO: APENAS VOLTA
+A imagem contém OPÇÕES DE VOO para um único trecho de VOLTA.
+TODAS as linhas da tabela são OPÇÕES DIFERENTES para o MESMO trecho.
+Extraia todos os voos como opções de um único trecho de volta.`,
+
+        'separate_legs': `MODO: TRECHOS SEPARADOS
+Cada linha/voo da imagem é um TRECHO DIFERENTE (conexões, multi-city).
+Extraia cada voo como um segment separado.`,
+    };
+
+    return `Você é um assistente especializado em extrair informações de VOOS de imagens de reservas/cotações.
+
+${modeInstructions[mode]}
+
+EXTRAIA TODOS OS VOOS da imagem. Cada voo deve ter:
+- segment_order: número sequencial (1, 2, 3...)
+- airline_code: código IATA da companhia (AD=Azul, G3=GOL, LA=LATAM, etc.)
+- airline_name: nome completo da companhia
+- flight_number: número do voo (apenas números, sem prefixo da cia)
+- departure_date: data de saída no formato YYYY-MM-DD
+- departure_time: hora de saída no formato HH:MM
+- departure_airport: código IATA do aeroporto (CGH, GRU, CWB, etc.)
+- departure_city: nome da cidade
+- arrival_date: data de chegada no formato YYYY-MM-DD
+- arrival_time: hora de chegada no formato HH:MM
+- arrival_airport: código IATA do aeroporto
+- arrival_city: nome da cidade
+- cabin_class: classe (Economy, Business, First)
+- baggage_included: informação de bagagem se disponível
+- price: valor numérico do voo (sem formatação, apenas número)
+
+IMPORTANTE:
+- Aeroporto CGH = São Paulo Congonhas
+- Aeroporto GRU = São Paulo Guarulhos
+- Aeroporto CWB = Curitiba Afonso Pena
+- Se o preço tiver centavos (ex: R$ 370,94), use 370.94
+
+Responda APENAS com um JSON válido no formato:
+{
+  "items": [{
+    "category": "flight",
+    "title": "Voos Extraídos",
+    "details": {
+      "segments": [
+        { "segment_order": 1, "airline_code": "AD", "airline_name": "Azul", "flight_number": "6404", ... },
+        { "segment_order": 2, ... }
+      ]
+    }
+  }],
+  "confidence": 0.95,
+  "rawText": "texto extraído da imagem"
+}`;
+}
+
 serve(async (req) => {
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
@@ -33,7 +151,7 @@ serve(async (req) => {
     try {
         console.log('[AI Extract] Request received');
 
-        const { image, imageUrl } = await req.json();
+        const { image, imageUrl, extractionMode, flightExtraction } = await req.json();
 
         if (!image && !imageUrl) {
             console.error('[AI Extract] No image provided');
@@ -58,6 +176,16 @@ serve(async (req) => {
             ? { type: "image_url", image_url: { url: imageUrl } }
             : { type: "image_url", image_url: { url: `data:image/jpeg;base64,${image}` } };
 
+        // Selecionar o prompt baseado no modo
+        const systemPrompt = flightExtraction && extractionMode
+            ? getFlightExtractionPrompt(extractionMode as ExtractionMode)
+            : GENERIC_PROMPT;
+
+        const userMessage = flightExtraction
+            ? "Extraia TODOS os voos desta imagem de cotação/reserva aérea."
+            : "Extraia todas as informações de viagem desta imagem de orçamento.";
+
+        console.log(`[AI Extract] Mode: ${extractionMode || 'generic'}, Flight extraction: ${flightExtraction}`);
         console.log('[AI Extract] Calling OpenAI GPT-5.1 Vision API...');
         const startTime = Date.now();
 
@@ -73,72 +201,21 @@ serve(async (req) => {
                 messages: [
                     {
                         role: "system",
-                        content: `Você é um assistente especializado em extrair informações de orçamentos de viagem de imagens.
-
-Analise a imagem e extraia TODOS os itens de viagem que encontrar (voos, hotéis, transfers, experiências, seguros, etc.).
-
-Para cada item encontrado, retorne um objeto JSON com:
-- title: nome/descrição do item
-- description: detalhes adicionais (opcional)
-- price: valor numérico sem formatação (opcional)
-- currency: moeda (BRL, USD, EUR) (opcional)
-- dates: datas relevantes como string (opcional)
-- location: cidade/local (opcional)
-- category: tipo do item (hotel, flight, transfer, experience, service, insurance, custom)
-- company_name: nome da empresa prestadora (ex: LATAM, Hilton, Localiza)
-- details: objeto com dados extras específicos do tipo (opcional)
-
-⚠️ IMPORTANTE PARA VOOS:
-Se a imagem contém uma TABELA DE VOOS com múltiplos trechos, extraia como UM ÚNICO ITEM com category "flight" e inclua um array "segments" em details.
-
-Cada segment deve ter:
-- segment_order: 1, 2, 3... (ordem dos trechos)
-- airline_code: código IATA (LA, G3, AA, etc.)
-- airline_name: nome completo (LATAM, GOL, etc.)
-- flight_number: número do voo (ex: "4904")
-- departure_date: data de saída (YYYY-MM-DD)
-- departure_time: hora de saída (HH:MM)
-- departure_airport: código do aeroporto (GRU, BOG, etc.)
-- departure_city: nome da cidade e aeroporto (ex: "São Paulo Guarulhos")
-- arrival_date: data de chegada (YYYY-MM-DD)
-- arrival_time: hora de chegada (HH:MM)
-- arrival_airport: código do aeroporto
-- arrival_city: nome da cidade e aeroporto
-- cabin_class: Economy, Business, First (se disponível)
-- baggage_included: informação de bagagem (se disponível)
-
-Exemplo de extração de tabela com 4 voos:
-{
-  "category": "flight",
-  "title": "Itinerário Aéreo Completo",
-  "details": {
-    "segments": [
-      { "segment_order": 1, "airline_code": "LA", "airline_name": "LATAM", "flight_number": "4904", "departure_date": "2026-11-16", "departure_time": "08:15", "departure_airport": "GRU", "departure_city": "São Paulo Guarulhos", "arrival_date": "2026-11-16", "arrival_time": "12:15", "arrival_airport": "BOG", "arrival_city": "Bogotá El Dorado" },
-      { "segment_order": 2, ... }
-    ]
-  }
-}
-
-Responda APENAS com um JSON válido no formato:
-{
-  "items": [...],
-  "confidence": 0.95,
-  "rawText": "texto extraído da imagem"
-}`
+                        content: systemPrompt
                     },
                     {
                         role: "user",
                         content: [
                             {
                                 type: "text",
-                                text: "Extraia todas as informações de viagem desta imagem de orçamento."
+                                text: userMessage
                             },
                             imageContent as any
                         ]
                     }
                 ],
                 max_completion_tokens: 4096,
-                temperature: 0.2,
+                temperature: 0.1, // Mais baixo para maior consistência
             }),
         });
 
@@ -210,7 +287,17 @@ Responda APENAS com um JSON válido no formato:
             rawText: parsed.rawText,
         };
 
-        console.log(`[AI Extract] Extraction complete. Found ${result.items.length} items.`);
+        // Log dos segments extraídos para debug
+        const flightItem = result.items.find(i => i.category === 'flight');
+        if (flightItem?.details?.segments) {
+            const segments = flightItem.details.segments as any[];
+            console.log(`[AI Extract] Flight extraction complete. Found ${segments.length} segments.`);
+            segments.forEach((seg, i) => {
+                console.log(`  Segment ${i + 1}: ${seg.airline_code} ${seg.flight_number} ${seg.departure_airport}->${seg.arrival_airport} ${seg.departure_date} ${seg.departure_time}`);
+            });
+        } else {
+            console.log(`[AI Extract] Extraction complete. Found ${result.items.length} items.`);
+        }
 
         return new Response(
             JSON.stringify(result),

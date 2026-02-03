@@ -9,6 +9,7 @@ import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { SystemPhase } from '../../types/pipeline'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
+import { FieldLockButton } from './FieldLockButton'
 
 type Card = Database['public']['Tables']['cards']['Row'] & {
     briefing_inicial?: any | null
@@ -358,10 +359,14 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {fields.map((field) => {
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
+                        {fields.map((field, index) => {
                             // Determine if field should be full width
                             const isFullWidth = ['textarea', 'multiselect', 'checklist', 'json', 'destinos'].includes(field.type) || field.key === 'destinos'
+
+                            // Cycle through colors by index for visual variety
+                            const dotColors = ['bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-teal-500', 'bg-emerald-500', 'bg-orange-500', 'bg-pink-500']
+                            const dotColor = dotColors[index % dotColors.length]
 
                             return (
                                 <div
@@ -371,13 +376,15 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                                         isFullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
                                     )}
                                 >
-                                    <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 uppercase tracking-wide">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full",
-                                            field.key === 'o_que_e_importante' ? "bg-red-500" :
-                                                field.key === 'o_que_nao_pode_dar_errado' ? "bg-orange-500" :
-                                                    field.key === 'sensibilidades' ? "bg-yellow-500" : "bg-gray-400"
-                                        )} />
+                                    <label className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                                        <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", dotColor)} />
                                         {field.label}
+                                        {/* Lock Button - Sempre visível ao lado do nome */}
+                                        <FieldLockButton
+                                            fieldKey={field.key}
+                                            cardId={card.id}
+                                            size="sm"
+                                        />
                                     </label>
                                     {renderFieldInput(field)}
                                 </div>

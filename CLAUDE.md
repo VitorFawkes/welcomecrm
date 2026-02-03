@@ -11,7 +11,7 @@
 
 Quando o usuário digitar **"modo antigravity"**, **EXECUTE IMEDIATAMENTE**:
 
-1. **Configurar Git:**
+1. **Configurar Git local:**
 ```bash
 PAT=$(cat .claude/secrets.json 2>/dev/null | grep github_pat | cut -d'"' -f4)
 git remote set-url origin "https://${PAT}@github.com/VitorFawkes/welcomecrm.git"
@@ -19,9 +19,19 @@ git config user.email "vitor@welcometrips.com.br"
 git config user.name "Vitor (via Claude)"
 ```
 
-2. **Testar Supabase MCP:** `supabase_rpc` → `list_all_tables()`
+2. **Verificar acessos disponíveis:**
+   - **MCP tools:** Checar se `list_tables`, `execute_sql` estão na lista de tools
+   - **GitHub CLI:** `gh auth status` para verificar se está autenticado
+   - **Supabase CLI:** `npx supabase projects list` para verificar acesso
 
-3. **Confirmar para o usuário:** "✅ IDE configurada - Git e Supabase prontos"
+3. **Confirmar para o usuário:**
+```
+✅ IDE Antigravity configurada:
+   - Git: [status]
+   - Supabase: [MCP ativo / CLI disponível / Dashboard]
+   - GitHub: [MCP ativo / gh CLI]
+   - N8N: [MCP ativo / API REST]
+```
 
 ---
 
@@ -163,19 +173,180 @@ const KEY = process.env.SUPABASE_KEY;
 
 ---
 
-## 🛠️ Capacidades
+## 🔌 MCP Servers (CONFIGURADOS)
 
-| Ação | Como |
-|------|------|
-| **SQL arbitrário** | `supabase_rpc` → `exec_sql({"query": "..."})` |
-| **Listar tabelas** | `supabase_rpc` → `list_all_tables()` |
-| **CRUD dados** | `supabase_query`, `supabase_insert`, etc |
-| **Git push** | Bash (após configurar PAT) |
-| **Editar código** | Read/Edit/Write tools |
-| **Build/Lint** | `npm run build`, `npm run lint` |
+O usuário configurou 3 servidores MCP. **VERIFIQUE SE ESTÃO ATIVOS antes de usar.**
+
+| MCP Server | Uso Principal |
+|------------|---------------|
+| **Supabase** | Banco de dados, SQL, CRUD, DDL, migrations |
+| **GitHub** | Repos, PRs, Issues, Actions |
+| **N8N** | Workflows, automações, webhooks |
+
+### 🔍 VERIFICAR CONEXÃO MCP
+
+**PASSO 1:** Verifique se os tools MCP estão na sua lista de ferramentas.
+Se você tem tools como `list_tables`, `execute_sql`, `list_workflows` → MCP está ativo.
+Se não tem → MCP não está conectado nesta sessão.
+
+**PASSO 2:** Se MCP não estiver conectado, use alternativas:
+- **Supabase:** Edge Function ou Dashboard
+- **GitHub:** `gh` CLI via Bash
+- **N8N:** API REST direta
+
+### ⚠️ Configuração MCP (referência)
+
+Os MCPs são configurados em `~/.gemini/antigravity/mcp_config.json`:
+```json
+{
+  "mcpServers": {
+    "supabase-mcp-server": { ... },
+    "github-mcp-server": { ... },
+    "n8n-mcp": { ... }
+  }
+}
+```
+
+Para ativar, o Claude Code precisa ser iniciado com os MCPs conectados.
+
+---
+
+### 🗄️ Supabase
+
+> Project ID: `szyrzxvlptqqheizyrxu`
+> Dashboard: https://supabase.com/dashboard/project/szyrzxvlptqqheizyrxu
+
+**Se MCP ativo** (tools `list_tables`, `execute_sql` disponíveis):
+```
+→ list_tables()
+→ execute_sql("SELECT * FROM cards LIMIT 10")
+→ execute_sql("ALTER TABLE cards ADD COLUMN new_field TEXT")
+```
+
+**Se MCP inativo** (alternativas):
+```bash
+# Via Supabase CLI
+npx supabase db execute --project-ref szyrzxvlptqqheizyrxu "SELECT * FROM cards LIMIT 10"
+
+# Ou pedir para o usuário executar no Dashboard
+```
+
+---
+
+### 🐙 GitHub MCP
+
+**Acesso completo ao repositório via API.**
+
+| Ferramenta | Descrição |
+|------------|-----------|
+| `get_file_contents` | Ler arquivo do repo |
+| `create_or_update_file` | Criar/atualizar arquivo |
+| `create_pull_request` | Criar PR |
+| `list_issues` | Listar issues |
+| `create_issue` | Criar issue |
+| `list_commits` | Listar commits |
+| `get_pull_request` | Ver detalhes de PR |
+
+**Exemplos:**
+```
+→ list_issues("VitorFawkes/welcomecrm")
+→ create_pull_request(...)
+→ get_file_contents("VitorFawkes/welcomecrm", "package.json")
+```
+
+---
+
+### ⚡ N8N MCP
+
+**Acesso aos workflows de automação.**
+
+| Ferramenta | Descrição |
+|------------|-----------|
+| `list_workflows` | Listar workflows |
+| `get_workflow` | Ver detalhes de workflow |
+| `execute_workflow` | Executar workflow |
+| `activate_workflow` | Ativar/desativar workflow |
+
+**URL Base:** `https://n8n-n8n.ymnmx7.easypanel.host`
+
+---
+
+## 🛠️ Capacidades Consolidadas
+
+| Ação | Opção 1 (MCP) | Opção 2 (CLI/API) |
+|------|---------------|-------------------|
+| **SQL arbitrário** | `execute_sql(...)` | `npx supabase db execute` ou Dashboard |
+| **Listar tabelas** | `list_tables()` | Dashboard |
+| **Git push** | — | `git push` (com PAT configurado) |
+| **PRs/Issues** | MCP GitHub | `gh pr create`, `gh issue list` |
+| **Automações N8N** | MCP N8N | API REST fetch/curl |
+| **Editar código** | — | Read/Edit/Write tools |
+| **Build/Lint** | — | `npm run build`, `npm run lint` |
+| **Deploy Functions** | — | `export SUPABASE_ACCESS_TOKEN="sbp_..." && npx supabase functions deploy <nome>` |
+
+### ⚠️ Segurança MCP
+
+- Tokens MCP (`sbp_...`, `github_pat_...`, `eyJ...`) **NUNCA** devem ser commitados
+- Sempre verificar estado LIVE antes de modificar views/functions
+- Seguir `docs/SQL_SOP.md` para operações DDL
+
+### 🔄 Alternativas quando MCP não está ativo
+
+| Serviço | Alternativa |
+|---------|-------------|
+| **Supabase SQL** | Bash: `npx supabase db execute` ou Dashboard |
+| **GitHub** | Bash: `gh pr create`, `gh issue list`, etc. |
+| **N8N** | API REST via `fetch()` ou `curl` |
+
+### 📋 Checklist antes de usar MCP
+
+1. Verificar se tools MCP aparecem na lista
+2. Se não aparecem → usar alternativas acima
+3. Não assumir que MCP está ativo só porque está configurado
+
+### 🚀 Deploy de Edge Functions
+
+O Claude PODE fazer deploy de Edge Functions via Bash.
+
+**PASSO 1: Obter o token do arquivo de secrets**
+```bash
+# Ler o token do arquivo de configuração MCP
+cat ~/.gemini/antigravity/mcp_config.json | grep -A5 "supabase-mcp-server" | grep "access-token" | cut -d'"' -f2
+```
+
+Ou ler diretamente o arquivo `.claude/secrets.json` se existir.
+
+**PASSO 2: Exportar e fazer deploy**
+```bash
+# Usar o token obtido (substitua sbp_XXXX pelo token real)
+export SUPABASE_ACCESS_TOKEN="sbp_XXXX..." && \
+npx supabase functions deploy <nome-da-function> --project-ref szyrzxvlptqqheizyrxu
+```
+
+**Exemplo completo - Método recomendado:**
+
+1. Ler o token do arquivo MCP config:
+```bash
+cat ~/.gemini/antigravity/mcp_config.json
+```
+
+2. Copiar o valor do `--access-token` (começa com `sbp_`)
+
+3. Executar o deploy:
+```bash
+export SUPABASE_ACCESS_TOKEN="sbp_COLE_AQUI" && \
+npx supabase functions deploy ai-extract-image --project-ref szyrzxvlptqqheizyrxu
+```
+
+**Alternativa - Pedir o token ao usuário:**
+Se não conseguir ler o arquivo, pergunte:
+"Qual é o SUPABASE_ACCESS_TOKEN (sbp_...)? Preciso dele para fazer deploy."
+
+**Nota:** O warning "Docker is not running" pode ser ignorado - deploy funciona sem Docker.
+
+**Project ID:** `szyrzxvlptqqheizyrxu`
 
 ### Limitações:
-- ❌ Deploy Edge Functions → usuário roda `supabase functions deploy`
 - ❌ Rodar app local → usuário roda `npm run dev`
 
 ---

@@ -14,6 +14,9 @@ import PessoasWidget from '../components/card/PessoasWidget'
 import ActivityFeed from '../components/card/ActivityFeed'
 import { ParentLinkBanner } from '../components/cards/group/ParentLinkBanner'
 import GroupDetailLayout from '../components/cards/group/GroupDetailLayout'
+import SubCardsList from '../components/card/SubCardsList'
+import { SubCardParentBanner } from '../components/pipeline/SubCardBadge'
+import { useSubCards, useSubCardParent } from '../hooks/useSubCards'
 import { ArrowLeft } from 'lucide-react'
 
 import type { Database } from '../database.types'
@@ -24,7 +27,11 @@ export default function CardDetail() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
 
+    // Check if card is a sub-card and get parent info
+    const { isSubCard, subCardMode, parentCard } = useSubCardParent(id)
 
+    // Get sub-cards if this is a parent
+    const { canCreateSubCard } = useSubCards(id)
 
     const { data: card, isLoading } = useQuery({
         queryKey: ['card-detail', id],
@@ -40,6 +47,27 @@ export default function CardDetail() {
         enabled: !!id,
         staleTime: 1000 * 30, // 30 seconds to avoid immediate refetch flickers
     })
+
+    // Get the card's current phase
+    const { data: stageInfo } = useQuery({
+        queryKey: ['card-stage-info', card?.pipeline_stage_id],
+        queryFn: async () => {
+            if (!card?.pipeline_stage_id) return null
+            const { data, error } = await supabase
+                .from('pipeline_stages')
+                .select('fase, phase_id')
+                .eq('id', card.pipeline_stage_id)
+                .single()
+            if (error) return null
+            return data
+        },
+        enabled: !!card?.pipeline_stage_id,
+    })
+
+    // Determine if we can show sub-cards functionality
+    const showSubCards = stageInfo?.fase === 'Pós-venda' &&
+        (card as any)?.card_type !== 'sub_card' &&
+        !card?.is_group_parent
 
     if (isLoading) return <div className="p-8 text-center">Carregando...</div>
     if (!card) return <div className="p-8 text-center">Viagem não encontrada</div>
@@ -96,10 +124,22 @@ export default function CardDetail() {
             <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 p-6">
                 {/* CENTER COLUMN - Work Area (What to do) */}
                 <div className="min-h-0 overflow-y-auto space-y-4 pr-2 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
-                    {/* Stage Requirements (Checklist) */}
-                    {card.parent_card_id && (
+                    {/* Sub-Card Parent Banner (if this is a sub-card) */}
+                    {isSubCard && parentCard && subCardMode && (
+                        <SubCardParentBanner
+                            parentId={parentCard.id}
+                            parentTitle={parentCard.titulo}
+                            mode={subCardMode}
+                            onNavigate={() => navigate(`/cards/${parentCard.id}`)}
+                        />
+                    )}
+
+                    {/* Group Child Banner (if this is a group child) */}
+                    {card.parent_card_id && !isSubCard && (
                         <ParentLinkBanner parentId={card.parent_card_id} />
                     )}
+
+                    {/* Stage Requirements (Checklist) */}
                     <StageRequirements card={card} />
 
                     {/* Tasks & Meetings (Unified) */}
@@ -121,6 +161,22 @@ export default function CardDetail() {
 
                 {/* SIDEBAR - Context & Accountability */}
                 <div className="min-h-0 overflow-y-auto space-y-4 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
+                    {/* Sub-Cards List (for cards in Pós-venda) */}
+                    {showSubCards && (
+                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                            <SubCardsList
+                                parentCardId={card.id!}
+                                parentTitle={card.titulo || 'Card'}
+                                parentValor={card.valor_final || card.valor_estimado}
+                                canCreate={canCreateSubCard({
+                                    card_type: (card as any).card_type,
+                                    fase: stageInfo?.fase,
+                                    is_group_parent: card.is_group_parent
+                                })}
+                            />
+                        </div>
+                    )}
+
                     {/* 1. Pessoas (Contact + Travelers) */}
                     <PessoasWidget card={card} />
 

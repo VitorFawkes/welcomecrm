@@ -194,8 +194,8 @@ export function useStageRequirements(card: Card) {
         }
 
         // Waterfall: Also check in briefing_inicial
-        if ((card as any).briefing_inicial && typeof (card as any).briefing_inicial === 'object') {
-            const briefingData = (card as any).briefing_inicial as Record<string, unknown>
+        if (card.briefing_inicial && typeof card.briefing_inicial === 'object') {
+            const briefingData = card.briefing_inicial as Record<string, unknown>
             const value = briefingData[fieldKey]
 
             if (value === null || value === undefined || value === '') return false

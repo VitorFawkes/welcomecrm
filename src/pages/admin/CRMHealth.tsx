@@ -25,7 +25,7 @@ export default function CRMHealth() {
 
     if (isLoading) return <div className="p-8">Carregando diagnóstico...</div>
 
-    const overdueCards = cards?.filter(c => c.urgencia_tempo_etapa === 1) || []
+    const overdueCards = cards?.filter(c => Number(c.urgencia_tempo_etapa) === 1) || []
     const stagnantCards = cards?.filter(c => (c.tempo_sem_contato || 0) > 7) || [] // > 7 days without contact
     const noTaskCards = cards?.filter(c => !c.proxima_tarefa) || []
 

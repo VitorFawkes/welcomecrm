@@ -23,8 +23,8 @@ export default function CardOverview({ card }: CardOverviewProps) {
                         <div>
                             <dt className="text-sm font-medium text-gray-500">Valor Final</dt>
                             <dd className="mt-1 text-sm text-gray-900">
-                                {card.valor_final
-                                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: card.moeda || 'BRL' }).format(card.valor_final)
+                                {(card as any).valor_final
+                                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: card.moeda || 'BRL' }).format((card as any).valor_final)
                                     : '-'}
                             </dd>
                         </div>
@@ -100,10 +100,10 @@ export default function CardOverview({ card }: CardOverviewProps) {
                                 {card.dono_atual_nome || 'Não atribuído'}
                             </dd>
                         </div>
-                        {card.sdr_nome && (
+                        {card.sdr_owner_nome && (
                             <div>
                                 <dt className="text-sm font-medium text-gray-500">SDR</dt>
-                                <dd className="mt-1 text-sm text-gray-900">{card.sdr_nome}</dd>
+                                <dd className="mt-1 text-sm text-gray-900">{card.sdr_owner_nome}</dd>
                             </div>
                         )}
                         {card.vendas_nome && (

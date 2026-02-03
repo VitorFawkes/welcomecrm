@@ -36,6 +36,38 @@ Deno.serve(async (req) => {
 
     console.log('[integration-dispatch] Starting outbound event processing...');
 
+    // 0. Check if outbound sync is enabled and not in shadow mode
+    const { data: settings } = await supabase
+        .from('integration_settings')
+        .select('key, value')
+        .in('key', ['OUTBOUND_SYNC_ENABLED', 'OUTBOUND_SHADOW_MODE']);
+
+    const settingsMap = (settings || []).reduce((acc, s) => {
+        acc[s.key] = s.value;
+        return acc;
+    }, {} as Record<string, string>);
+
+    const syncEnabled = settingsMap['OUTBOUND_SYNC_ENABLED'] === 'true';
+    const shadowMode = settingsMap['OUTBOUND_SHADOW_MODE'] === 'true';
+
+    if (!syncEnabled) {
+        console.log('[integration-dispatch] Outbound sync is disabled');
+        return new Response(JSON.stringify({
+            message: 'Outbound sync is disabled',
+            processed: 0,
+            sync_enabled: false
+        }), { status: 200 });
+    }
+
+    if (shadowMode) {
+        console.log('[integration-dispatch] Shadow mode is active - skipping actual dispatch');
+        return new Response(JSON.stringify({
+            message: 'Shadow mode active - no events dispatched',
+            processed: 0,
+            shadow_mode: true
+        }), { status: 200 });
+    }
+
     // 1. Fetch pending outbound events
     const { data: events, error: fetchError } = await supabase
         .from('integration_outbound_queue')
@@ -70,12 +102,29 @@ Deno.serve(async (req) => {
                 .eq('id', event.id);
 
             // 3. Get ActiveCampaign API credentials
+            // First try from integration config, then fallback to integration_settings
             const integration = event.integrations as { config?: { api_key?: string; api_url?: string } };
-            const acApiKey = integration?.config?.api_key;
-            const acApiUrl = integration?.config?.api_url;
+            let acApiKey = integration?.config?.api_key;
+            let acApiUrl = integration?.config?.api_url;
+
+            // Fallback to integration_settings if not in config
+            if (!acApiKey || !acApiUrl) {
+                const { data: acSettings } = await supabase
+                    .from('integration_settings')
+                    .select('key, value')
+                    .in('key', ['ACTIVECAMPAIGN_API_KEY', 'ACTIVECAMPAIGN_API_URL']);
+
+                const acSettingsMap = (acSettings || []).reduce((acc, s) => {
+                    acc[s.key] = s.value;
+                    return acc;
+                }, {} as Record<string, string>);
+
+                acApiKey = acApiKey || acSettingsMap['ACTIVECAMPAIGN_API_KEY'];
+                acApiUrl = acApiUrl || acSettingsMap['ACTIVECAMPAIGN_API_URL'];
+            }
 
             if (!acApiKey || !acApiUrl) {
-                throw new Error('ActiveCampaign API not configured in integration settings');
+                throw new Error('ActiveCampaign API not configured. Set ACTIVECAMPAIGN_API_KEY and ACTIVECAMPAIGN_API_URL in integration settings.');
             }
 
             // 4. Build API request based on event type

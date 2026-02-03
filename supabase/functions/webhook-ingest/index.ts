@@ -127,6 +127,19 @@ serve(async (req) => {
             payload = Object.fromEntries(new URLSearchParams(formData));
         }
 
+        // ---- DEBUG LOGGING (Fire and Forget) ----
+        console.log("Incoming Webhook Payload:", JSON.stringify(payload));
+        supabaseClient.from("debug_requests").insert({
+            function_name: "webhook-ingest",
+            method: req.method,
+            url: req.url,
+            headers: Object.fromEntries(req.headers.entries()),
+            payload: payload
+        }).then(({ error }) => {
+            if (error) console.error("Failed to log to debug_requests:", error);
+        });
+        // -----------------------------------------
+
         const headers = Object.fromEntries(req.headers.entries());
 
         // 2. Validate HMAC (if configured)

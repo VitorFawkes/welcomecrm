@@ -19,7 +19,7 @@ export function useTrips() {
             if (filters.search) {
                 const searchTerm = filters.search.trim();
                 if (searchTerm) {
-                    query = query.or(`titulo.ilike.%${searchTerm}%,pessoa_nome.ilike.%${searchTerm}%,origem.ilike.%${searchTerm}%,pessoa_email.ilike.%${searchTerm}%,pessoa_telefone.ilike.%${searchTerm}%`)
+                    query = query.or(`titulo.ilike.%${searchTerm}%,pessoa_nome.ilike.%${searchTerm}%,origem.ilike.%${searchTerm}%`)
                 }
             }
 

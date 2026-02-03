@@ -18,9 +18,35 @@ import {
     Mail,
     ArrowLeft,
     ChevronDown,
-    Check
+    Check,
+    FileText,
+    Sparkles
 } from 'lucide-react';
 import { MultiSelectEmail } from '@/components/ui/MultiSelectEmail';
+
+const N8N_WEBHOOK_URL = 'https://n8n-n8n.ymnmx7.easypanel.host/webhook/transcript-process';
+
+// Helper para formatar nomes de campos extraídos pela IA
+const formatCampoLabel = (campo: string): string => {
+    const labels: Record<string, string> = {
+        destinos: 'Destinos',
+        epoca_viagem: 'Época da viagem',
+        motivo: 'Motivo',
+        duracao_viagem: 'Duração',
+        orcamento: 'Orçamento',
+        quantidade_viajantes: 'Viajantes',
+        servico_contratado: 'Serviço contratado',
+        qual_servio_contratado: 'Qual serviço',
+        momento_viagem: 'Momento especial',
+        prioridade_viagem: 'Prioridades',
+        o_que_e_importante: 'O que é importante',
+        algo_especial_viagem: 'Algo especial',
+        receio_ou_medo: 'Receios/medos',
+        frequencia_viagem: 'Frequência de viagem',
+        usa_agencia: 'Usa agência'
+    };
+    return labels[campo] || campo;
+};
 
 interface SmartTaskModalProps {
     isOpen: boolean;
@@ -82,6 +108,12 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
     // Meeting Specifics (New)
     const [externalParticipants, setExternalParticipants] = useState<string[]>([]);
 
+    // Transcription for meetings
+    const [transcricao, setTranscricao] = useState('');
+    const [isProcessingAI, setIsProcessingAI] = useState(false);
+    const [aiProcessResult, setAiProcessResult] = useState<{ status: string; campos_extraidos?: string[] } | null>(null);
+    const [processWithAI, setProcessWithAI] = useState(true); // Toggle para processar com IA
+
     // Refs for native pickers
     const dateInputRef = useRef<HTMLInputElement>(null);
     const rescheduleDateInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +126,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
     const [metadata, setMetadata] = useState<any>({});
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'processing_ai' | 'done'>('idle');
     const queryClient = useQueryClient();
 
     // Fetch profiles for responsible selection
@@ -184,6 +217,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 setCancellationReason(initialData?.motivo_cancelamento || '');
                 setOtherCategory(initialData?.categoria_outro || '');
                 setExternalParticipants(initialData?.participantes_externos || []);
+                setTranscricao(initialData?.transcricao || '');
+                setAiProcessResult(null);
+                setIsProcessingAI(false);
+                setProcessWithAI(true); // Default: processar com IA
+                setSubmitPhase('idle');
 
                 if (initialData?.data_vencimento && mode !== 'reschedule') {
                     const dt = new Date(initialData.data_vencimento);
@@ -223,6 +261,11 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 setExternalParticipants([]);
                 setRescheduleDate('');
                 setRescheduleTime('');
+                setTranscricao('');
+                setAiProcessResult(null);
+                setIsProcessingAI(false);
+                setProcessWithAI(true); // Default: processar com IA
+                setSubmitPhase('idle');
 
                 // Defaults: Today + Now (rounded to next 15 min)
                 const now = new Date();
@@ -288,9 +331,79 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
         setShowRescheduleTimeList(false);
     };
 
+    // Process transcription with AI
+    const processTranscriptionWithAI = async (taskId: string | null, transcriptionText: string, showFeedback: boolean = true) => {
+        if (!transcriptionText || transcriptionText.trim().length < 50) {
+            if (showFeedback) {
+                toast.error('Transcrição precisa ter pelo menos 50 caracteres');
+            }
+            return null;
+        }
+
+        setIsProcessingAI(true);
+        setAiProcessResult(null);
+
+        try {
+            const response = await fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    card_id: cardId,
+                    meeting_id: taskId || 'preview', // Use 'preview' if no task ID yet
+                    transcription: transcriptionText
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao processar transcrição');
+            }
+
+            const result = await response.json();
+            setAiProcessResult(result);
+
+            if (result.status === 'success' && result.campos_extraidos?.length > 0) {
+                toast.success(
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-lg">✨</span>
+                            <p className="font-semibold">IA atualizou {result.campos_extraidos.length} campos!</p>
+                        </div>
+                        <div className="bg-white/20 rounded-lg p-2">
+                            <ul className="text-xs space-y-0.5">
+                                {result.campos_extraidos.slice(0, 6).map((campo: string) => (
+                                    <li key={campo} className="flex items-center gap-1.5">
+                                        <span className="text-green-300">✓</span>
+                                        {formatCampoLabel(campo)}
+                                    </li>
+                                ))}
+                                {result.campos_extraidos.length > 6 && (
+                                    <li className="text-white/70 pl-4">+{result.campos_extraidos.length - 6} campos</li>
+                                )}
+                            </ul>
+                        </div>
+                    </div>,
+                    { duration: 6000 }
+                );
+                queryClient.invalidateQueries({ queryKey: ['card', cardId] });
+                queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] });
+            } else if (result.status === 'no_update' || !result.campos_extraidos?.length) {
+                toast.info('IA não encontrou novas informações na transcrição');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Erro ao processar com IA:', error);
+            toast.error('Erro ao processar transcrição com IA');
+            return null;
+        } finally {
+            setIsProcessingAI(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        setSubmitPhase('saving');
 
         try {
             // Combine date and time
@@ -310,27 +423,27 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 finalResponsibleId = user?.id || '';
             }
 
-            // Validation: Meeting requires explicit responsible
-            if (type === 'reuniao' && !finalResponsibleId) {
-                throw new Error("Para reuniões, é obrigatório selecionar um responsável.");
+            // Validations for Meeting
+            if (type === 'reuniao') {
+                // Participantes externos obrigatórios para reunião
+                if (!externalParticipants || externalParticipants.length === 0) {
+                    throw new Error("Para reuniões, é obrigatório adicionar pelo menos um participante externo.");
+                }
+
+                // Se não tiver responsável, usa o usuário atual
+                if (!finalResponsibleId) {
+                    finalResponsibleId = user?.id || '';
+                }
+
+                // Apenas validação de reagendamento (precisa de nova data/hora)
+                if (meetingStatus === 'reagendada' && (!rescheduleDate || !rescheduleTime)) {
+                    throw new Error("Para reagendar, é necessário informar a nova data e hora.");
+                }
             }
 
             if (!finalResponsibleId) {
                 finalResponsibleId = initialData?.responsavel_id || user?.id;
                 if (!finalResponsibleId) throw new Error("Não foi possível identificar o responsável.");
-            }
-
-            // Validations for Meeting Status
-            if (type === 'reuniao') {
-                if (meetingStatus === 'realizada' && (!meetingResult || !meetingFeedback)) {
-                    throw new Error("Para reuniões realizadas, Resultado e Feedback são obrigatórios.");
-                }
-                if (meetingStatus === 'cancelada' && !cancellationReason) {
-                    throw new Error("Para reuniões canceladas, o Motivo do Cancelamento é obrigatório.");
-                }
-                if (meetingStatus === 'reagendada' && (!rescheduleDate || !rescheduleTime)) {
-                    throw new Error("Para reagendar, é necessário informar a nova data e hora.");
-                }
             }
 
             // Validation for Change Request
@@ -358,7 +471,9 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                 // Map status to outcome for workflow triggering
                 outcome: type === 'reuniao' && ['realizada', 'cancelada', 'nao_compareceu'].includes(meetingStatus)
                     ? meetingStatus
-                    : (type === 'reuniao' && meetingStatus === 'reagendada' ? 'remarcada' : null)
+                    : (type === 'reuniao' && meetingStatus === 'reagendada' ? 'remarcada' : null),
+                // Transcription for meetings
+                transcricao: type === 'reuniao' && meetingStatus === 'realizada' ? (transcricao || null) : null
             };
 
             // Only add participantes_externos if it's a meeting and has values
@@ -431,10 +546,33 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             } else {
                 // Normal Save (Create or Update)
                 if (initialData?.id) {
+                    // Validar se o ID existe antes de atualizar
+                    const taskId = initialData.id;
+                    if (!taskId || typeof taskId !== 'string' || taskId.trim() === '') {
+                        throw new Error('ID da tarefa inválido');
+                    }
+
+                    // Verificar se a tarefa existe
+                    const { data: existing, error: checkError } = await supabase
+                        .from('tarefas')
+                        .select('id')
+                        .eq('id', taskId)
+                        .maybeSingle();
+
+                    if (checkError) {
+                        console.error('Erro ao verificar tarefa:', checkError);
+                        throw new Error('Erro ao verificar tarefa: ' + checkError.message);
+                    }
+
+                    if (!existing) {
+                        console.error('Tarefa não encontrada:', taskId);
+                        throw new Error('Tarefa não encontrada. Ela pode ter sido excluída. Por favor, feche e reabra o modal.');
+                    }
+
                     const { error: updateError } = await supabase
                         .from('tarefas')
                         .update(payload)
-                        .eq('id', initialData.id);
+                        .eq('id', taskId);
                     error = updateError;
                 } else {
                     const { error: insertError } = await supabase
@@ -446,15 +584,33 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
 
             if (error) throw error;
 
+            // Process transcription with AI if meeting is realized, has transcription, AND toggle is ON
+            const taskId = initialData?.id || newMeetingId;
+            const shouldProcessAI = type === 'reuniao' && meetingStatus === 'realizada' && transcricao && transcricao.trim().length >= 50 && taskId && processWithAI && !aiProcessResult;
+
+            if (shouldProcessAI) {
+                // AGUARDA a IA terminar - não processa em background
+                setSubmitPhase('processing_ai');
+                const aiResult = await processTranscriptionWithAI(taskId, transcricao, false); // false = não mostrar toast aqui
+
+                if (aiResult?.status === 'success' && aiResult.campos_extraidos?.length > 0) {
+                    setSubmitPhase('done');
+                    // Mostra resultado por 2 segundos antes de fechar
+                    await new Promise(resolve => setTimeout(resolve, 2500));
+                }
+            }
+
             if (mode === 'reschedule') {
                 toast.success("Re-agendamento confirmado!");
-            } else {
+            } else if (!shouldProcessAI) {
+                // Só mostra toast se não processou com IA (IA tem seu próprio feedback)
                 toast.success(initialData ? "Item atualizado!" : "Item criado!");
             }
 
             queryClient.invalidateQueries({ queryKey: ['tasks', cardId] });
             queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] });
             queryClient.invalidateQueries({ queryKey: ['card-tasks-completed', cardId] });
+            queryClient.invalidateQueries({ queryKey: ['reunioes', cardId] }); // Refresh meetings tab
 
             onClose();
         } catch (error: any) {
@@ -474,6 +630,7 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             toast.error(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setIsSubmitting(false);
+            setSubmitPhase('idle');
         }
     };
 
@@ -522,7 +679,10 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                     <form onSubmit={handleSubmit} className="space-y-4 py-4">
                         {/* Common Fields */}
                         <div className="grid gap-2">
-                            <Label>Título</Label>
+                            <Label className="flex items-center gap-1">
+                                Título
+                                <span className="text-red-500">*</span>
+                            </Label>
                             <Input
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
@@ -576,12 +736,18 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                     />
                                 </div>
                                 <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
-                                    <Label>Participantes Externos (E-mails)</Label>
+                                    <Label className="flex items-center gap-1">
+                                        Participantes Externos (E-mails)
+                                        <span className="text-red-500">*</span>
+                                    </Label>
                                     <MultiSelectEmail
                                         value={externalParticipants}
                                         onChange={setExternalParticipants}
                                         placeholder="Digite o e-mail e pressione Enter..."
                                     />
+                                    {externalParticipants.length === 0 && (
+                                        <p className="text-xs text-amber-600">Adicione pelo menos um participante externo</p>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -624,6 +790,109 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                                 onChange={e => setMeetingFeedback(e.target.value)}
                                                 placeholder="Detalhes do feedback..."
                                             />
+                                        </div>
+
+                                        {/* Transcription Field */}
+                                        <div className="grid gap-2 pt-3 border-t border-purple-200">
+                                            <Label className="flex items-center gap-2 text-purple-700">
+                                                <FileText className="h-4 w-4" />
+                                                Transcrição da Reunião
+                                            </Label>
+                                            <Textarea
+                                                value={transcricao}
+                                                onChange={e => setTranscricao(e.target.value)}
+                                                placeholder="Cole aqui a transcrição completa da reunião para extração automática de dados..."
+                                                className="min-h-[150px] text-sm"
+                                            />
+                                            <div className="flex items-center justify-between flex-wrap gap-2">
+                                                <p className="text-xs text-gray-500">
+                                                    {transcricao.length > 0
+                                                        ? `${transcricao.length} caracteres ${transcricao.length >= 50 ? '✓' : '(mínimo 50 para IA)'}`
+                                                        : 'Cole a transcrição para extração automática via IA'}
+                                                </p>
+
+                                                {/* Toggle para processar com IA ao salvar */}
+                                                {transcricao.length >= 50 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setProcessWithAI(!processWithAI)}
+                                                        disabled={isProcessingAI}
+                                                        className={`
+                                                            flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all
+                                                            ${isProcessingAI
+                                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                : processWithAI
+                                                                    ? 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 ring-2 ring-purple-300 shadow-sm'
+                                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                            }
+                                                        `}
+                                                    >
+                                                        {/* Toggle switch visual */}
+                                                        <div className={`
+                                                            relative w-8 h-4 rounded-full transition-colors
+                                                            ${processWithAI ? 'bg-purple-500' : 'bg-gray-300'}
+                                                        `}>
+                                                            <div className={`
+                                                                absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all
+                                                                ${processWithAI ? 'left-[18px]' : 'left-0.5'}
+                                                            `} />
+                                                        </div>
+                                                        <Sparkles className={`h-3.5 w-3.5 ${processWithAI ? 'text-purple-600' : 'text-gray-400'}`} />
+                                                        <span>{processWithAI ? 'Extrair com IA ao salvar' : 'IA desativada'}</span>
+                                                    </button>
+                                                )}
+
+                                                {/* Botão para reprocessar quando já tem ID (modo edição) */}
+                                                {transcricao.length >= 50 && initialData?.id && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => processTranscriptionWithAI(initialData.id, transcricao)}
+                                                        disabled={isProcessingAI}
+                                                        className="h-7 px-3 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                                                    >
+                                                        {isProcessingAI ? (
+                                                            <>
+                                                                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                                                                Processando...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Sparkles className="h-3 w-3 mr-1" />
+                                                                Reprocessar agora
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            {/* AI Processing Result */}
+                                            {aiProcessResult && (
+                                                <div className={`mt-2 p-2 rounded-md text-xs ${
+                                                    aiProcessResult.status === 'success'
+                                                        ? 'bg-green-50 border border-green-200 text-green-700'
+                                                        : 'bg-amber-50 border border-amber-200 text-amber-700'
+                                                }`}>
+                                                    {aiProcessResult.status === 'success' ? (
+                                                        <>
+                                                            <div className="font-medium flex items-center gap-1">
+                                                                <Sparkles className="h-3 w-3" />
+                                                                IA extraiu {aiProcessResult.campos_extraidos?.length || 0} campos:
+                                                            </div>
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {aiProcessResult.campos_extraidos?.map((campo: string) => (
+                                                                    <span key={campo} className="px-1.5 py-0.5 bg-green-100 rounded text-green-800">
+                                                                        {campo}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <span>Nenhuma nova informação encontrada na transcrição</span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -750,11 +1019,101 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                             />
                         </div>
 
+                        {/* Feedback visual de processamento da IA */}
+                        {isSubmitting && submitPhase !== 'idle' && (
+                            <div className="mb-4 p-4 rounded-lg border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+                                {submitPhase === 'saving' && (
+                                    <div className="flex items-center gap-3">
+                                        <RefreshCw className="h-5 w-5 text-purple-600 animate-spin" />
+                                        <div>
+                                            <p className="font-medium text-purple-900">Salvando reunião...</p>
+                                            <p className="text-xs text-purple-600">Aguarde um momento</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {submitPhase === 'processing_ai' && (
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                            <Sparkles className="h-5 w-5 text-purple-600 animate-pulse" />
+                                            <div className="absolute inset-0 animate-ping">
+                                                <Sparkles className="h-5 w-5 text-purple-400 opacity-50" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-purple-900">IA analisando transcrição...</p>
+                                            <p className="text-xs text-purple-600">Extraindo informações da reunião</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {submitPhase === 'done' && aiProcessResult && (
+                                    <div className="space-y-3">
+                                        {aiProcessResult.status === 'success' && (aiProcessResult.campos_extraidos?.length ?? 0) > 0 ? (
+                                            <>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="p-1.5 rounded-full bg-green-100">
+                                                        <Check className="h-4 w-4 text-green-600" />
+                                                    </div>
+                                                    <p className="font-semibold text-green-800">
+                                                        IA extraiu {aiProcessResult.campos_extraidos?.length ?? 0} campos!
+                                                    </p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {(aiProcessResult.campos_extraidos ?? []).map((campo: string) => (
+                                                        <div key={campo} className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-green-200">
+                                                            <span className="text-green-500 text-xs">✓</span>
+                                                            <span className="text-xs text-gray-700">{formatCampoLabel(campo)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <p className="text-xs text-gray-500 text-center">Fechando automaticamente...</p>
+                                            </>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 rounded-full bg-amber-100">
+                                                    <Check className="h-4 w-4 text-amber-600" />
+                                                </div>
+                                                <p className="font-medium text-amber-800">
+                                                    Nenhuma nova informação identificada
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Salvando...' : (mode === 'reschedule' ? 'Confirmar Re-agendamento' : 'Salvar Item')}
+                            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                                Cancelar
                             </Button>
+                            {/* Botão com feedback visual de IA */}
+                            {type === 'reuniao' && meetingStatus === 'realizada' && transcricao.length >= 50 && processWithAI ? (
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md min-w-[180px]"
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                            {submitPhase === 'saving' && 'Salvando...'}
+                                            {submitPhase === 'processing_ai' && 'Processando IA...'}
+                                            {submitPhase === 'done' && 'Concluído!'}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="h-4 w-4 mr-2" />
+                                            Salvar e Extrair com IA
+                                        </>
+                                    )}
+                                </Button>
+                            ) : (
+                                <Button type="submit" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Salvando...' : (mode === 'reschedule' ? 'Confirmar Re-agendamento' : 'Salvar Item')}
+                                </Button>
+                            )}
                         </DialogFooter>
                     </form>
                 )}

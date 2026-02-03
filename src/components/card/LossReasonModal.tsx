@@ -16,6 +16,9 @@ interface LossReasonModalProps {
     onConfirm: (motivoId: string, comentario: string) => void;
     targetStageId: string;
     targetStageName: string;
+    initialMotivoId?: string | null;
+    initialComentario?: string | null;
+    isEditing?: boolean;
 }
 
 export default function LossReasonModal({
@@ -23,7 +26,10 @@ export default function LossReasonModal({
     onClose,
     onConfirm,
     targetStageId,
-    targetStageName
+    targetStageName,
+    initialMotivoId,
+    initialComentario,
+    isEditing = false
 }: LossReasonModalProps) {
     const [motivoId, setMotivoId] = useState('');
     const [comentario, setComentario] = useState('');
@@ -54,14 +60,14 @@ export default function LossReasonModal({
         enabled: isOpen
     });
 
-    // Reset state when opening
+    // Reset or pre-fill state when opening
     useEffect(() => {
         if (isOpen) {
-            setMotivoId('');
-            setComentario('');
+            setMotivoId(initialMotivoId || '');
+            setComentario(initialComentario || '');
             setError(null);
         }
-    }, [isOpen]);
+    }, [isOpen, initialMotivoId, initialComentario]);
 
     const handleConfirm = () => {
         setError(null);
@@ -88,11 +94,13 @@ export default function LossReasonModal({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-red-600">
                         <AlertTriangle className="w-5 h-5" />
-                        Negócio Perdido
+                        {isEditing ? 'Editar Motivo de Perda' : 'Negócio Perdido'}
                     </DialogTitle>
                     <DialogDescription>
-                        Você está movendo este card para <strong>{targetStageName}</strong>.
-                        Por favor, informe o motivo da perda para nossos relatórios.
+                        {isEditing
+                            ? 'Atualize o motivo e comentário sobre a perda deste negócio.'
+                            : <>Você está movendo este card para <strong>{targetStageName}</strong>. Por favor, informe o motivo da perda para nossos relatórios.</>
+                        }
                     </DialogDescription>
                 </DialogHeader>
 
@@ -155,7 +163,7 @@ export default function LossReasonModal({
                         onClick={handleConfirm}
                         className="bg-red-600 hover:bg-red-700 text-white border-transparent"
                     >
-                        Confirmar Perda
+                        {isEditing ? 'Salvar Alterações' : 'Confirmar Perda'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
