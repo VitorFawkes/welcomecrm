@@ -10,14 +10,15 @@ import PersonDetailDrawer from '../components/people/PersonDetailDrawer'
 import PeopleStatsBar from '../components/people/PeopleStatsBar'
 import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle } from '../components/ui/drawer'
 import ContactForm from '../components/card/ContactForm'
+import ContactImportModal from '../components/people/ContactImportModal'
 
 export default function People() {
     const {
         people,
         loading,
-        // totalCount,
-        // page,
-        // setPage,
+        totalCount,
+        page,
+        setPage,
         filters,
         setFilters,
         sort,
@@ -28,6 +29,7 @@ export default function People() {
 
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
     const [isNewPersonDrawerOpen, setIsNewPersonDrawerOpen] = useState(false)
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false)
     const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
 
     const handleCreateSuccess = () => {
@@ -46,6 +48,14 @@ export default function People() {
                             <p className="mt-1 text-sm text-gray-500">Gerencie seus contatos e visualize inteligência de dados.</p>
                         </div>
                         <div className="flex items-center space-x-4">
+                            <Button
+                                onClick={() => setIsImportModalOpen(true)}
+                                variant="outline"
+                                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
+                            >
+                                <Filter className="h-4 w-4 mr-2" />
+                                Importar
+                            </Button>
                             <Button
                                 onClick={() => setIsNewPersonDrawerOpen(true)}
                                 className="bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20"
@@ -104,6 +114,40 @@ export default function People() {
                         setSort={setSort}
                         onPersonClick={setSelectedPerson}
                     />
+
+                    {/* Pagination Footer */}
+                    {!loading && totalCount > 0 && (
+                        <div className="flex items-center justify-between py-6 mt-4 border-t border-gray-100">
+                            <p className="text-sm text-gray-500">
+                                Mostrando <span className="font-medium text-gray-900">{people.length}</span> de <span className="font-medium text-gray-900">{totalCount}</span> contatos
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(page - 1)}
+                                    disabled={page === 0}
+                                    className="h-8 px-3"
+                                >
+                                    Anterior
+                                </Button>
+                                <div className="flex items-center gap-1.5 px-2">
+                                    <span className="text-sm font-medium text-gray-900">{page + 1}</span>
+                                    <span className="text-xs text-gray-400">/</span>
+                                    <span className="text-xs text-gray-400 font-medium">{Math.ceil(totalCount / 50)}</span>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(page + 1)}
+                                    disabled={(page + 1) * 50 >= totalCount}
+                                    className="h-8 px-3"
+                                >
+                                    Próximo
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Drawers */}
@@ -135,6 +179,12 @@ export default function People() {
                         </DrawerBody>
                     </DrawerContent>
                 </Drawer>
+
+                <ContactImportModal
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    onSuccess={refresh}
+                />
             </div>
         </ErrorBoundary>
     )

@@ -53,6 +53,11 @@ export function usePeopleIntelligence() {
         direction: 'asc'
     })
 
+    // Reset page to 0 when filters or sort change
+    useEffect(() => {
+        setPage(0)
+    }, [filters, sort])
+
     const fetchPeople = useCallback(async () => {
         setLoading(true)
         try {
@@ -146,30 +151,63 @@ export function usePeopleIntelligence() {
         totalLeaders: 0
     })
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            const { data } = await supabase
-                .from('contact_stats')
-                .select('total_spend, total_trips, is_group_leader')
+    const fetchStats = useCallback(async () => {
+        // Fetch total count directly from contatos for accuracy
+        const { count: realTotalCount } = await supabase
+            .from('contatos')
+            .select('*', { count: 'exact', head: true })
 
-            if (data) {
-                // Cast data to any to avoid type errors with missing columns in generated types
-                const statsData = data as any[]
-                const stats = statsData.reduce((acc, curr) => ({
-                    totalPeople: acc.totalPeople + 1,
-                    totalSpend: acc.totalSpend + (curr.total_spend || 0),
-                    totalTrips: acc.totalTrips + (curr.total_trips || 0),
-                    totalLeaders: acc.totalLeaders + (curr.is_group_leader ? 1 : 0)
-                }), { totalPeople: 0, totalSpend: 0, totalTrips: 0, totalLeaders: 0 })
-                setSummaryStats(stats)
-            }
+        const { data } = await supabase
+            .from('contact_stats')
+            .select('total_spend, total_trips, is_group_leader')
+
+        if (data) {
+            const statsData = data as any[]
+            const stats = statsData.reduce((acc, curr) => ({
+                totalPeople: acc.totalPeople, // Keep the real count
+                totalSpend: acc.totalSpend + (curr.total_spend || 0),
+                totalTrips: acc.totalTrips + (curr.total_trips || 0),
+                totalLeaders: acc.totalLeaders + (curr.is_group_leader ? 1 : 0)
+            }), { totalPeople: realTotalCount || 0, totalSpend: 0, totalTrips: 0, totalLeaders: 0 })
+            setSummaryStats(stats)
+        } else {
+            setSummaryStats(prev => ({ ...prev, totalPeople: realTotalCount || 0 }))
         }
-        fetchStats()
     }, [])
+
+    useEffect(() => {
+        fetchStats()
+    }, [fetchStats])
 
     useEffect(() => {
         fetchPeople()
     }, [fetchPeople])
+
+    const refresh = useCallback(async () => {
+        await Promise.all([fetchPeople(), fetchStats()])
+    }, [fetchPeople, fetchStats])
+
+    // Set up real-time listener for contatos table
+    useEffect(() => {
+        const channel = supabase
+            .channel('contatos-realtime')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'contatos'
+                },
+                () => {
+                    refresh()
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [refresh])
 
     return {
         people,
@@ -181,7 +219,7 @@ export function usePeopleIntelligence() {
         setFilters,
         sort,
         setSort,
-        refresh: fetchPeople,
+        refresh,
         summaryStats
     }
 }
