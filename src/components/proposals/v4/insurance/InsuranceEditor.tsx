@@ -31,7 +31,15 @@ interface InsuranceEditorProps {
 }
 
 export function InsuranceEditor({ data, onChange, itemId }: InsuranceEditorProps) {
-    const insuranceData = useMemo(() => data || createInitialInsuranceData(), [data])
+    const insuranceData = useMemo(() => {
+        const raw = data || createInitialInsuranceData()
+        // Ensure arrays are always defined
+        return {
+            ...raw,
+            options: raw.options || [],
+            coverages: raw.coverages || [],
+        }
+    }, [data])
     const [newCoverage, setNewCoverage] = useState('')
 
     const updateField = useCallback(<K extends keyof InsuranceData>(

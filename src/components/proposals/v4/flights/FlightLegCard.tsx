@@ -44,43 +44,47 @@ export const FlightLegCard = memo(function FlightLegCard({
 }: FlightLegCardProps) {
     const [isExpanded, setIsExpanded] = useState(leg.is_expanded ?? true)
 
+    // Ensure options is always an array
+    const legOptions = leg.options || []
+
     // Calcular preço mais baixo das opções
-    const lowestPrice = leg.options.length > 0
-        ? Math.min(...leg.options.map(o => o.price).filter(p => p > 0))
+    const lowestPrice = legOptions.length > 0
+        ? Math.min(...legOptions.map(o => o.price).filter(p => p > 0))
         : 0
 
     // Handlers para opções
     const handleAddOption = useCallback(() => {
-        const newOption = createEmptyOption(leg.options.length)
+        const newOption = createEmptyOption(legOptions.length)
         onChange({
-            options: [...leg.options, newOption]
+            options: [...legOptions, newOption]
         })
-    }, [leg.options, onChange])
+    }, [legOptions, onChange])
 
     const handleUpdateOption = useCallback((optionId: string, updates: Partial<FlightOption>) => {
         onChange({
-            options: leg.options.map(opt =>
+            options: legOptions.map(opt =>
                 opt.id === optionId ? { ...opt, ...updates } : opt
             )
         })
-    }, [leg.options, onChange])
+    }, [legOptions, onChange])
 
     const handleRemoveOption = useCallback((optionId: string) => {
         onChange({
-            options: leg.options.filter(opt => opt.id !== optionId)
+            options: legOptions.filter(opt => opt.id !== optionId)
         })
-    }, [leg.options, onChange])
+    }, [legOptions, onChange])
 
     const handleSetRecommended = useCallback((optionId: string) => {
         onChange({
-            options: leg.options.map(opt => ({
+            options: legOptions.map(opt => ({
                 ...opt,
                 is_recommended: opt.id === optionId
             }))
         })
-    }, [leg.options, onChange])
+    }, [legOptions, onChange])
 
-    // Cor do card baseado no tipo
+    // Cor do card baseado no tipo - support both 'leg_type' and 'type' field names
+    const legType = leg.leg_type || (leg as any).type || 'outbound'
     const legColors = {
         outbound: {
             bg: 'bg-sky-50',
@@ -103,7 +107,13 @@ export const FlightLegCard = memo(function FlightLegCard({
             text: 'text-purple-700',
             icon: 'text-purple-500'
         }
-    }[leg.leg_type]
+    }[legType] || {
+        bg: 'bg-slate-50',
+        border: 'border-slate-200',
+        header: 'bg-slate-100',
+        text: 'text-slate-700',
+        icon: 'text-slate-500'
+    }
 
     return (
         <div className={cn("rounded-xl border-2 overflow-hidden", legColors.border, legColors.bg)}>
@@ -166,9 +176,9 @@ export const FlightLegCard = memo(function FlightLegCard({
 
                 {/* Badge de opções */}
                 <div className="flex items-center gap-2">
-                    {leg.options.length > 0 && (
+                    {legOptions.length > 0 && (
                         <span className="px-2 py-0.5 text-xs font-medium bg-white rounded-full text-slate-600">
-                            {leg.options.length} opç{leg.options.length === 1 ? 'ão' : 'ões'}
+                            {legOptions.length} opç{legOptions.length === 1 ? 'ão' : 'ões'}
                         </span>
                     )}
                     {lowestPrice > 0 && (
@@ -224,7 +234,7 @@ export const FlightLegCard = memo(function FlightLegCard({
                     </div>
 
                     {/* Header das colunas */}
-                    {leg.options.length > 0 && (
+                    {legOptions.length > 0 && (
                         <div className="grid grid-cols-[auto_1fr_80px_80px_100px_80px_80px_auto] gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             <div className="w-12"></div>
                             <div>Companhia / Voo</div>
@@ -239,7 +249,7 @@ export const FlightLegCard = memo(function FlightLegCard({
 
                     {/* Lista de opções */}
                     <div className="space-y-2">
-                        {leg.options.map((option) => (
+                        {legOptions.map((option) => (
                             <FlightOptionRow
                                 key={option.id}
                                 option={option}

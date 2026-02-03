@@ -147,17 +147,40 @@ Deno.serve(async (req) => {
 
                 case 'field_update': {
                     endpoint = `/api/3/deals/${event.external_id}`;
-                    // ActiveCampaign custom fields need special formatting
-                    const fieldValues = Object.entries(event.payload || {}).map(([fieldId, value]) => ({
-                        customFieldId: fieldId,
-                        fieldValue: String(value)
-                    }));
-                    body = {
-                        deal: {
-                            fields: fieldValues
+
+                    // Separate standard fields from custom fields
+                    // Standard fields use format "deal[fieldname]" (e.g., "deal[value]", "deal[title]")
+                    // Custom fields use numeric IDs (e.g., "21", "24")
+                    const standardFields: Record<string, unknown> = {};
+                    const customFields: Array<{ customFieldId: string; fieldValue: string }> = [];
+
+                    for (const [fieldId, value] of Object.entries(event.payload || {})) {
+                        // Skip metadata fields
+                        if (fieldId === 'shadow_mode') continue;
+
+                        // Check if it's a standard field (deal[fieldname] format)
+                        const standardMatch = fieldId.match(/^deal\[(\w+)\]$/);
+                        if (standardMatch) {
+                            // Standard field - add directly to deal object
+                            const fieldName = standardMatch[1];
+                            standardFields[fieldName] = value;
+                        } else {
+                            // Custom field - add to fields array
+                            customFields.push({
+                                customFieldId: fieldId,
+                                fieldValue: String(value)
+                            });
                         }
-                    };
-                    console.log(`[integration-dispatch] Field update: Deal ${event.external_id}, ${fieldValues.length} fields`);
+                    }
+
+                    // Build the deal object
+                    const dealObject: Record<string, unknown> = { ...standardFields };
+                    if (customFields.length > 0) {
+                        dealObject.fields = customFields;
+                    }
+
+                    body = { deal: dealObject };
+                    console.log(`[integration-dispatch] Field update: Deal ${event.external_id}, ${Object.keys(standardFields).length} standard fields, ${customFields.length} custom fields`);
                     break;
                 }
 

@@ -58,7 +58,7 @@ const BLOCK_TO_LIBRARY_CATEGORY: Partial<Record<BlockType, LibraryCategory>> = {
     car: 'transfer',
     transfer: 'transfer',
     experience: 'experience',
-    insurance: 'custom',
+    insurance: 'service',  // Seguros estão na categoria 'service'
     custom: 'custom',
 }
 
@@ -526,18 +526,15 @@ export function BlockSearchDrawer({
                                                     <p className="font-medium text-slate-900 truncate group-hover:text-blue-700">
                                                         {item.name}
                                                     </p>
-                                                    {item.location_city && (
+                                                    {item.destination && (
                                                         <p className="text-xs text-slate-500 mt-0.5">
-                                                            {item.location_city}
-                                                            {item.location_country && `, ${item.location_country}`}
+                                                            {item.destination}
                                                         </p>
                                                     )}
-                                                    {item.star_rating && (
-                                                        <div className="flex items-center gap-0.5 mt-1">
-                                                            {Array.from({ length: item.star_rating }).map((_, i) => (
-                                                                <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
-                                                            ))}
-                                                        </div>
+                                                    {item.supplier && (
+                                                        <p className="text-xs text-slate-400 mt-0.5">
+                                                            {item.supplier}
+                                                        </p>
                                                     )}
                                                 </div>
 

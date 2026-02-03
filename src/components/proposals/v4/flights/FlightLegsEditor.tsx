@@ -57,12 +57,14 @@ export function FlightLegsEditor({ data, onChange }: FlightLegsEditorProps) {
     // Calcular totais
     const totals = useMemo(() => {
         const recommendedTotal = flightsData.legs.reduce((sum, leg) => {
-            const recommended = leg.options.find(o => o.is_recommended)
+            const legOptions = leg.options || []
+            const recommended = legOptions.find(o => o.is_recommended)
             return sum + (recommended?.price || 0)
         }, 0)
 
         const lowestTotal = flightsData.legs.reduce((sum, leg) => {
-            const prices = leg.options.map(o => o.price).filter(p => p > 0)
+            const legOptions = leg.options || []
+            const prices = legOptions.map(o => o.price).filter(p => p > 0)
             return sum + (prices.length > 0 ? Math.min(...prices) : 0)
         }, 0)
 
@@ -100,11 +102,12 @@ export function FlightLegsEditor({ data, onChange }: FlightLegsEditorProps) {
         const legToDuplicate = flightsData.legs.find(l => l.id === legId)
         if (!legToDuplicate) return
 
+        const legOptions = legToDuplicate.options || []
         const duplicatedLeg: FlightLeg = {
             ...legToDuplicate,
             id: `leg-${Date.now()}`,
             label: `${legToDuplicate.label} (cópia)`,
-            options: legToDuplicate.options.map(opt => ({
+            options: legOptions.map(opt => ({
                 ...opt,
                 id: `opt-${Date.now()}-${opt.ordem}`
             })),

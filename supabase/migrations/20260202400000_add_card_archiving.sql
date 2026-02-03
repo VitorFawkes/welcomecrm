@@ -204,7 +204,7 @@ FROM pipeline_stages s
 LEFT JOIN cards c ON c.pipeline_stage_id = s.id
     AND c.deleted_at IS NULL
     AND c.archived_at IS NULL
-WHERE s.is_active = true
+WHERE s.ativo = true
 GROUP BY s.id, s.nome, s.fase, s.ordem, c.produto
 ORDER BY s.ordem;
 

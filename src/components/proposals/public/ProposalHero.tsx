@@ -40,7 +40,7 @@ export function ProposalHero({
 
     return (
         <div
-            className="relative h-[40vh] min-h-[280px] max-h-[360px] w-full"
+            className="relative h-[30vh] min-h-[200px] max-h-[280px] w-full"
             style={backgroundStyle}
         >
             {/* Fallback gradient if no image */}

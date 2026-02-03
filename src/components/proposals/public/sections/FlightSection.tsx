@@ -1,6 +1,6 @@
 /**
  * FlightSection - Refactored to use FlightItinerary for multi-leg display
- * 
+ *
  * Features:
  * - Uses FlightItinerary for segment-based display
  * - Fallback to simple cards for legacy data
@@ -12,6 +12,7 @@ import type { ProposalItemWithOptions } from '@/types/proposals'
 import { Plane, ArrowRight, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FlightItinerary } from '../FlightItinerary'
+import { normalizeItemForViewer } from '../SmartSection'
 
 interface Selection {
     selected: boolean
@@ -31,13 +32,19 @@ export function FlightSection({
     selections,
     onSelectItem,
 }: FlightSectionProps) {
+    // Normalize items to flatten namespaced data
+    const normalizedItems = useMemo(
+        () => items.map(normalizeItemForViewer),
+        [items]
+    )
+
     // Check if items have segments (new format) or legacy format
     const hasSegments = useMemo(() => {
-        return items.some(item => {
+        return normalizedItems.some(item => {
             const rich = (item.rich_content as Record<string, any>) || {}
             return Array.isArray(rich.segments) && rich.segments.length > 0
         })
-    }, [items])
+    }, [normalizedItems])
 
     const formatPrice = (value: number | string) =>
         new Intl.NumberFormat('pt-BR', {
@@ -49,7 +56,7 @@ export function FlightSection({
     if (hasSegments) {
         return (
             <div className="space-y-4">
-                {items.map(item => (
+                {normalizedItems.map(item => (
                     <FlightItinerary
                         key={item.id}
                         item={item}
@@ -64,7 +71,7 @@ export function FlightSection({
     // Legacy fallback: simple card display
     return (
         <div className="space-y-3">
-            {items.map((item, idx) => {
+            {normalizedItems.map((item, idx) => {
                 const rich = (item.rich_content as Record<string, any>) || {}
                 const isSelected = selections[item.id]?.selected
 

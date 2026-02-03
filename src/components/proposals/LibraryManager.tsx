@@ -19,6 +19,12 @@ import {
     Loader2,
     Package,
     RotateCcw,
+    Building2,
+    Sparkles,
+    Car,
+    Shield,
+    Plane,
+    Ship,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -29,6 +35,84 @@ import {
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
+
+// Ícones por categoria
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+    hotel: Building2,
+    experience: Sparkles,
+    transfer: Car,
+    service: Shield,
+    flight: Plane,
+    cruise: Ship,
+    text_block: Package,
+    custom: Package,
+}
+
+// Cores por categoria (bg para badge, gradient para placeholder)
+const CATEGORY_COLORS: Record<string, { bg: string; gradient: string }> = {
+    hotel: { bg: 'bg-emerald-500', gradient: 'from-emerald-400 to-emerald-600' },
+    experience: { bg: 'bg-orange-500', gradient: 'from-orange-400 to-orange-600' },
+    transfer: { bg: 'bg-teal-500', gradient: 'from-teal-400 to-teal-600' },
+    service: { bg: 'bg-amber-500', gradient: 'from-amber-400 to-amber-600' },
+    flight: { bg: 'bg-sky-500', gradient: 'from-sky-400 to-sky-600' },
+    cruise: { bg: 'bg-indigo-500', gradient: 'from-indigo-400 to-indigo-600' },
+    text_block: { bg: 'bg-slate-500', gradient: 'from-slate-400 to-slate-600' },
+    custom: { bg: 'bg-slate-500', gradient: 'from-slate-400 to-slate-600' },
+}
+
+// Extrair thumbnail do content JSONB
+function getThumbnail(item: LibraryItem): string | null {
+    const content = item.content as Record<string, unknown>
+    if (!content) return null
+
+    // Tentar cada namespace
+    const namespaces = ['hotel', 'experience', 'transfer', 'insurance', 'cruise']
+    for (const ns of namespaces) {
+        const nsContent = content[ns] as Record<string, unknown> | undefined
+        if (nsContent) {
+            // Array de imagens
+            if (Array.isArray(nsContent.images) && nsContent.images.length > 0) {
+                const first = nsContent.images[0]
+                if (typeof first === 'string' && first) return first
+            }
+            // image_url única
+            if (typeof nsContent.image_url === 'string' && nsContent.image_url) {
+                return nsContent.image_url
+            }
+        }
+    }
+
+    // Formato flat/legado
+    if (Array.isArray(content.images) && content.images.length > 0) {
+        const first = content.images[0]
+        if (typeof first === 'string' && first) return first
+    }
+    if (typeof content.image_url === 'string' && content.image_url) {
+        return content.image_url
+    }
+
+    return null
+}
+
+// Extrair descrição do content
+function getDescription(item: LibraryItem): string {
+    const content = item.content as Record<string, unknown>
+    if (!content) return ''
+
+    // Tentar cada namespace
+    const namespaces = ['hotel', 'experience', 'transfer', 'insurance', 'cruise']
+    for (const ns of namespaces) {
+        const nsContent = content[ns] as Record<string, unknown> | undefined
+        if (nsContent?.description && typeof nsContent.description === 'string') {
+            return nsContent.description
+        }
+    }
+
+    // Formato flat
+    if (typeof content.description === 'string') return content.description
+
+    return ''
+}
 
 export function LibraryManager() {
     const [search, setSearch] = useState('')
@@ -45,7 +129,7 @@ export function LibraryManager() {
 
     const filteredItems = items.filter(item =>
         item.name.toLowerCase().includes(search.toLowerCase()) ||
-        ((item.content as any)?.description || '').toLowerCase().includes(search.toLowerCase())
+        getDescription(item).toLowerCase().includes(search.toLowerCase())
     )
 
     const handleDelete = async (id: string) => {
@@ -60,7 +144,7 @@ export function LibraryManager() {
     }
 
     const formatCurrency = (value: number | null) => {
-        if (value === null) return '-'
+        if (value === null || value === 0) return null
         return new Intl.NumberFormat('pt-BR', {
             style: 'currency',
             currency: 'BRL',
@@ -87,30 +171,33 @@ export function LibraryManager() {
                             className={cn(
                                 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
                                 selectedCategory === 'all'
-                                    ? 'bg-slate-100 text-slate-900'
+                                    ? 'bg-slate-900 text-white'
                                     : 'text-slate-500 hover:bg-slate-50'
                             )}
                         >
                             Todos
                         </button>
-                        {Object.entries(LIBRARY_CATEGORY_CONFIG).map(([key, config]) => {
-                            return (
-                                <button
-                                    key={key}
-                                    onClick={() => setSelectedCategory(key as LibraryCategory)}
-                                    className={cn(
-                                        'px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1',
-                                        selectedCategory === key
-                                            ? 'bg-slate-100 text-slate-900'
-                                            : 'text-slate-500 hover:bg-slate-50'
-                                    )}
-                                    title={config.label}
-                                >
-                                    {/* Icon would go here if we imported them dynamically */}
-                                    {config.label}
-                                </button>
-                            )
-                        })}
+                        {Object.entries(LIBRARY_CATEGORY_CONFIG)
+                            .filter(([, config]) => config.isAvailable !== false)
+                            .map(([key, config]) => {
+                                const Icon = CATEGORY_ICONS[key] || Package
+                                return (
+                                    <button
+                                        key={key}
+                                        onClick={() => setSelectedCategory(key as LibraryCategory)}
+                                        className={cn(
+                                            'px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5',
+                                            selectedCategory === key
+                                                ? 'bg-slate-900 text-white'
+                                                : 'text-slate-500 hover:bg-slate-50'
+                                        )}
+                                        title={config.label}
+                                    >
+                                        <Icon className="h-3.5 w-3.5" />
+                                        {config.label}
+                                    </button>
+                                )
+                            })}
                     </div>
                 </div>
 
@@ -151,26 +238,51 @@ export function LibraryManager() {
                     </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-20">
                     {filteredItems.map((item) => {
                         const config = LIBRARY_CATEGORY_CONFIG[item.category as LibraryCategory] || LIBRARY_CATEGORY_CONFIG.custom
+                        const colors = CATEGORY_COLORS[item.category] || CATEGORY_COLORS.custom
+                        const Icon = CATEGORY_ICONS[item.category] || Package
+                        const thumbnail = getThumbnail(item)
+                        const description = getDescription(item)
+                        const price = formatCurrency(item.base_price)
+
                         return (
                             <div
                                 key={item.id}
-                                className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group overflow-hidden flex flex-col"
+                                onClick={() => setEditingItem(item)}
+                                className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-200 group overflow-hidden cursor-pointer"
                             >
-                                <div className="p-4 flex-1">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <span className={cn(
-                                            "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full",
-                                            "bg-slate-100 text-slate-600"
+                                {/* Thumbnail ou Placeholder */}
+                                <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+                                    {thumbnail ? (
+                                        <img
+                                            src={thumbnail}
+                                            alt={item.name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            onError={(e) => {
+                                                // Fallback se imagem falhar
+                                                (e.target as HTMLImageElement).style.display = 'none'
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className={cn(
+                                            "w-full h-full flex items-center justify-center bg-gradient-to-br",
+                                            colors.gradient
                                         )}>
-                                            {config.label}
-                                        </span>
+                                            <Icon className="h-14 w-14 text-white/70" />
+                                        </div>
+                                    )}
+
+                                    {/* Menu no hover */}
+                                    <div
+                                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <button className="p-1 rounded hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <MoreVertical className="h-4 w-4 text-slate-400" />
+                                                <button className="p-1.5 rounded-lg bg-white/90 hover:bg-white shadow-sm">
+                                                    <MoreVertical className="h-4 w-4 text-slate-600" />
                                                 </button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
@@ -188,19 +300,60 @@ export function LibraryManager() {
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
+                                </div>
 
-                                    <h3 className="font-medium text-slate-900 mb-1 line-clamp-1" title={item.name}>
+                                {/* Content */}
+                                <div className="p-4">
+                                    {/* Badge colorido */}
+                                    <div className={cn(
+                                        "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider text-white mb-2",
+                                        colors.bg
+                                    )}>
+                                        <Icon className="h-3 w-3" />
+                                        {config.label}
+                                    </div>
+
+                                    {/* Nome */}
+                                    <h3 className="font-semibold text-slate-900 line-clamp-1 mb-1" title={item.name}>
                                         {item.name}
                                     </h3>
-                                    <p className="text-sm text-slate-500 line-clamp-2 mb-3 h-10">
-                                        {(item.content as any)?.description || 'Sem descrição'}
-                                    </p>
 
-                                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-50">
-                                        <span className="text-xs text-slate-400">Preço Base</span>
-                                        <span className="text-sm font-medium text-slate-900">
-                                            {formatCurrency(item.base_price)}
-                                        </span>
+                                    {/* Destino */}
+                                    {item.destination && (
+                                        <p className="text-sm text-slate-500 line-clamp-1">
+                                            {item.destination}
+                                        </p>
+                                    )}
+
+                                    {/* Supplier */}
+                                    {item.supplier && (
+                                        <p className="text-xs text-slate-400 mt-0.5">
+                                            {item.supplier}
+                                        </p>
+                                    )}
+
+                                    {/* Descrição (se não tem destino nem supplier) */}
+                                    {!item.destination && !item.supplier && description && (
+                                        <p className="text-sm text-slate-500 line-clamp-2 mt-1">
+                                            {description}
+                                        </p>
+                                    )}
+
+                                    {/* Footer */}
+                                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                                        {price ? (
+                                            <span className="font-semibold text-emerald-600">
+                                                {price}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">Sem preco</span>
+                                        )}
+
+                                        {item.usage_count > 0 && (
+                                            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                                {item.usage_count} {item.usage_count === 1 ? 'uso' : 'usos'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>

@@ -173,11 +173,22 @@ export function LibrarySearch({
                                                 onClick={() => handleSelect(item)}
                                                 className="w-full px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors text-left"
                                             >
-                                                <div className={cn(
-                                                    "p-2 rounded-lg bg-slate-100",
-                                                    config.color
-                                                )}>
-                                                    <Icon className="h-4 w-4" />
+                                                {/* Thumbnail */}
+                                                <div className="w-12 h-12 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden">
+                                                    {item.thumbnail_url ? (
+                                                        <img
+                                                            src={item.thumbnail_url}
+                                                            alt={item.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className={cn(
+                                                            "w-full h-full flex items-center justify-center",
+                                                            config.color
+                                                        )}>
+                                                            <Icon className="h-5 w-5" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-medium text-slate-900 truncate">
@@ -205,7 +216,7 @@ export function LibrarySearch({
                                                         )}
                                                     </div>
                                                     {item.base_price && Number(item.base_price) > 0 && (
-                                                        <p className="text-xs text-slate-500 mt-1">
+                                                        <p className="text-xs text-emerald-600 font-medium mt-1">
                                                             {new Intl.NumberFormat('pt-BR', {
                                                                 style: 'currency',
                                                                 currency: item.currency || 'BRL',

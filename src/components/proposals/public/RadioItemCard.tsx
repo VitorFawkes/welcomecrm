@@ -1,20 +1,24 @@
 /**
  * RadioItemCard - Premium item card with radio button selection
- * 
+ *
  * Features:
  * - Image thumbnail (when available)
  * - Premium typography with clear hierarchy
  * - Larger touch targets (48px minimum)
  * - Smooth animations
  * - Quantity adjustment for hotels
- * - ALL CONTENT VISIBLE INLINE (no "Ver mais")
+ * - COMPACT design - essential info only
  */
 
+import { useState } from 'react'
 import type { ProposalItemWithOptions } from '@/types/proposals'
 import { ITEM_TYPE_CONFIG } from '@/types/proposals'
-import { Minus, Plus, Check, MapPin, Calendar, Users, Utensils, Clock, Info } from 'lucide-react'
+import { Minus, Plus, Check, MapPin, Utensils, Clock, Info } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MobileImageGallery } from './MobileImageGallery'
+import { formatPrice, formatDate } from './utils'
+import { ItemDetailModal } from './ItemDetailModal'
 
 interface RadioItemCardProps {
     item: ProposalItemWithOptions
@@ -35,18 +39,14 @@ export function RadioItemCard({
     quantity = 1,
     onChangeQuantity,
 }: RadioItemCardProps) {
+    const [showDetailModal, setShowDetailModal] = useState(false)
     const config = ITEM_TYPE_CONFIG[item.item_type]
     const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[config.icon] || LucideIcons.Package
 
-    const formatPrice = (value: number | string, currency = 'BRL') =>
-        new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency,
-        }).format(Number(value) || 0)
-
-    const hasOptions = item.options.length > 0
+    const options = item.options || []
+    const hasOptions = options.length > 0
     const basePrice = Number(item.base_price) || 0
-    const selectedOption = item.options.find(o => o.id === selectedOptionId)
+    const selectedOption = options.find(o => o.id === selectedOptionId)
     const unitPrice = basePrice + (selectedOption ? Number(selectedOption.price_delta) || 0 : 0)
     const finalPrice = unitPrice * quantity
 
@@ -55,20 +55,25 @@ export function RadioItemCard({
     const quantityUnit = richContent.quantity_unit || 'un'
     const showQuantity = onChangeQuantity && (item.item_type === 'hotel' || richContent.quantity_adjustable)
 
-    // Has image to display
-    const hasImage = !!item.image_url
-
-    // Format dates helper
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return null
-        try {
-            return new Date(dateStr).toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            })
-        } catch { return dateStr }
-    }
+    // Image handling - supports gallery_urls, images array, or single image_url
+    const galleryImages: string[] = (() => {
+        const rc = richContent
+        // Check for gallery_urls array
+        if (Array.isArray(rc.gallery_urls) && rc.gallery_urls.length > 0) {
+            return rc.gallery_urls
+        }
+        // Check for images array
+        if (Array.isArray(rc.images) && rc.images.length > 0) {
+            return rc.images
+        }
+        // Fallback to single image
+        if (item.image_url) {
+            return [item.image_url]
+        }
+        return []
+    })()
+    const hasImage = galleryImages.length > 0
+    const hasMultipleImages = galleryImages.length > 1
 
     return (
         <div
@@ -87,16 +92,36 @@ export function RadioItemCard({
             >
                 {/* Image Header - Full width when available */}
                 {hasImage && (
-                    <div className="relative aspect-[16/9] w-full overflow-hidden">
-                        <img
-                            src={item.image_url!}
-                            alt={item.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                        />
+                    <div className="relative w-full">
+                        {hasMultipleImages ? (
+                            // Use MobileImageGallery for multiple images
+                            <MobileImageGallery
+                                images={galleryImages}
+                                altText={item.title}
+                                aspectRatio="3/2"
+                            />
+                        ) : (
+                            // Single image fallback - COMPACT height
+                            <div className="relative aspect-[3/2] w-full overflow-hidden">
+                                <img
+                                    src={galleryImages[0]}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                />
+                            </div>
+                        )}
+                        {/* Badges de destaque - Canto superior esquerdo */}
+                        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-20 pointer-events-none">
+                            {item.is_default_selected && (
+                                <span className="px-3 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-full shadow-lg">
+                                    ✓ Recomendado
+                                </span>
+                            )}
+                        </div>
                         {/* Selection indicator */}
                         <div className={cn(
-                            "absolute top-3 right-3 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all",
+                            "absolute top-3 right-3 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all z-20",
                             isSelected
                                 ? "border-blue-600 bg-blue-600"
                                 : "border-white bg-white/80 backdrop-blur-sm"
@@ -150,6 +175,15 @@ export function RadioItemCard({
                                             {richContent.subtitle || richContent.location_city}
                                         </p>
                                     )}
+
+                                    {/* Star Rating - Hotéis */}
+                                    {richContent.star_rating && (
+                                        <div className="flex items-center gap-0.5 mt-1">
+                                            {Array.from({ length: Number(richContent.star_rating) }).map((_, i) => (
+                                                <LucideIcons.Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Price */}
@@ -170,107 +204,67 @@ export function RadioItemCard({
                         </div>
                     </div>
 
-                    {/* Description - Always visible */}
+                    {/* Description - Truncated */}
                     {item.description && (
-                        <p className="text-sm text-slate-600 mt-3 leading-relaxed">
+                        <p className="text-sm text-slate-600 mt-2 line-clamp-2">
                             {item.description}
                         </p>
                     )}
 
-                    {/* Rich Content Grid - Always visible */}
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                        {/* Room Type */}
+                    {/* COMPACT Rich Content - Max 4 items as chips */}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                        {/* Room Type chip */}
                         {richContent.room_type && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                                    <LucideIcons.BedDouble className="h-4 w-4 text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs">Quarto</p>
-                                    <p className="font-medium text-slate-700">{richContent.room_type}</p>
-                                </div>
-                            </div>
+                            <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded flex items-center gap-1">
+                                <LucideIcons.BedDouble className="h-3 w-3" />
+                                {richContent.room_type}
+                            </span>
                         )}
 
-                        {/* Board Type */}
+                        {/* Board Type chip */}
                         {richContent.board_type && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                                    <Utensils className="h-4 w-4 text-emerald-600" />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs">Regime</p>
-                                    <p className="font-medium text-slate-700">{richContent.board_type}</p>
-                                </div>
-                            </div>
+                            <span className="px-2 py-1 bg-emerald-50 text-emerald-700 text-xs rounded flex items-center gap-1">
+                                <Utensils className="h-3 w-3" />
+                                {richContent.board_type}
+                            </span>
                         )}
 
-                        {/* Check-in/Check-out dates */}
-                        {richContent.check_in_date && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                                    <Calendar className="h-4 w-4 text-indigo-600" />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs">Check-in</p>
-                                    <p className="font-medium text-slate-700">
-                                        {formatDate(richContent.check_in_date)}
-                                    </p>
-                                </div>
-                            </div>
+                        {/* Dates chip - Combined */}
+                        {(richContent.check_in_date || richContent.check_out_date) && (
+                            <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">
+                                {formatDate(richContent.check_in_date)} - {formatDate(richContent.check_out_date)}
+                            </span>
                         )}
 
-                        {richContent.check_out_date && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-                                    <Calendar className="h-4 w-4 text-amber-600" />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs">Check-out</p>
-                                    <p className="font-medium text-slate-700">
-                                        {formatDate(richContent.check_out_date)}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Duration */}
+                        {/* Duration chip */}
                         {richContent.duration && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
-                                    <Clock className="h-4 w-4 text-purple-600" />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs">Duração</p>
-                                    <p className="font-medium text-slate-700">{richContent.duration}</p>
-                                </div>
-                            </div>
+                            <span className="px-2 py-1 bg-purple-50 text-purple-700 text-xs rounded flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {richContent.duration}
+                            </span>
                         )}
 
-                        {/* Cabin Class */}
+                        {/* Cabin Class chip */}
                         {richContent.cabin_class && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center">
-                                    <LucideIcons.Plane className="h-4 w-4 text-sky-600" />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs">Classe</p>
-                                    <p className="font-medium text-slate-700">{richContent.cabin_class}</p>
-                                </div>
-                            </div>
+                            <span className="px-2 py-1 bg-sky-50 text-sky-700 text-xs rounded">
+                                {richContent.cabin_class}
+                            </span>
                         )}
 
-                        {/* Travelers */}
-                        {richContent.guests && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center">
-                                    <Users className="h-4 w-4 text-pink-600" />
-                                </div>
-                                <div>
-                                    <p className="text-slate-500 text-xs">Hóspedes</p>
-                                    <p className="font-medium text-slate-700">{richContent.guests}</p>
-                                </div>
-                            </div>
+                        {/* Amenities - max 3 */}
+                        {richContent.amenities && Array.isArray(richContent.amenities) && (
+                            <>
+                                {(richContent.amenities as string[]).slice(0, 3).map((amenity: string, i: number) => (
+                                    <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">
+                                        {amenity}
+                                    </span>
+                                ))}
+                                {richContent.amenities.length > 3 && (
+                                    <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs rounded">
+                                        +{richContent.amenities.length - 3}
+                                    </span>
+                                )}
+                            </>
                         )}
                     </div>
 
@@ -281,6 +275,18 @@ export function RadioItemCard({
                             <span className="text-slate-500">{richContent.cancellation_policy}</span>
                         </div>
                     )}
+
+                    {/* Ver mais button */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            setShowDetailModal(true)
+                        }}
+                        className="mt-3 w-full text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center gap-1 py-1.5 bg-blue-50/50 rounded-lg"
+                    >
+                        <Info className="h-3 w-3" />
+                        Ver detalhes completos
+                    </button>
                 </div>
             </button>
 
@@ -317,7 +323,7 @@ export function RadioItemCard({
                         Opções disponíveis
                     </p>
                     <div className="space-y-2">
-                        {item.options.map(option => {
+                        {options.map(option => {
                             const isOptionSelected = selectedOptionId === option.id
                             const delta = Number(option.price_delta) || 0
                             return (
@@ -368,6 +374,15 @@ export function RadioItemCard({
                     </div>
                 </div>
             )}
+
+            {/* Item Detail Modal */}
+            <ItemDetailModal
+                item={item}
+                isOpen={showDetailModal}
+                onClose={() => setShowDetailModal(false)}
+                isSelected={isSelected}
+                onSelect={onSelect}
+            />
         </div>
     )
 }

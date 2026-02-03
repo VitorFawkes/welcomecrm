@@ -1,6 +1,6 @@
 /**
  * HotelSection - Specialized component for hotel display
- * 
+ *
  * Features:
  * - Group by city/destination
  * - Multiple hotel options per city
@@ -13,6 +13,8 @@ import { useMemo, useState } from 'react'
 import type { ProposalItemWithOptions } from '@/types/proposals'
 import { Building2, Calendar, Minus, Plus, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { normalizeItemForViewer } from '../SmartSection'
+import { HotelComparisonTable } from '../HotelComparisonTable'
 
 interface Selection {
     selected: boolean
@@ -46,10 +48,16 @@ function formatDate(dateStr?: string): string {
 
 function getDateRange(items: ProposalItemWithOptions[]): string | undefined {
     const checkIns = items
-        .map(i => (i.rich_content as any)?.check_in_date)
+        .map(i => {
+            const rc = i.rich_content as any
+            return rc?.check_in_date || rc?.hotel?.check_in_date
+        })
         .filter(Boolean)
     const checkOuts = items
-        .map(i => (i.rich_content as any)?.check_out_date)
+        .map(i => {
+            const rc = i.rich_content as any
+            return rc?.check_out_date || rc?.hotel?.check_out_date
+        })
         .filter(Boolean)
 
     if (checkIns.length === 0) return undefined
@@ -69,11 +77,17 @@ export function HotelSection({
 }: HotelSectionProps) {
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
 
-    // Group hotels by city
+    // Normalize items to flatten namespaced data (hotel, flights, etc)
+    const normalizedItems = useMemo(
+        () => items.map(normalizeItemForViewer),
+        [items]
+    )
+
+    // Group hotels by city (using normalized items)
     const cityGroups = useMemo<CityGroup[]>(() => {
         const byCity = new Map<string, ProposalItemWithOptions[]>()
 
-        items.forEach(item => {
+        normalizedItems.forEach(item => {
             const rich = item.rich_content as Record<string, any> || {}
             const city = rich.location_city || rich.city || 'Hospedagem'
             if (!byCity.has(city)) byCity.set(city, [])
@@ -85,7 +99,7 @@ export function HotelSection({
             dateRange: getDateRange(cityItems),
             items: cityItems
         }))
-    }, [items])
+    }, [normalizedItems])
 
     const formatPrice = (value: number | string) =>
         new Intl.NumberFormat('pt-BR', {
@@ -109,26 +123,37 @@ export function HotelSection({
         <div className="space-y-6">
             {cityGroups.map(group => (
                 <div key={group.city}>
-                    {/* City Header */}
-                    {cityGroups.length > 1 && (
-                        <div className="flex items-center gap-2 px-2 mb-3">
-                            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                <Building2 className="h-4 w-4 text-blue-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-slate-900">{group.city}</p>
-                                {group.dateRange && (
-                                    <p className="text-xs text-slate-500 flex items-center gap-1">
-                                        <Calendar className="h-3 w-3" />
-                                        {group.dateRange}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    {/* Use comparison table when 2+ hotels in group */}
+                    {group.items.length >= 2 ? (
+                        <HotelComparisonTable
+                            items={group.items}
+                            selections={selections}
+                            onSelectItem={onSelectItem}
+                            cityGroup={cityGroups.length > 1 ? group.city : undefined}
+                            dateRange={group.dateRange}
+                        />
+                    ) : (
+                        <>
+                            {/* City Header - Only show for single hotel when multiple groups */}
+                            {cityGroups.length > 1 && (
+                                <div className="flex items-center gap-2 px-2 mb-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                        <Building2 className="h-4 w-4 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-900">{group.city}</p>
+                                        {group.dateRange && (
+                                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                                                <Calendar className="h-3 w-3" />
+                                                {group.dateRange}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
-                    {/* Hotel Options */}
-                    <div className="space-y-2">
+                            {/* Single hotel - Simple card view */}
+                            <div className="space-y-2">
                         {group.items.map((item, idx) => {
                             const rich = item.rich_content as Record<string, any> || {}
                             const sel = selections[item.id]
@@ -259,7 +284,7 @@ export function HotelSection({
                                     )}
 
                                     {/* Expand Details */}
-                                    {(item.description || item.options.length > 0) && (
+                                    {(item.description || (item.options || []).length > 0) && (
                                         <>
                                             <button
                                                 onClick={() => toggleExpand(item.id)}
@@ -278,10 +303,10 @@ export function HotelSection({
                                                     )}
 
                                                     {/* Options */}
-                                                    {item.options.length > 0 && (
+                                                    {(item.options || []).length > 0 && (
                                                         <div className="space-y-2 pt-2">
                                                             <p className="text-xs font-medium text-slate-500 uppercase">Upgrades</p>
-                                                            {item.options.map(option => {
+                                                            {(item.options || []).map(option => {
                                                                 const isOptSelected = sel?.optionId === option.id
                                                                 const delta = Number(option.price_delta) || 0
                                                                 return (
@@ -328,7 +353,9 @@ export function HotelSection({
                                 </div>
                             )
                         })}
-                    </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             ))}
         </div>

@@ -1,12 +1,15 @@
 import { useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { usePublicProposal } from '@/hooks/useProposal'
-import { ProposalMobileViewer } from '@/components/proposals/public/ProposalMobileViewer'
+import { ProposalViewRouter } from '@/components/proposals/public/ProposalViewRouter'
+import { MobileProposalViewer } from '@/components/proposals/public/mobile'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 export default function ProposalView() {
     const { token } = useParams<{ token: string }>()
+    const [searchParams] = useSearchParams()
+    const forceMobile = searchParams.get('mode') === 'mobile'
     const { data: proposal, isLoading, error } = usePublicProposal(token!)
 
     // Track link opened event
@@ -71,5 +74,11 @@ export default function ProposalView() {
         )
     }
 
-    return <ProposalMobileViewer proposal={proposal} />
+    // Force mobile mode if requested via URL param
+    if (forceMobile) {
+        return <MobileProposalViewer proposal={proposal} />
+    }
+
+    // Use router for automatic mobile/desktop detection
+    return <ProposalViewRouter proposal={proposal} />
 }

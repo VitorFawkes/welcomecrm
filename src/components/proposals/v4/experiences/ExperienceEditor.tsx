@@ -31,7 +31,13 @@ interface ExperienceEditorProps {
 }
 
 export function ExperienceEditor({ data, onChange, itemId }: ExperienceEditorProps) {
-    const expData = data || createInitialExperienceData()
+    const rawExpData = data || createInitialExperienceData()
+    // Ensure arrays are always defined
+    const expData = {
+        ...rawExpData,
+        options: rawExpData.options || [],
+        included: rawExpData.included || [],
+    }
     const [newIncluded, setNewIncluded] = useState('')
     const { getCurrency } = useProposalBuilder()
     const currency = getCurrency()

@@ -34,7 +34,13 @@ interface CruiseEditorProps {
 }
 
 export function CruiseEditor({ data, onChange, itemId }: CruiseEditorProps) {
-    const cruiseData = data || createInitialCruiseData()
+    const rawCruiseData = data || createInitialCruiseData()
+    // Ensure arrays are always defined
+    const cruiseData = {
+        ...rawCruiseData,
+        options: rawCruiseData.options || [],
+        included: rawCruiseData.included || [],
+    }
     const [newIncluded, setNewIncluded] = useState('')
     const { getCurrency } = useProposalBuilder()
     const currency = getCurrency()

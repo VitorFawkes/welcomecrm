@@ -1,6 +1,6 @@
 /**
  * TransferSection - Specialized component for transfers
- * 
+ *
  * Features:
  * - Toggle for each transfer (opcional)
  * - Clear origin/destination
@@ -8,9 +8,11 @@
  * - Vehicle type
  */
 
+import { useMemo } from 'react'
 import type { ProposalItemWithOptions } from '@/types/proposals'
 import { Bus, MapPin, ArrowRight, Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { normalizeItemForViewer } from '../SmartSection'
 
 interface Selection {
     selected: boolean
@@ -29,6 +31,12 @@ export function TransferSection({
     selections,
     onToggleItem,
 }: TransferSectionProps) {
+    // Normalize items to flatten namespaced data
+    const normalizedItems = useMemo(
+        () => items.map(normalizeItemForViewer),
+        [items]
+    )
+
     const formatPrice = (value: number | string) =>
         new Intl.NumberFormat('pt-BR', {
             style: 'currency',
@@ -51,7 +59,7 @@ export function TransferSection({
 
     return (
         <div className="space-y-2">
-            {items.map(item => {
+            {normalizedItems.map(item => {
                 const rich = item.rich_content as Record<string, any> || {}
                 const isSelected = selections[item.id]?.selected ?? false
                 const price = Number(item.base_price) || 0
