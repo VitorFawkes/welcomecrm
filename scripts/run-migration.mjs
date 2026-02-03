@@ -8,14 +8,19 @@ const { execSync } = require('child_process');
 
 console.log('Instalando pg temporariamente...');
 try {
-  execSync('npm install pg --no-save', { stdio: 'pipe' });
+    execSync('npm install pg --no-save', { stdio: 'pipe' });
 } catch (e) {
-  console.log('pg já instalado ou erro ao instalar');
+    console.log('pg já instalado ou erro ao instalar');
 }
 
 const { Client } = require('pg');
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:Fawkesco26%23@db.szyrzxvlptqqheizyrxu.supabase.co:5432/postgres';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+    console.error('❌ DATABASE_URL is required');
+    process.exit(1);
+}
 
 const migration = `
 -- SPRINT 2: MIGRATIONS CONSOLIDADAS
@@ -518,23 +523,23 @@ DROP POLICY IF EXISTS "Allow admin to view logs" ON audit_logs;
 `;
 
 async function runMigration() {
-  const client = new Client({
-    connectionString: DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
+    const client = new Client({
+        connectionString: DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    });
 
-  try {
-    console.log('Conectando ao banco...');
-    await client.connect();
-    console.log('Conectado! Executando migração Sprint 2...');
+    try {
+        console.log('Conectando ao banco...');
+        await client.connect();
+        console.log('Conectado! Executando migração Sprint 2...');
 
-    await client.query(migration);
+        await client.query(migration);
 
-    console.log('\n✅ SPRINT 2 COMPLETA!');
-    console.log('\nPolicies otimizadas e consolidadas com sucesso.');
+        console.log('\n✅ SPRINT 2 COMPLETA!');
+        console.log('\nPolicies otimizadas e consolidadas com sucesso.');
 
-    // Verificar quantas policies ainda não estão otimizadas
-    const unoptimized = await client.query(`
+        // Verificar quantas policies ainda não estão otimizadas
+        const unoptimized = await client.query(`
       SELECT COUNT(*) as count
       FROM pg_policies
       WHERE schemaname = 'public'
@@ -542,10 +547,10 @@ async function runMigration() {
       AND qual::text NOT LIKE '%(SELECT auth.uid())%'
     `);
 
-    console.log(`\nPolicies ainda não otimizadas: ${unoptimized.rows[0].count}`);
+        console.log(`\nPolicies ainda não otimizadas: ${unoptimized.rows[0].count}`);
 
-    // Verificar policies duplicadas
-    const duplicates = await client.query(`
+        // Verificar policies duplicadas
+        const duplicates = await client.query(`
       SELECT tablename, cmd, COUNT(*) as count
       FROM pg_policies
       WHERE schemaname = 'public'
@@ -556,15 +561,15 @@ async function runMigration() {
       LIMIT 5
     `);
 
-    console.log('\nPolicies duplicadas (top 5):');
-    console.table(duplicates.rows);
+        console.log('\nPolicies duplicadas (top 5):');
+        console.table(duplicates.rows);
 
-  } catch (err) {
-    console.error('\n❌ Erro ao executar migração:', err.message);
-    process.exit(1);
-  } finally {
-    await client.end();
-  }
+    } catch (err) {
+        console.error('\n❌ Erro ao executar migração:', err.message);
+        process.exit(1);
+    } finally {
+        await client.end();
+    }
 }
 
 runMigration();
