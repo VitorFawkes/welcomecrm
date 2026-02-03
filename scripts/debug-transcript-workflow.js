@@ -7,7 +7,12 @@
 const WEBHOOK_URL = 'https://n8n-n8n.ymnmx7.easypanel.host/webhook/transcript-process';
 const SUPABASE_URL = 'https://szyrzxvlptqqheizyrxu.supabase.co';
 // Service Role Key (read from secrets)
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6eXJ6eHZscHRxcWhlaXp5cnh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTYzMzg1OCwiZXhwIjoyMDg0OTkzODU4fQ.ILyMlG1ZVCzsnLTIG0MSQhHK7eq-eqBgoNsKcpbbZVs';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SERVICE_KEY) {
+  console.error('❌ SUPABASE_SERVICE_ROLE_KEY is required');
+  process.exit(1);
+}
 
 // IDs de teste - usando reunião existente com transcrição
 const TEST_CARD_ID = process.argv[2] || '9e5e2ec6-c7af-4d95-a915-4d0276921ff7';

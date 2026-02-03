@@ -447,7 +447,6 @@ export default function CardTasks({ cardId }: CardTasksProps) {
             />
 
             <Dialog open={outcomeModalOpen} onOpenChange={setOutcomeModalOpen}>
-<<<<<<< Updated upstream
                 <DialogContent className="sm:max-w-[500px] p-0 gap-0 max-h-[85vh] flex flex-col">
                     <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-50 bg-gray-50/30 flex-shrink-0">
                         <DialogTitle className="text-xl font-semibold text-gray-900">Como foi essa tarefa?</DialogTitle>
@@ -455,15 +454,6 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     </DialogHeader>
 
                     <div className="p-6 space-y-6 overflow-y-auto max-h-[50vh]">
-=======
-                <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden gap-0">
-                    <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-50 bg-gray-50/30">
-                        <DialogTitle className="text-xl font-semibold text-gray-900">Como foi a reunião?</DialogTitle>
-                        <p className="text-sm text-gray-500 mt-1">Registre o resultado para manter o histórico atualizado.</p>
-                    </DialogHeader>
-
-                    <div className="p-6 space-y-6">
->>>>>>> Stashed changes
                         <div className="space-y-3">
                             <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Resultado</Label>
                             <div className="w-full">

@@ -149,10 +149,16 @@ Cliente: 2 pessoas, eu e meu marido.
     console.log('\nVerificando dados salvos...');
     await new Promise(r => setTimeout(r, 1000));
 
-    const cardRes = await fetch('https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/cards?id=eq.9e5e2ec6-c7af-4d95-a915-4d0276921ff7&select=briefing_inicial', {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY is required for verification');
+      return;
+    }
+    const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://szyrzxvlptqqheizyrxu.supabase.co';
+
+    const cardRes = await fetch(`${SUPABASE_URL}/rest/v1/cards?id=eq.9e5e2ec6-c7af-4d95-a915-4d0276921ff7&select=briefing_inicial`, {
       headers: {
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6eXJ6eHZscHRxcWhlaXp5cnh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTYzMzg1OCwiZXhwIjoyMDg0OTkzODU4fQ.ILyMlG1ZVCzsnLTIG0MSQhHK7eq-eqBgoNsKcpbbZVs',
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6eXJ6eHZscHRxcWhlaXp5cnh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTYzMzg1OCwiZXhwIjoyMDg0OTkzODU4fQ.ILyMlG1ZVCzsnLTIG0MSQhHK7eq-eqBgoNsKcpbbZVs'
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
       }
     });
     const cardData = await cardRes.json();
