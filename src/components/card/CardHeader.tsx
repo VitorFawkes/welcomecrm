@@ -6,10 +6,28 @@ import type { Database } from '../../database.types'
 
 interface TripsProdutoData {
     orcamento?: {
+        // Estrutura antiga (date_range)
         total?: number
+        por_pessoa?: number
+        // Estrutura nova (smart_budget)
+        tipo?: 'total' | 'por_pessoa' | 'range'
+        valor?: number
+        total_calculado?: number
+        display?: string
     }
     epoca_viagem?: {
+        // Estrutura antiga (date_range)
         inicio?: string
+        fim?: string
+        flexivel?: boolean
+        // Estrutura nova (flexible_date)
+        tipo?: 'data_exata' | 'mes' | 'range_meses' | 'indefinido'
+        data_inicio?: string
+        data_fim?: string
+        mes_inicio?: number
+        mes_fim?: number
+        ano?: number
+        display?: string
     }
     destinos?: any[]
 }
@@ -668,13 +686,55 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
                             {/* Value - Always show when data exists */}
                             {(() => {
-                                if (card.produto === 'TRIPS') {
-                                    const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as TripsProdutoData
-                                    if (productData?.orcamento?.total) {
+                                // Parse both produto_data and briefing_inicial - priority to produto_data
+                                const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data || '{}') : card.produto_data || {}) as TripsProdutoData
+                                const briefingData = (typeof (card as any).briefing_inicial === 'string' ? JSON.parse((card as any).briefing_inicial || '{}') : (card as any).briefing_inicial || {}) as TripsProdutoData
+
+                                // Merge: produto_data takes priority, fallback to briefing_inicial
+                                const mergedData: TripsProdutoData = {
+                                    ...briefingData,
+                                    ...productData,
+                                    // For nested objects, merge them too
+                                    orcamento: productData?.orcamento || briefingData?.orcamento,
+                                    epoca_viagem: productData?.epoca_viagem || briefingData?.epoca_viagem
+                                }
+
+                                // Debug: Log data structure
+                                console.log('[CardHeader DEBUG]', {
+                                    cardProduto: card.produto,
+                                    productDataKeys: productData ? Object.keys(productData) : [],
+                                    briefingDataKeys: briefingData ? Object.keys(briefingData) : [],
+                                    mergedOrcamento: mergedData?.orcamento,
+                                    mergedEpocaViagem: mergedData?.epoca_viagem
+                                })
+
+                                // Check for TRIPS (including null/undefined which defaults to TRIPS behavior)
+                                if (card.produto === 'TRIPS' || !card.produto) {
+                                    const orcamento = mergedData?.orcamento
+
+                                    // Tentar múltiplas fontes de valor (nova e antiga estrutura)
+                                    const valorDisplay =
+                                        orcamento?.display ||                    // Novo: display pré-formatado
+                                        orcamento?.total_calculado ||            // Novo: total calculado
+                                        orcamento?.total ||                       // Antigo: total direto
+                                        (orcamento?.tipo === 'total' && orcamento?.valor) ||  // Novo: valor quando tipo=total
+                                        null
+
+                                    if (valorDisplay) {
+                                        // Se já é string formatada (display), usar diretamente
+                                        if (typeof valorDisplay === 'string') {
+                                            return (
+                                                <div className="flex items-center gap-1.5 text-gray-600 font-medium">
+                                                    <DollarSign className="h-3.5 w-3.5 text-gray-400" />
+                                                    {valorDisplay}
+                                                </div>
+                                            )
+                                        }
+                                        // Se é número, formatar
                                         return (
                                             <div className="flex items-center gap-1.5 text-gray-600 font-medium">
                                                 <DollarSign className="h-3.5 w-3.5 text-gray-400" />
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(productData.orcamento.total)}
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorDisplay)}
                                             </div>
                                         )
                                     }
@@ -700,16 +760,43 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             {(() => {
                                 let tripDate: Date | null = null
 
-                                if (card.produto === 'TRIPS') {
-                                    const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as TripsProdutoData
+                                // Check for TRIPS (including null/undefined which defaults to TRIPS behavior)
+                                if (card.produto === 'TRIPS' || !card.produto) {
+                                    // Parse both produto_data and briefing_inicial - priority to produto_data
+                                    const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data || '{}') : card.produto_data || {}) as TripsProdutoData
+                                    const briefingData = (typeof (card as any).briefing_inicial === 'string' ? JSON.parse((card as any).briefing_inicial || '{}') : (card as any).briefing_inicial || {}) as TripsProdutoData
 
-                                    // Only show if productData has the date
-                                    if (productData?.epoca_viagem?.inicio) {
-                                        // Prefer the column if available (synced), otherwise parse JSON
+                                    // Merge: produto_data.epoca_viagem takes priority, fallback to briefing_inicial
+                                    const epocaViagem = productData?.epoca_viagem || briefingData?.epoca_viagem
+
+                                    // Se tem display pré-formatado (nova estrutura), usar diretamente
+                                    if (epocaViagem?.display) {
+                                        return (
+                                            <>
+                                                <div className="h-4 w-px bg-gray-300 mx-1" />
+                                                <div className="flex items-center gap-1.5 text-gray-600 font-medium">
+                                                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                                                    {epocaViagem.display}
+                                                </div>
+                                                {epocaViagem.flexivel && (
+                                                    <span className="text-xs text-amber-600 px-1.5 py-0.5 bg-amber-50 rounded">📌 Flexível</span>
+                                                )}
+                                            </>
+                                        )
+                                    }
+
+                                    // Tentar múltiplas fontes de data (nova e antiga estrutura)
+                                    const dataStr =
+                                        epocaViagem?.data_inicio ||      // Novo: flexible_date
+                                        epocaViagem?.inicio ||           // Antigo: date_range
+                                        null
+
+                                    if (dataStr) {
+                                        // Preferir coluna sincronizada se disponível
                                         if (card.data_viagem_inicio) {
                                             tripDate = new Date(card.data_viagem_inicio + 'T12:00:00')
                                         } else {
-                                            tripDate = new Date(productData.epoca_viagem.inicio + 'T12:00:00')
+                                            tripDate = new Date(dataStr + 'T12:00:00')
                                         }
                                     }
                                 } else if (card.data_viagem_inicio) {
