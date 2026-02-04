@@ -1,402 +1,338 @@
-# WelcomeCRM - Claude Cowork IDE
+# WelcomeCRM - Claude Code
 
-> **🚨 LEIA ESTE ARQUIVO AUTOMATICAMENTE 🚨**
->
-> Quando a pasta `WelcomeCRM` for selecionada no Cowork, este arquivo
-> define como operar. O Cowork deve ter a **mesma qualidade** do Antigravity.
+> Este arquivo define como o Claude opera neste projeto.
 
 ---
 
-## ⚡ MODO ANTIGRAVITY (Ativar em nova conversa)
+## 🗄️ SUPABASE - ACESSO NATIVO (VIA CLI)
 
-Quando o usuário digitar **"modo antigravity"**, **EXECUTE IMEDIATAMENTE**:
+**Project ID:** `szyrzxvlptqqheizyrxu`
+**Dashboard:** https://supabase.com/dashboard/project/szyrzxvlptqqheizyrxu
 
-1. **Configurar Git local:**
+> **NUNCA coloque tokens diretamente neste arquivo. Use variaveis de ambiente.**
+
+### Setup Inicial (usuario faz uma vez):
 ```bash
-PAT=$(cat .claude/secrets.json 2>/dev/null | grep github_pat | cut -d'"' -f4)
-git remote set-url origin "https://${PAT}@github.com/VitorFawkes/welcomecrm.git"
-git config user.email "vitor@welcometrips.com.br"
-git config user.name "Vitor (via Claude)"
+# Criar arquivo de ambiente (FORA do repo)
+echo 'export SUPABASE_ACCESS_TOKEN="seu_token_aqui"' >> ~/.welcomecrm-env
+echo 'export SUPABASE_PROJECT_REF="szyrzxvlptqqheizyrxu"' >> ~/.welcomecrm-env
+
+# Adicionar ao shell profile
+echo '[ -f ~/.welcomecrm-env ] && source ~/.welcomecrm-env' >> ~/.zshrc
+source ~/.zshrc
 ```
 
-2. **Verificar acessos disponíveis:**
-   - **MCP tools:** Checar se `list_tables`, `execute_sql` estão na lista de tools
-   - **GitHub CLI:** `gh auth status` para verificar se está autenticado
-   - **Supabase CLI:** `npx supabase projects list` para verificar acesso
+### Comandos (via API REST - SEMPRE FUNCIONA):
+```bash
+# Carregar credenciais do .env
+source .env
 
-3. **Confirmar para o usuário:**
+# Query simples (listar cards)
+curl -s "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/cards?select=id,titulo&limit=5" \
+  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+
+# Contar registros
+curl -s "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/cards?select=count" \
+  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Prefer: count=exact" -I | grep content-range
+
+# Query SQL via RPC (se existir funcao)
+curl -s "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/rpc/nome_funcao" \
+  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"param1": "valor"}'
 ```
-✅ IDE Antigravity configurada:
-   - Git: [status]
-   - Supabase: [MCP ativo / CLI disponível / Dashboard]
-   - GitHub: [MCP ativo / gh CLI]
-   - N8N: [MCP ativo / API REST]
+
+### Deploy de Edge Function:
+```bash
+export SUPABASE_ACCESS_TOKEN="sbp_SEU_TOKEN" && \
+npx supabase functions deploy NOME_FUNCTION --project-ref szyrzxvlptqqheizyrxu
 ```
+
+### Regenerar Types:
+```bash
+npx supabase gen types typescript --project-id szyrzxvlptqqheizyrxu > src/database.types.ts
+```
+
+### Para queries SQL complexas:
+Usar o Dashboard: https://supabase.com/dashboard/project/szyrzxvlptqqheizyrxu/sql
 
 ---
 
-## 🧠 Comportamento Automático (SEMPRE)
+## 🐙 GITHUB - ACESSO NATIVO
 
-Ao receber **qualquer tarefa** neste projeto, o Claude Cowork DEVE:
+### Git ja esta configurado com PAT. Comandos funcionam:
+```bash
+git status
+git add .
+git commit -m "mensagem"
+git push origin main
+git pull origin main
+```
 
-### 1. Identificar o tipo de tarefa e carregar o Agent correto
+### Para PRs e Issues (se gh CLI estiver instalado):
+```bash
+# Verificar se gh esta disponivel
+gh --version
 
-| Tipo de Tarefa | Agent (LER ANTES de executar) |
-|----------------|-------------------------------|
-| SQL, banco, migrations, views, triggers | `.agent/agents/database-architect.md` |
-| Frontend, React, componentes, UI | `.agent/agents/frontend-specialist.md` |
-| Backend, API, Edge Functions | `.agent/agents/backend-specialist.md` |
-| Debug, investigar erro, troubleshoot | `.agent/agents/debugger.md` |
-| Testes, QA | `.agent/agents/test-engineer.md` |
-| Planejar feature, brainstorm | `.agent/agents/project-planner.md` |
-| Código legado, refactor | `.agent/agents/code-archaeologist.md` |
-| Performance, otimização | `.agent/agents/performance-optimizer.md` |
-| Segurança, vulnerabilidades | `.agent/agents/security-auditor.md` |
+# PRs
+gh pr create --title "..." --body "..."
+gh pr list
 
-### 2. Carregar os Skills referenciados pelo Agent
+# Issues
+gh issue list
+```
 
-Cada agent tem um campo `skills:` no header. Ler cada skill em:
+### Se gh nao estiver instalado:
+- Criar PRs pelo Dashboard: https://github.com/VitorFawkes/welcomecrm/pulls
+- Ou instalar: `brew install gh && gh auth login`
+
+---
+
+## 🧠 Comportamento Automatico (SEMPRE)
+
+### 1. Classificar a Tarefa
+
+| Tipo | Trigger | Acao |
+|------|---------|------|
+| **PERGUNTA** | "o que e", "como funciona" | Responder diretamente |
+| **EXPLORACAO** | "analisar", "listar", "overview" | Investigar sem editar |
+| **CODIGO SIMPLES** | "corrigir", "adicionar" (1 arquivo) | Editar diretamente |
+| **CODIGO COMPLEXO** | "criar", "implementar", "refatorar" | Socratic Gate -> Agent |
+| **DESIGN/UI** | "design", "UI", "pagina" | Socratic Gate -> Agent |
+
+### 2. Socratic Gate (Tarefas Complexas)
+
+**Para tarefas COMPLEXAS ou DESIGN, PARE e pergunte:**
+- Qual o objetivo principal?
+- Quais sao os edge cases?
+- Ha preferencias de implementacao?
+
+> Minimo 2-3 perguntas antes de implementar.
+
+### 3. Routing Automatico de Agents
+
+| Tipo de Tarefa | Agent |
+|----------------|-------|
+| SQL, banco, migrations | `database-architect` |
+| Frontend, React, UI | `frontend-specialist` |
+| Backend, API, Edge Functions | `backend-specialist` |
+| Debug, investigar erro | `debugger` |
+| Testes, QA | `test-engineer` |
+| Planejar feature | `project-planner` |
+| Codigo legado, refactor | `code-archaeologist` |
+| Performance | `performance-optimizer` |
+| Seguranca | `security-auditor` |
+| **Mobile (RN, Flutter)** | `mobile-developer` - NAO usar frontend! |
+
+**Ao ativar um agent:**
+```
+Aplicando conhecimento de `{agent}`...
+```
+
+### 4. Carregar Skills do Agent
+
+Cada agent tem campo `skills:` no header. Ler em:
 `.agent/skills/<nome>/SKILL.md`
 
-Exemplo: `database-architect` referencia `database-design`, então ler:
-`.agent/skills/database-design/SKILL.md`
+### 5. Consultar Documentacao
 
-### 3. Seguir os checklists e princípios do Agent
-
-Cada agent tem:
-- **Philosophy/Mindset** → Como pensar
-- **Decision Process** → Passos a seguir
-- **Anti-Patterns** → O que NÃO fazer
-- **Review Checklist** → Verificar antes de entregar
-
-### 4. Consultar a documentação de negócio
-
-- `.agent/CODEBASE.md` → Entidades, hooks, páginas, regras
-- `docs/SYSTEM_CONTEXT.md` → Arquitetura, patterns, decisões
-- `.cursorrules` → Iron Dome Protocol (segurança)
+- `.agent/CODEBASE.md` -> Entidades, hooks, paginas
+- `docs/SYSTEM_CONTEXT.md` -> Arquitetura, patterns
+- `docs/SQL_SOP.md` -> Antes de modificar views/triggers
 
 ---
 
-## ⚡ PROTOCOLO DE ENTRADA (OBRIGATÓRIO - QUALQUER AGENTE)
+## 🔒 TRIPLE-LOCK PROTOCOL (OBRIGATORIO)
 
-> ⛔ **BLOQUEIO:** Nenhuma ação de código/banco pode ser executada sem completar este protocolo.
-
-### PASSO 1: Classificar a Tarefa
-
-Identificar o tipo e carregar o agent correspondente (seção acima).
-
-### PASSO 2: Ler Documentação
-
-**ANTES de escrever qualquer código, LER:**
-1. O agent correspondente: `.agent/agents/{agent}.md`
-2. A seção relevante do `.agent/CODEBASE.md`
-3. Se SQL: ler `docs/SQL_SOP.md` e verificar estado LIVE
-
-### PASSO 3: Declarar Contexto
-
-**O agente DEVE declarar antes de executar:**
-
-```
-🤖 Contexto Carregado:
-- Agent: {nome do agent}
-- CODEBASE.md seções: {seções lidas}
-- Entidades envolvidas: {tabelas/hooks/pages}
-```
-
-⛔ **Se não declarar, o usuário pode cobrar: "Você seguiu o protocolo de entrada?"**
+> **BLOQUEANTE:** Cada lock deve ser completado com OUTPUT VISIVEL antes de prosseguir.
 
 ---
 
-## ✅ CHECKLIST DE SAÍDA (BLOQUEANTE)
+### 🔒 LOCK 1: REALITY SNAPSHOT (Antes de qualquer codigo)
 
-> ⛔ O agente **NÃO PODE** dizer "concluído" sem verificar:
+**O agente DEVE produzir esta tabela verificando estado REAL:**
 
-| Criei... | Ação Obrigatória | Seção CODEBASE.md |
-|----------|------------------|-------------------|
-| Nova página | Adicionar à lista | 3.3 Pages |
-| Novo hook | Adicionar à lista | 2.3 Hooks |
-| Nova tabela/coluna | Adicionar à lista | 1. Core Entities |
-| Novo componente crítico | Documentar | 9. Componentes Críticos |
+```markdown
+## REALITY SNAPSHOT - [DATA/HORA]
 
-**Comando de verificação:**
-```bash
-grep "nome_do_item_criado" .agent/CODEBASE.md
-# Se não encontrar → ATUALIZAR antes de finalizar
+### Verificacao ao Vivo
+| Asset | CODEBASE.md | Realidade | Delta | Status |
+|-------|-------------|-----------|-------|--------|
+| Hooks | {doc}       | {scan}    | +/-N  | FRESH/STALE |
+| Pages | {doc}       | {scan}    | +/-N  | FRESH/STALE |
+| Tables| {doc}       | {query}   | +/-N  | FRESH/STALE |
+
+### Comandos Executados:
+find src/hooks -name "*.ts" -type f | wc -l
+find src/pages -name "*.tsx" -type f | wc -l
+
+### Entidades Envolvidas na Tarefa:
+- {lista das tabelas/hooks/pages que serao tocados}
+```
+
+**Se Delta > 5:** Agente DEVE avisar que CODEBASE.md esta desatualizado.
+
+---
+
+### 🔒 LOCK 2: BLAST RADIUS (Antes de modificar)
+
+**O agente DEVE produzir analise de impacto com PROVA:**
+
+```markdown
+## BLAST RADIUS - Analise de Impacto
+
+### Dependencias Diretas (VAO QUEBRAR)
+| Dependencia | Tipo | Por que Quebra | Severidade |
+|-------------|------|----------------|------------|
+| {nome}      | Hook/Page | {razao} | CRITICO/ALTO/MEDIO |
+
+### Comandos de Verificacao Executados:
+grep -r "ENTIDADE" src/hooks/
+grep -r "ENTIDADE" src/pages/
+grep -r "ENTIDADE" src/components/
+
+### Resultado do Grep:
+{colar output real}
+
+### Plano de Mitigacao:
+1. {passo para evitar quebra}
+2. {arquivos que precisam ser atualizados junto}
 ```
 
 ---
 
-## 🔐 Rules Globais (SEMPRE ATIVAS)
+### 🔒 LOCK 3: SYNC CERTIFICATE (Antes de dizer "pronto")
 
-Ler e seguir TODAS as rules em `.agent/rules/`:
+**O agente DEVE provar que atualizou a documentacao:**
 
-| Rule | Propósito |
+```markdown
+## SYNC CERTIFICATE
+
+### Itens Criados/Modificados
+| Item | Tipo | Secao CODEBASE.md | Status |
+|------|------|-------------------|--------|
+| {nome} | Hook/Page/Table | Secao X.Y | ADICIONADO |
+
+### Prova de Atualizacao:
+grep "{nome_criado}" .agent/CODEBASE.md
+# Output: {mostrar linha encontrada}
+
+### Stats Atualizados:
+- Antes: X hooks | Y pages
+- Depois: X+1 hooks | Y pages
+- Header atualizado: SIM/NAO
+
+### Assinatura:
+- Agent: {nome}
+- Timestamp: {ISO}
+```
+
+**Se grep nao encontrar:** BLOQUEADO. Nao pode finalizar sem atualizar CODEBASE.md.
+
+---
+
+## 🎯 TRIGGERS DE VERIFICACAO (Usuario pode cobrar)
+
+| Comando do Usuario | O que o Agente DEVE Fazer |
+|--------------------|---------------------------|
+| **"State check"** | Rodar contagem ao vivo e comparar com CODEBASE.md |
+| **"Show me the blast radius"** | Mostrar analise de impacto com grep |
+| **"Prove you synced"** | Mostrar Sync Certificate com grep de prova |
+| **"Protocol audit"** | Relatorio completo de compliance dos 3 locks |
+
+### Resposta ao "Protocol audit":
+```markdown
+## PROTOCOL COMPLIANCE AUDIT
+
+### Lock 1 (Grounding): {PASS/FAIL}
+- Reality Snapshot produzido: SIM/NAO
+- Contagens verificadas ao vivo: SIM/NAO
+
+### Lock 2 (Impact): {PASS/FAIL}
+- Blast Radius produzido: SIM/NAO
+- Grep de dependencias executado: SIM/NAO
+
+### Lock 3 (Sync): {PASS/FAIL}
+- Sync Certificate produzido: SIM/NAO
+- Grep de prova executado: SIM/NAO
+- CODEBASE.md atualizado: SIM/NAO
+
+### Compliance Geral: {PASS/FAIL}
+```
+
+---
+
+## 🔐 Rules Globais
+
+| Rule | Proposito |
 |------|-----------|
-| `01-mandatory-context.md` | **⚡ Protocolo de entrada/saída** |
-| `00-project-context.md` | IDs do Supabase, stack |
-| `10-secrets-protection.md` | **🚨 NUNCA hardcodar tokens/keys** |
-| `20-supabase-safety.md` | Segurança SQL |
-| `90-project-architecture.md` | Arquitetura |
+| `01-mandatory-context.md` | Protocolo entrada/saida |
+| `00-project-context.md` | IDs Supabase, stack |
+| `10-secrets-protection.md` | **NUNCA hardcodar tokens** |
+| `20-supabase-safety.md` | Seguranca SQL |
+| `90-project-architecture.md` | Arquitetura (3 Suns) |
 | `91-project-design.md` | Design system |
-| `95-excellence-enforcement.md` | Padrões de qualidade |
-| `99-qa-guardian.md` | QA obrigatório |
+| `95-excellence-enforcement.md` | Qualidade |
+| `99-qa-guardian.md` | QA obrigatorio |
 
 ---
 
-## 🔑 Secrets (`.claude/secrets.json`)
+## 🔑 Secrets
 
-```json
-{
-  "github_pat": "ghp_...",
-  "supabase_service_role": "eyJ...",
-  "supabase_management_key": "sb_secret_..."
-}
-```
-
-### ⛔ REGRA CRÍTICA DE SECRETS
-
-**NUNCA** escrever tokens, keys ou senhas diretamente em código.
-
+**NUNCA** hardcodar tokens:
 ```typescript
-// ❌ PROIBIDO
+// PROIBIDO
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 
-// ✅ CORRETO
+// CORRETO
 const KEY = process.env.SUPABASE_KEY;
 ```
 
-**Antes de criar qualquer arquivo**, verificar:
-1. Contém strings que parecem tokens? → Usar `process.env`
-2. É arquivo de debug/teste? → Verificar se está no `.gitignore`
-
-**Ler obrigatoriamente:** `.agent/rules/10-secrets-protection.md`
-
 ---
 
-## 🔌 MCP Servers (CONFIGURADOS)
-
-O usuário configurou 3 servidores MCP. **VERIFIQUE SE ESTÃO ATIVOS antes de usar.**
-
-| MCP Server | Uso Principal |
-|------------|---------------|
-| **Supabase** | Banco de dados, SQL, CRUD, DDL, migrations |
-| **GitHub** | Repos, PRs, Issues, Actions |
-| **N8N** | Workflows, automações, webhooks |
-
-### 🔍 VERIFICAR CONEXÃO MCP
-
-**PASSO 1:** Verifique se os tools MCP estão na sua lista de ferramentas.
-Se você tem tools como `list_tables`, `execute_sql`, `list_workflows` → MCP está ativo.
-Se não tem → MCP não está conectado nesta sessão.
-
-**PASSO 2:** Se MCP não estiver conectado, use alternativas:
-- **Supabase:** Edge Function ou Dashboard
-- **GitHub:** `gh` CLI via Bash
-- **N8N:** API REST direta
-
-### ⚠️ Configuração MCP (referência)
-
-Os MCPs são configurados em `~/.gemini/antigravity/mcp_config.json`:
-```json
-{
-  "mcpServers": {
-    "supabase-mcp-server": { ... },
-    "github-mcp-server": { ... },
-    "n8n-mcp": { ... }
-  }
-}
-```
-
-Para ativar, o Claude Code precisa ser iniciado com os MCPs conectados.
-
----
-
-### 🗄️ Supabase
-
-> Project ID: `szyrzxvlptqqheizyrxu`
-> Dashboard: https://supabase.com/dashboard/project/szyrzxvlptqqheizyrxu
-
-**Se MCP ativo** (tools `list_tables`, `execute_sql` disponíveis):
-```
-→ list_tables()
-→ execute_sql("SELECT * FROM cards LIMIT 10")
-→ execute_sql("ALTER TABLE cards ADD COLUMN new_field TEXT")
-```
-
-**Se MCP inativo** (alternativas):
-```bash
-# Via Supabase CLI
-npx supabase db execute --project-ref szyrzxvlptqqheizyrxu "SELECT * FROM cards LIMIT 10"
-
-# Ou pedir para o usuário executar no Dashboard
-```
-
----
-
-### 🐙 GitHub MCP
-
-**Acesso completo ao repositório via API.**
-
-| Ferramenta | Descrição |
-|------------|-----------|
-| `get_file_contents` | Ler arquivo do repo |
-| `create_or_update_file` | Criar/atualizar arquivo |
-| `create_pull_request` | Criar PR |
-| `list_issues` | Listar issues |
-| `create_issue` | Criar issue |
-| `list_commits` | Listar commits |
-| `get_pull_request` | Ver detalhes de PR |
-
-**Exemplos:**
-```
-→ list_issues("VitorFawkes/welcomecrm")
-→ create_pull_request(...)
-→ get_file_contents("VitorFawkes/welcomecrm", "package.json")
-```
-
----
-
-### ⚡ N8N MCP
-
-**Acesso aos workflows de automação.**
-
-| Ferramenta | Descrição |
-|------------|-----------|
-| `list_workflows` | Listar workflows |
-| `get_workflow` | Ver detalhes de workflow |
-| `execute_workflow` | Executar workflow |
-| `activate_workflow` | Ativar/desativar workflow |
-
-**URL Base:** `https://n8n-n8n.ymnmx7.easypanel.host`
-
----
-
-## 🛠️ Capacidades Consolidadas
-
-| Ação | Opção 1 (MCP) | Opção 2 (CLI/API) |
-|------|---------------|-------------------|
-| **SQL arbitrário** | `execute_sql(...)` | `npx supabase db execute` ou Dashboard |
-| **Listar tabelas** | `list_tables()` | Dashboard |
-| **Git push** | — | `git push` (com PAT configurado) |
-| **PRs/Issues** | MCP GitHub | `gh pr create`, `gh issue list` |
-| **Automações N8N** | MCP N8N | API REST fetch/curl |
-| **Editar código** | — | Read/Edit/Write tools |
-| **Build/Lint** | — | `npm run build`, `npm run lint` |
-| **Deploy Functions** | — | `export SUPABASE_ACCESS_TOKEN="sbp_..." && npx supabase functions deploy <nome>` |
-
-### ⚠️ Segurança MCP
-
-- Tokens MCP (`sbp_...`, `github_pat_...`, `eyJ...`) **NUNCA** devem ser commitados
-- Sempre verificar estado LIVE antes de modificar views/functions
-- Seguir `docs/SQL_SOP.md` para operações DDL
-
-### 🔄 Alternativas quando MCP não está ativo
-
-| Serviço | Alternativa |
-|---------|-------------|
-| **Supabase SQL** | Bash: `npx supabase db execute` ou Dashboard |
-| **GitHub** | Bash: `gh pr create`, `gh issue list`, etc. |
-| **N8N** | API REST via `fetch()` ou `curl` |
-
-### 📋 Checklist antes de usar MCP
-
-1. Verificar se tools MCP aparecem na lista
-2. Se não aparecem → usar alternativas acima
-3. Não assumir que MCP está ativo só porque está configurado
-
-### 🚀 Deploy de Edge Functions
-
-O Claude PODE fazer deploy de Edge Functions via Bash.
-
-**PASSO 1: Obter o token do arquivo de secrets**
-```bash
-# Ler o token do arquivo de configuração MCP
-cat ~/.gemini/antigravity/mcp_config.json | grep -A5 "supabase-mcp-server" | grep "access-token" | cut -d'"' -f2
-```
-
-Ou ler diretamente o arquivo `.claude/secrets.json` se existir.
-
-**PASSO 2: Exportar e fazer deploy**
-```bash
-# Usar o token obtido (substitua sbp_XXXX pelo token real)
-export SUPABASE_ACCESS_TOKEN="sbp_XXXX..." && \
-npx supabase functions deploy <nome-da-function> --project-ref szyrzxvlptqqheizyrxu
-```
-
-**Exemplo completo - Método recomendado:**
-
-1. Ler o token do arquivo MCP config:
-```bash
-cat ~/.gemini/antigravity/mcp_config.json
-```
-
-2. Copiar o valor do `--access-token` (começa com `sbp_`)
-
-3. Executar o deploy:
-```bash
-export SUPABASE_ACCESS_TOKEN="sbp_COLE_AQUI" && \
-npx supabase functions deploy ai-extract-image --project-ref szyrzxvlptqqheizyrxu
-```
-
-**Alternativa - Pedir o token ao usuário:**
-Se não conseguir ler o arquivo, pergunte:
-"Qual é o SUPABASE_ACCESS_TOKEN (sbp_...)? Preciso dele para fazer deploy."
-
-**Nota:** O warning "Docker is not running" pode ser ignorado - deploy funciona sem Docker.
-
-**Project ID:** `szyrzxvlptqqheizyrxu`
-
-### Limitações:
-- ❌ Rodar app local → usuário roda `npm run dev`
-
----
-
-## ⚠️ SQL Safety (OBRIGATÓRIO)
+## ⚠️ SQL Safety (OBRIGATORIO)
 
 Antes de modificar View/Function/Trigger:
-
 1. Ler `docs/SQL_SOP.md`
 2. Consultar estado LIVE: `SELECT definition FROM pg_views WHERE viewname = '...'`
-3. Verificar após aplicar que nada foi perdido
+3. Verificar apos aplicar
 
-**Violação = Critical Engineering Failure**
+**Violacao = Critical Engineering Failure**
 
 ---
 
-## 🔄 Workflows Disponíveis
+## 🔄 Workflows
 
-Comandos estruturados para tarefas complexas (ler em `.agent/workflows/`):
-
-| Comando | Workflow | Quando usar |
-|---------|----------|-------------|
-| `/plan` | `plan.md` | Planejar feature antes de implementar |
-| `/create` | `create.md` | Criar nova funcionalidade |
-| `/debug` | `debug.md` | Investigar e corrigir bug |
-| `/enhance` | `enhance.md` | Melhorar código existente |
-| `/test` | `test.md` | Criar ou rodar testes |
-| `/deploy` | `deploy.md` | Preparar para deploy |
-| `/status` | `status.md` | Verificar estado do projeto |
-| `/brainstorm` | `brainstorm.md` | Explorar ideias (Socratic) |
-| `/new-module` | `new-module.md` | Criar módulo completo |
-| `/sync` | `sync.md` | **Sincronizar CODEBASE.md com código** |
+| Comando | Quando usar |
+|---------|-------------|
+| `/plan` | Planejar feature |
+| `/create` | Criar funcionalidade |
+| `/debug` | Investigar bug |
+| `/enhance` | Melhorar codigo |
+| `/test` | Criar/rodar testes |
+| `/deploy` | Preparar deploy |
+| `/sync` | Sincronizar CODEBASE.md |
 
 ---
 
 ## 🔄 Commits
 
-- Mensagens em português
+- Mensagens em portugues
 - Co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
 - Branch: `main`
 - Lint antes: `npm run lint`
 
 ---
 
-## 🔧 Após Mudanças no Banco
+## 🏁 Verificacao Final
 
-Sempre regenerar types após alterar schema:
-
+Quando solicitado "verificacao final" ou "final checks":
 ```bash
-npx supabase gen types typescript --project-id szyrzxvlptqqheizyrxu > src/database.types.ts
+python .agent/scripts/checklist.py .
 ```
 
-E atualizar `.agent/CODEBASE.md` se criou nova entidade/hook/page.
+Ordem de prioridade: Security -> Lint -> Schema -> Tests -> UX -> SEO
