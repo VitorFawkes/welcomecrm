@@ -369,8 +369,8 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
 
                                 {visibleColumns.value && (
                                     <TableCell className="text-right font-mono text-gray-700">
-                                        {trip.valor_estimado
-                                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trip.valor_estimado)
+                                        {(trip.valor_final || trip.valor_estimado)
+                                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trip.valor_final || trip.valor_estimado || 0)
                                             : '-'
                                         }
                                     </TableCell>

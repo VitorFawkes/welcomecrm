@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../../contexts/AuthContext'
 import type { Database } from '../../database.types'
 
 type Product = Database['public']['Enums']['app_product']
@@ -32,7 +33,8 @@ const DEAL_FIELDS = [
     { key: 'data_viagem_inicio', label: 'Data Viagem (Início)', required: false },
 ]
 
-export default function DealImportModal({ isOpen, onClose, onSuccess, currentProduct }: DealImportModalProps) {
+export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess, currentProduct }: DealImportModalProps) {
+    const { session } = useAuth()
     const [step, setStep] = useState<'upload' | 'mapping' | 'importing' | 'results'>('upload')
     const [fileData, setFileData] = useState<any[]>([])
     const [headers, setHeaders] = useState<string[]>([])
@@ -43,6 +45,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
 
     // Resolve effective product (default to TRIPS if ALL)
     const effectiveProduct: Product = currentProduct === 'ALL' ? 'TRIPS' : currentProduct
+    const currentUserId = session?.user?.id
 
     // Fetch Pipeline ID
     const { data: pipeline } = useQuery({
@@ -59,7 +62,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         enabled: isOpen
     })
 
-    // Fetch Stages for fallback
+    // Fetch Stages - prioritize "Ganho" stage for won deals
     const { data: stages } = useQuery({
         queryKey: ['stages-for-pipeline', pipeline?.id],
         queryFn: async () => {
@@ -68,11 +71,21 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                 .from('pipeline_stages')
                 .select('id, nome')
                 .eq('pipeline_id', pipeline.id)
+                .eq('ativo', true)
                 .order('ordem', { ascending: true })
             return data || []
         },
         enabled: !!pipeline?.id
     })
+
+    // Find the "Viagem Concluída" stage for imported sales (already completed trips)
+    const viagemConcluidaStage = stages?.find(s =>
+        s.nome.toLowerCase().includes('conclu') ||
+        s.nome.toLowerCase().includes('finalizada')
+    ) || stages?.find(s =>
+        s.nome.toLowerCase().includes('ganho') ||
+        s.nome.toLowerCase().includes('confirmada')
+    )
 
     const handleDownloadTemplate = () => {
         const template = [
@@ -207,14 +220,11 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         continue
                     }
 
-                    // 2. Resolve Stage
-                    let stageId = null
-                    if (stages && stages.length > 0) {
-                        stageId = stages[0].id // Default
-                        if (row['stage_name']) {
-                            const foundStage = stages.find(s => s.nome.toLowerCase() === String(row['stage_name']).toLowerCase())
-                            if (foundStage) stageId = foundStage.id
-                        }
+                    // 2. Resolve Stage - use "Viagem Concluída" stage for imported sales
+                    let stageId = viagemConcluidaStage?.id || stages?.[0]?.id || null
+                    if (row['stage_name']) {
+                        const foundStage = stages?.find(s => s.nome.toLowerCase() === String(row['stage_name']).toLowerCase())
+                        if (foundStage) stageId = foundStage.id
                     }
 
                     const excelDateToISO = (serial: any) => {
@@ -247,16 +257,23 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         pipeline_id: pipeline.id,
                         pipeline_stage_id: stageId, // Can be null
                         produto: effectiveProduct,
-                        valor_final: row['valor'] || 0,
+                        valor_estimado: Number(row['valor']) || 0,
+                        valor_final: Number(row['valor']) || 0,
                         data_viagem_inicio: excelDateToISO(row['data_viagem_inicio']),
                         origem: 'manual', // Must be one of allowed values (manual, api, etc)
                         status_comercial: 'ganho',
                         estado_operacional: 'finalizado', // Viagem Concluída
                         data_fechamento: new Date().toISOString(),
                         moeda: 'BRL',
+                        dono_atual_id: currentUserId, // Atribui ao usuário que importou
                         briefing_inicial: {
                             importado_em: new Date().toISOString(),
-                            categoria: row['categoria'] || 'Geral'
+                            categoria: row['categoria'] || 'Geral',
+                            // Store budget in format expected by CardHeader display
+                            orcamento: row['valor'] ? {
+                                total: Number(row['valor']),
+                                display: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(row['valor']))
+                            } : undefined
                         }
                     }
 

@@ -26,11 +26,12 @@ export interface AnalyticsLead {
 
     // Dates
     createdAt: Date;
-    contactedAt?: Date;  // New
-    briefingAt?: Date;   // New
-    proposalAt?: Date;   // New
+    contactedAt?: Date;
+    briefingAt?: Date;
+    proposalAt?: Date;
     wonAt?: Date;
     lostAt?: Date;
+    tripStartDate?: Date;  // Data de início da viagem
 
     value: number;
     product: string;

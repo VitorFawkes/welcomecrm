@@ -22,6 +22,7 @@ export interface FilterState {
     sortBy?: SortBy
     sortDirection?: SortDirection
     showArchived?: boolean // Mostrar cards arquivados
+    statusComercial?: string[] // Multi-select: em_aberto, em_andamento, pausado, ganho, perdido
 }
 
 export interface GroupFilters {
