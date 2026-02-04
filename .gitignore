@@ -47,6 +47,9 @@ update_card_contact.ts
 *credentials*
 *_KEY*
 
+# Backup files (local rollback data)
+.backup/
+
 # Reports and temporary files
 *.docx
 *_REPORT.md
