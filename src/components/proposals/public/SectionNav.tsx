@@ -22,6 +22,7 @@ interface SectionNavProps {
     sections: Section[]
     activeSection?: string
     completedSections?: string[]
+    incompleteSections?: string[]
     onSectionClick: (sectionId: string) => void
 }
 
@@ -43,6 +44,7 @@ export function SectionNav({
     sections,
     activeSection,
     completedSections = [],
+    incompleteSections = [],
     onSectionClick,
 }: SectionNavProps) {
     const scrollRef = useRef<HTMLDivElement>(null)
@@ -88,6 +90,7 @@ export function SectionNav({
                         const Icon = SECTION_ICONS[section.section_type] || FileText
                         const isActive = activeSection === section.id
                         const isCompleted = completedSections.includes(section.id)
+                        const isIncomplete = incompleteSections.includes(section.id)
 
                         return (
                             <button
@@ -98,14 +101,25 @@ export function SectionNav({
                                     "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                                     isActive
                                         ? "bg-slate-900 text-white shadow-sm"
-                                        : isCompleted
-                                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                        : isIncomplete
+                                            ? "bg-red-50 text-red-700 hover:bg-red-100"
+                                            : isCompleted
+                                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                 )}
                             >
-                                {isCompleted && !isActive && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
-                                        <Check className="h-2.5 w-2.5 text-white" />
+                                {/* Indicador de status */}
+                                {!isActive && (
+                                    <div className={cn(
+                                        "absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center",
+                                        isIncomplete && "bg-red-500",
+                                        isCompleted && !isIncomplete && "bg-emerald-500"
+                                    )}>
+                                        {isIncomplete ? (
+                                            <span className="text-white text-xs font-bold">!</span>
+                                        ) : isCompleted ? (
+                                            <Check className="h-2.5 w-2.5 text-white" />
+                                        ) : null}
                                     </div>
                                 )}
                                 <Icon className="h-4 w-4 flex-shrink-0" />

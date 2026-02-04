@@ -19,6 +19,7 @@ export type LibraryCategory = 'hotel' | 'experience' | 'transfer' | 'flight' | '
 
 export interface LibrarySearchResult extends Omit<LibraryItem, 'name_search' | 'updated_at'> {
     similarity_score: number
+    thumbnail_url: string | null  // Extracted from content JSONB by RPC
 }
 
 export interface LibraryFilters {
@@ -30,19 +31,28 @@ export interface LibraryFilters {
 // ============================================
 // Category Config
 // ============================================
+// Categorias disponíveis na biblioteca
+// NOTA: "flight" foi removido porque voos são muito voláteis (preços mudam constantemente)
 export const LIBRARY_CATEGORY_CONFIG: Record<LibraryCategory, {
     label: string
     icon: string
     color: string
+    description?: string
+    isAvailable?: boolean  // false = não aparece na UI de criação
 }> = {
-    hotel: { label: 'Hotel', icon: 'Building2', color: 'text-blue-600' },
-    experience: { label: 'Experiência', icon: 'Sparkles', color: 'text-purple-600' },
-    transfer: { label: 'Transfer', icon: 'Car', color: 'text-green-600' },
-    flight: { label: 'Voo', icon: 'Plane', color: 'text-sky-600' },
-    service: { label: 'Serviço', icon: 'Briefcase', color: 'text-amber-600' },
-    text_block: { label: 'Texto', icon: 'FileText', color: 'text-gray-600' },
-    custom: { label: 'Personalizado', icon: 'Package', color: 'text-slate-600' },
+    hotel: { label: 'Hotel', icon: 'Building2', color: 'text-blue-600', description: 'Hotéis, pousadas, resorts', isAvailable: true },
+    experience: { label: 'Experiência', icon: 'Sparkles', color: 'text-purple-600', description: 'Passeios, tours, atividades', isAvailable: true },
+    transfer: { label: 'Transfer', icon: 'Car', color: 'text-green-600', description: 'Traslados, transporte', isAvailable: true },
+    flight: { label: 'Voo', icon: 'Plane', color: 'text-sky-600', description: 'Voos (não reutilizável)', isAvailable: false },  // Desabilitado - muito volátil
+    service: { label: 'Seguro', icon: 'Shield', color: 'text-amber-600', description: 'Seguros viagem', isAvailable: true },
+    text_block: { label: 'Texto', icon: 'FileText', color: 'text-gray-600', isAvailable: false },
+    custom: { label: 'Personalizado', icon: 'Package', color: 'text-slate-600', isAvailable: false },
 }
+
+// Categorias que podem ser criadas na biblioteca (exclui flight, text_block, custom)
+export const AVAILABLE_LIBRARY_CATEGORIES = Object.entries(LIBRARY_CATEGORY_CONFIG)
+    .filter(([_, config]) => config.isAvailable)
+    .map(([key]) => key as LibraryCategory)
 
 // ============================================
 // Search Hook

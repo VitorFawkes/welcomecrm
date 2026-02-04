@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowUpDown, Calendar, Clock, AlertCircle, User as UserIcon, Trash2, Edit, Phone, Mail, MoreHorizontal, CheckCircle2, Plane, AlertTriangle, Archive } from 'lucide-react'
+import { ArrowUpDown, Calendar, Clock, AlertCircle, User as UserIcon, Trash2, Edit, Phone, Mail, MoreHorizontal, CheckCircle2, Plane, AlertTriangle } from 'lucide-react'
 import { usePipelineCards } from '../../hooks/usePipelineCards'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
@@ -16,7 +16,8 @@ import { ColumnManager, type ColumnConfig } from '../ui/data-grid/ColumnManager'
 import { BulkActions } from '../ui/data-grid/BulkActions'
 import { BulkEditModal, type BulkEditField } from '../ui/data-grid/BulkEditModal'
 import { useDeleteCard } from '../../hooks/useDeleteCard'
-import { useArchiveCard } from '../../hooks/useArchiveCard'
+// DISABLED: Feature rolled back
+// import { useArchiveCard } from '../../hooks/useArchiveCard'
 import DeleteCardModal from '../card/DeleteCardModal'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
@@ -38,7 +39,7 @@ interface PipelineListViewProps {
 
 export default function PipelineListView({ productFilter, viewMode, subView, filters }: PipelineListViewProps) {
     const queryClient = useQueryClient()
-    const { groupFilters, setFilters } = usePipelineFilters()
+    const { groupFilters, setFilters: _setFilters } = usePipelineFilters()
 
     const { data: cards, isLoading } = usePipelineCards({
         productFilter,
@@ -129,7 +130,8 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
     const { softDelete, isDeleting } = useDeleteCard()
-    const { archiveBulk } = useArchiveCard()
+    // DISABLED: Feature rolled back
+    // const { archiveBulk } = useArchiveCard()
 
     // Mutation para marcar tarefa como concluída
     const completeTaskMutation = useMutation({
@@ -691,15 +693,16 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                 onClick: () => setShowEditModal(true),
                                 variant: 'outline'
                             },
-                            {
-                                label: 'Arquivar',
-                                icon: Archive,
-                                onClick: () => {
-                                    archiveBulk(selectedCards)
-                                    setSelectedCards([])
-                                },
-                                variant: 'outline'
-                            },
+                            // DISABLED: Feature rolled back
+                            // {
+                            //     label: 'Arquivar',
+                            //     icon: Archive,
+                            //     onClick: () => {
+                            //         archiveBulk(selectedCards)
+                            //         setSelectedCards([])
+                            //     },
+                            //     variant: 'outline'
+                            // },
                             {
                                 label: 'Excluir',
                                 icon: Trash2,
@@ -819,8 +822,8 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                 {/* Divider */}
                 <div className="h-4 w-px bg-gray-200 mx-1" />
 
-                {/* Toggle Arquivados */}
-                <button
+                {/* Toggle Arquivados - DISABLED: Feature rolled back */}
+                {/* <button
                     onClick={() => setFilters({ ...filters, showArchived: !filters.showArchived })}
                     className={cn(
                         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
@@ -831,7 +834,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                 >
                     <Archive className="h-3 w-3" />
                     {filters.showArchived ? 'Mostrando Arquivados' : 'Ver Arquivados'}
-                </button>
+                </button> */}
 
                 {activeQuickFilters.length > 0 && (
                     <button
@@ -880,79 +883,80 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
 
             <div className="rounded-md border border-gray-200 bg-white shadow-sm overflow-hidden">
                 <div className="max-h-[calc(100vh-350px)] overflow-auto">
-                <Table>
-                    <TableHeader className="bg-gray-50/50 sticky top-0 z-10">
-                        <TableRow>
-                            <TableHead className="w-[40px] px-4">
-                                <Checkbox
-                                    checked={cards && cards.length > 0 && selectedCards.length === cards.length}
-                                    onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                                />
-                            </TableHead>
-
-                            {/* Colunas renderizadas dinamicamente na ordem definida */}
-                            {visibleColumnsOrdered.map((col) => {
-                                const renderer = columnRenderers[col.id]
-                                if (!renderer) return null
-                                return (
-                                    <TableHead
-                                        key={col.id}
-                                        className={cn(
-                                            renderer.width,
-                                            renderer.headerClass,
-                                            renderer.sortKey && "cursor-pointer hover:bg-gray-100 transition-colors"
-                                        )}
-                                        onClick={renderer.sortKey ? () => handleSort(renderer.sortKey!) : undefined}
-                                    >
-                                        {renderer.renderHeader()}
-                                    </TableHead>
-                                )
-                            })}
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {sortedCards.length === 0 ? (
+                    <Table>
+                        <TableHeader className="bg-gray-50/50 sticky top-0 z-10">
                             <TableRow>
-                                <TableCell colSpan={visibleColumnsOrdered.length + 1} className="h-24 text-center text-gray-500">
-                                    Nenhum card encontrado.
-                                </TableCell>
+                                <TableHead className="w-[40px] px-4">
+                                    <Checkbox
+                                        checked={cards && cards.length > 0 && selectedCards.length === cards.length}
+                                        onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                                    />
+                                </TableHead>
+
+                                {/* Colunas renderizadas dinamicamente na ordem definida */}
+                                {visibleColumnsOrdered.map((col) => {
+                                    const renderer = columnRenderers[col.id]
+                                    if (!renderer) return null
+                                    return (
+                                        <TableHead
+                                            key={col.id}
+                                            className={cn(
+                                                renderer.width,
+                                                renderer.headerClass,
+                                                renderer.sortKey && "cursor-pointer hover:bg-gray-100 transition-colors"
+                                            )}
+                                            onClick={renderer.sortKey ? () => handleSort(renderer.sortKey!) : undefined}
+                                        >
+                                            {renderer.renderHeader()}
+                                        </TableHead>
+                                    )
+                                })}
                             </TableRow>
-                        ) : (
-                            sortedCards.map((card) => {
-                                const hasOverdueTasks = (card.tarefas_atrasadas as number) > 0
-                                const hasTripSoon = card.dias_ate_viagem !== null && (card.dias_ate_viagem as number) <= 30 && (card.dias_ate_viagem as number) >= 0
-
-                                return (
-                                <TableRow
-                                    key={card.id}
-                                    className={cn(
-                                        "hover:bg-gray-50/50 transition-colors group",
-                                        hasOverdueTasks && "bg-red-50/30 hover:bg-red-50/50",
-                                        !hasOverdueTasks && hasTripSoon && "bg-orange-50/30 hover:bg-orange-50/50"
-                                    )}
-                                >
-                                    <TableCell className="px-4">
-                                        <Checkbox
-                                            checked={selectedCards.includes(card.id!)}
-                                            onCheckedChange={(checked) => handleSelectRow(card.id!, checked as boolean)}
-                                        />
+                        </TableHeader>
+                        <TableBody>
+                            {sortedCards.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={visibleColumnsOrdered.length + 1} className="h-24 text-center text-gray-500">
+                                        Nenhum card encontrado.
                                     </TableCell>
-
-                                    {/* Colunas renderizadas dinamicamente na ordem definida */}
-                                    {visibleColumnsOrdered.map((col) => {
-                                        const renderer = columnRenderers[col.id]
-                                        if (!renderer) return null
-                                        return (
-                                            <TableCell key={col.id} className={renderer.headerClass}>
-                                                {renderer.renderCell(card)}
-                                            </TableCell>
-                                        )
-                                    })}
                                 </TableRow>
-                            )})
-                        )}
-                    </TableBody>
-                </Table>
+                            ) : (
+                                sortedCards.map((card) => {
+                                    const hasOverdueTasks = (card.tarefas_atrasadas as number) > 0
+                                    const hasTripSoon = card.dias_ate_viagem !== null && (card.dias_ate_viagem as number) <= 30 && (card.dias_ate_viagem as number) >= 0
+
+                                    return (
+                                        <TableRow
+                                            key={card.id}
+                                            className={cn(
+                                                "hover:bg-gray-50/50 transition-colors group",
+                                                hasOverdueTasks && "bg-red-50/30 hover:bg-red-50/50",
+                                                !hasOverdueTasks && hasTripSoon && "bg-orange-50/30 hover:bg-orange-50/50"
+                                            )}
+                                        >
+                                            <TableCell className="px-4">
+                                                <Checkbox
+                                                    checked={selectedCards.includes(card.id!)}
+                                                    onCheckedChange={(checked) => handleSelectRow(card.id!, checked as boolean)}
+                                                />
+                                            </TableCell>
+
+                                            {/* Colunas renderizadas dinamicamente na ordem definida */}
+                                            {visibleColumnsOrdered.map((col) => {
+                                                const renderer = columnRenderers[col.id]
+                                                if (!renderer) return null
+                                                return (
+                                                    <TableCell key={col.id} className={renderer.headerClass}>
+                                                        {renderer.renderCell(card)}
+                                                    </TableCell>
+                                                )
+                                            })}
+                                        </TableRow>
+                                    )
+                                })
+                            )}
+                        </TableBody>
+                    </Table>
                 </div>
             </div>
 

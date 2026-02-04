@@ -138,10 +138,10 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
             }
 
-            // Archived Filter - por padrão não mostra arquivados
-            if (!filters.showArchived) {
-                query = query.is('archived_at', null)
-            }
+            // Archived Filter - DISABLED (colunas removidas no rollback)
+            // if (!filters.showArchived) {
+            //     query = query.is('archived_at', null)
+            // }
 
             // Apply Sorting
             if (filters.sortBy && filters.sortBy !== 'data_proxima_tarefa') {

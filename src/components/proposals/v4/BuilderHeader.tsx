@@ -52,13 +52,14 @@ export function BuilderHeader({ proposal, isDirty, isSaving }: BuilderHeaderProp
         setShowPreviewMenu(false)
         if (!proposal.public_token) return
 
-        const url = `/p/${proposal.public_token}`
+        const baseUrl = `/p/${proposal.public_token}`
 
         if (mode === 'desktop') {
             // Open in new tab
-            window.open(url, '_blank')
+            window.open(baseUrl, '_blank')
         } else {
-            // Open mobile preview in a sized popup
+            // Open mobile preview in a sized popup with force mobile mode
+            const url = `${baseUrl}?mode=mobile`
             const width = 390 // iPhone 14 Pro width
             const height = 844 // iPhone 14 Pro height
             const left = (window.screen.width - width) / 2

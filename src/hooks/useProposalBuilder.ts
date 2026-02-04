@@ -336,14 +336,51 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
 
         const itemType = categoryToItemType[libraryItem.category] || 'custom'
 
+        // Extract image_url from library content
+        // Content can be namespaced (e.g., {hotel: {image_url: ...}}) or flat
+        const content = (libraryItem.content || {}) as Record<string, unknown>
+        let imageUrl: string | null = null
+
+        // Try namespaced paths first
+        const namespacedContent = (
+            content.hotel ||
+            content.experience ||
+            content.transfer ||
+            content.insurance ||
+            content.cruise ||
+            content
+        ) as Record<string, unknown> | undefined
+
+        if (namespacedContent) {
+            // Try image_url field
+            if (typeof namespacedContent.image_url === 'string' && namespacedContent.image_url) {
+                imageUrl = namespacedContent.image_url
+            }
+            // Try images array
+            else if (Array.isArray(namespacedContent.images) && namespacedContent.images.length > 0) {
+                const firstImage = namespacedContent.images[0]
+                if (typeof firstImage === 'string' && firstImage) {
+                    imageUrl = firstImage
+                }
+            }
+        }
+
+        // Fallback to top-level images array
+        if (!imageUrl && Array.isArray(content.images) && content.images.length > 0) {
+            const firstImage = content.images[0]
+            if (typeof firstImage === 'string' && firstImage) {
+                imageUrl = firstImage
+            }
+        }
+
         const newItem: ProposalItemWithOptions = {
             id: crypto.randomUUID(),
             section_id: sectionId,
             item_type: itemType,
             title: libraryItem.name,
             description: null,
-            image_url: null,
-            rich_content: (libraryItem.content || {}) as any,
+            image_url: imageUrl,
+            rich_content: content as any,
             base_price: libraryItem.base_price || 0,
             ordem: 0,
             is_optional: false,

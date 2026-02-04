@@ -9,7 +9,7 @@
  * - Visual limpo e escaneável
  */
 
-import { useCallback, useState, useRef, useEffect } from 'react'
+import { useCallback, useState, useRef, useEffect, useMemo } from 'react'
 import { Plus, Star, Trash2, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { type FlightsData, type FlightLeg, type FlightOption, AIRLINES } from './types'
@@ -56,7 +56,17 @@ const createInitialData = (): FlightsData => ({
 })
 
 export function FlightEditor({ data, onChange }: FlightEditorProps) {
-    const flightsData = data?.legs?.length ? data : createInitialData()
+    // Memoize initial data to avoid recreating on every render
+    const initialData = useMemo(() => createInitialData(), [])
+    const flightsData = data?.legs?.length ? data : initialData
+
+    // Persist initial data if none exists - ensures flights are saved even before user edits
+    useEffect(() => {
+        if (!data?.legs?.length) {
+            onChange(initialData)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []) // Run only on mount - intentionally ignoring deps to avoid infinite loops
     const [showAIExtractor, setShowAIExtractor] = useState(false)
 
     // Callback quando IA extrai trechos
@@ -65,7 +75,7 @@ export function FlightEditor({ data, onChange }: FlightEditorProps) {
 
         // Se os legs atuais estão vazios (sem opções), substituir
         const currentLegsEmpty = flightsData.legs.every(leg =>
-            leg.options.length === 0 &&
+            (leg.options || []).length === 0 &&
             !leg.origin_code &&
             !leg.destination_code
         )
@@ -140,6 +150,7 @@ export function FlightEditor({ data, onChange }: FlightEditorProps) {
         const leg = flightsData.legs.find(l => l.id === legId)
         if (!leg) return
 
+        const legOptions = leg.options || []
         const newOption: FlightOption = {
             id: `opt-${Date.now()}`,
             airline_code: 'G3',
@@ -154,12 +165,12 @@ export function FlightEditor({ data, onChange }: FlightEditorProps) {
             baggage: '',
             price: 0,
             currency: 'BRL',
-            is_recommended: leg.options.length === 0,
+            is_recommended: legOptions.length === 0,
             enabled: true,
-            ordem: leg.options.length
+            ordem: legOptions.length
         }
 
-        updateLeg(legId, { options: [...leg.options, newOption] })
+        updateLeg(legId, { options: [...legOptions, newOption] })
     }, [flightsData.legs, updateLeg])
 
     // Atualizar opção
@@ -168,7 +179,7 @@ export function FlightEditor({ data, onChange }: FlightEditorProps) {
         if (!leg) return
 
         updateLeg(legId, {
-            options: leg.options.map(opt =>
+            options: (leg.options || []).map(opt =>
                 opt.id === optionId ? { ...opt, ...updates } : opt
             )
         })
@@ -180,7 +191,7 @@ export function FlightEditor({ data, onChange }: FlightEditorProps) {
         if (!leg) return
 
         updateLeg(legId, {
-            options: leg.options.filter(opt => opt.id !== optionId)
+            options: (leg.options || []).filter(opt => opt.id !== optionId)
         })
     }, [flightsData.legs, updateLeg])
 
@@ -190,7 +201,7 @@ export function FlightEditor({ data, onChange }: FlightEditorProps) {
         if (!leg) return
 
         updateLeg(legId, {
-            options: leg.options.map(opt => ({
+            options: (leg.options || []).map(opt => ({
                 ...opt,
                 is_recommended: opt.id === optionId
             }))
@@ -271,11 +282,13 @@ function LegBlock({
     onRemoveOption,
     onSetRecommended
 }: LegBlockProps) {
+    // Support both 'leg_type' (builder) and 'type' (legacy) field names
+    const legType = leg.leg_type || (leg as any).type || 'outbound'
     const colors = {
         outbound: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', label: 'bg-blue-600' },
         return: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', label: 'bg-green-600' },
         connection: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', label: 'bg-purple-600' }
-    }[leg.leg_type]
+    }[legType] || { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', label: 'bg-slate-600' }
 
     return (
         <div className={cn("rounded-xl border", colors.border, colors.bg)}>
@@ -351,12 +364,12 @@ function LegBlock({
 
             {/* Lista de Opções */}
             <div className="p-3 space-y-2">
-                {leg.options.length === 0 ? (
+                {(leg.options || []).length === 0 ? (
                     <p className="text-sm text-slate-400 text-center py-2">
                         Nenhuma opção de voo ainda
                     </p>
                 ) : (
-                    leg.options.map((option) => (
+                    (leg.options || []).map((option) => (
                         <FlightRow
                             key={option.id}
                             option={option}

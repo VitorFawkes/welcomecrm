@@ -1,20 +1,22 @@
 /**
  * SelectableItemCard - Premium card for optional items with toggle switch
- * 
+ *
  * Features:
  * - Modern toggle switch instead of checkbox
  * - Image thumbnail support
  * - Smooth animations
  * - Touch-friendly 48px+ targets
- * - ALL CONTENT VISIBLE INLINE (no "Ver mais")
+ * - COMPACT design - essential info only
  */
 
 import { useState } from 'react'
 import type { ProposalItemWithOptions } from '@/types/proposals'
 import { ITEM_TYPE_CONFIG } from '@/types/proposals'
-import { Check, MapPin, Calendar, Clock, Users, Info, X } from 'lucide-react'
+import { Check, Clock, Info, X, MapPin } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatPrice, formatDate } from './utils'
+import { ItemDetailModal } from './ItemDetailModal'
 
 interface SelectableItemCardProps {
     item: ProposalItemWithOptions
@@ -31,48 +33,31 @@ export function SelectableItemCard({
     onToggle,
     onSelectOption,
 }: SelectableItemCardProps) {
+    const [showDetailModal, setShowDetailModal] = useState(false)
+    const [imageLoaded, setImageLoaded] = useState(false)
+
     const config = ITEM_TYPE_CONFIG[item.item_type]
     const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[config.icon] || LucideIcons.Package
 
-    const formatPrice = (value: number | string) =>
-        new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        }).format(Number(value) || 0)
-
-    const hasOptions = item.options.length > 0
+    const options = item.options || []
+    const hasOptions = options.length > 0
     const basePrice = Number(item.base_price) || 0
-    const selectedOption = item.options.find(o => o.id === selectedOptionId)
+    const selectedOption = options.find(o => o.id === selectedOptionId)
     const finalPrice = basePrice + (selectedOption ? Number(selectedOption.price_delta) || 0 : 0)
 
     // Rich content for additional details
     const richContent = item.rich_content as Record<string, any> || {}
     const hasImage = !!item.image_url
 
-    // Image loading state
-    const [imageLoaded, setImageLoaded] = useState(false)
-
-    // Format dates helper
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return null
-        try {
-            return new Date(dateStr).toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            })
-        } catch { return dateStr }
-    }
-
     return (
         <div className={cn(
             "transition-all duration-200 overflow-hidden",
             isSelected ? "bg-white" : "bg-slate-50/80"
         )}>
-            {/* Image Header - Full width when available */}
+            {/* Image Header - COMPACT height */}
             {hasImage && (
                 <div className={cn(
-                    "relative aspect-[16/9] w-full overflow-hidden transition-all",
+                    "relative aspect-[3/2] w-full overflow-hidden transition-all",
                     !isSelected && "opacity-60"
                 )}>
                     {/* Image placeholder */}
@@ -184,219 +169,103 @@ export function SelectableItemCard({
                             </div>
                         </div>
 
-                        {/* Description - Always visible */}
+                        {/* Description - Truncated */}
                         {item.description && (
                             <p className={cn(
-                                "text-sm mt-3 leading-relaxed transition-colors",
+                                "text-sm mt-2 line-clamp-2 transition-colors",
                                 isSelected ? "text-slate-600" : "text-slate-400"
                             )}>
                                 {item.description}
                             </p>
                         )}
 
-                        {/* Rich Content Grid - Always visible */}
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-                            {/* Duration */}
+                        {/* COMPACT Rich Content - Chips */}
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                            {/* Duration chip */}
                             {richContent.duration && (
-                                <div className="flex items-center gap-2 text-sm">
-                                    <div className={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                                        isSelected ? "bg-purple-50" : "bg-slate-100"
-                                    )}>
-                                        <Clock className={cn(
-                                            "h-4 w-4 transition-colors",
-                                            isSelected ? "text-purple-600" : "text-slate-400"
-                                        )} />
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs">Duração</p>
-                                        <p className={cn(
-                                            "font-medium transition-colors",
-                                            isSelected ? "text-slate-700" : "text-slate-500"
-                                        )}>
-                                            {richContent.duration}
-                                        </p>
-                                    </div>
-                                </div>
+                                <span className={cn(
+                                    "px-2 py-1 text-xs rounded flex items-center gap-1 transition-colors",
+                                    isSelected ? "bg-purple-50 text-purple-700" : "bg-slate-100 text-slate-500"
+                                )}>
+                                    <Clock className="h-3 w-3" />
+                                    {richContent.duration}
+                                </span>
                             )}
 
-                            {/* Date */}
+                            {/* Date chip */}
                             {richContent.date && (
-                                <div className="flex items-center gap-2 text-sm">
-                                    <div className={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                                        isSelected ? "bg-indigo-50" : "bg-slate-100"
-                                    )}>
-                                        <Calendar className={cn(
-                                            "h-4 w-4 transition-colors",
-                                            isSelected ? "text-indigo-600" : "text-slate-400"
-                                        )} />
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs">Data</p>
-                                        <p className={cn(
-                                            "font-medium transition-colors",
-                                            isSelected ? "text-slate-700" : "text-slate-500"
-                                        )}>
-                                            {formatDate(richContent.date)}
-                                        </p>
-                                    </div>
-                                </div>
+                                <span className={cn(
+                                    "px-2 py-1 text-xs rounded transition-colors",
+                                    isSelected ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-500"
+                                )}>
+                                    {formatDate(richContent.date)}
+                                </span>
                             )}
 
-                            {/* Included */}
-                            {richContent.included && (
-                                <div className="flex items-center gap-2 text-sm col-span-2">
-                                    <div className={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                                        isSelected ? "bg-emerald-50" : "bg-slate-100"
-                                    )}>
-                                        <Check className={cn(
-                                            "h-4 w-4 transition-colors",
-                                            isSelected ? "text-emerald-600" : "text-slate-400"
-                                        )} />
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs">Incluso</p>
-                                        <p className={cn(
-                                            "font-medium transition-colors",
-                                            isSelected ? "text-slate-700" : "text-slate-500"
-                                        )}>
-                                            {richContent.included}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Participants */}
+                            {/* Participants chip */}
                             {richContent.participants && (
-                                <div className="flex items-center gap-2 text-sm">
-                                    <div className={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                                        isSelected ? "bg-pink-50" : "bg-slate-100"
-                                    )}>
-                                        <Users className={cn(
-                                            "h-4 w-4 transition-colors",
-                                            isSelected ? "text-pink-600" : "text-slate-400"
-                                        )} />
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs">Participantes</p>
-                                        <p className={cn(
-                                            "font-medium transition-colors",
-                                            isSelected ? "text-slate-700" : "text-slate-500"
-                                        )}>
-                                            {richContent.participants}
-                                        </p>
-                                    </div>
-                                </div>
+                                <span className={cn(
+                                    "px-2 py-1 text-xs rounded transition-colors",
+                                    isSelected ? "bg-pink-50 text-pink-700" : "bg-slate-100 text-slate-500"
+                                )}>
+                                    {richContent.participants} pessoas
+                                </span>
                             )}
+
+                            {/* Included chip */}
+                            {richContent.included && typeof richContent.included === 'string' && (
+                                <span className={cn(
+                                    "px-2 py-1 text-xs rounded flex items-center gap-1 transition-colors",
+                                    isSelected ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                                )}>
+                                    <Check className="h-3 w-3" />
+                                    {richContent.included}
+                                </span>
+                            )}
+
+                            {/* Custom fields as chips */}
+                            {richContent.custom_fields && (richContent.custom_fields as { id: string; label: string; value: string }[]).slice(0, 3).map((field) => (
+                                <span
+                                    key={field.id}
+                                    className={cn(
+                                        "px-2 py-1 text-xs rounded transition-colors",
+                                        isSelected ? "bg-slate-100 text-slate-700" : "bg-slate-100 text-slate-500"
+                                    )}
+                                >
+                                    {field.value}
+                                </span>
+                            ))}
                         </div>
 
-                        {/* Custom Fields - Dynamic rendering */}
-                        {richContent.custom_fields && (richContent.custom_fields as { id: string; label: string; value: string; icon: string }[]).length > 0 && (
-                            <div className="mt-4 grid grid-cols-2 gap-3">
-                                {(richContent.custom_fields as { id: string; label: string; value: string; icon: string }[]).map((field) => {
-                                    // Map icon string to component
-                                    const iconMap: Record<string, React.ReactNode> = {
-                                        'calendar': <Calendar className={cn("h-4 w-4 transition-colors", isSelected ? "text-indigo-600" : "text-slate-400")} />,
-                                        'clock': <Clock className={cn("h-4 w-4 transition-colors", isSelected ? "text-purple-600" : "text-slate-400")} />,
-                                        'bed': <LucideIcons.Bed className={cn("h-4 w-4 transition-colors", isSelected ? "text-emerald-600" : "text-slate-400")} />,
-                                        'utensils': <LucideIcons.Utensils className={cn("h-4 w-4 transition-colors", isSelected ? "text-amber-600" : "text-slate-400")} />,
-                                        'map-pin': <MapPin className={cn("h-4 w-4 transition-colors", isSelected ? "text-red-600" : "text-slate-400")} />,
-                                        'plane': <LucideIcons.Plane className={cn("h-4 w-4 transition-colors", isSelected ? "text-sky-600" : "text-slate-400")} />,
-                                        'car': <LucideIcons.Car className={cn("h-4 w-4 transition-colors", isSelected ? "text-amber-600" : "text-slate-400")} />,
-                                        'users': <Users className={cn("h-4 w-4 transition-colors", isSelected ? "text-pink-600" : "text-slate-400")} />,
-                                        'check': <Check className={cn("h-4 w-4 transition-colors", isSelected ? "text-emerald-600" : "text-slate-400")} />,
-                                        'info': <Info className={cn("h-4 w-4 transition-colors", isSelected ? "text-slate-600" : "text-slate-400")} />,
-                                    };
-                                    const IconNode = iconMap[field.icon] || iconMap['info'];
-
-                                    return (
-                                        <div key={field.id} className="flex items-center gap-2 text-sm">
-                                            <div className={cn(
-                                                "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                                                isSelected ? "bg-slate-100" : "bg-slate-100"
-                                            )}>
-                                                {IconNode}
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500 text-xs">{field.label}</p>
-                                                <p className={cn(
-                                                    "font-medium transition-colors",
-                                                    isSelected ? "text-slate-700" : "text-slate-500"
-                                                )}>
-                                                    {field.value}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* Legacy Rich Content Grid - Fallback for old data */}
-                        {!richContent.custom_fields?.length && (richContent.duration || richContent.date || richContent.included || richContent.participants) && (
-                            <div className="mt-4 grid grid-cols-2 gap-3">
-                                {richContent.duration && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center transition-colors", isSelected ? "bg-purple-50" : "bg-slate-100")}>
-                                            <Clock className={cn("h-4 w-4 transition-colors", isSelected ? "text-purple-600" : "text-slate-400")} />
-                                        </div>
-                                        <div>
-                                            <p className="text-slate-500 text-xs">Duração</p>
-                                            <p className={cn("font-medium transition-colors", isSelected ? "text-slate-700" : "text-slate-500")}>{richContent.duration}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {richContent.date && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center transition-colors", isSelected ? "bg-indigo-50" : "bg-slate-100")}>
-                                            <Calendar className={cn("h-4 w-4 transition-colors", isSelected ? "text-indigo-600" : "text-slate-400")} />
-                                        </div>
-                                        <div>
-                                            <p className="text-slate-500 text-xs">Data</p>
-                                            <p className={cn("font-medium transition-colors", isSelected ? "text-slate-700" : "text-slate-500")}>{formatDate(richContent.date)}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {richContent.included && (
-                                    <div className="flex items-center gap-2 text-sm col-span-2">
-                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center transition-colors", isSelected ? "bg-emerald-50" : "bg-slate-100")}>
-                                            <Check className={cn("h-4 w-4 transition-colors", isSelected ? "text-emerald-600" : "text-slate-400")} />
-                                        </div>
-                                        <div>
-                                            <p className="text-slate-500 text-xs">Incluso</p>
-                                            <p className={cn("font-medium transition-colors", isSelected ? "text-slate-700" : "text-slate-500")}>{richContent.included}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {richContent.participants && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center transition-colors", isSelected ? "bg-pink-50" : "bg-slate-100")}>
-                                            <Users className={cn("h-4 w-4 transition-colors", isSelected ? "text-pink-600" : "text-slate-400")} />
-                                        </div>
-                                        <div>
-                                            <p className="text-slate-500 text-xs">Participantes</p>
-                                            <p className={cn("font-medium transition-colors", isSelected ? "text-slate-700" : "text-slate-500")}>{richContent.participants}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Notes */}
+                        {/* Notes - Compact */}
                         {richContent.notes && (
-                            <div className="mt-3 flex items-start gap-2 text-xs">
-                                <Info className="h-3.5 w-3.5 text-slate-400 mt-0.5" />
+                            <div className="mt-2 flex items-start gap-1.5 text-xs">
+                                <Info className="h-3 w-3 text-slate-400 mt-0.5 flex-shrink-0" />
                                 <span className={cn(
-                                    "transition-colors",
+                                    "line-clamp-1 transition-colors",
                                     isSelected ? "text-slate-500" : "text-slate-400"
                                 )}>
                                     {richContent.notes}
                                 </span>
                             </div>
                         )}
+
+                        {/* Ver mais button */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setShowDetailModal(true)
+                            }}
+                            className={cn(
+                                "mt-3 w-full text-xs font-medium flex items-center justify-center gap-1 py-1.5 rounded-lg transition-colors",
+                                isSelected
+                                    ? "text-blue-600 hover:text-blue-700 bg-blue-50/50"
+                                    : "text-slate-500 hover:text-slate-600 bg-slate-100/50"
+                            )}
+                        >
+                            <Info className="h-3 w-3" />
+                            Ver detalhes completos
+                        </button>
                     </div>
                 </div>
             </div>
@@ -408,7 +277,7 @@ export function SelectableItemCard({
                         Opções disponíveis
                     </p>
                     <div className="space-y-2">
-                        {item.options.map(option => {
+                        {options.map(option => {
                             const isOptionSelected = selectedOptionId === option.id
                             const delta = Number(option.price_delta) || 0
                             return (
@@ -459,6 +328,15 @@ export function SelectableItemCard({
                     </div>
                 </div>
             )}
+
+            {/* Item Detail Modal */}
+            <ItemDetailModal
+                item={item}
+                isOpen={showDetailModal}
+                onClose={() => setShowDetailModal(false)}
+                isSelected={isSelected}
+                onSelect={onToggle}
+            />
         </div>
     )
 }

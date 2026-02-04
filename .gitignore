@@ -54,3 +54,10 @@ update_card_contact.ts
 *_SUMMARY.txt
 *_SUMMARY.md
 *.bak
+Weddings/
+EXECUTE_NOW*.sql
+FIX_VIEW_TIMEOUT_EXECUTE_NOW.sql
+mockup-cards-mobile.html
+scripts/*.sql
+scripts/*.mjs
+

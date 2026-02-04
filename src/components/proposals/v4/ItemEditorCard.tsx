@@ -33,6 +33,7 @@ import {
     Car,
     Ship,
     Shield,
+    BookmarkPlus,
 } from 'lucide-react'
 import type { ProposalItemWithOptions, ProposalOption } from '@/types/proposals'
 import type { Json } from '@/database.types'
@@ -42,6 +43,7 @@ import { ExperienceEditor, type ExperienceData } from './experiences'
 import { TransferEditor, type TransferData } from './transfers'
 import { CruiseEditor, type CruiseData } from './cruises'
 import { InsuranceEditor, type InsuranceData } from './insurance'
+import { SaveToLibraryModal } from './SaveToLibraryModal'
 
 interface ItemEditorCardProps {
     item: ProposalItemWithOptions
@@ -258,6 +260,7 @@ function FlightItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCar
 // ===========================================
 
 function HotelItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCardProps) {
+    const [showSaveModal, setShowSaveModal] = useState(false)
     const {
         attributes,
         listeners,
@@ -307,6 +310,16 @@ function HotelItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCard
                 <Button
                     variant="ghost"
                     size="icon"
+                    onClick={(e) => { e.stopPropagation(); setShowSaveModal(true) }}
+                    className="h-8 w-8 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                    title="Salvar na Biblioteca"
+                >
+                    <BookmarkPlus className="h-4 w-4" />
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={(e) => { e.stopPropagation(); onRemove() }}
                     className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
                 >
@@ -324,6 +337,14 @@ function HotelItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCard
                     itemId={item.id}
                 />
             </div>
+
+            {/* Modal para salvar na biblioteca */}
+            <SaveToLibraryModal
+                isOpen={showSaveModal}
+                onClose={() => setShowSaveModal(false)}
+                item={item}
+                category="hotel"
+            />
         </div>
     )
 }
@@ -333,6 +354,7 @@ function HotelItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCard
 // ===========================================
 
 function ExperienceItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCardProps) {
+    const [showSaveModal, setShowSaveModal] = useState(false)
     const {
         attributes,
         listeners,
@@ -382,6 +404,16 @@ function ExperienceItemCard({ item, richContent, onUpdate, onRemove }: FlightIte
                 <Button
                     variant="ghost"
                     size="icon"
+                    onClick={(e) => { e.stopPropagation(); setShowSaveModal(true) }}
+                    className="h-8 w-8 text-slate-400 hover:text-orange-600 hover:bg-orange-50"
+                    title="Salvar na Biblioteca"
+                >
+                    <BookmarkPlus className="h-4 w-4" />
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={(e) => { e.stopPropagation(); onRemove() }}
                     className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
                 >
@@ -399,6 +431,14 @@ function ExperienceItemCard({ item, richContent, onUpdate, onRemove }: FlightIte
                     itemId={item.id}
                 />
             </div>
+
+            {/* Modal para salvar na biblioteca */}
+            <SaveToLibraryModal
+                isOpen={showSaveModal}
+                onClose={() => setShowSaveModal(false)}
+                item={item}
+                category="experience"
+            />
         </div>
     )
 }
@@ -408,6 +448,7 @@ function ExperienceItemCard({ item, richContent, onUpdate, onRemove }: FlightIte
 // ===========================================
 
 function TransferItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCardProps) {
+    const [showSaveModal, setShowSaveModal] = useState(false)
     const {
         attributes,
         listeners,
@@ -457,6 +498,16 @@ function TransferItemCard({ item, richContent, onUpdate, onRemove }: FlightItemC
                 <Button
                     variant="ghost"
                     size="icon"
+                    onClick={(e) => { e.stopPropagation(); setShowSaveModal(true) }}
+                    className="h-8 w-8 text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                    title="Salvar na Biblioteca"
+                >
+                    <BookmarkPlus className="h-4 w-4" />
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={(e) => { e.stopPropagation(); onRemove() }}
                     className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
                 >
@@ -474,6 +525,14 @@ function TransferItemCard({ item, richContent, onUpdate, onRemove }: FlightItemC
                     itemId={item.id}
                 />
             </div>
+
+            {/* Modal para salvar na biblioteca */}
+            <SaveToLibraryModal
+                isOpen={showSaveModal}
+                onClose={() => setShowSaveModal(false)}
+                item={item}
+                category="transfer"
+            />
         </div>
     )
 }
@@ -483,6 +542,7 @@ function TransferItemCard({ item, richContent, onUpdate, onRemove }: FlightItemC
 // ===========================================
 
 function CruiseItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCardProps) {
+    const [showSaveModal, setShowSaveModal] = useState(false)
     const {
         attributes,
         listeners,
@@ -532,6 +592,16 @@ function CruiseItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCar
                 <Button
                     variant="ghost"
                     size="icon"
+                    onClick={(e) => { e.stopPropagation(); setShowSaveModal(true) }}
+                    className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                    title="Salvar na Biblioteca"
+                >
+                    <BookmarkPlus className="h-4 w-4" />
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={(e) => { e.stopPropagation(); onRemove() }}
                     className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
                 >
@@ -549,6 +619,14 @@ function CruiseItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCar
                     itemId={item.id}
                 />
             </div>
+
+            {/* Modal para salvar na biblioteca */}
+            <SaveToLibraryModal
+                isOpen={showSaveModal}
+                onClose={() => setShowSaveModal(false)}
+                item={item}
+                category="cruise"
+            />
         </div>
     )
 }
@@ -558,6 +636,7 @@ function CruiseItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCar
 // ===========================================
 
 function InsuranceItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCardProps) {
+    const [showSaveModal, setShowSaveModal] = useState(false)
     const {
         attributes,
         listeners,
@@ -607,6 +686,16 @@ function InsuranceItemCard({ item, richContent, onUpdate, onRemove }: FlightItem
                 <Button
                     variant="ghost"
                     size="icon"
+                    onClick={(e) => { e.stopPropagation(); setShowSaveModal(true) }}
+                    className="h-8 w-8 text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                    title="Salvar na Biblioteca"
+                >
+                    <BookmarkPlus className="h-4 w-4" />
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={(e) => { e.stopPropagation(); onRemove() }}
                     className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
                 >
@@ -624,6 +713,14 @@ function InsuranceItemCard({ item, richContent, onUpdate, onRemove }: FlightItem
                     itemId={item.id}
                 />
             </div>
+
+            {/* Modal para salvar na biblioteca */}
+            <SaveToLibraryModal
+                isOpen={showSaveModal}
+                onClose={() => setShowSaveModal(false)}
+                item={item}
+                category="service"
+            />
         </div>
     )
 }
@@ -751,9 +848,9 @@ function GenericItemCard({
                                 Qtd. ajustável
                             </span>
                         )}
-                        {item.options.length > 0 && (
+                        {(item.options || []).length > 0 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                                {item.options.length} opções
+                                {(item.options || []).length} opções
                             </span>
                         )}
                     </div>
@@ -905,9 +1002,9 @@ function GenericItemCard({
                             </div>
                         </div>
 
-                        {item.options.length > 0 && (
+                        {(item.options || []).length > 0 && (
                             <div className="space-y-2 mb-3">
-                                {item.options.map((option) => (
+                                {(item.options || []).map((option) => (
                                     <div
                                         key={option.id}
                                         className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"

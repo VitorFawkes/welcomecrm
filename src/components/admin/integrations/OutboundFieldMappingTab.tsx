@@ -5,8 +5,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { toast } from 'sonner';
-import { Check, RefreshCw, Settings, ChevronDown, ChevronRight, Loader2, ArrowRightLeft } from 'lucide-react';
+import { Check, RefreshCw, Settings, ChevronDown, ChevronRight, Loader2, ArrowRightLeft, Search } from 'lucide-react';
+import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { useSections, useSectionLabelsMap } from '@/hooks/useSections';
 
@@ -74,6 +76,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
     const [syncingMappings, setSyncingMappings] = useState(false);
     const [selectedPipelineId, setSelectedPipelineId] = useState<string>('8');
     const [selectedFase, setSelectedFase] = useState<string>(''); // Empty = show ALL fields
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Fetch sections dynamically (replaces hardcoded SECTION_LABELS and GOVERNABLE_SECTIONS)
     const { data: sections = [], isLoading: loadingSections } = useSections();
@@ -231,6 +234,15 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
             const section = field.section || 'details';
             const isGovernableSection = governableSectionKeys.includes(section);
 
+            // Search filter - filter by label or key
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                const matchesSearch =
+                    field.label.toLowerCase().includes(term) ||
+                    field.key.toLowerCase().includes(term);
+                if (!matchesSearch) return;
+            }
+
             // If phase selected AND this is a governable section, apply filter
             if (visibleFieldsInPhase !== null && isGovernableSection) {
                 if (!visibleFieldsInPhase.includes(field.key)) return;
@@ -241,7 +253,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         });
 
         return grouped;
-    }, [systemFields, visibleFieldsInPhase]);
+    }, [systemFields, visibleFieldsInPhase, searchTerm]);
 
     // Lookup for existing mappings
     const mappingByField = useMemo(() => {
@@ -252,10 +264,20 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         return lookup;
     }, [existingMappings]);
 
-    // AC field options for select
+    // AC field options for select (with standard deal fields)
     const acFieldOptions = useMemo(() => {
         return [
             { value: '', label: 'Não mapeado' },
+            // Seção: General Details (campos padrão do AC)
+            { value: '__section_general__', label: '▼ General Details' },
+            { value: 'deal[value]', label: 'Deal Value' },
+            { value: 'deal[title]', label: 'Deal Title' },
+            { value: 'deal[status]', label: 'Deal Status' },
+            { value: 'deal[stageid]', label: 'Deal Stage ID' },
+            { value: 'deal[currency]', label: 'Deal Currency' },
+            { value: 'deal[owner]', label: 'Deal Owner' },
+            // Seção: Custom Fields
+            { value: '__section_custom__', label: '▼ Custom Fields' },
             ...externalFields.map(f => ({
                 value: f.external_id,
                 label: f.external_name || f.external_id
@@ -425,10 +447,10 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                 </CardHeader>
             </Card>
 
-            {/* ONLY 2 FILTERS: Pipeline + Fase */}
+            {/* Filters: Pipeline + Fase + Busca */}
             <Card className="border-2 border-blue-200 bg-blue-50/30">
                 <CardContent className="py-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Pipeline AC Destino */}
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-semibold text-blue-700">
@@ -467,6 +489,28 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                                 {selectedFase
                                     ? `Mostrando ${totalFieldsVisible} campos visíveis em ${selectedFase}`
                                     : 'Mostrando todos os campos disponíveis'
+                                }
+                            </span>
+                        </div>
+
+                        {/* Buscar Campo */}
+                        <div className="flex flex-col gap-2">
+                            <label className="text-sm font-semibold text-slate-700">
+                                🔍 Buscar Campo
+                            </label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Filtrar por nome ou chave..."
+                                    className="pl-9"
+                                />
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                {searchTerm
+                                    ? `Filtrando por "${searchTerm}"`
+                                    : 'Digite para filtrar campos'
                                 }
                             </span>
                         </div>
@@ -567,7 +611,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                                                                 </div>
                                                             </td>
                                                             <td className="px-4 py-3">
-                                                                <Select
+                                                                <SearchableSelect
                                                                     value={mapping?.external_field_id || ''}
                                                                     onChange={(val) => upsertMapping.mutate({
                                                                         fieldKey: field.key,
@@ -576,6 +620,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                                                                     })}
                                                                     options={acFieldOptions}
                                                                     placeholder="Selecione..."
+                                                                    searchPlaceholder="Buscar campo AC..."
                                                                     className="w-full"
                                                                 />
                                                             </td>

@@ -32,7 +32,13 @@ interface HotelEditorProps {
 }
 
 export function HotelEditor({ data, onChange, itemId }: HotelEditorProps) {
-    const hotelData = data || createInitialHotelData()
+    const rawHotelData = data || createInitialHotelData()
+    // Ensure arrays are always defined
+    const hotelData = {
+        ...rawHotelData,
+        options: rawHotelData.options || [],
+        amenities: rawHotelData.amenities || [],
+    }
     const [newAmenity, setNewAmenity] = useState('')
     const { getCurrency } = useProposalBuilder()
     const currency = getCurrency()

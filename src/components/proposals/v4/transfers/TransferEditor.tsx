@@ -37,7 +37,14 @@ const LOCATION_ICONS: Record<LocationType, React.ElementType> = {
 }
 
 export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) {
-    const transferData = useMemo(() => data || createInitialTransferData(), [data])
+    const transferData = useMemo(() => {
+        const raw = data || createInitialTransferData()
+        // Ensure arrays are always defined
+        return {
+            ...raw,
+            options: raw.options || [],
+        }
+    }, [data])
 
     const updateField = useCallback(<K extends keyof TransferData>(
         field: K,

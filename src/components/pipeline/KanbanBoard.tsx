@@ -444,8 +444,28 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const totalPipelineValue = cards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
     const totalCards = cards.length
 
-
-
+    // DEBUG: Log para diagnóstico do problema de colunas vazias
+    console.log('🔍 DEBUG Kanban:', {
+        viewMode,
+        subView,
+        cardsCount: cards.length,
+        stagesCount: stages.length,
+        phasesCount: displayPhases.length,
+        sampleCards: cards.slice(0, 3).map(c => ({
+            id: c.id,
+            titulo: c.titulo,
+            pipeline_stage_id: c.pipeline_stage_id
+        })),
+        allStages: stages.map((s: any) => ({
+            id: s.id,
+            nome: s.nome,
+            pipeline_id: s.pipeline_id
+        })),
+        matchingTest: stages.map((s: any) => ({
+            stageName: s.nome,
+            cardsInStage: cards.filter(c => c.pipeline_stage_id === s.id).length
+        }))
+    })
 
 
     return (

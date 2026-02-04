@@ -1,6 +1,6 @@
 /**
  * ExperienceSection - Specialized component for experiences/tours
- * 
+ *
  * Features:
  * - Group by date
  * - Time and location display
@@ -12,6 +12,7 @@ import { useMemo } from 'react'
 import type { ProposalItemWithOptions } from '@/types/proposals'
 import { Star, Calendar, MapPin, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { normalizeItemForViewer } from '../SmartSection'
 
 interface Selection {
     selected: boolean
@@ -51,11 +52,17 @@ export function ExperienceSection({
     selections,
     onToggleItem,
 }: ExperienceSectionProps) {
-    // Group by date
+    // Normalize items to flatten namespaced data
+    const normalizedItems = useMemo(
+        () => items.map(normalizeItemForViewer),
+        [items]
+    )
+
+    // Group by date (using normalized items)
     const dateGroups = useMemo<DateGroup[]>(() => {
         const byDate = new Map<string, ProposalItemWithOptions[]>()
 
-        items.forEach(item => {
+        normalizedItems.forEach(item => {
             const rich = item.rich_content as Record<string, any> || {}
             const date = rich.date || 'no-date'
             if (!byDate.has(date)) byDate.set(date, [])

@@ -10,12 +10,13 @@
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import type { ProposalFull } from '@/types/proposals'
+import type { ProposalFull, ProposalSectionWithItems } from '@/types/proposals'
 import { ProposalHero } from './ProposalHero'
 import { SectionNav } from './SectionNav'
-import { SmartSection } from './SmartSection'
+import { SmartSection, normalizeSection } from './SmartSection'
 import { AcceptProposalModal } from './AcceptProposalModal'
 import { Plane, Building2, Bus, Star, Shield, Briefcase, FileText } from 'lucide-react'
+import { toast } from 'sonner'
 
 // Section icons map (reserved for future use)
 // @ts-expect-error Reserved for future use
@@ -65,6 +66,7 @@ function useAnimatedNumber(value: number, duration = 300) {
 
 interface ProposalMobileViewerProps {
     proposal: ProposalFull
+    forceMobile?: boolean
 }
 
 interface Selection {
@@ -80,9 +82,15 @@ const CURRENCY_RATES: Record<string, number> = {
     EUR: 0.92,
 }
 
-export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
+export function ProposalMobileViewer({ proposal, forceMobile = false }: ProposalMobileViewerProps) {
     const version = proposal.active_version
-    const sections = version?.sections || []
+    const rawSections = version?.sections || []
+
+    // Normalize all sections to flatten namespaced data (hotel, flights, etc)
+    const sections = useMemo<ProposalSectionWithItems[]>(
+        () => rawSections.map(normalizeSection),
+        [rawSections]
+    )
 
     // Refs for scroll tracking
     const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -231,7 +239,7 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                     const quantity = sel.quantity || 1
 
                     let optionDelta = 0
-                    if (sel.optionId) {
+                    if (sel.optionId && item.options) {
                         const option = item.options.find(o => o.id === sel.optionId)
                         if (option) {
                             optionDelta = Number(option.price_delta) || 0
@@ -281,6 +289,9 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                     title: item.title,
                     price: Number(item.base_price) || 0,
                     quantity: selections[item.id]?.quantity || 1,
+                    imageUrl: item.image_url,
+                    sectionTitle: section.title,
+                    sectionType: section.section_type,
                 }))
         )
     }, [sections, selections])
@@ -291,19 +302,82 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
     // Animated total for premium feel
     const animatedTotal = useAnimatedNumber(totalPrimary)
 
-    // Calculate completed sections (sections where user has made a selection)
-    const completedSections = useMemo(() => {
-        return contentSections
-            .filter(section => {
-                const sectionItems = section.items
-                // For selectable (radio) - check if any item is selected
-                if (sectionItems.length >= 2) {
-                    return sectionItems.some(item => selections[item.id]?.selected)
+    // Selected items for modal summary
+    const selectedItemsForModal = useMemo(() => {
+        return sections.flatMap(section =>
+            section.items
+                .filter(item => selections[item.id]?.selected)
+                .map(item => {
+                    const sel = selections[item.id]
+                    const selectedOption = sel?.optionId
+                        ? item.options?.find(o => o.id === sel.optionId)
+                        : null
+                    const basePrice = Number(item.base_price) || 0
+                    const optionDelta = selectedOption ? Number(selectedOption.price_delta) || 0 : 0
+
+                    return {
+                        id: item.id,
+                        title: item.title,
+                        image_url: item.image_url,
+                        price: basePrice + optionDelta,
+                        quantity: sel?.quantity || 1,
+                        optionLabel: selectedOption?.option_label,
+                        sectionTitle: section.title,
+                    }
+                })
+        )
+    }, [sections, selections])
+
+    // Validate selections before accepting
+    const validateSelections = useCallback(() => {
+        const errors: string[] = []
+
+        contentSections.forEach(section => {
+            const sectionItems = section.items || []
+            const hasSelection = sectionItems.some(item => selections[item.id]?.selected)
+
+            // Seções com 2+ items são obrigatórias (radio) - precisa escolher uma
+            if (sectionItems.length >= 2 && !hasSelection) {
+                errors.push(`Selecione uma opção em "${section.title}"`)
+            }
+        })
+
+        return errors
+    }, [contentSections, selections])
+
+    // Handle opening accept modal with validation
+    const handleOpenAcceptModal = useCallback(() => {
+        const errors = validateSelections()
+        if (errors.length > 0) {
+            toast.error(errors[0])
+            return
+        }
+        setShowAcceptModal(true)
+    }, [validateSelections])
+
+    // Calculate section completion status
+    const { completedSections, incompleteSections } = useMemo(() => {
+        const completed: string[] = []
+        const incomplete: string[] = []
+
+        contentSections.forEach(section => {
+            const sectionItems = section.items
+            const hasSelection = sectionItems.some(item => selections[item.id]?.selected)
+
+            // Seções com 2+ items são obrigatórias (radio)
+            if (sectionItems.length >= 2) {
+                if (hasSelection) {
+                    completed.push(section.id)
+                } else {
+                    incomplete.push(section.id)
                 }
-                // For toggleable/optional - always considered "complete" since user can choose none
-                return true
-            })
-            .map(s => s.id)
+            } else {
+                // Seções opcionais/single item sempre consideradas "completas"
+                completed.push(section.id)
+            }
+        })
+
+        return { completedSections: completed, incompleteSections: incomplete }
     }, [contentSections, selections])
 
     // Count selected vs total items for progress (reserved for future use)
@@ -317,7 +391,7 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
     return (
         <div ref={containerRef} className="h-screen overflow-y-auto bg-slate-50">
             {/* Left content - Main scrollable area */}
-            <div className="lg:mr-[320px]">
+            <div className={forceMobile ? "mr-0" : "lg:mr-[340px]"}>
                 {/* Hero Section */}
                 <ProposalHero
                     title={version?.title || 'Sua Viagem'}
@@ -336,11 +410,12 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                     }))}
                     activeSection={activeSection}
                     completedSections={completedSections}
+                    incompleteSections={incompleteSections}
                     onSectionClick={handleSectionClick}
                 />
 
                 {/* Content Sections */}
-                <div className="px-4 sm:px-6 py-6 space-y-8 pb-32 lg:pb-8">
+                <div className={`px-4 sm:px-6 py-6 space-y-8 ${forceMobile ? "pb-32" : "pb-32 lg:pb-8"}`}>
                     {contentSections.map(section => (
                         <div
                             key={section.id}
@@ -360,54 +435,90 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                 </div>
             </div>
 
-            {/* Desktop Summary Sidebar - Fixed position */}
-            <div className="hidden lg:block fixed top-0 right-0 h-screen w-[320px] border-l border-slate-200 bg-white overflow-y-auto">
-                <div className="p-6">
-                    <h2 className="text-lg font-bold text-slate-900 mb-4">Resumo</h2>
-                    <div className="space-y-3 mb-6">
-                        {summaryItems.filter(item => selections[item.id]?.selected).map(item => (
-                            <div key={item.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                                <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <svg className="h-3 w-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-900 truncate">{item.title}</p>
-                                </div>
-                                <p className="text-sm font-semibold text-slate-900 flex-shrink-0">
-                                    {formatCurrency(item.price * (selections[item.id]?.quantity || 1), primaryCurrency)}
-                                </p>
-                            </div>
-                        ))}
+            {/* Desktop Summary Sidebar - Fixed position (hidden in forceMobile mode) */}
+            <div className={forceMobile ? "hidden" : "hidden lg:block fixed top-0 right-0 h-screen w-[340px] border-l border-slate-200 bg-white shadow-xl"}>
+                <div className="h-full flex flex-col">
+                    {/* Header */}
+                    <div className="p-6 border-b border-slate-100">
+                        <h2 className="text-lg font-bold text-slate-900">Resumo da Viagem</h2>
+                        <p className="text-sm text-slate-500 mt-1">
+                            {summaryItems.filter(item => selections[item.id]?.selected).length} itens selecionados
+                        </p>
                     </div>
-                    <div className="h-px bg-slate-200 my-4" />
-                    <div className="mb-6">
-                        <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-slate-600">Total</span>
-                            <span className="text-2xl font-bold text-slate-900">
-                                {formatCurrency(totalPrimary, primaryCurrency)}
-                            </span>
-                        </div>
-                        {showSecondary && (
-                            <p className="text-right text-xs text-slate-500">
-                                ≈ {formatCurrency(totalSecondary, secondaryCurrency)}
-                            </p>
+
+                    {/* Scrollable Items List */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {summaryItems.filter(item => selections[item.id]?.selected).length === 0 ? (
+                            <div className="text-center py-8 text-slate-400">
+                                <p className="text-sm">Nenhum item selecionado</p>
+                            </div>
+                        ) : (
+                            summaryItems.filter(item => selections[item.id]?.selected).map(item => (
+                                <div key={item.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+                                    {/* Image or Icon */}
+                                    {item.imageUrl ? (
+                                        <img
+                                            src={item.imageUrl}
+                                            alt={item.title}
+                                            className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                                        />
+                                    ) : (
+                                        <div className="w-14 h-14 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                            <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                    )}
+
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider">{item.sectionTitle}</p>
+                                        <p className="text-sm font-semibold text-slate-900 truncate">{item.title}</p>
+                                        {(selections[item.id]?.quantity || 1) > 1 && (
+                                            <p className="text-xs text-slate-500">Qtd: {selections[item.id]?.quantity}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Price */}
+                                    <div className="text-right flex-shrink-0">
+                                        <p className="text-sm font-bold text-emerald-600">
+                                            {formatCurrency(item.price * (selections[item.id]?.quantity || 1), primaryCurrency)}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))
                         )}
                     </div>
-                    <button
-                        onClick={() => setShowAcceptModal(true)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition-colors"
-                    >
-                        Confirmar Proposta
-                    </button>
-                    <p className="text-center text-xs text-slate-400 mt-3">Esta ação não gera cobranças</p>
+
+                    {/* Footer with Total */}
+                    <div className="p-6 border-t border-slate-200 bg-white">
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-base font-medium text-slate-600">Total</span>
+                            <div className="text-right">
+                                <span className="text-2xl font-bold text-slate-900">
+                                    {formatCurrency(totalPrimary, primaryCurrency)}
+                                </span>
+                                {showSecondary && (
+                                    <p className="text-xs text-slate-500">
+                                        ≈ {formatCurrency(totalSecondary, secondaryCurrency)}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleOpenAcceptModal}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-4 rounded-xl transition-colors text-lg shadow-lg shadow-emerald-600/20"
+                        >
+                            Confirmar Proposta
+                        </button>
+                        <p className="text-center text-xs text-slate-400 mt-3">Esta ação não gera cobranças</p>
+                    </div>
                 </div>
             </div>
 
-            {/* Mobile Sticky Footer - Hidden on desktop */}
+            {/* Mobile Sticky Footer - Hidden on desktop (shown in forceMobile mode) */}
             <div
-                className="fixed bottom-0 left-0 right-0 lg:hidden z-50 transform transition-transform duration-300 ease-out"
+                className={`fixed bottom-0 left-0 right-0 z-50 transform transition-transform duration-300 ease-out ${forceMobile ? "" : "lg:hidden"}`}
                 style={{ transform: totalPrimary > 0 ? 'translateY(0)' : 'translateY(100%)' }}
             >
                 {/* Glass blur backdrop */}
@@ -431,7 +542,7 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
 
                     {/* CTA Button - Green for confirmation */}
                     <button
-                        onClick={() => setShowAcceptModal(true)}
+                        onClick={handleOpenAcceptModal}
                         className="w-full px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all duration-200 active:scale-[0.98] shadow-lg shadow-emerald-600/25"
                     >
                         Confirmar Proposta
@@ -450,6 +561,7 @@ export function ProposalMobileViewer({ proposal }: ProposalMobileViewerProps) {
                 total={totalPrimary}
                 currency={primaryCurrency}
                 selections={selections}
+                selectedItems={selectedItemsForModal}
             />
         </div>
     )

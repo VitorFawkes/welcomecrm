@@ -114,6 +114,16 @@ interface Selection {
     quantity?: number
 }
 
+interface SelectedItemSummary {
+    id: string
+    title: string
+    image_url?: string | null
+    price: number
+    quantity: number
+    optionLabel?: string
+    sectionTitle: string
+}
+
 interface AcceptProposalModalProps {
     isOpen: boolean
     onClose: () => void
@@ -122,6 +132,7 @@ interface AcceptProposalModalProps {
     total: number
     currency: string
     selections: Record<string, Selection>
+    selectedItems: SelectedItemSummary[]
     onSuccess?: () => void
 }
 
@@ -135,10 +146,12 @@ export function AcceptProposalModal({
     total,
     currency,
     selections,
+    selectedItems,
     onSuccess,
 }: AcceptProposalModalProps) {
     const [step, setStep] = useState<Step>('confirm')
     const [error, setError] = useState<string | null>(null)
+    const [clientNotes, setClientNotes] = useState('')
 
     const formatPrice = (value: number) =>
         new Intl.NumberFormat('pt-BR', {
@@ -189,7 +202,7 @@ export function AcceptProposalModal({
 
             if (updateError) throw updateError
 
-            // 3. Log event
+            // 3. Log event with client notes
             await supabase.from('proposal_events').insert({
                 proposal_id: proposalId,
                 event_type: 'proposal_accepted',
@@ -197,6 +210,7 @@ export function AcceptProposalModal({
                     total,
                     currency,
                     items_count: selectedItems.length,
+                    client_notes: clientNotes || null,
                 },
             })
 
@@ -243,27 +257,68 @@ export function AcceptProposalModal({
 
                     {step === 'confirm' && (
                         <>
-                            <div className="text-center mb-6">
-                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-                                    <Check className="h-8 w-8 text-blue-600" />
-                                </div>
-                                <h2 className="text-xl font-bold text-slate-900 mb-2">
-                                    Confirmar Proposta
+                            <div className="text-center mb-4">
+                                <h2 className="text-xl font-bold text-slate-900 mb-1">
+                                    Revisar Seleções
                                 </h2>
-                                <p className="text-slate-600 text-sm">
-                                    Ao aceitar, você confirma seu interesse nesta proposta
-                                    e suas seleções serão enviadas para a consultora.
+                                <p className="text-slate-500 text-sm">
+                                    Confira seus itens antes de confirmar
                                 </p>
                             </div>
 
+                            {/* Lista de itens selecionados */}
+                            <div className="max-h-[240px] overflow-y-auto space-y-2 mb-4">
+                                {selectedItems.map(item => (
+                                    <div key={item.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
+                                        {item.image_url ? (
+                                            <img
+                                                src={item.image_url}
+                                                alt={item.title}
+                                                className="w-11 h-11 rounded-lg object-cover flex-shrink-0"
+                                            />
+                                        ) : (
+                                            <div className="w-11 h-11 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
+                                                <Check className="h-5 w-5 text-slate-400" />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-slate-900 truncate">
+                                                {item.title}
+                                            </p>
+                                            <p className="text-xs text-slate-500 truncate">
+                                                {item.optionLabel || item.sectionTitle}
+                                                {item.quantity > 1 && ` × ${item.quantity}`}
+                                            </p>
+                                        </div>
+                                        <p className="text-sm font-semibold text-emerald-600 flex-shrink-0">
+                                            {formatPrice(item.price * item.quantity)}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+
                             {/* Total */}
-                            <div className="bg-slate-50 rounded-xl p-4 mb-6">
+                            <div className="bg-emerald-50 rounded-xl p-4 mb-4">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-slate-600">Total selecionado</span>
-                                    <span className="text-2xl font-bold text-slate-900">
+                                    <span className="font-medium text-emerald-900">Total</span>
+                                    <span className="text-2xl font-bold text-emerald-700">
                                         {formatPrice(total)}
                                     </span>
                                 </div>
+                            </div>
+
+                            {/* Observações do cliente */}
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                    Observações (opcional)
+                                </label>
+                                <textarea
+                                    value={clientNotes}
+                                    onChange={(e) => setClientNotes(e.target.value)}
+                                    placeholder="Ex: Prefiro quarto com vista para o mar, horário de check-in flexível..."
+                                    className="w-full p-3 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                                    rows={2}
+                                />
                             </div>
 
                             {/* Error */}
@@ -280,17 +335,17 @@ export function AcceptProposalModal({
                                     className="flex-1"
                                     onClick={onClose}
                                 >
-                                    Voltar
+                                    Voltar e Alterar
                                 </Button>
                                 <Button
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                                     onClick={handleAccept}
                                 >
-                                    Aceitar Proposta
+                                    Confirmar Proposta
                                 </Button>
                             </div>
 
-                            <p className="text-center text-xs text-slate-400 mt-4">
+                            <p className="text-center text-xs text-slate-400 mt-3">
                                 Esta ação não gera cobranças. Sua consultora entrará em contato.
                             </p>
                         </>

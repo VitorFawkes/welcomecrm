@@ -1,15 +1,18 @@
 /**
  * InsuranceSection - Specialized component for travel insurance
- * 
+ *
  * Features:
  * - Radio selection for insurance level
  * - Coverage details
  * - Price per person
  */
 
+import { useMemo } from 'react'
 import type { ProposalItemWithOptions } from '@/types/proposals'
 import { Shield, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { normalizeItemForViewer } from '../SmartSection'
+import { InsuranceComparisonTable } from '../InsuranceComparisonTable'
 
 interface Selection {
     selected: boolean
@@ -28,15 +31,21 @@ export function InsuranceSection({
     selections,
     onSelectItem,
 }: InsuranceSectionProps) {
+    // Normalize items to flatten namespaced data
+    const normalizedItems = useMemo(
+        () => items.map(normalizeItemForViewer),
+        [items]
+    )
+
     const formatPrice = (value: number | string) =>
         new Intl.NumberFormat('pt-BR', {
             style: 'currency',
             currency: 'USD',
         }).format(Number(value) || 0)
 
-    // Get tier color
-    const getTierColor = (title: string) => {
-        const lower = title.toLowerCase()
+    // Get tier color - handles undefined title safely
+    const getTierColor = (title?: string) => {
+        const lower = (title || '').toLowerCase()
         if (lower.includes('premium') || lower.includes('gold')) {
             return { bg: 'bg-amber-50', border: 'border-amber-300', icon: 'text-amber-600', ring: 'ring-amber-200' }
         }
@@ -46,16 +55,28 @@ export function InsuranceSection({
         return { bg: 'bg-slate-50', border: 'border-slate-300', icon: 'text-slate-600', ring: 'ring-slate-200' }
     }
 
+    // Use comparison table when 2+ insurance options
+    if (normalizedItems.length >= 2) {
+        return (
+            <InsuranceComparisonTable
+                items={normalizedItems}
+                selections={selections}
+                onSelectItem={onSelectItem}
+            />
+        )
+    }
+
+    // Single insurance - simple card view
     return (
         <div className="space-y-3">
-            {items.map((item) => {
+            {normalizedItems.map((item) => {
                 const rich = item.rich_content as Record<string, any> || {}
                 const isSelected = selections[item.id]?.selected ?? false
                 const price = Number(item.base_price) || 0
                 const colors = getTierColor(item.title)
 
-                // Features list
-                const features = rich.features || []
+                // Features/coverages list - support both field names
+                const features = rich.coverages || rich.features || []
 
                 return (
                     <button
@@ -100,9 +121,9 @@ export function InsuranceSection({
                                         )}>
                                             {item.title}
                                         </p>
-                                        {rich.coverage && (
+                                        {(rich.coverage_amount || rich.coverage) && (
                                             <p className="text-xs text-slate-500">
-                                                Cobertura até {rich.coverage}
+                                                Cobertura até {rich.coverage_amount || rich.coverage}
                                             </p>
                                         )}
                                     </div>
