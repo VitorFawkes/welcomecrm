@@ -128,6 +128,9 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
             // Exclude group parents
             query = query.eq('is_group_parent', false)
 
+            // Exclude archived leads
+            query = query.is('archived_at', null)
+
             // Sorting
             if (filters.sortBy) {
                 query = query.order(filters.sortBy, {

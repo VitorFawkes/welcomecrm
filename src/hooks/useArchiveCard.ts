@@ -15,6 +15,8 @@ export function useArchiveCard(options?: UseArchiveCardOptions) {
         queryClient.invalidateQueries({ queryKey: ['card', cardId] })
         queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] })
         queryClient.invalidateQueries({ queryKey: ['archived-cards'] })
+        queryClient.invalidateQueries({ queryKey: ['trips'] })
+        queryClient.invalidateQueries({ queryKey: ['leads'] })
     }
 
     const archiveMutation = useMutation({
@@ -88,6 +90,8 @@ export function useArchiveCard(options?: UseArchiveCardOptions) {
             toast.success(`${cardIds.length} cards arquivados com sucesso`)
             queryClient.invalidateQueries({ queryKey: ['cards'] })
             queryClient.invalidateQueries({ queryKey: ['archived-cards'] })
+            queryClient.invalidateQueries({ queryKey: ['trips'] })
+            queryClient.invalidateQueries({ queryKey: ['leads'] })
             options?.onSuccess?.()
         },
         onError: (error: Error) => {

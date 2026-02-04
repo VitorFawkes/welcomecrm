@@ -15,6 +15,7 @@ export function useTrips() {
             let query = (supabase.from('view_cards_acoes') as any)
                 .select('*')
                 .eq('status_comercial', 'ganho') // Only Won deals are Trips
+                .is('archived_at', null) // Exclude archived trips
 
             if (filters.search) {
                 const searchTerm = filters.search.trim();

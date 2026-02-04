@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Trash2, ArrowRight, UserCog, Flag, Loader2, X, Search } from 'lucide-react'
+import { Archive, ArrowRight, UserCog, Flag, Loader2, X, Search } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useBulkLeadActions } from '../../hooks/useBulkLeadActions'
+import { useArchiveCard } from '../../hooks/useArchiveCard'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import {
@@ -20,14 +21,15 @@ interface LeadsBulkActionsProps {
 }
 
 export default function LeadsBulkActions({ selectedIds, onClearSelection }: LeadsBulkActionsProps) {
-    const { bulkMoveStage, bulkChangeOwner, bulkChangePriority, bulkDelete, isLoading } = useBulkLeadActions()
+    const { bulkMoveStage, bulkChangeOwner, bulkChangePriority, isLoading } = useBulkLeadActions()
+    const { archiveBulk, isArchiving } = useArchiveCard()
     const { data: stages } = usePipelineStages()
     const { data: options } = useFilterOptions()
 
     const [showMoveModal, setShowMoveModal] = useState(false)
     const [showOwnerModal, setShowOwnerModal] = useState(false)
     const [showPriorityModal, setShowPriorityModal] = useState(false)
-    const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [showArchiveModal, setShowArchiveModal] = useState(false)
 
     const [selectedStageId, setSelectedStageId] = useState<string>('')
     const [selectedOwnerId, setSelectedOwnerId] = useState<string>('')
@@ -69,9 +71,9 @@ export default function LeadsBulkActions({ selectedIds, onClearSelection }: Lead
         onClearSelection()
     }
 
-    const handleDelete = async () => {
-        await bulkDelete({ cardIds: selectedIds })
-        setShowDeleteModal(false)
+    const handleArchive = () => {
+        archiveBulk(selectedIds)
+        setShowArchiveModal(false)
         onClearSelection()
     }
 
@@ -118,14 +120,14 @@ export default function LeadsBulkActions({ selectedIds, onClearSelection }: Lead
                 </Button>
 
                 <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
-                    onClick={() => setShowDeleteModal(true)}
-                    disabled={isLoading}
+                    onClick={() => setShowArchiveModal(true)}
+                    disabled={isLoading || isArchiving}
                     className="h-8 px-3 text-xs gap-1.5"
                 >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Excluir
+                    <Archive className="h-3.5 w-3.5" />
+                    Arquivar
                 </Button>
 
                 <div className="h-5 w-px bg-gray-200 mx-1" />
@@ -299,23 +301,27 @@ export default function LeadsBulkActions({ selectedIds, onClearSelection }: Lead
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Modal */}
-            <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+            {/* Archive Confirmation Modal */}
+            <Dialog open={showArchiveModal} onOpenChange={setShowArchiveModal}>
                 <DialogContent className="sm:max-w-[400px]">
                     <DialogHeader>
-                        <DialogTitle className="text-red-600">Excluir Leads</DialogTitle>
+                        <DialogTitle className="text-amber-600">Arquivar Leads</DialogTitle>
                         <DialogDescription>
-                            Tem certeza que deseja mover {selectedIds.length} lead(s) para a lixeira?
-                            Esta ação pode ser desfeita posteriormente.
+                            Tem certeza que deseja arquivar {selectedIds.length} lead(s)?
+                            Os dados serão preservados e podem ser restaurados em Configurações → Arquivados.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="mt-4">
-                        <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+                        <Button variant="outline" onClick={() => setShowArchiveModal(false)}>
                             Cancelar
                         </Button>
-                        <Button variant="destructive" onClick={handleDelete} disabled={isLoading}>
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Excluir
+                        <Button
+                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                            onClick={handleArchive}
+                            disabled={isLoading || isArchiving}
+                        >
+                            {(isLoading || isArchiving) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Arquivar
                         </Button>
                     </DialogFooter>
                 </DialogContent>
