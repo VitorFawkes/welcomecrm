@@ -5,9 +5,9 @@
 > Use o workflow `/new-module` Phase 5 para manter sincronizado.
 
 > **Purpose:** Source of Truth for the AI Agent. Read this BEFORE any implementation.
-> **Last Updated:** 2026-02-01
+> **Last Updated:** 2026-02-04
 > **Trigger:** ALWAYS ON
-> **Stats:** 94 tabelas | 30 páginas | 40 hooks | 16 views
+> **Stats:** 94 tabelas | 35 paginas | 48 hooks | 16 views
 
 ---
 
@@ -565,3 +565,35 @@ npm run build
 8. **Mover card** → Sempre via RPC `mover_card`, nunca UPDATE direto
 9. **Quality Gate** → Validar antes de mover para nova etapa
 10. **Campos dinâmicos** → Via `pipeline_card_settings` + `system_fields`
+
+---
+
+## 11. Mapa de Dependencias Criticas
+
+### 11.1 Tabelas → Hooks → Paginas
+
+| Tabela | Hooks que Usam | Paginas Afetadas |
+|--------|----------------|------------------|
+| `cards` | usePipelineCards, useCardContacts, useTrips, useSubCards | Pipeline, CardDetail, Dashboard, Trips |
+| `contatos` | useContacts, useCardPeople | People, CardDetail |
+| `pipeline_stages` | usePipelineStages, useQualityGate, useAllowedStages | Pipeline, CreateCardModal, CardHeader |
+| `proposals` | useProposals, useProposalBuilder | ProposalBuilderV4, CardDetail |
+| `tarefas` | useTasks, useCardTasks | CardDetail, Tasks |
+| `system_fields` | useFieldConfig, useStageRequiredFields | CardDetail (todas as sections) |
+
+### 11.2 Views Criticas
+
+| View | Usado Por | Se Modificar... |
+|------|-----------|-----------------|
+| `view_cards_acoes` | usePipelineCards, Pipeline | Impacta TODO o Kanban |
+| `view_contacts_full` | useContacts | Impacta lista de Pessoas |
+| `view_card_360` | CardDetail | Impacta pagina de detalhes |
+
+### 11.3 Componentes Core
+
+| Componente | Usado Em | Impacto |
+|------------|----------|---------|
+| `KanbanBoard` | Pipeline | Todo o fluxo de cards |
+| `CardHeader` | CardDetail | Titulo, fase, owner |
+| `SectionRenderer` | CardDetail | Todas as secoes dinamicas |
+| `CreateCardModal` | Pipeline, Dashboard | Criacao de novos cards |
