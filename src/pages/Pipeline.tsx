@@ -3,6 +3,7 @@ import KanbanBoard from '../components/pipeline/KanbanBoard'
 import PipelineListView from '../components/pipeline/PipelineListView'
 import { cn } from '../lib/utils'
 import CreateCardModal from '../components/pipeline/CreateCardModal'
+
 import { usePipelineFilters } from '../hooks/usePipelineFilters'
 import { useProductContext } from '../hooks/useProductContext'
 
@@ -27,6 +28,7 @@ export default function Pipeline() {
     } = usePipelineFilters()
     const { currentProduct } = useProductContext()
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
 
 
@@ -255,6 +257,8 @@ export default function Pipeline() {
                                     Filtros
                                 </button>
 
+
+
                                 <button
                                     onClick={() => setIsCreateModalOpen(true)}
                                     className="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark border border-transparent rounded-lg shadow-sm transition-all"
@@ -305,6 +309,8 @@ export default function Pipeline() {
                     isOpen={isCreateModalOpen}
                     onClose={() => setIsCreateModalOpen(false)}
                 />
+
+
 
                 <FilterDrawer
                     isOpen={isFilterDrawerOpen}

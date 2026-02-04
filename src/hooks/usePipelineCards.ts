@@ -138,6 +138,11 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
             }
 
+            // Status Comercial Filter
+            if ((filters.statusComercial?.length ?? 0) > 0) {
+                query = query.in('status_comercial', filters.statusComercial)
+            }
+
             // Archived Filter - DISABLED (colunas removidas no rollback)
             // if (!filters.showArchived) {
             //     query = query.is('archived_at', null)

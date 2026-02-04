@@ -5,7 +5,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useCreateProposal } from '@/hooks/useProposal'
 import { useAuth } from '@/contexts/AuthContext'
-import { useDeleteCard } from '@/hooks/useDeleteCard'
+import { useArchiveCard } from '@/hooks/useArchiveCard'
 import DeleteCardModal from './DeleteCardModal'
 import { toast } from 'sonner'
 
@@ -32,7 +32,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
     })
     const [showDeleteModal, setShowDeleteModal] = useState(false)
 
-    const { softDelete, isDeleting } = useDeleteCard({
+    const { archive, isArchiving } = useArchiveCard({
         onSuccess: () => navigate('/pipeline')
     })
 
@@ -373,8 +373,8 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
             <DeleteCardModal
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
-                onConfirm={() => softDelete(card.id)}
-                isLoading={isDeleting}
+                onConfirm={() => archive(card.id)}
+                isLoading={isArchiving}
                 cardTitle={card.titulo || undefined}
             />
         </>

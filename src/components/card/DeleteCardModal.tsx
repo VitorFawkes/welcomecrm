@@ -1,4 +1,4 @@
-import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
+import { Archive, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '../ui/Button'
 
 interface DeleteCardModalProps {
@@ -35,7 +35,7 @@ export default function DeleteCardModal({
                 <div className="px-6 py-5 border-b border-gray-100">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-red-100 rounded-full">
-                            <Trash2 className="h-5 w-5 text-red-600" />
+                            <Archive className="h-5 w-5 text-red-600" />
                         </div>
                         <h2 className="text-lg font-semibold text-gray-900">
                             Arquivar Viagem
@@ -59,7 +59,7 @@ export default function DeleteCardModal({
                                 Os dados serão preservados
                             </p>
                             <p className="text-amber-700 mt-1">
-                                A viagem será movida para a lixeira e poderá ser restaurada a qualquer momento.
+                                A viagem será arquivada e poderá ser restaurada a qualquer momento em Configurações → Arquivados.
                             </p>
                         </div>
                     </div>
@@ -83,7 +83,7 @@ export default function DeleteCardModal({
                         {isLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                            <Trash2 className="h-4 w-4" />
+                            <Archive className="h-4 w-4" />
                         )}
                         Arquivar Viagem
                     </Button>

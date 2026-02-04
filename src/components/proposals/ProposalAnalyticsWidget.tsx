@@ -47,7 +47,6 @@ export function ProposalAnalyticsWidget() {
                 .select(`
                     id,
                     status,
-                    total_value,
                     created_at,
                     card:cards!proposals_card_id_fkey(titulo)
                 `)
@@ -79,7 +78,8 @@ export function ProposalAnalyticsWidget() {
                 }
 
                 if (p.status === 'accepted') {
-                    stats.totalValue += Number(p.total_value) || 0
+                    // total_value missing in DB view/table
+                    stats.totalValue += 0
                 }
             })
 
@@ -103,7 +103,6 @@ export function ProposalAnalyticsWidget() {
                     id,
                     card_id,
                     status,
-                    total_value,
                     created_at,
                     card:cards!proposals_card_id_fkey(titulo),
                     active_version:proposal_versions!fk_proposals_active_version(title)
@@ -126,7 +125,7 @@ export function ProposalAnalyticsWidget() {
                     card_title: p.card?.titulo || 'Sem título',
                     title: p.active_version?.title || 'Proposta sem título',
                     status: p.status,
-                    total_value: Number(p.total_value) || 0,
+                    total_value: 0, // Column missing
                     created_at: p.created_at,
                     days_pending: diffDays,
                 }

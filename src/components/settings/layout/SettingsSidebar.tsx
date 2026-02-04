@@ -10,6 +10,7 @@ import {
     Users as UsersIcon,
     MessageSquare,
     Trash2,
+    Archive,
     FileCheck,
     ChevronDown,
     Palette,
@@ -163,6 +164,7 @@ export default function SettingsSidebar() {
                         ═══════════════════════════════════════════════════════════ */}
                         <NavSection title="Operações" icon={Wrench}>
                             <NavItem to="/settings/operations/health" icon={Activity} label="Saúde do Sistema" />
+                            <NavItem to="/settings/operations/archive" icon={Archive} label="Arquivados" />
                             <NavItem to="/settings/operations/trash" icon={Trash2} label="Lixeira" />
                         </NavSection>
                     </>

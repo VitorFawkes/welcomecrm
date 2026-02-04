@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { useDeleteCard } from '../../hooks/useDeleteCard'
+import { useArchiveCard } from '../../hooks/useArchiveCard'
 import DeleteCardModal from '../card/DeleteCardModal'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -41,7 +41,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
     // Delete card functionality
     const [showMenu, setShowMenu] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
-    const { softDelete, isDeleting } = useDeleteCard()
+    const { archive, isArchiving } = useArchiveCard()
 
     const handleMenuClick = (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -589,8 +589,8 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             <DeleteCardModal
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
-                onConfirm={() => softDelete(card.id!)}
-                isLoading={isDeleting}
+                onConfirm={() => archive(card.id!)}
+                isLoading={isArchiving}
                 cardTitle={card.titulo || undefined}
             />
         </div>

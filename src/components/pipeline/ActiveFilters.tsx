@@ -5,6 +5,14 @@ import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+const STATUS_LABELS: Record<string, string> = {
+    em_aberto: 'Em Aberto',
+    em_andamento: 'Em Andamento',
+    pausado: 'Pausado',
+    ganho: 'Ganho',
+    perdido: 'Perdido',
+}
+
 export function ActiveFilters() {
     const { filters: rawFilters, setFilters } = usePipelineFilters()
     const filters = rawFilters || {}
@@ -18,6 +26,7 @@ export function ActiveFilters() {
         filters.posIds?.length ||
         filters.teamIds?.length ||
         filters.departmentIds?.length ||
+        filters.statusComercial?.length ||
         filters.startDate ||
         filters.endDate ||
         filters.creationStartDate ||
@@ -87,6 +96,10 @@ export function ActiveFilters() {
                     return <Chip key={id} label={`Depto: ${name}`} onRemove={() => removeFilter('departmentIds', id)} />
                 })}
 
+                {/* Status Comercial */}
+                {filters.statusComercial?.map(status => (
+                    <Chip key={status} label={`Status: ${STATUS_LABELS[status] || status}`} onRemove={() => removeFilter('statusComercial', status)} />
+                ))}
 
                 {/* Dates */}
                 {(filters.startDate || filters.endDate) && (

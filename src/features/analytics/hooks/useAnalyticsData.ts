@@ -36,10 +36,12 @@ export function useAnalyticsData() {
 
                 const stageMap = new Map(stages?.map(s => [s.id, s.nome]));
 
-                // 3. Fetch Cards
+                // 3. Fetch Cards (excluding deleted and archived)
                 const { data: cards, error: cardsError } = await supabase
                     .from('cards')
-                    .select('*');
+                    .select('*')
+                    .is('deleted_at', null)
+                    .is('archived_at', null);
 
                 if (cardsError) throw cardsError;
 
@@ -60,7 +62,8 @@ export function useAnalyticsData() {
                         sdrId: card.sdr_owner_id || undefined,
                         plannerId: card.vendas_owner_id || card.dono_atual_id || undefined,
                         createdAt: new Date(card.created_at || Date.now()),
-                        wonAt: card.taxa_data_status ? new Date(card.taxa_data_status) : undefined, // Rough approximation
+                        wonAt: card.taxa_data_status ? new Date(card.taxa_data_status) : undefined,
+                        tripStartDate: card.data_viagem_inicio ? new Date(card.data_viagem_inicio) : undefined,
                         value: card.valor_final || card.valor_estimado || 0,
                         product: card.produto
                     };
