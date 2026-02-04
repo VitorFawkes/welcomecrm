@@ -152,12 +152,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         // Priority 3: Phone (Last 8 digits)
         const phoneRaw = cleanPhone(row['telefone'])
         if (phoneRaw && phoneRaw.length >= 8) {
-            // Hard to do fuzzy "ends with" efficiently without full scan or specific index. 
-            // Using ilike '%12345678'
-            const { data } = await supabase.from('contatos').select('id').ilike('celular', `%${phoneRaw.slice(-8)}`).limit(1)
-            if (data && data.length > 0) return data[0].id
-
-            // Try 'telefone' field too
+            // Try 'telefone' field (using ilike for partial match on last 8 digits)
             const { data: dataTel } = await supabase.from('contatos').select('id').ilike('telefone', `%${phoneRaw.slice(-8)}`).limit(1)
             if (dataTel && dataTel.length > 0) return dataTel[0].id
         }
@@ -213,42 +208,82 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                     }
 
                     // 2. Resolve Stage
-                    // For WON deals, we can use the first stage id as placeholder or look for a specific "won" stage if needed.
-                    // But effectively we are setting status_comercial = 'ganho'.
-                    let stageId = stages?.[0]?.id // Default to first stage if exists
+                    let stageId = null
+                    if (stages && stages.length > 0) {
+                        stageId = stages[0].id // Default
+                        if (row['stage_name']) {
+                            const foundStage = stages.find(s => s.nome.toLowerCase() === String(row['stage_name']).toLowerCase())
+                            if (foundStage) stageId = foundStage.id
+                        }
+                    }
+
+                    const excelDateToISO = (serial: any) => {
+                        if (!serial) return null
+
+                        // If it's already a string that looks like a date, try to use it
+                        if (typeof serial === 'string' && (serial.includes('-') || serial.includes('/'))) {
+                            // Basic check, ideally use a lib or more robust parsing if needed
+                            // But Excel often gives integers like 44505
+                            return serial
+                        }
+
+                        // If it's a number (Excel Serial Date)
+                        const serialNum = Number(serial)
+                        if (!isNaN(serialNum)) {
+                            // Excel base date is Dec 30, 1899 usually (weird history)
+                            // 25569 is the diff between 1970 and 1900. 
+                            // Formula: (serial - 25569) * 86400 * 1000
+                            const date = new Date((serialNum - (25567 + 2)) * 86400 * 1000)
+                            return date.toISOString().split('T')[0] // Return YYYY-MM-DD
+                        }
+
+                        return null
+                    }
 
                     // 3. Create Card
-                    const { error } = await supabase.from('cards').insert({
+                    const cardData: any = {
                         titulo: row['titulo'],
                         pessoa_principal_id: contactId,
                         pipeline_id: pipeline.id,
-                        pipeline_stage_id: stageId,
+                        pipeline_stage_id: stageId, // Can be null
                         produto: effectiveProduct,
                         valor_final: row['valor'] || 0,
-                        data_viagem_inicio: row['data_viagem_inicio'] || null,
-                        origem: 'importacao_excel',
+                        data_viagem_inicio: excelDateToISO(row['data_viagem_inicio']),
+                        origem: 'manual', // Must be one of allowed values (manual, api, etc)
                         status_comercial: 'ganho',
+                        estado_operacional: 'finalizado', // Viagem Concluída
                         data_fechamento: new Date().toISOString(),
                         moeda: 'BRL',
                         briefing_inicial: {
                             importado_em: new Date().toISOString(),
                             categoria: row['categoria'] || 'Geral'
                         }
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    } as any)
+                    }
 
-                    if (error) throw error
+                    // Remove undefined/null keys if they cause issues (optional, but safe)
+                    // if (!stageId) delete cardData.pipeline_stage_id
+
+                    const { error } = await supabase.from('cards').insert(cardData)
+
+                    if (error) {
+                        console.error('Erro detalhado Supabase (Insert Card):', error)
+                        throw error
+                    }
                     successCount++
 
                 } catch (err: any) {
                     skippedCount++
-                    errors.push(`Linha ${i + 2}: Erro ao criar venda - ${err.message}`)
+                    const errorMsg = err.details || err.message || JSON.stringify(err)
+                    errors.push(`Linha ${i + 2}: Erro ao criar venda - ${errorMsg}`)
                 }
             }
 
             setImportResults({ success: successCount, skipped: skippedCount, errors })
             setStep('results')
-            if (successCount > 0) onSuccess()
+            if (successCount > 0) {
+                // Do not instantly reload, let user see results
+                // onSuccess() can be called when closing or manually
+            }
 
         } catch (error: any) {
             console.error('Import fatal error:', error)
