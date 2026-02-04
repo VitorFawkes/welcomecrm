@@ -11,7 +11,7 @@ import { cn } from '../../lib/utils'
 import { ColumnToggle } from '../ui/data-grid/ColumnToggle'
 import { BulkActions } from '../ui/data-grid/BulkActions'
 import { BulkEditModal, type BulkEditField } from '../ui/data-grid/BulkEditModal'
-import { useDeleteCard } from '../../hooks/useDeleteCard'
+import { useArchiveCard } from '../../hooks/useArchiveCard'
 import DeleteCardModal from '../card/DeleteCardModal'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
@@ -37,7 +37,7 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
     })
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
-    const { softDelete, isDeleting } = useDeleteCard()
+    const { archive, isArchiving } = useArchiveCard()
 
     // --- Handlers ---
     const handleSort = (field: TripsFilterState['sortBy']) => {
@@ -81,7 +81,7 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
 
     const confirmBulkDelete = async () => {
         for (const id of selectedTrips) {
-            await softDelete(id)
+            await archive(id)
         }
         setSelectedTrips([])
         setShowDeleteModal(false)
@@ -400,7 +400,7 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
                 onConfirm={confirmBulkDelete}
-                isLoading={isDeleting}
+                isLoading={isArchiving}
                 cardTitle={`${selectedTrips.length} viagens selecionadas`}
             />
 

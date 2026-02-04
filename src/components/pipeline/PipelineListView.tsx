@@ -15,9 +15,7 @@ import type { Database } from '../../database.types'
 import { ColumnManager, type ColumnConfig } from '../ui/data-grid/ColumnManager'
 import { BulkActions } from '../ui/data-grid/BulkActions'
 import { BulkEditModal, type BulkEditField } from '../ui/data-grid/BulkEditModal'
-import { useDeleteCard } from '../../hooks/useDeleteCard'
-// DISABLED: Feature rolled back
-// import { useArchiveCard } from '../../hooks/useArchiveCard'
+import { useArchiveCard } from '../../hooks/useArchiveCard'
 import DeleteCardModal from '../card/DeleteCardModal'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
@@ -129,9 +127,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
 
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [showEditModal, setShowEditModal] = useState(false)
-    const { softDelete, isDeleting } = useDeleteCard()
-    // DISABLED: Feature rolled back
-    // const { archiveBulk } = useArchiveCard()
+    const { archive, isArchiving } = useArchiveCard()
 
     // Mutation para marcar tarefa como concluída
     const completeTaskMutation = useMutation({
@@ -190,9 +186,9 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
     }
 
     const confirmBulkDelete = async () => {
-        // Sequential delete for now (could be optimized with a bulk RPC)
+        // Sequential archive for now (could be optimized with a bulk RPC)
         for (const id of selectedCards) {
-            await softDelete(id)
+            await archive(id)
         }
         setSelectedCards([])
         setShowDeleteModal(false)
@@ -964,7 +960,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
                 onConfirm={confirmBulkDelete}
-                isLoading={isDeleting}
+                isLoading={isArchiving}
                 cardTitle={`${selectedCards.length} cards selecionados`}
             />
 
