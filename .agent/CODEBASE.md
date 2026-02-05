@@ -7,7 +7,7 @@
 > **Purpose:** Source of Truth for the AI Agent. Read this BEFORE any implementation.
 > **Last Updated:** 2026-02-04
 > **Trigger:** ALWAYS ON
-> **Stats:** 94 tabelas | 35 paginas | 48 hooks | 16 views
+> **Stats:** 93 tabelas | 33 paginas | 48 hooks | 15 views | 326 components
 
 ---
 
@@ -193,8 +193,8 @@ Permite bloquear campos individuais para impedir atualizações automáticas via
 | `useArchiveCard()` | `useArchiveCard.ts` | **Card archive/unarchive logic** |
 | `useQualityGate()` | `useQualityGate.ts` | Stage transition validation |
 | `useFilterOptions()` | `useFilterOptions.ts` | Filter options for pipeline |
-| `useTrips()` | `useTrips.ts` | Query de viagens ganhas |
-| `useTripsFilters()` | `useTripsFilters.ts` | Zustand store para filtros de viagens |
+| `useTrips()` | `useTrips.ts` | ⚠️ **LEGADO** - Query de viagens ganhas (usar /leads) |
+| `useTripsFilters()` | `useTripsFilters.ts` | ⚠️ **LEGADO** - Zustand store para filtros de viagens |
 | `useSubCards()` | `useSubCards.ts` | **Sub-cards CRUD (change requests)** |
 | `useSubCardParent()` | `useSubCards.ts` | Get parent info for sub-cards |
 | `useFieldLock()` | `useFieldLock.ts` | **Gerencia bloqueio de campos (locked_fields)** |
@@ -279,7 +279,7 @@ Permite bloquear campos individuais para impedir atualizações automáticas via
 | `Pipeline` | `src/pages/Pipeline.tsx` | `/pipeline` | Kanban board |
 | `Dashboard` | `src/pages/Dashboard.tsx` | `/dashboard` | Main dashboard |
 | `People` | `src/pages/People.tsx` | `/people` | Contacts list |
-| `Cards` | `src/pages/Cards.tsx` | `/cards` | Cards list view |
+| `Leads` | `src/pages/Leads.tsx` | `/leads` | **Gestão de Leads (principal)** |
 | `Tasks` | `src/pages/Tasks.tsx` | `/tasks` | Task management |
 | `ActivitiesPage` | `src/pages/ActivitiesPage.tsx` | `/activities` | Activities view |
 | `GroupsPage` | `src/pages/GroupsPage.tsx` | `/groups` | Groups management |
@@ -325,6 +325,13 @@ Permite bloquear campos individuais para impedir atualizações automáticas via
 |------|------|-------|-------------|
 | `Login` | `src/pages/Login.tsx` | `/login` | Authentication |
 | `InvitePage` | `src/pages/InvitePage.tsx` | `/invite/:token` | User invitation |
+
+#### Páginas Legadas (NÃO UTILIZAR)
+> **AVISO:** Estas páginas existem no código mas foram substituídas. Não criar links para elas.
+
+| Page | Path | Route | Substituída por | Motivo |
+|------|------|-------|-----------------|--------|
+| `Cards` (Trips) | `src/pages/Cards.tsx` | `/trips` | `/leads` com filtro `status_comercial=ganho` | Redundante - /leads já cobre viagens ganhas |
 
 ---
 
