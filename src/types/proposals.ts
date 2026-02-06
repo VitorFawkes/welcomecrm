@@ -29,6 +29,9 @@ export type ProposalClientSelection = Database['public']['Tables']['proposal_cli
 export type ProposalClientSelectionInsert = Database['public']['Tables']['proposal_client_selections']['Insert']
 export type ProposalClientSelectionUpdate = Database['public']['Tables']['proposal_client_selections']['Update']
 
+export type ProposalFlight = Database['public']['Tables']['proposal_flights']['Row']
+export type ProposalFlightInsert = Database['public']['Tables']['proposal_flights']['Insert']
+
 // ============================================
 // Enum Types
 // ============================================
@@ -45,6 +48,7 @@ export interface ProposalWithVersion extends Proposal {
 
 export interface ProposalVersionWithSections extends ProposalVersion {
     sections: ProposalSectionWithItems[]
+    flights?: ProposalFlight[]
 }
 
 export interface ProposalSectionWithItems extends ProposalSection {

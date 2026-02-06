@@ -1,4 +1,5 @@
 import DynamicFieldRenderer from './DynamicFieldRenderer'
+import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import type { Database } from '../../database.types'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -8,6 +9,8 @@ interface CardOverviewProps {
 }
 
 export default function CardOverview({ card }: CardOverviewProps) {
+    const receitaPerm = useReceitaPermission()
+
     return (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-6">
@@ -21,13 +24,35 @@ export default function CardOverview({ card }: CardOverviewProps) {
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-sm font-medium text-gray-500">Valor Final</dt>
+                            <dt className="text-sm font-medium text-gray-500">Valor de Venda</dt>
                             <dd className="mt-1 text-sm text-gray-900">
-                                {(card as any).valor_final
-                                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: card.moeda || 'BRL' }).format((card as any).valor_final)
+                                {card.valor_final
+                                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: card.moeda || 'BRL' }).format(card.valor_final)
                                     : '-'}
                             </dd>
                         </div>
+                        {receitaPerm.canView && (
+                            <div>
+                                <dt className="text-sm font-medium text-gray-500">
+                                    Receita
+                                    {card.receita_source === 'calculated' && (
+                                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 font-normal">
+                                            Calculado
+                                        </span>
+                                    )}
+                                    {card.receita_source === 'manual' && (
+                                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 font-normal">
+                                            Manual
+                                        </span>
+                                    )}
+                                </dt>
+                                <dd className="mt-1 text-sm font-semibold text-amber-700">
+                                    {card.receita != null
+                                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: card.moeda || 'BRL' }).format(card.receita)
+                                        : '-'}
+                                </dd>
+                            </div>
+                        )}
                         <div>
                             <dt className="text-sm font-medium text-gray-500">Condições de Pagamento</dt>
                             <dd className="mt-1 text-sm text-gray-900">{card.condicoes_pagamento || '-'}</dd>

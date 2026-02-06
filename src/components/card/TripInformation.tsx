@@ -8,6 +8,7 @@ import { useStageRequirements } from '../../hooks/useStageRequirements'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 // Marketing is now a regular section rendered via DynamicSectionWidget in CardDetail
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { SystemPhase } from '../../types/pipeline'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
 import { Input } from '../ui/Input'
@@ -215,6 +216,7 @@ export default function TripInformation({ card }: TripInformationProps) {
     const { missingBlocking } = useStageRequirements(card as any)
     const { getVisibleFields } = useFieldConfig()
     const { data: phases } = usePipelinePhases()
+    const { data: stages } = usePipelineStages()
 
     // --- MODULARITY: Get all visible fields for 'trip_info' section ---
     const visibleFields = useMemo(() => {
@@ -223,11 +225,20 @@ export default function TripInformation({ card }: TripInformationProps) {
         return getVisibleFields(card.pipeline_stage_id!, 'trip_info')
     }, [card.pipeline_stage_id, getVisibleFields])
 
-    // Sync ViewMode with Card Stage
+    // Sync ViewMode with Card Stage - FIX: Use pipeline_stage_id to get fase
+    // The card object from 'cards' table doesn't have 'fase' field,
+    // only the view_cards_acoes has it via join with pipeline_stages
     useEffect(() => {
-        if (!phases) return
+        if (!phases || !stages) return
 
-        const currentPhase = phases.find(p => p.name === card.fase)
+        // Find the current stage by pipeline_stage_id
+        const currentStage = stages.find(s => s.id === card.pipeline_stage_id)
+
+        // Get the phase name from the stage (this is the correct source)
+        const phaseName = currentStage?.fase
+
+        // Find the matching phase
+        const currentPhase = phases.find(p => p.name === phaseName)
 
         // Only switch to current phase if it exists, has a slug, AND is visible
         if (currentPhase && currentPhase.slug && currentPhase.visible_in_card !== false) {
@@ -238,7 +249,7 @@ export default function TripInformation({ card }: TripInformationProps) {
             if (sdrPhase && sdrPhase.slug) setViewMode(sdrPhase.slug)
         }
         // eslint-disable-next-line react-hooks/set-state-in-effect
-    }, [card.fase, phases])
+    }, [card.pipeline_stage_id, phases, stages])
 
     // Determine which data to display/edit based on ViewMode and CorrectionMode
     // SDR View: Shows briefingData (or productData if briefing is empty/synced)
@@ -311,7 +322,9 @@ export default function TripInformation({ card }: TripInformationProps) {
             // If updating 'briefing_inicial' (SDR Correction), ALSO sync 'produto_data' IF we are in SDR stage
             else if (target === 'briefing_inicial') {
                 const sdrPhase = phases?.find(p => p.slug === SystemPhase.SDR)
-                const isSdr = sdrPhase && card.fase === sdrPhase.name
+                // FIX: Get fase from stages instead of card.fase (which doesn't exist in cards table)
+                const currentStage = stages?.find(s => s.id === card.pipeline_stage_id)
+                const isSdr = sdrPhase && currentStage?.fase === sdrPhase.name
 
                 if (isSdr) {
                     updates.produto_data = newData

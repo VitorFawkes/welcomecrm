@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+// --- Constants ---
+
+/** ID da integração ActiveCampaign (principal do sistema) */
+export const AC_INTEGRATION_ID = 'a2141b92-561f-4514-92b4-9412a068d236';
+
 // --- Shared Types ---
 
 export const IntegrationTypeSchema = z.enum(['input', 'output']);

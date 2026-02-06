@@ -38,11 +38,17 @@ const LOCATION_ICONS: Record<LocationType, React.ElementType> = {
 
 export function TransferEditor({ data, onChange, itemId }: TransferEditorProps) {
     const transferData = useMemo(() => {
-        const raw = data || createInitialTransferData()
-        // Ensure arrays are always defined
+        const defaults = createInitialTransferData()
+        // Merge with defaults to handle legacy/incomplete data
         return {
-            ...raw,
-            options: raw.options || [],
+            ...defaults,
+            ...data,
+            // Ensure arrays are always defined
+            options: data?.options || [],
+            // Ensure required type fields have valid defaults
+            origin_type: data?.origin_type || 'airport',
+            destination_type: data?.destination_type || 'hotel',
+            vehicle_type: data?.vehicle_type || 'sedan',
         }
     }, [data])
 

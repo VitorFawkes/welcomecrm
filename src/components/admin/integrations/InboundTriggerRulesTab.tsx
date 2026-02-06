@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/Input';
-import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, ArrowRight, User, Target, Pencil, RefreshCw, FileWarning, Clock, ChevronDown, ChevronUp, ShieldAlert, ShieldOff, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, ArrowRight, User, Target, Pencil, RefreshCw, FileWarning, ChevronDown, ChevronUp, ShieldAlert, ShieldOff, AlertCircle, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
+import { TriggerEventHistory } from './TriggerEventHistory';
 
 interface InboundTriggerRulesTabProps {
     integrationId: string;
@@ -54,17 +55,6 @@ interface CRMPipeline {
     produto: string;
 }
 
-interface IntegrationEvent {
-    id: string;
-    event_type: string | null;
-    entity_type: string | null;
-    status: string;
-    processing_log: string | null;
-    payload: Record<string, unknown> | null;
-    created_at: string;
-    processed_at: string | null;
-}
-
 interface TriggerFormData {
     name: string;
     pipelineIds: string[];
@@ -101,7 +91,7 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<TriggerFormData>(emptyFormData);
     const [showLogs, setShowLogs] = useState(false);
-    const [logFilter, setLogFilter] = useState<'all' | 'errors' | 'success'>('all');
+    const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
     // Fetch existing triggers
     const { data: triggers, isLoading: triggersLoading } = useQuery({
@@ -192,33 +182,31 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
         }
     });
 
-    // Fetch Integration Events (últimos 50)
-    const { data: integrationEvents, isLoading: logsLoading, refetch: refetchLogs } = useQuery({
-        queryKey: ['integration-events-logs', integrationId, showLogs],
+    // Fetch trigger event stats (counts per trigger per status)
+    const { data: triggerStats } = useQuery({
+        queryKey: ['trigger-event-stats', integrationId],
         queryFn: async () => {
-            if (!showLogs) return [];
-            const { data, error } = await supabase
-                .from('integration_events')
-                .select('id, event_type, entity_type, status, processing_log, payload, created_at, processed_at')
-                .eq('integration_id', integrationId)
-                .order('created_at', { ascending: false })
-                .limit(50);
-            if (error) throw error;
-            return data as IntegrationEvent[];
+            const { data, error } = await supabase.rpc('get_trigger_event_stats', {
+                p_integration_id: integrationId
+            });
+            if (error) {
+                console.warn('get_trigger_event_stats error:', error.message);
+                return new Map<string, { processed: number; failed: number; ignored: number; total: number }>();
+            }
+            const stats = new Map<string, { processed: number; failed: number; ignored: number; total: number }>();
+            for (const row of (data || [])) {
+                const key = row.trigger_id;
+                if (!stats.has(key)) stats.set(key, { processed: 0, failed: 0, ignored: 0, total: 0 });
+                const s = stats.get(key)!;
+                s.total += Number(row.cnt);
+                if (row.status === 'processed' || row.status === 'processed_shadow') s.processed += Number(row.cnt);
+                else if (row.status === 'failed') s.failed += Number(row.cnt);
+                else if (row.status === 'ignored' || row.status === 'blocked') s.ignored += Number(row.cnt);
+            }
+            return stats;
         },
-        enabled: showLogs,
-        staleTime: 30000, // Cache por 30 segundos
-        refetchOnWindowFocus: false // Não recarrega ao focar na janela
+        staleTime: 30000,
     });
-
-    // Filter logs based on selection
-    const filteredLogs = integrationEvents?.filter(event => {
-        if (logFilter === 'all') return true;
-        const isError = event.status === 'failed' || event.status === 'ignored';
-        if (logFilter === 'errors') return isError;
-        if (logFilter === 'success') return event.status === 'processed' || event.status === 'processed_shadow';
-        return true;
-    }) || [];
 
     // Filter AC stages by selected pipelines
     const filteredAcStages = acAllStages?.filter(s =>
@@ -985,8 +973,8 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                                                     )}
                                                 </div>
 
-                                                {/* Meta info */}
-                                                <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
+                                                {/* Meta info + Stats */}
+                                                <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2 flex-wrap">
                                                     <Badge
                                                         variant="outline"
                                                         className={`text-xs ${
@@ -1005,6 +993,38 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                                                             <><RefreshCw className="w-3 h-3 mr-1 inline" />Criação + Atualização</>
                                                         )}
                                                     </Badge>
+                                                    {triggerStats?.has(trigger.id) && (() => {
+                                                        const s = triggerStats.get(trigger.id)!;
+                                                        return (
+                                                            <>
+                                                                <span className="text-slate-300">|</span>
+                                                                <Badge className="bg-green-100 text-green-700 text-xs">
+                                                                    <CheckCircle className="w-3 h-3 mr-0.5" />{s.processed}
+                                                                </Badge>
+                                                                {s.failed > 0 && (
+                                                                    <Badge className="bg-red-100 text-red-700 text-xs">
+                                                                        {s.failed} erros
+                                                                    </Badge>
+                                                                )}
+                                                                {s.ignored > 0 && (
+                                                                    <Badge className="bg-amber-100 text-amber-700 text-xs">
+                                                                        {s.ignored} ignorados
+                                                                    </Badge>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 px-2 text-xs text-slate-500 hover:text-slate-700 gap-1"
+                                                        onClick={() => setExpandedHistoryId(
+                                                            expandedHistoryId === trigger.id ? null : trigger.id
+                                                        )}
+                                                    >
+                                                        <History className="w-3.5 h-3.5" />
+                                                        {expandedHistoryId === trigger.id ? 'Fechar' : 'Historico'}
+                                                    </Button>
                                                 </div>
                                             </div>
                                         </div>
@@ -1033,6 +1053,15 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                                             </Button>
                                         </div>
                                     </div>
+                                    {expandedHistoryId === trigger.id && (
+                                        <div className="mt-3">
+                                            <TriggerEventHistory
+                                                triggerId={trigger.id}
+                                                triggerName={trigger.name || 'Regra sem nome'}
+                                                integrationId={integrationId}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -1040,122 +1069,27 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
                 </Card>
             )}
 
-            {/* Logs de Sincronização */}
+            {/* Eventos sem regra (allowed by default / sync manual) */}
             <Card className="bg-white border-slate-200 shadow-sm">
                 <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowLogs(!showLogs)}>
-                            {showLogs ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <FileWarning className="w-5 h-5 text-slate-500" />
-                                Logs de Sincronização
-                            </CardTitle>
-                        </div>
-                        {showLogs && (
-                            <div className="flex items-center gap-2">
-                                <Select
-                                    value={logFilter}
-                                    onChange={(v) => setLogFilter(v as 'all' | 'errors' | 'success')}
-                                    options={[
-                                        { value: 'all', label: 'Todos' },
-                                        { value: 'errors', label: '❌ Apenas Erros' },
-                                        { value: 'success', label: '✅ Apenas Sucesso' }
-                                    ]}
-                                />
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => refetchLogs()}
-                                    className="gap-1"
-                                >
-                                    <RefreshCw className="w-4 h-4" />
-                                    Atualizar
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                    {!showLogs && (
-                        <CardDescription>
-                            Clique para ver os últimos 50 eventos processados
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowLogs(!showLogs)}>
+                        {showLogs ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <FileWarning className="w-5 h-5 text-slate-500" />
+                            Eventos sem Regra
+                        </CardTitle>
+                        <CardDescription className="ml-2">
+                            Eventos processados sem match com nenhuma regra (sync manual ou allow by default)
                         </CardDescription>
-                    )}
+                    </div>
                 </CardHeader>
                 {showLogs && (
                     <CardContent>
-                        {logsLoading ? (
-                            <div className="text-muted-foreground text-sm py-4 text-center">Carregando eventos...</div>
-                        ) : filteredLogs.length === 0 ? (
-                            <div className="text-muted-foreground text-sm py-4 text-center">
-                                Nenhum evento encontrado
-                            </div>
-                        ) : (
-                            <div className="space-y-2 max-h-96 overflow-y-auto">
-                                {filteredLogs.map(event => {
-                                    const isError = event.status === 'failed';
-                                    const isIgnored = event.status === 'ignored';
-                                    const isShadow = event.status === 'processed_shadow';
-
-                                    // Extrair título do payload
-                                    const payload = event.payload as Record<string, unknown> | null;
-                                    const dealTitle = (payload?.title as string) || (payload?.['deal[title]'] as string) || 'Deal sem título';
-                                    const contactEmail = (payload?.contact_email as string) || (payload?.['contact[email]'] as string) || null;
-
-                                    const eventTime = event.created_at ? new Date(event.created_at).toLocaleString('pt-BR') : '';
-
-                                    return (
-                                        <div
-                                            key={event.id}
-                                            className={`p-3 rounded-lg border text-sm ${
-                                                isError
-                                                    ? 'bg-red-50 border-red-200'
-                                                    : isIgnored
-                                                        ? 'bg-amber-50 border-amber-200'
-                                                        : isShadow
-                                                            ? 'bg-slate-50 border-slate-200'
-                                                            : 'bg-green-50 border-green-200'
-                                            }`}
-                                        >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        {isError ? (
-                                                            <Badge className="bg-red-100 text-red-700 text-xs">❌ Erro</Badge>
-                                                        ) : isIgnored ? (
-                                                            <Badge className="bg-amber-100 text-amber-700 text-xs">⚠️ Ignorado</Badge>
-                                                        ) : isShadow ? (
-                                                            <Badge className="bg-slate-100 text-slate-700 text-xs">👁️ Shadow</Badge>
-                                                        ) : (
-                                                            <Badge className="bg-green-100 text-green-700 text-xs">✅ OK</Badge>
-                                                        )}
-                                                        <Badge variant="outline" className="text-xs">{event.event_type || 'unknown'}</Badge>
-                                                        <Badge variant="outline" className="text-xs bg-slate-100">{event.entity_type || 'deal'}</Badge>
-                                                        <span className="font-medium truncate">{dealTitle}</span>
-                                                    </div>
-                                                    {contactEmail && (
-                                                        <p className="text-xs text-slate-600 mt-1">
-                                                            Contato: {contactEmail}
-                                                        </p>
-                                                    )}
-                                                    {event.processing_log && (
-                                                        <p className={`text-xs mt-1 font-mono p-1 rounded ${
-                                                            isError ? 'text-red-600 bg-red-100' :
-                                                            isIgnored ? 'text-amber-600 bg-amber-100' :
-                                                            'text-green-600 bg-green-100'
-                                                        }`}>
-                                                            {event.processing_log}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
-                                                    <Clock className="w-3 h-3" />
-                                                    {eventTime}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                        <TriggerEventHistory
+                            triggerId={null}
+                            triggerName="Sem Regra"
+                            integrationId={integrationId}
+                        />
                     </CardContent>
                 )}
             </Card>

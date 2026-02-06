@@ -3,18 +3,13 @@ import { useState } from 'react';
 import { IntegrationList } from './IntegrationList';
 import { IntegrationBuilder } from './IntegrationBuilder';
 import { IntegrationFieldExplorer } from './IntegrationFieldExplorer';
-import { IntegrationLogs } from './IntegrationLogs';
 import { IntegrationSettings } from './IntegrationSettings';
-import { IntegrationMapping } from './IntegrationMapping';
-import { SyncGovernancePanel } from './SyncGovernancePanel';
-import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
-import { InboundFieldMappingTab } from './InboundFieldMappingTab';
-import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
-import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { OutboundLogsTab } from './OutboundLogsTab';
-import { ACFieldManager } from './ACFieldManager';
-import { InboundTriggerRulesTab } from './InboundTriggerRulesTab';
-import { OutboundTriggerRulesTab } from './OutboundTriggerRulesTab';
+
+// Unified components
+import { IntegrationOverviewTab } from './IntegrationOverviewTab';
+import { UnifiedMappingTab } from './UnifiedMappingTab';
+import { UnifiedRulesTab } from './UnifiedRulesTab';
 
 import type { IntegrationType } from '@/lib/integrations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -22,19 +17,17 @@ import { Button } from '@/components/ui/Button';
 import {
     ArrowLeft,
     LayoutDashboard,
-    GitBranch,
-    FileText,
     Settings,
     Zap,
-    Sparkles,
-    ArrowUpRight
+    Send,
+    Map
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const AC_INTEGRATION_ID = 'a2141b92-561f-4514-92b4-9412a068d236';
 
 export function IntegrationsPage() {
-    const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer' | 'active_campaign' | 'api_keys' | 'api_docs'>('list');
+    const [view, setView] = useState<'list' | 'builder' | 'explorer' | 'active_campaign'>('list');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<IntegrationType>('input');
@@ -63,52 +56,44 @@ export function IntegrationsPage() {
                     </Button>
                     <div className="flex-1">
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            ActiveCampaign Integration
+                            Integração ActiveCampaign
                         </h1>
                         <p className="text-slate-500 text-sm">
                             Gerencie a sincronização bidirecional de deals em uma única central de controle.
                         </p>
                     </div>
-                    <IntegrationStatusDashboard />
                 </div>
 
-                {/* Main Tabs - Consolidated to 4 */}
-                <Tabs defaultValue="sync" className="space-y-6">
+                {/* Main Tabs - Simplified to 4 + Settings */}
+                <Tabs defaultValue="overview" className="space-y-6">
                     <TabsList className="bg-slate-100 p-1 rounded-lg">
                         <TabsTrigger
-                            value="sync"
+                            value="overview"
                             className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                         >
-                            <Zap className="w-4 h-4" />
-                            Sincronização
+                            <LayoutDashboard className="w-4 h-4" />
+                            Visão Geral
                         </TabsTrigger>
                         <TabsTrigger
                             value="mapping"
                             className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                         >
-                            <GitBranch className="w-4 h-4" />
-                            Mapeamento
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="fields"
-                            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
-                        >
-                            <FileText className="w-4 h-4" />
-                            Campos
+                            <Map className="w-4 h-4" />
+                            Mapeamentos
                         </TabsTrigger>
                         <TabsTrigger
                             value="rules"
                             className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                         >
-                            <Sparkles className="w-4 h-4" />
-                            Regras de Criação
+                            <Zap className="w-4 h-4" />
+                            Regras
                         </TabsTrigger>
                         <TabsTrigger
                             value="outbound"
                             className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                         >
-                            <ArrowUpRight className="w-4 h-4" />
-                            Saída (CRM → AC)
+                            <Send className="w-4 h-4" />
+                            Fila de Eventos
                         </TabsTrigger>
                         <TabsTrigger
                             value="settings"
@@ -119,93 +104,27 @@ export function IntegrationsPage() {
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* Tab 1: Sync (Governance) */}
-                    <TabsContent value="sync" className="space-y-6">
-                        <SyncGovernancePanel />
-
-                        {/* Recent Activity - Optional, can be removed or kept as separate view */}
-                        <Card className="border-slate-200 bg-white shadow-sm">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <LayoutDashboard className="w-4 h-4 text-slate-400" />
-                                    Eventos Recentes
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <IntegrationLogs mode="inbox" />
-                            </CardContent>
-                        </Card>
+                    {/* Tab 1: Overview (Dashboard + Sync + Recent Events) */}
+                    <TabsContent value="overview" className="space-y-6">
+                        <IntegrationOverviewTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 2: Mapping */}
+                    {/* Tab 2: Unified Mapping (Structure + Fields) */}
                     <TabsContent value="mapping">
-                        <IntegrationMapping integrationId={AC_INTEGRATION_ID} />
+                        <UnifiedMappingTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 3: Fields */}
-                    <TabsContent value="fields" className="space-y-6">
-                        <Tabs defaultValue="inbound" className="space-y-4">
-                            <TabsList className="bg-slate-50">
-                                <TabsTrigger value="inbound" className="text-sm">
-                                    Campos de Entrada (AC → Welcome)
-                                </TabsTrigger>
-                                <TabsTrigger value="outbound" className="text-sm">
-                                    Campos de Saída (Welcome → AC)
-                                </TabsTrigger>
-                                <TabsTrigger value="ac-fields" className="text-sm">
-                                    Catálogo AC
-                                </TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="inbound">
-                                <InboundFieldMappingTab integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-
-                            <TabsContent value="outbound">
-                                <OutboundFieldMappingTab integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-
-                            <TabsContent value="ac-fields">
-                                <ACFieldManager integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-                        </Tabs>
-                    </TabsContent>
-
-                    {/* Tab 4: Rules */}
+                    {/* Tab 3: Unified Rules (Inbound + Outbound in one place) */}
                     <TabsContent value="rules">
-                        <InboundTriggerRulesTab integrationId={AC_INTEGRATION_ID} />
+                        <UnifiedRulesTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 5: Outbound */}
-                    <TabsContent value="outbound" className="space-y-6">
-                        <Tabs defaultValue="rules" className="space-y-4">
-                            <TabsList className="bg-slate-50">
-                                <TabsTrigger value="rules" className="text-sm">
-                                    Regras de Saida
-                                </TabsTrigger>
-                                <TabsTrigger value="logs" className="text-sm">
-                                    Fila de Eventos
-                                </TabsTrigger>
-                                <TabsTrigger value="stages" className="text-sm">
-                                    Mapeamento de Etapas
-                                </TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="rules">
-                                <OutboundTriggerRulesTab integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-
-                            <TabsContent value="logs">
-                                <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-
-                            <TabsContent value="stages">
-                                <OutboundStageMappingTab integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-                        </Tabs>
+                    {/* Tab 4: Outbound Queue (Fila de Eventos) */}
+                    <TabsContent value="outbound">
+                        <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 6: Settings */}
+                    {/* Tab 5: Settings */}
                     <TabsContent value="settings">
                         <IntegrationSettings />
                     </TabsContent>

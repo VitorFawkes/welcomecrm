@@ -1,12 +1,19 @@
-import React from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Webhook, Activity, ArrowRight, Zap, Database, Trash2 } from 'lucide-react';
+import { Zap, Database } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+// Novos componentes e hooks
+import { useIntegrationProviders } from '@/hooks/useIntegrationProviders';
+import { ProviderCard } from './ProviderCard';
+import { CategoryFilterSimple } from './CategoryFilter';
+import { ActiveConnectionCard } from './ActiveConnectionCard';
+
+// Constante centralizada
+import { AC_INTEGRATION_ID } from '@/lib/integrations';
 
 interface Integration {
     id: string;
@@ -14,53 +21,46 @@ interface Integration {
     type: 'input' | 'output';
     provider: string;
     is_active: boolean;
+    updated_at: string | null;
 }
 
-interface ProviderDef {
-    id: string;
-    name: string;
-    description: string;
-    icon: React.ElementType;
-    type: 'input' | 'output';
-    category: 'Marketing' | 'Finance' | 'Developer' | 'Communication';
+interface IntegrationListProps {
+    onSelect: (id: string | null, type?: 'input' | 'output') => void;
+    onExploreFields: () => void;
 }
 
-const PROVIDERS: ProviderDef[] = [
-    {
-        id: 'webhook-in',
-        name: 'Receber Dados (Webhook)',
-        description: 'Crie uma URL única para receber dados de qualquer ferramenta externa (Typeform, WordPress, etc) e criar registros no CRM.',
-        icon: Webhook,
-        type: 'input',
-        category: 'Developer'
-    },
-    {
-        id: 'webhook-out',
-        name: 'Enviar Dados (Disparo)',
-        description: 'Envie dados do CRM para outras ferramentas quando eventos acontecerem (ex: Negócio Ganho -> Slack/Zapier).',
-        icon: Zap,
-        type: 'output',
-        category: 'Developer'
-    }
-];
-
-export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: string | null, type?: 'input' | 'output') => void, onExploreFields: () => void }) {
-    const [deleteConfirmation, setDeleteConfirmation] = React.useState<string | null>(null);
+export function IntegrationList({ onSelect, onExploreFields }: IntegrationListProps) {
+    const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
+    const [activeCategory, setActiveCategory] = useState<string>('all');
     const queryClient = useQueryClient();
 
-    const { data: integrations, isLoading } = useQuery({
+    // Busca providers do banco (com fallback para legados)
+    const { data: providers, isLoading: providersLoading } = useIntegrationProviders({
+        category: activeCategory,
+        activeOnly: true,
+        includeBeta: true, // Mostrar beta providers também
+    });
+
+    // Busca integrações ativas do usuário
+    const { data: integrations, isLoading: integrationsLoading } = useQuery({
         queryKey: ['integrations'],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('integrations' as any)
-                .select('*')
+                .from('integrations')
+                .select('id, name, type, provider, is_active, updated_at')
                 .not('name', 'ilike', '%(Rascunho)%')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            return data as unknown as Integration[];
+            return data as Integration[];
         },
     });
+
+    // Identifica quais providers já estão conectados
+    const connectedProviders = useMemo(() => {
+        if (!integrations) return new Set<string>();
+        return new Set(integrations.map(i => i.provider?.toLowerCase()));
+    }, [integrations]);
 
     const handleDelete = async () => {
         if (!deleteConfirmation) return;
@@ -82,17 +82,34 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
         }
     };
 
+    const handleProviderConnect = (providerSlug: string) => {
+        // Determinar o tipo baseado na direção do provider
+        const provider = providers?.find(p => p.slug === providerSlug);
+        const type = provider?.direction.includes('inbound') ? 'input' : 'output';
+        onSelect('new', type);
+    };
+
+    const isLoading = providersLoading || integrationsLoading;
+
     if (isLoading) {
         return (
-            <div className="grid grid-cols-3 gap-4">
-                {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-32 w-full bg-white/5" />
-                ))}
+            <div className="space-y-10">
+                <div className="flex justify-between items-end">
+                    <Skeleton className="h-12 w-64" />
+                    <Skeleton className="h-10 w-40" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-32 w-full" />
+                    ))}
+                </div>
             </div>
         );
     }
 
     const activeIntegrations = integrations || [];
+    // IDs protegidos que não podem ser deletados
+    const protectedIds = [AC_INTEGRATION_ID];
 
     return (
         <div className="space-y-10">
@@ -119,55 +136,13 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {activeIntegrations.map((integration) => (
-                            <Card
+                            <ActiveConnectionCard
                                 key={integration.id}
-                                className="bg-card border-border hover:border-primary/50 transition-all cursor-pointer group shadow-sm border-l-4 border-l-primary relative"
+                                integration={integration}
                                 onClick={() => onSelect(integration.id)}
-                            >
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-primary/10 rounded-lg">
-                                            {integration.type === 'input' ? (
-                                                <Webhook className="h-5 w-5 text-primary" />
-                                            ) : (
-                                                <Activity className="h-5 w-5 text-primary" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <CardTitle className="text-base font-medium text-foreground">
-                                                {integration.name}
-                                            </CardTitle>
-                                            <p className="text-xs text-muted-foreground capitalize">
-                                                {integration.provider}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant={integration.is_active ? 'default' : 'secondary'} className="text-[10px]">
-                                            {integration.is_active ? 'Ativo' : 'Inativo'}
-                                        </Badge>
-                                        {integration.id !== 'a2141b92-561f-4514-92b4-9412a068d236' && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setDeleteConfirmation(integration.id);
-                                                }}
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex justify-between items-center mt-2">
-                                        <span className="text-xs text-muted-foreground">Última sincronização: Hoje, 10:42</span>
-                                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 group-hover:text-primary transition-all" />
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                onDelete={() => setDeleteConfirmation(integration.id)}
+                                protectedIds={protectedIds}
+                            />
                         ))}
                     </div>
                 </div>
@@ -177,49 +152,35 @@ export function IntegrationList({ onSelect, onExploreFields }: { onSelect: (id: 
             <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-border pb-4">
                     <h3 className="text-xl font-semibold text-foreground">Catálogo de Apps</h3>
-                    <div className="flex gap-2">
-                        {['Todos', 'Marketing', 'Finance', 'Developer'].map((cat) => (
-                            <Button key={cat} variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted">
-                                {cat}
-                            </Button>
-                        ))}
-                    </div>
+                    <CategoryFilterSimple
+                        active={activeCategory}
+                        onChange={setActiveCategory}
+                    />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {PROVIDERS.map((provider) => (
-                        <Card
-                            key={provider.id}
-                            className="group hover:shadow-lg transition-all duration-300 border-border bg-card hover:bg-muted/50"
-                        >
-                            <CardHeader>
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="p-3 bg-muted rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
-                                        <provider.icon className="w-8 h-8 text-foreground" />
-                                    </div>
-                                    <Badge variant="outline" className="text-xs font-normal text-muted-foreground border-border">
-                                        {provider.category}
-                                    </Badge>
-                                </div>
-                                <CardTitle className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-                                    {provider.name}
-                                </CardTitle>
-                                <CardDescription className="line-clamp-2 h-10 text-muted-foreground">
-                                    {provider.description}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardFooter>
-                                <Button
-                                    className="w-full bg-muted text-foreground hover:bg-primary hover:text-primary-foreground transition-colors border border-border"
-                                    onClick={() => onSelect('new', provider.type)}
-                                >
-                                    Conectar
-                                </Button>
-                            </CardFooter>
-                        </Card>
-                    ))}
+                    {providers?.map((provider) => {
+                        const isConnected = connectedProviders.has(provider.slug);
+
+                        return (
+                            <ProviderCard
+                                key={provider.id}
+                                provider={provider}
+                                isConnected={isConnected}
+                                onConnect={() => handleProviderConnect(provider.slug)}
+                            />
+                        );
+                    })}
+
+                    {/* Mensagem se não houver providers */}
+                    {(!providers || providers.length === 0) && (
+                        <div className="col-span-full text-center py-12 text-muted-foreground">
+                            <p>Nenhum app disponível nesta categoria.</p>
+                        </div>
+                    )}
                 </div>
 
+                {/* Delete Confirmation Dialog */}
                 <Dialog open={!!deleteConfirmation} onOpenChange={(open) => !open && setDeleteConfirmation(null)}>
                     <DialogContent>
                         <DialogHeader>

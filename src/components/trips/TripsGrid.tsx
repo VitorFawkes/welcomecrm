@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { ArrowUpDown, Calendar, MapPin, User as UserIcon, Plane, Trash2, Download, CheckSquare } from 'lucide-react'
 import { useTrips } from '../../hooks/useTrips'
+import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import { useTripsFilters, type TripsFilterState } from '../../hooks/useTripsFilters'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table'
 import { Badge } from '../ui/Badge'
@@ -23,6 +24,7 @@ interface TripsGridProps {
 export default function TripsGrid({ onCardClick }: TripsGridProps) {
     const { filters, setFilters } = useTripsFilters()
     const { data: trips, isLoading, isError, refetch } = useTrips()
+    const receitaPerm = useReceitaPermission()
 
     // --- State ---
     const [selectedTrips, setSelectedTrips] = useState<string[]>([])
@@ -33,6 +35,7 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
         boarding_date: true,
         destinations: true,
         value: true,
+        receita: true,
         concierge: true
     })
     const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -92,17 +95,23 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
         if (!trips) return
 
         const selectedData = trips.filter(t => selectedTrips.includes(t.id!))
+        const headers = ['ID', 'Título', 'Cliente', 'Status', 'Data Embarque', 'Destinos', 'Valor']
+        if (receitaPerm.canView) headers.push('Receita')
         const csvContent = [
-            ['ID', 'Título', 'Cliente', 'Status', 'Data Embarque', 'Destinos', 'Valor'],
-            ...selectedData.map(t => [
-                t.id,
-                t.titulo,
-                t.pessoa_nome,
-                t.estado_operacional,
-                t.data_viagem_inicio,
-                Array.isArray(t.destinos) ? t.destinos.join(';') : '',
-                t.valor_estimado
-            ])
+            headers,
+            ...selectedData.map(t => {
+                const row = [
+                    t.id,
+                    t.titulo,
+                    t.pessoa_nome,
+                    t.estado_operacional,
+                    t.data_viagem_inicio,
+                    Array.isArray(t.destinos) ? t.destinos.join(';') : '',
+                    t.valor_display || t.valor_estimado
+                ]
+                if (receitaPerm.canView) row.push(t.receita)
+                return row
+            })
         ].map(e => e.join(',')).join('\n')
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -185,6 +194,7 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
         { id: 'boarding_date', label: 'Data Embarque', isVisible: visibleColumns.boarding_date },
         { id: 'destinations', label: 'Destinos', isVisible: visibleColumns.destinations },
         { id: 'value', label: 'Valor Total', isVisible: visibleColumns.value },
+        ...(receitaPerm.canView ? [{ id: 'receita', label: 'Receita', isVisible: visibleColumns.receita }] : []),
         { id: 'concierge', label: 'Concierge', isVisible: visibleColumns.concierge },
     ]
 
@@ -287,13 +297,17 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
                             {visibleColumns.value && (
                                 <TableHead
                                     className="w-[150px] cursor-pointer group hover:bg-gray-100 transition-colors text-right"
-                                    onClick={() => handleSort('valor_estimado')}
+                                    onClick={() => handleSort('valor_display')}
                                 >
                                     <div className="flex items-center justify-end">
                                         Valor Total
-                                        <SortIcon field="valor_estimado" />
+                                        <SortIcon field="valor_display" />
                                     </div>
                                 </TableHead>
+                            )}
+
+                            {receitaPerm.canView && visibleColumns.receita && (
+                                <TableHead className="w-[120px] text-right">Receita</TableHead>
                             )}
 
                             {visibleColumns.concierge && (
@@ -369,8 +383,17 @@ export default function TripsGrid({ onCardClick }: TripsGridProps) {
 
                                 {visibleColumns.value && (
                                     <TableCell className="text-right font-mono text-gray-700">
-                                        {(trip.valor_final || trip.valor_estimado)
-                                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trip.valor_final || trip.valor_estimado || 0)
+                                        {(trip.valor_display || trip.valor_estimado)
+                                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trip.valor_display || trip.valor_estimado || 0)
+                                            : '-'
+                                        }
+                                    </TableCell>
+                                )}
+
+                                {receitaPerm.canView && visibleColumns.receita && (
+                                    <TableCell className="text-right font-mono text-amber-700">
+                                        {trip.receita
+                                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trip.receita)
                                             : '-'
                                         }
                                     </TableCell>

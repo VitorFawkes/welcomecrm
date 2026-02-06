@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import { cn } from '../../lib/utils'
 import KanbanCard from './KanbanCard'
+import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import type { Database } from '../../database.types'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -17,8 +18,10 @@ export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnP
         id: stage.id,
         data: stage
     })
+    const receitaPerm = useReceitaPermission()
 
-    const totalValue = cards.reduce((acc, card) => acc + (card.valor_estimado || 0), 0)
+    const totalValue = cards.reduce((acc, card) => acc + (card.valor_display || card.valor_estimado || 0), 0)
+    const totalReceita = cards.reduce((acc, card) => acc + (card.receita || 0), 0)
 
     // Robust color handling
     const isHex = phaseColor.startsWith('#') || phaseColor.startsWith('rgb')
@@ -46,9 +49,16 @@ export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnP
                 </div>
                 <div className="flex items-center justify-between">
                     <div className="h-1 w-12 rounded-full bg-primary/20"></div>
-                    <p className="text-xs font-bold text-gray-400">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}
-                    </p>
+                    <div className="text-right">
+                        <p className="text-xs font-bold text-gray-400">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}
+                        </p>
+                        {receitaPerm.canView && totalReceita > 0 && (
+                            <p className="text-[10px] font-semibold text-amber-600">
+                                Rec: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(totalReceita)}
+                            </p>
+                        )}
+                    </div>
                 </div>
             </div>
 

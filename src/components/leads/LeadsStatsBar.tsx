@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { TrendingUp, Users, DollarSign, AlertCircle, Clock } from 'lucide-react'
+import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import type { LeadCard } from '../../hooks/useLeadsQuery'
 
 interface LeadsStatsBarProps {
@@ -14,9 +15,11 @@ interface StatCard {
 }
 
 export default function LeadsStatsBar({ leads }: LeadsStatsBarProps) {
+    const receitaPerm = useReceitaPermission()
     const stats = useMemo(() => {
         // Calculate stats from current page data
-        const valorTotal = leads.reduce((sum, lead) => sum + (lead.valor_estimado || 0), 0)
+        const valorTotal = leads.reduce((sum, lead) => sum + (lead.valor_display || lead.valor_estimado || 0), 0)
+        const receitaTotal = leads.reduce((sum, lead) => sum + (lead.receita || 0), 0)
 
         const statusCounts = leads.reduce((acc, lead) => {
             const status = lead.status_comercial || 'aberto'
@@ -38,6 +41,7 @@ export default function LeadsStatsBar({ leads }: LeadsStatsBarProps) {
 
         return {
             valorTotal,
+            receitaTotal,
             abertos: statusCounts['aberto'] || 0,
             ganhos: statusCounts['ganho'] || 0,
             perdidos: statusCounts['perdido'] || 0,
@@ -58,6 +62,17 @@ export default function LeadsStatsBar({ leads }: LeadsStatsBarProps) {
             icon: <DollarSign className="h-4 w-4" />,
             color: 'text-emerald-600 bg-emerald-50'
         },
+        ...(receitaPerm.canView && stats.receitaTotal > 0 ? [{
+            label: 'Receita',
+            value: new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                notation: 'compact' as const,
+                maximumFractionDigits: 1
+            }).format(stats.receitaTotal),
+            icon: <TrendingUp className="h-4 w-4" />,
+            color: 'text-amber-600 bg-amber-50'
+        }] : []),
         {
             label: 'Abertos',
             value: stats.abertos,

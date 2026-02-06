@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import type { Database } from '../../database.types'
-import { DollarSign, Layers } from 'lucide-react'
+import { DollarSign, Layers, TrendingUp } from 'lucide-react'
 
 type Product = Database['public']['Enums']['app_product']
 
@@ -27,10 +28,12 @@ export default function StatsCards({ productFilter = 'ALL' }: StatsCardsProps) {
         }
     })
 
+    const receitaPerm = useReceitaPermission()
     const stats = (data as any[])?.reduce((acc, curr) => ({
         totalCards: acc.totalCards + (curr.total_cards || 0),
-        totalValue: acc.totalValue + (curr.total_valor_estimado || 0)
-    }), { totalCards: 0, totalValue: 0 }) || { totalCards: 0, totalValue: 0 }
+        totalValue: acc.totalValue + (curr.valor_total || 0),
+        totalReceita: acc.totalReceita + (curr.receita_total || 0)
+    }), { totalCards: 0, totalValue: 0, totalReceita: 0 }) || { totalCards: 0, totalValue: 0, totalReceita: 0 }
 
     if (isLoading) {
         return (
@@ -69,6 +72,22 @@ export default function StatsCards({ productFilter = 'ALL' }: StatsCardsProps) {
                     </div>
                 </div>
             </div>
+
+            {receitaPerm.canView && stats.totalReceita > 0 && (
+                <div className="rounded-lg bg-white p-6 shadow-sm">
+                    <div className="flex items-center">
+                        <div className="rounded-md bg-amber-50 p-3">
+                            <TrendingUp className="h-6 w-6 text-amber-600" />
+                        </div>
+                        <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-500">Receita Total</p>
+                            <p className="text-2xl font-semibold text-amber-700">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalReceita)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

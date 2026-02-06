@@ -3,6 +3,7 @@ import { cn } from '../../lib/utils'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useCardPeople } from '../../hooks/useCardPeople'
+import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import type { Database } from '../../database.types'
 import TaxaPlanejamentoCard from './TaxaPlanejamentoCard'
 import CardTravelers from './CardTravelers'
@@ -14,6 +15,7 @@ interface CardSidebarProps {
 }
 
 export default function CardSidebar({ card }: CardSidebarProps) {
+    const receitaPerm = useReceitaPermission()
     const getDaysInStage = () => {
         if (!card.updated_at) return 0
         const diff = new Date().getTime() - new Date(card.updated_at).getTime()
@@ -76,9 +78,24 @@ export default function CardSidebar({ card }: CardSidebarProps) {
                 <div className="flex items-center gap-2 mt-3">
                     <DollarSign className="h-5 w-5 text-green-600" />
                     <span className="text-2xl font-bold text-gray-900">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_estimado || 0)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.valor_display || card.valor_estimado || 0)}
                     </span>
                 </div>
+                {receitaPerm.canView && card.receita != null && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed">
+                        <span className="text-xs text-gray-500">Receita</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold text-amber-700">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.receita)}
+                            </span>
+                            {card.receita_source === 'calculated' && (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                    Auto
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
                 {card.cliente_recorrente && clientHistory && clientHistory.count > 0 && (
                     <div className="mt-3 pt-3 border-t">
                         <div className="flex items-center gap-2 text-xs text-indigo-600">

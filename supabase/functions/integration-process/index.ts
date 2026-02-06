@@ -18,10 +18,36 @@ Deno.serve(async (req) => {
     let isAuthorized = false;
     let authMethod = '';
 
-    // Method 1: Service Role Key (for webhooks, cron jobs, internal calls)
-    if (authHeader === `Bearer ${serviceRoleKey}`) {
+    // Method 0: Internal processing bypass (for webhook-ingest fire-and-forget)
+    const internalSecret = req.headers.get('x-internal-secret');
+    const expectedSecret = Deno.env.get('CRON_SECRET');
+    if (internalSecret && expectedSecret && internalSecret === expectedSecret) {
         isAuthorized = true;
-        authMethod = 'service_role';
+        authMethod = 'internal';
+    }
+
+    // Method 1: Service Role Key - decode JWT and check role claim
+    const tokenFromHeader = authHeader?.replace('Bearer ', '');
+    if (!isAuthorized && tokenFromHeader) {
+        try {
+            // Decode JWT payload (base64)
+            const payloadBase64 = tokenFromHeader.split('.')[1];
+            if (payloadBase64) {
+                const payload = JSON.parse(atob(payloadBase64));
+                if (payload.role === 'service_role') {
+                    isAuthorized = true;
+                    authMethod = 'service_role_jwt';
+                }
+            }
+        } catch (e) {
+            console.error('JWT decode error:', e);
+        }
+    }
+
+    // Method 1b: Also accept exact match (backward compat)
+    if (!isAuthorized && authHeader === `Bearer ${serviceRoleKey}`) {
+        isAuthorized = true;
+        authMethod = 'service_role_exact';
     }
 
     // Method 2: Authenticated user with admin role (for frontend calls)
@@ -67,14 +93,18 @@ Deno.serve(async (req) => {
         )
 
         // Helper to update event status
-        const updateEventStatus = async (eventId: string, status: string, log: string) => {
+        const updateEventStatus = async (eventId: string, status: string, log: string, triggerId?: string | null) => {
+            const update: Record<string, unknown> = {
+                status,
+                processing_log: log,
+                processed_at: new Date().toISOString()
+            };
+            if (triggerId !== undefined) {
+                update.matched_trigger_id = triggerId;
+            }
             const { error } = await supabase
                 .from('integration_events')
-                .update({
-                    status,
-                    processing_log: log,
-                    processed_at: new Date().toISOString()
-                })
+                .update(update)
                 .eq('id', eventId);
             return error;
         }
@@ -104,14 +134,14 @@ Deno.serve(async (req) => {
         let query = supabase
             .from('integration_events')
             .select('*')
-            .order('created_at', { ascending: true })
-            .limit(50);
+            .order('created_at', { ascending: true });
 
-        // If specific event IDs provided, fetch those (any status); otherwise fetch pending
+        // If specific event IDs provided, fetch those (any status) without limit;
+        // otherwise fetch pending with limit of 50
         if (event_ids && Array.isArray(event_ids) && event_ids.length > 0) {
             query = query.in('id', event_ids);
         } else {
-            query = query.eq('status', 'pending');
+            query = query.eq('status', 'pending').limit(50);
         }
 
         if (integration_id) {
@@ -226,22 +256,28 @@ Deno.serve(async (req) => {
             }
 
             // Find matching trigger using array matching
-            // NULL or empty array = "qualquer" (match any)
+            // NULL, empty array, or array with only empty strings = "qualquer" (match any)
+            const filterValid = (arr: string[] | null | undefined) =>
+                (arr || []).filter(id => id && id.trim() !== '');
+
             const matchingTrigger = triggers.find(t => {
                 // Check pipeline match: NULL/empty = any, otherwise must be in array
-                const pipelineMatch = !t.external_pipeline_ids || t.external_pipeline_ids.length === 0
+                const validPipelines = filterValid(t.external_pipeline_ids);
+                const pipelineMatch = validPipelines.length === 0
                     ? true  // "Qualquer Pipeline"
-                    : t.external_pipeline_ids.includes(pipelineId);
+                    : validPipelines.includes(pipelineId);
 
                 // Check stage match: NULL/empty = any, otherwise must be in array
-                const stageMatch = !t.external_stage_ids || t.external_stage_ids.length === 0
+                const validStages = filterValid(t.external_stage_ids);
+                const stageMatch = validStages.length === 0
                     ? true  // "Qualquer Etapa"
-                    : t.external_stage_ids.includes(stageId);
+                    : validStages.includes(stageId);
 
                 // Check owner match: NULL/empty = any, otherwise must be in array
-                const ownerMatch = !t.external_owner_ids || t.external_owner_ids.length === 0
+                const validOwners = filterValid(t.external_owner_ids);
+                const ownerMatch = validOwners.length === 0
                     ? true  // "Qualquer Pessoa"
-                    : ownerId && t.external_owner_ids.includes(ownerId);
+                    : ownerId && validOwners.includes(ownerId);
 
                 // Check entity type
                 const entityMatch = t.entity_types.includes(entityType === 'deal' ? 'deal' : 'contact');
@@ -250,9 +286,11 @@ Deno.serve(async (req) => {
             });
 
             if (!matchingTrigger) {
+                // Non-blocking: allow events even when no specific trigger matches
+                // This prevents silent drops - events flow through and can be monitored
                 return {
-                    allowed: false,
-                    reason: `No trigger for Pipeline ${pipelineId} + Stage ${stageId}${ownerId ? ` + Owner ${ownerId}` : ''}`,
+                    allowed: true,
+                    reason: `No specific trigger matched - allowing by default (Pipeline ${pipelineId}, Stage ${stageId}${ownerId ? `, Owner ${ownerId}` : ''})`,
                     trigger: null
                 };
             }
@@ -290,6 +328,7 @@ Deno.serve(async (req) => {
         for (const event of events) {
             stats.eligible++;
             let log = '';
+            let matchedTrigger: any = null;
 
             try {
                 const payload = event.payload || {};
@@ -547,7 +586,6 @@ Deno.serve(async (req) => {
 
                 // Get AC owner ID for trigger matching
                 const acOwnerId = payload.owner || payload.owner_id || payload['deal[owner]'];
-                let matchedTrigger: any = null;
 
                 if (!isManualSync) {
                     const triggerCheck = checkInboundTrigger(
@@ -561,7 +599,7 @@ Deno.serve(async (req) => {
 
                     if (!triggerCheck.allowed) {
                         stats.ignored_by_trigger++;
-                        await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`);
+                        await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`, triggerCheck.trigger?.id || null);
                         results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
                         continue;
                     }
@@ -854,8 +892,8 @@ Deno.serve(async (req) => {
 
                             // Route based on storage_location from database configuration
                             if (storageLocation === 'column' && dbColumnName) {
-                                // Direct column in cards table
-                                topLevelUpdates[dbColumnName] = value;
+                                // Direct column in cards table - convert empty strings to null for DB compatibility
+                                topLevelUpdates[dbColumnName] = value === '' ? null : value;
                             } else if (storageLocation === 'produto_data') {
                                 // Store in produto_data JSON
                                 if (!cardPayload_produtoData) cardPayload_produtoData = {};
@@ -980,7 +1018,7 @@ Deno.serve(async (req) => {
 
                                         stats.blocked++;
                                         await updateEventStatus(event.id, 'blocked',
-                                            `Quality Gate rejected: ${missingReqs.length} requirements not met`);
+                                            `Quality Gate rejected: ${missingReqs.length} requirements not met`, matchedTrigger?.id || null);
                                         results.push({ id: event.id, status: 'blocked', missing: missingReqs });
                                         continue; // Skip to next event
                                     }
@@ -1071,20 +1109,20 @@ Deno.serve(async (req) => {
                         log = `Created Card (Pipeline: ${topology.pipelineName})`;
                     }
 
-                    await updateEventStatus(event.id, 'processed', log);
+                    await updateEventStatus(event.id, 'processed', log, matchedTrigger?.id || null);
                     stats.updated++;
                     results.push({ id: event.id, status: 'processed', log });
 
                 } else {
                     log = `[SHADOW] Would ${targetStageId ? 'Upsert Card' : 'Process Event'} - Pipeline: ${topology?.pipelineName || 'N/A'}`;
-                    await updateEventStatus(event.id, 'processed_shadow', log);
+                    await updateEventStatus(event.id, 'processed_shadow', log, matchedTrigger?.id || null);
                     stats.processed_shadow++;
                     results.push({ id: event.id, status: 'processed_shadow', log });
                 }
 
             } catch (err: any) {
                 console.error(`Event ${event.id} failed:`, err);
-                await updateEventStatus(event.id, 'failed', err.message);
+                await updateEventStatus(event.id, 'failed', err.message, matchedTrigger?.id || null);
                 stats.errors++;
                 results.push({ id: event.id, status: 'failed', error: err.message });
             }

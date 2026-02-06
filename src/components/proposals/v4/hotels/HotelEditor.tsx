@@ -322,6 +322,7 @@ export function HotelEditor({ data, onChange, itemId }: HotelEditorProps) {
                 </div>
             </div>
 
+
             {/* Descricao */}
             <div>
                 <label className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">

@@ -28,6 +28,7 @@ import { AlertTriangle } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { useHorizontalScroll } from '../../hooks/useHorizontalScroll'
+import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import { ScrollArrows } from '../ui/ScrollArrows'
 import { usePipelineCards } from '../../hooks/usePipelineCards'
 
@@ -51,6 +52,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
+    const receitaPerm = useReceitaPermission()
 
     // Elite horizontal scroll with Shift+Wheel, Drag-to-Pan, and arrow indicators
     // Must be called before any conditional returns to respect React hooks rules
@@ -441,7 +443,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const displayPhases = [...phases]
 
     // Calculate Totals for Sticky Footer
-    const totalPipelineValue = cards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
+    const totalPipelineValue = cards.reduce((acc, c) => acc + (c.valor_display || c.valor_estimado || 0), 0)
+    const totalPipelineReceita = cards.reduce((acc, c) => acc + (c.receita || 0), 0)
     const totalCards = cards.length
 
     // DEBUG: Log para diagnóstico do problema de colunas vazias
@@ -618,6 +621,18 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                             </span>
                         </div>
                     </div>
+
+                    {receitaPerm.canView && totalPipelineReceita > 0 && (
+                        <>
+                            <div className="h-10 w-px bg-gray-200" />
+                            <div className="flex flex-col">
+                                <span className="text-xs uppercase tracking-widest text-amber-500 font-semibold mb-1">Receita Total</span>
+                                <span className="text-lg font-bold text-amber-700">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPipelineReceita)}
+                                </span>
+                            </div>
+                        </>
+                    )}
 
                     {/* Vertical Divider */}
                     <div className="h-10 w-px bg-gray-200" />
