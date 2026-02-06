@@ -25,6 +25,7 @@ interface Mapping {
 const DEAL_FIELDS = [
     { key: 'titulo', label: 'Título da Venda', required: true },
     { key: 'valor', label: 'Valor (Estimado/Final)', required: false },
+    { key: 'receita', label: 'Receita (Margem)', required: false },
     { key: 'categoria', label: 'Categoria (Ex: Aéreo, Hotel)', required: false },
     { key: 'email_contato', label: 'Email do Contato (Prioridade 1)', required: false },
     { key: 'cpf', label: 'CPF (Prioridade 2)', required: false },
@@ -92,6 +93,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
             {
                 'Título da Venda': 'Viagem Paris 2024',
                 'Valor': 15000,
+                'Receita': 2500,
                 'Categoria': 'Pacote Completo',
                 'Email do Contato': 'cliente@email.com',
                 'CPF': '123.456.789-00',
@@ -259,6 +261,8 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
                         produto: effectiveProduct,
                         valor_estimado: Number(row['valor']) || 0,
                         valor_final: Number(row['valor']) || 0,
+                        receita: row['receita'] ? Number(row['receita']) : null,
+                        receita_source: row['receita'] ? 'manual' : null,
                         data_viagem_inicio: excelDateToISO(row['data_viagem_inicio']),
                         origem: 'manual', // Must be one of allowed values (manual, api, etc)
                         status_comercial: 'ganho',

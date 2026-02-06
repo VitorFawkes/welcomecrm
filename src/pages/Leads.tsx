@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Database } from 'lucide-react'
+import { Database, UploadCloud } from 'lucide-react'
 import { useLeadsFilters } from '../hooks/useLeadsFilters'
 import { useLeadsQuery } from '../hooks/useLeadsQuery'
 import { useLeadsColumns } from '../hooks/useLeadsColumns'
@@ -10,12 +10,14 @@ import LeadsExport from '../components/leads/LeadsExport'
 import LeadsPagination from '../components/leads/LeadsPagination'
 import LeadsStatsBar from '../components/leads/LeadsStatsBar'
 import { ColumnManager } from '../components/ui/data-grid/ColumnManager'
+import DealImportModal from '../components/kanban/DealImportModal'
 
 export default function Leads() {
     const { filters, setPage, setPageSize } = useLeadsFilters()
     const { data: queryResult, isLoading } = useLeadsQuery({ filters })
     const { columns, setColumns } = useLeadsColumns()
     const [selectedIds, setSelectedIds] = useState<string[]>([])
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
     const leads = queryResult?.data || []
     const total = queryResult?.total || 0
@@ -63,6 +65,13 @@ export default function Leads() {
                         onChange={setColumns}
                     />
                     <LeadsExport leads={leads} selectedIds={selectedIds.length > 0 ? selectedIds : undefined} />
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center px-4 py-2 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 border border-gray-200 rounded-lg shadow-sm transition-all"
+                    >
+                        <UploadCloud className="h-4 w-4 mr-1.5" />
+                        Importar
+                    </button>
                 </div>
             </div>
 
@@ -106,6 +115,14 @@ export default function Leads() {
                     onPageSizeChange={setPageSize}
                 />
             )}
+            <DealImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                currentProduct={'ALL'}
+                onSuccess={() => {
+                    window.location.reload()
+                }}
+            />
         </div>
     )
 }
