@@ -334,43 +334,52 @@ Deno.serve(async (req) => {
         }
 
         // AUTO-PROCESS: Trigger integration-process to handle the created events
-        // This makes the sync actually update the CRM, not just create pending events
+        // Process in chunks to avoid timeout and ensure all events are handled
         let processedCount = 0;
         let processError = null;
+        const PROCESS_CHUNK_SIZE = 50;
 
         if (totalInserted > 0) {
-            try {
-                const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-                const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+            const cronSecret = Deno.env.get('CRON_SECRET') ?? '';
+            const totalChunks = Math.ceil(allInsertedIds.length / PROCESS_CHUNK_SIZE);
+            console.log(`Processing ${allInsertedIds.length} events in ${totalChunks} chunks`);
 
-                // Use service_role_key for both headers - it has admin privileges
-                // and satisfies JWT verification requirements
-                const processResponse = await fetch(`${supabaseUrl}/functions/v1/integration-process`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${serviceKey}`,
-                        'apikey': serviceKey
-                    },
-                    body: JSON.stringify({
-                        integration_id: integration.id,
-                        event_ids: allInsertedIds // Pass specific IDs to bypass queue backlog
-                    })
-                });
+            for (let i = 0; i < allInsertedIds.length; i += PROCESS_CHUNK_SIZE) {
+                const chunk = allInsertedIds.slice(i, i + PROCESS_CHUNK_SIZE);
+                const chunkNum = Math.floor(i / PROCESS_CHUNK_SIZE) + 1;
 
-                if (processResponse.ok) {
-                    const processResult = await processResponse.json();
-                    processedCount = processResult.stats?.updated || 0;
-                    console.log(`Auto-process completed: ${processedCount} events processed`);
-                } else {
-                    const errorText = await processResponse.text();
-                    processError = `Process failed: ${processResponse.status} - ${errorText}`;
-                    console.error(processError);
+                try {
+                    const { data: processResult, error: invokeError } = await supabase.functions.invoke('integration-process', {
+                        body: {
+                            integration_id: integration.id,
+                            event_ids: chunk
+                        },
+                        headers: {
+                            'x-internal-secret': cronSecret
+                        }
+                    });
+
+                    if (invokeError) {
+                        // Capture full error details including response body
+                        let errorDetail = invokeError.message;
+                        try {
+                            if (processResult) errorDetail += ` | data: ${JSON.stringify(processResult)}`;
+                        } catch (_) {}
+                        console.error(`Chunk ${chunkNum}/${totalChunks} failed:`, errorDetail);
+                        if (!processError) processError = `Chunk ${chunkNum}: ${errorDetail}`;
+                    } else {
+                        const chunkProcessed = processResult?.stats?.updated || 0;
+                        processedCount += chunkProcessed;
+                        console.log(`Chunk ${chunkNum}/${totalChunks}: ${chunkProcessed} processed`);
+                    }
+                } catch (procErr: unknown) {
+                    const msg = procErr instanceof Error ? procErr.message : String(procErr);
+                    console.error(`Chunk ${chunkNum}/${totalChunks} error:`, msg);
+                    if (!processError) processError = msg;
                 }
-            } catch (procErr: unknown) {
-                processError = procErr instanceof Error ? procErr.message : String(procErr);
-                console.error('Auto-process error:', processError);
             }
+
+            console.log(`Auto-process completed: ${processedCount}/${allInsertedIds.length} events processed`);
         }
 
         return new Response(JSON.stringify({

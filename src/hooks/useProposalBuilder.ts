@@ -297,10 +297,12 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             image_url: null,
             rich_content: {},
             base_price: 0,
+            supplier_cost: 0,
             ordem: 0,
             is_optional: false,
             is_default_selected: true,
             created_at: new Date().toISOString(),
+            supplier: null,
             options: [],
         }
 
@@ -382,10 +384,12 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
             image_url: imageUrl,
             rich_content: content as any,
             base_price: libraryItem.base_price || 0,
+            supplier_cost: 0,
             ordem: 0,
             is_optional: false,
             is_default_selected: true,
             created_at: new Date().toISOString(),
+            supplier: null,
             options: [],
         }
 
@@ -607,6 +611,26 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
 
                 // Insert items
                 for (const item of section.items) {
+                    // Calculate base_price for flight items from rich_content.flights
+                    let calculatedBasePrice = item.base_price
+                    if (item.item_type === 'flight') {
+                        const richContent = item.rich_content as Record<string, unknown> | null
+                        const flightsData = richContent?.flights as {
+                            legs?: Array<{
+                                options?: Array<{ price?: number; is_recommended?: boolean }>
+                            }>
+                        } | undefined
+
+                        if (flightsData?.legs) {
+                            calculatedBasePrice = flightsData.legs.reduce((sum, leg) => {
+                                if (!leg.options || leg.options.length === 0) return sum
+                                // Get recommended option or first one
+                                const recommended = leg.options.find(o => o.is_recommended) || leg.options[0]
+                                return sum + (recommended?.price || 0)
+                            }, 0)
+                        }
+                    }
+
                     const { data: newItem, error: itemError } = await supabase
                         .from('proposal_items')
                         .insert({
@@ -615,7 +639,8 @@ export const useProposalBuilder = create<ProposalBuilderState>((set, get) => ({
                             title: item.title,
                             description: item.description,
                             rich_content: item.rich_content,
-                            base_price: item.base_price,
+                            base_price: calculatedBasePrice,
+                            supplier_cost: item.supplier_cost ?? 0,
                             ordem: item.ordem,
                             is_optional: item.is_optional,
                             is_default_selected: item.is_default_selected,

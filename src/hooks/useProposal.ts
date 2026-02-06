@@ -78,6 +78,16 @@ export function useProposal(proposalId: string) {
 
             if (sectionsError) throw sectionsError
 
+            // Fetch flights (only selected ones)
+            const { data: flights, error: flightsError } = await supabase
+                .from('proposal_flights')
+                .select('*')
+                .eq('proposal_id', proposalId)
+                .order('trip_leg')
+                .order('segment_order')
+
+            if (flightsError) throw flightsError
+
             // Sort items by ordem within each section
             const sortedSections = sections.map(section => ({
                 ...section,
@@ -91,7 +101,8 @@ export function useProposal(proposalId: string) {
                 ...proposal,
                 active_version: {
                     ...proposal.active_version,
-                    sections: sortedSections
+                    sections: sortedSections,
+                    flights: flights || []
                 }
             } as ProposalFull
         },
@@ -410,6 +421,7 @@ export function useCloneProposal() {
                             description: item.description,
                             details: item.details || item.rich_content,
                             base_price: item.base_price,
+                            supplier_cost: item.supplier_cost ?? 0,
                             ordem: item.ordem,
                             is_optional: item.is_optional,
                             quantity: item.quantity,

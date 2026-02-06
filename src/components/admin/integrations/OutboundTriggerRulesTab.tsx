@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/Input';
-import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, User, Pencil, Ban, CheckCheck } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, User, Pencil, Ban, CheckCheck, History, ChevronDown, ChevronUp, FileWarning, XCircle, Eye, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
+import { OutboundTriggerEventHistory } from './OutboundTriggerEventHistory';
 
 interface OutboundTriggerRulesTabProps {
     integrationId: string;
@@ -20,7 +21,7 @@ interface OutboundTrigger {
     integration_id: string;
     name: string;
     description: string | null;
-    // Condições de origem (CRM)
+    // Condicoes de origem (CRM)
     source_pipeline_ids: string[] | null;
     source_stage_ids: string[] | null;
     source_owner_ids: string[] | null;
@@ -100,6 +101,8 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<TriggerFormData>(emptyFormData);
+    const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+    const [showNoRuleLogs, setShowNoRuleLogs] = useState(false);
 
     // Fetch existing triggers
     const { data: triggers, isLoading: triggersLoading } = useQuery({
@@ -114,6 +117,34 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
             if (error) throw error;
             return data as OutboundTrigger[];
         }
+    });
+
+    // Fetch outbound trigger event stats (counts per trigger per status)
+    const { data: triggerStats } = useQuery({
+        queryKey: ['outbound-trigger-event-stats', integrationId],
+        queryFn: async () => {
+            const { data, error } = await supabase.rpc('get_outbound_trigger_event_stats', {
+                p_integration_id: integrationId
+            });
+            if (error) {
+                console.warn('get_outbound_trigger_event_stats error:', error.message);
+                return new Map<string, { sent: number; failed: number; blocked: number; pending: number; shadow: number; total: number }>();
+            }
+            const stats = new Map<string, { sent: number; failed: number; blocked: number; pending: number; shadow: number; total: number }>();
+            for (const row of (data || [])) {
+                const key = row.trigger_id || 'null';
+                if (!stats.has(key)) stats.set(key, { sent: 0, failed: 0, blocked: 0, pending: 0, shadow: 0, total: 0 });
+                const s = stats.get(key)!;
+                s.total += Number(row.cnt);
+                if (row.status === 'sent') s.sent += Number(row.cnt);
+                else if (row.status === 'failed') s.failed += Number(row.cnt);
+                else if (row.status === 'blocked') s.blocked += Number(row.cnt);
+                else if (row.status === 'pending') s.pending += Number(row.cnt);
+                else if (row.status === 'shadow') s.shadow += Number(row.cnt);
+            }
+            return stats;
+        },
+        staleTime: 30000,
     });
 
     // Fetch CRM Pipelines
@@ -744,133 +775,220 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {triggers.map(trigger => (
-                                <div
-                                    key={trigger.id}
-                                    className={`p-4 rounded-lg border transition-colors ${
-                                        editingId === trigger.id
-                                            ? 'bg-amber-50 border-amber-300'
-                                            : trigger.is_active
-                                                ? 'bg-white border-slate-200'
-                                                : 'bg-slate-50 border-slate-100 opacity-60'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex items-start gap-4 flex-1">
-                                            <Switch
-                                                checked={trigger.is_active}
-                                                onCheckedChange={(checked) => toggleMutation.mutate({ id: trigger.id, isActive: checked })}
-                                                disabled={editingId === trigger.id}
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                {/* Nome e Acao */}
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <p className="font-semibold text-slate-800">{trigger.name}</p>
-                                                    <Badge
-                                                        className={trigger.action_mode === 'allow'
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-red-100 text-red-700'
-                                                        }
-                                                    >
-                                                        {trigger.action_mode === 'allow' ? 'Permitir' : 'Bloquear'}
-                                                    </Badge>
-                                                    <Badge variant="outline" className="text-xs">
-                                                        Prioridade: {trigger.priority}
-                                                    </Badge>
-                                                </div>
+                            {triggers.map(trigger => {
+                                const stats = triggerStats?.get(trigger.id);
+                                return (
+                                    <div
+                                        key={trigger.id}
+                                        className={`p-4 rounded-lg border transition-colors ${
+                                            editingId === trigger.id
+                                                ? 'bg-amber-50 border-amber-300'
+                                                : trigger.is_active
+                                                    ? 'bg-white border-slate-200'
+                                                    : 'bg-slate-50 border-slate-100 opacity-60'
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-start gap-4 flex-1">
+                                                <Switch
+                                                    checked={trigger.is_active}
+                                                    onCheckedChange={(checked) => toggleMutation.mutate({ id: trigger.id, isActive: checked })}
+                                                    disabled={editingId === trigger.id}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    {/* Nome e Acao */}
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <p className="font-semibold text-slate-800">{trigger.name}</p>
+                                                        <Badge
+                                                            className={trigger.action_mode === 'allow'
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : 'bg-red-100 text-red-700'
+                                                            }
+                                                        >
+                                                            {trigger.action_mode === 'allow' ? 'Permitir' : 'Bloquear'}
+                                                        </Badge>
+                                                        <Badge variant="outline" className="text-xs">
+                                                            Prioridade: {trigger.priority}
+                                                        </Badge>
+                                                    </div>
 
-                                                {/* Condicoes */}
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="text-xs font-medium text-blue-600 uppercase">QUANDO:</span>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {(trigger.source_pipeline_ids?.length ?? 0) > 0 ? (
-                                                                trigger.source_pipeline_ids?.map(id => (
-                                                                    <Badge key={id} variant="secondary" className="text-xs">
-                                                                        {getCrmPipelineName(id)}
+                                                    {/* Condicoes */}
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-xs font-medium text-blue-600 uppercase">QUANDO:</span>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {(trigger.source_pipeline_ids?.length ?? 0) > 0 ? (
+                                                                    trigger.source_pipeline_ids?.map(id => (
+                                                                        <Badge key={id} variant="secondary" className="text-xs">
+                                                                            {getCrmPipelineName(id)}
+                                                                        </Badge>
+                                                                    ))
+                                                                ) : (
+                                                                    <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                                                                        Qualquer Pipeline
                                                                     </Badge>
-                                                                ))
-                                                            ) : (
-                                                                <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                                                                    Qualquer Pipeline
-                                                                </Badge>
-                                                            )}
+                                                                )}
+                                                            </div>
+                                                            <span className="text-slate-400">+</span>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {(trigger.source_stage_ids?.length ?? 0) > 0 ? (
+                                                                    trigger.source_stage_ids?.map(id => (
+                                                                        <Badge key={id} variant="outline" className="text-xs">
+                                                                            {getCrmStageName(id)}
+                                                                        </Badge>
+                                                                    ))
+                                                                ) : (
+                                                                    <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                                                                        Qualquer Estagio
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <span className="text-slate-400">+</span>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {(trigger.source_stage_ids?.length ?? 0) > 0 ? (
-                                                                trigger.source_stage_ids?.map(id => (
-                                                                    <Badge key={id} variant="outline" className="text-xs">
-                                                                        {getCrmStageName(id)}
-                                                                    </Badge>
-                                                                ))
+
+                                                        {/* Eventos */}
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-xs font-medium text-amber-600 uppercase">EVENTOS:</span>
+                                                            {trigger.event_types?.map(et => (
+                                                                <Badge key={et} variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                                                    {EVENT_TYPE_LABELS[et] || et}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+
+                                                        {/* Acao */}
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-xs font-medium text-slate-600 uppercase">ACAO:</span>
+                                                            {trigger.action_mode === 'allow' ? (
+                                                                <Badge className="text-xs bg-green-100 text-green-700">
+                                                                    <CheckCheck className="w-3 h-3 mr-1" />
+                                                                    Sincronizar para AC
+                                                                </Badge>
                                                             ) : (
-                                                                <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                                                                    Qualquer Estagio
+                                                                <Badge className="text-xs bg-red-100 text-red-700">
+                                                                    <Ban className="w-3 h-3 mr-1" />
+                                                                    Nao sincronizar
                                                                 </Badge>
                                                             )}
                                                         </div>
                                                     </div>
 
-                                                    {/* Eventos */}
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="text-xs font-medium text-amber-600 uppercase">EVENTOS:</span>
-                                                        {trigger.event_types?.map(et => (
-                                                            <Badge key={et} variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                                                                {EVENT_TYPE_LABELS[et] || et}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
-
-                                                    {/* Acao */}
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="text-xs font-medium text-slate-600 uppercase">ACAO:</span>
-                                                        {trigger.action_mode === 'allow' ? (
-                                                            <Badge className="text-xs bg-green-100 text-green-700">
-                                                                <CheckCheck className="w-3 h-3 mr-1" />
-                                                                Sincronizar para AC
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge className="text-xs bg-red-100 text-red-700">
-                                                                <Ban className="w-3 h-3 mr-1" />
-                                                                Nao sincronizar
-                                                            </Badge>
+                                                    {/* Stats + History Button */}
+                                                    <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2 flex-wrap">
+                                                        {stats && (
+                                                            <>
+                                                                {stats.sent > 0 && (
+                                                                    <Badge className="bg-green-100 text-green-700 text-xs">
+                                                                        <CheckCircle className="w-3 h-3 mr-0.5" />{stats.sent}
+                                                                    </Badge>
+                                                                )}
+                                                                {stats.failed > 0 && (
+                                                                    <Badge className="bg-red-100 text-red-700 text-xs">
+                                                                        <XCircle className="w-3 h-3 mr-0.5" />{stats.failed}
+                                                                    </Badge>
+                                                                )}
+                                                                {stats.blocked > 0 && (
+                                                                    <Badge className="bg-slate-100 text-slate-700 text-xs">
+                                                                        <Ban className="w-3 h-3 mr-0.5" />{stats.blocked}
+                                                                    </Badge>
+                                                                )}
+                                                                {stats.pending > 0 && (
+                                                                    <Badge className="bg-yellow-100 text-yellow-700 text-xs">
+                                                                        <Clock className="w-3 h-3 mr-0.5" />{stats.pending}
+                                                                    </Badge>
+                                                                )}
+                                                                {stats.shadow > 0 && (
+                                                                    <Badge className="bg-purple-100 text-purple-700 text-xs">
+                                                                        <Eye className="w-3 h-3 mr-0.5" />{stats.shadow}
+                                                                    </Badge>
+                                                                )}
+                                                                <span className="text-slate-300">|</span>
+                                                            </>
                                                         )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 px-2 text-xs text-slate-500 hover:text-slate-700 gap-1"
+                                                            onClick={() => setExpandedHistoryId(
+                                                                expandedHistoryId === trigger.id ? null : trigger.id
+                                                            )}
+                                                        >
+                                                            <History className="w-3.5 h-3.5" />
+                                                            {expandedHistoryId === trigger.id ? 'Fechar' : 'Historico'}
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                                                    onClick={() => startEditing(trigger)}
+                                                    disabled={isFormOpen && editingId !== trigger.id}
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    onClick={() => {
+                                                        if (confirm('Remover esta regra?')) {
+                                                            deleteMutation.mutate(trigger.id);
+                                                        }
+                                                    }}
+                                                    disabled={editingId === trigger.id}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                                                onClick={() => startEditing(trigger)}
-                                                disabled={isFormOpen && editingId !== trigger.id}
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                onClick={() => {
-                                                    if (confirm('Remover esta regra?')) {
-                                                        deleteMutation.mutate(trigger.id);
-                                                    }
-                                                }}
-                                                disabled={editingId === trigger.id}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
+                                        {expandedHistoryId === trigger.id && (
+                                            <div className="mt-3">
+                                                <OutboundTriggerEventHistory
+                                                    triggerId={trigger.id}
+                                                    triggerName={trigger.name || 'Regra sem nome'}
+                                                    integrationId={integrationId}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>
             )}
+
+            {/* Eventos sem regra */}
+            <Card className="bg-white border-slate-200 shadow-sm">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowNoRuleLogs(!showNoRuleLogs)}>
+                        {showNoRuleLogs ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <FileWarning className="w-5 h-5 text-slate-500" />
+                            Eventos sem Regra
+                        </CardTitle>
+                        {triggerStats?.has('null') && (
+                            <Badge variant="outline" className="ml-2">
+                                {triggerStats.get('null')!.total} eventos
+                            </Badge>
+                        )}
+                    </div>
+                    <CardDescription>
+                        Eventos processados sem match com nenhuma regra (allow by default ou eventos antigos)
+                    </CardDescription>
+                </CardHeader>
+                {showNoRuleLogs && (
+                    <CardContent>
+                        <OutboundTriggerEventHistory
+                            triggerId={null}
+                            triggerName="Sem Regra"
+                            integrationId={integrationId}
+                        />
+                    </CardContent>
+                )}
+            </Card>
 
             {/* Help Card */}
             <Card className="bg-slate-50 border-slate-200">

@@ -11,7 +11,8 @@ import {
     GitBranch,
     RefreshCw,
     AlertCircle,
-    Shield
+    Shield,
+    Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -23,6 +24,7 @@ import { ptBR } from 'date-fns/locale';
 import { WhatsAppPayloadExplorer } from './WhatsAppPayloadExplorer';
 import { WhatsAppFieldMapping } from './WhatsAppFieldMapping';
 import { WhatsAppGovernanceTab } from './WhatsAppGovernanceTab';
+import { PhaseInstanceMappingTab } from './PhaseInstanceMappingTab';
 
 interface Platform {
     id: string;
@@ -167,6 +169,10 @@ export function WhatsAppPage() {
                             <Shield className="w-4 h-4" />
                             Governança
                         </TabsTrigger>
+                        <TabsTrigger value="routing" className="gap-2">
+                            <Link2 className="w-4 h-4" />
+                            Roteamento
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="explorer">
@@ -251,6 +257,10 @@ export function WhatsAppPage() {
                     <TabsContent value="governance">
                         <WhatsAppGovernanceTab />
                     </TabsContent>
+
+                    <TabsContent value="routing">
+                        <PhaseInstanceMappingTab />
+                    </TabsContent>
                 </Tabs>
             </div>
         );
@@ -265,7 +275,7 @@ export function WhatsAppPage() {
                         Integrações WhatsApp
                     </h1>
                     <p className="text-muted-foreground text-sm">
-                        Gerencie conexões com ChatPro, Echo e outras plataformas
+                        Gerencie conexões com Echo e outras plataformas
                     </p>
                 </div>
                 <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['whatsapp-platforms'] })}>

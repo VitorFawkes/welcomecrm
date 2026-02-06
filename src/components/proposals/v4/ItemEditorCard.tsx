@@ -45,6 +45,37 @@ import { CruiseEditor, type CruiseData } from './cruises'
 import { InsuranceEditor, type InsuranceData } from './insurance'
 import { SaveToLibraryModal } from './SaveToLibraryModal'
 
+// Barra de custo do fornecedor - usada em todos os tipos de item
+function SupplierCostBar({
+    item,
+    onUpdate,
+}: {
+    item: ProposalItemWithOptions
+    onUpdate: (updates: Partial<ProposalItemWithOptions>) => void
+}) {
+    return (
+        <div className="flex items-center gap-3 px-4 py-2 border-t border-amber-100 bg-amber-50/50">
+            <span className="text-xs font-medium text-amber-700">Custo Fornecedor:</span>
+            <div className="flex items-center gap-1">
+                <span className="text-xs text-amber-600">R$</span>
+                <input
+                    type="number"
+                    value={item.supplier_cost || ''}
+                    onChange={(e) => onUpdate({ supplier_cost: parseFloat(e.target.value) || 0 })}
+                    className="w-24 text-sm font-semibold text-amber-800 bg-white border border-amber-200 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-amber-400 text-right"
+                    placeholder="0,00"
+                    step="0.01"
+                />
+            </div>
+            {(item.supplier_cost ?? 0) > 0 && (item.base_price ?? 0) > 0 && (
+                <span className="text-xs text-amber-600 ml-auto">
+                    Receita: R$ {((item.base_price || 0) - (item.supplier_cost || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+            )}
+        </div>
+    )
+}
+
 interface ItemEditorCardProps {
     item: ProposalItemWithOptions
     onUpdate: (updates: Partial<ProposalItemWithOptions>) => void
@@ -251,6 +282,8 @@ function FlightItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCar
                     })}
                 />
             </div>
+
+            <SupplierCostBar item={item} onUpdate={onUpdate} />
         </div>
     )
 }
@@ -337,6 +370,8 @@ function HotelItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCard
                     itemId={item.id}
                 />
             </div>
+
+            <SupplierCostBar item={item} onUpdate={onUpdate} />
 
             {/* Modal para salvar na biblioteca */}
             <SaveToLibraryModal
@@ -432,6 +467,8 @@ function ExperienceItemCard({ item, richContent, onUpdate, onRemove }: FlightIte
                 />
             </div>
 
+            <SupplierCostBar item={item} onUpdate={onUpdate} />
+
             {/* Modal para salvar na biblioteca */}
             <SaveToLibraryModal
                 isOpen={showSaveModal}
@@ -525,6 +562,8 @@ function TransferItemCard({ item, richContent, onUpdate, onRemove }: FlightItemC
                     itemId={item.id}
                 />
             </div>
+
+            <SupplierCostBar item={item} onUpdate={onUpdate} />
 
             {/* Modal para salvar na biblioteca */}
             <SaveToLibraryModal
@@ -620,6 +659,8 @@ function CruiseItemCard({ item, richContent, onUpdate, onRemove }: FlightItemCar
                 />
             </div>
 
+            <SupplierCostBar item={item} onUpdate={onUpdate} />
+
             {/* Modal para salvar na biblioteca */}
             <SaveToLibraryModal
                 isOpen={showSaveModal}
@@ -713,6 +754,8 @@ function InsuranceItemCard({ item, richContent, onUpdate, onRemove }: FlightItem
                     itemId={item.id}
                 />
             </div>
+
+            <SupplierCostBar item={item} onUpdate={onUpdate} />
 
             {/* Modal para salvar na biblioteca */}
             <SaveToLibraryModal
@@ -857,7 +900,7 @@ function GenericItemCard({
                 </div>
 
                 {/* Price - Highlighted */}
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 flex items-center gap-2">
                     <div className="flex items-center gap-1 border border-violet-200 rounded-lg px-3 py-2 bg-violet-50">
                         <select
                             value={(richContent.currency as string) || 'BRL'}
@@ -876,6 +919,18 @@ function GenericItemCard({
                             onChange={(e) => onUpdate({ base_price: parseFloat(e.target.value) || 0 })}
                             className="w-20 text-base font-bold text-violet-700 text-right bg-transparent border-none outline-none focus:ring-0 p-0"
                             placeholder="0,00"
+                            step="0.01"
+                        />
+                    </div>
+                    {/* Supplier Cost */}
+                    <div className="flex items-center gap-1 border border-amber-200 rounded-lg px-2 py-2 bg-amber-50" title="Custo do fornecedor">
+                        <span className="text-[10px] font-medium text-amber-600">Custo</span>
+                        <input
+                            type="number"
+                            value={item.supplier_cost || ''}
+                            onChange={(e) => onUpdate({ supplier_cost: parseFloat(e.target.value) || 0 })}
+                            className="w-16 text-sm font-semibold text-amber-700 text-right bg-transparent border-none outline-none focus:ring-0 p-0"
+                            placeholder="0"
                             step="0.01"
                         />
                     </div>

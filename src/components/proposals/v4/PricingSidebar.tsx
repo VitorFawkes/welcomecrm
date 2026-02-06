@@ -22,6 +22,9 @@ import type { ProposalSectionWithItems, ProposalItemWithOptions } from '@/types/
  * - Total price with visual hierarchy
  * - Breakdown by category with percentages
  * - Save and Send buttons
+ *
+ * NOTE: Voos são calculados a partir de proposal_items.rich_content.flights
+ *       A tabela proposal_flights é apenas um espelho para integração Monde
  */
 
 interface PricingSidebarProps {
@@ -71,14 +74,16 @@ function getItemPrice(item: ProposalItemWithOptions): number {
         const flights = richContent?.flights as { legs?: Array<{ options?: Array<{ price?: number; is_recommended?: boolean }> }> } | undefined
 
         if (flights?.legs) {
-            return flights.legs.reduce((total, leg) => {
-                if (!leg.options || leg.options.length === 0) return total
+            const total = flights.legs.reduce((sum, leg) => {
+                if (!leg.options || leg.options.length === 0) return sum
                 // Get recommended option or first one
                 const recommended = leg.options.find(o => o.is_recommended) || leg.options[0]
-                return total + (recommended?.price || 0)
+                return sum + (recommended?.price || 0)
             }, 0)
+            if (total > 0) return total
         }
-        return 0
+        // Fallback to base_price
+        return item.base_price || 0
     }
 
     // For hotels, calculate from rich_content including options
@@ -89,7 +94,7 @@ function getItemPrice(item: ProposalItemWithOptions): number {
             options?: Array<{ price_delta?: number; is_recommended?: boolean }>
         } | undefined
 
-        if (hotel) {
+        if (hotel && hotel.price_per_night) {
             const nights = Math.max(1, hotel.nights || 1)
             const basePrice = (hotel.price_per_night || 0) * nights
 
@@ -99,7 +104,8 @@ function getItemPrice(item: ProposalItemWithOptions): number {
 
             return basePrice + optionDelta
         }
-        return 0
+        // Fallback to base_price
+        return item.base_price || 0
     }
 
     // For experiences, use rich_content price with options
@@ -111,7 +117,7 @@ function getItemPrice(item: ProposalItemWithOptions): number {
             options?: Array<{ price?: number; is_recommended?: boolean }>
         } | undefined
 
-        if (experience) {
+        if (experience && experience.price) {
             // If has options and one is recommended, use that price
             const selectedOption = experience.options?.find(o => o.is_recommended)
             if (selectedOption?.price) {
@@ -125,7 +131,8 @@ function getItemPrice(item: ProposalItemWithOptions): number {
             }
             return basePrice
         }
-        return 0
+        // Fallback to base_price
+        return item.base_price || 0
     }
 
     // For transfers, use rich_content price with options
@@ -135,15 +142,16 @@ function getItemPrice(item: ProposalItemWithOptions): number {
             options?: Array<{ price?: number; is_recommended?: boolean }>
         } | undefined
 
-        if (transfer) {
+        if (transfer && transfer.price) {
             // If has options and one is recommended, use that price
             const selectedOption = transfer.options?.find(o => o.is_recommended)
             if (selectedOption?.price) {
                 return selectedOption.price
             }
-            return transfer.price || 0
+            return transfer.price
         }
-        return 0
+        // Fallback to base_price
+        return item.base_price || 0
     }
 
     // For other types, use base_price
@@ -170,13 +178,21 @@ export function PricingSidebar({ sections }: PricingSidebarProps) {
     }, [])
 
     // Calculate totals by category
+    // NOTE: Voos são items com item_type='flight' e rich_content.flights
+    //       NÃO soma proposal_flights separadamente (é apenas espelho para Monde)
     const { categoryTotals, grandTotal } = useMemo(() => {
         const totals: Record<string, number> = {}
         let total = 0
 
+        // Sum items from sections (including flights via getItemPrice)
         sections.forEach((section) => {
-            const category = section.section_type === 'custom' ? 'other' : section.section_type
+            // Para items de voo, usa categoria 'flights'
             section.items.forEach((item) => {
+                const category = item.item_type === 'flight'
+                    ? 'flights'
+                    : section.section_type === 'custom'
+                        ? 'other'
+                        : section.section_type
                 const price = getItemPrice(item)
                 totals[category] = (totals[category] || 0) + price
                 total += price

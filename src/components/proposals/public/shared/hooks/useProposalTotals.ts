@@ -20,6 +20,9 @@ import { readCruiseData } from '../readers/readCruiseData'
 interface UseProposalTotalsResult {
   totalPrimary: number
   totalSecondary: number
+  totalCost: number
+  totalReceita: number
+  marginPercent: number
   primaryCurrency: Currency
   secondaryCurrency: Currency
   itemsCount: number
@@ -37,6 +40,7 @@ export function useProposalTotals(
 ): UseProposalTotalsResult {
   return useMemo(() => {
     let totalPrimary = 0
+    let totalCost = 0
     let itemsCount = 0
     let selectedItemsCount = 0
 
@@ -51,18 +55,34 @@ export function useProposalTotals(
 
         selectedItemsCount++
 
-        // Calcula preço do item
+        // Calcula preço de venda do item
         const itemPrice = calculateItemPrice(item, selection)
         totalPrimary += itemPrice
+
+        // Calcula custo do fornecedor
+        const itemCost = Number((item as any).supplier_cost) || 0
+        if (itemCost > 0) {
+          const quantity = selection.quantity ?? 1
+          totalCost += itemCost * quantity
+        }
       })
     })
 
     // Converte para moeda secundária
     const totalSecondary = convertCurrency(totalPrimary, primaryCurrency, secondaryCurrency)
 
+    // Receita e margem
+    const totalReceita = totalPrimary - totalCost
+    const marginPercent = totalPrimary > 0
+      ? Math.round((totalReceita / totalPrimary) * 10000) / 100
+      : 0
+
     return {
       totalPrimary,
       totalSecondary,
+      totalCost,
+      totalReceita,
+      marginPercent,
       primaryCurrency,
       secondaryCurrency,
       itemsCount,

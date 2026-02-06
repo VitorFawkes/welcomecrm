@@ -7,7 +7,7 @@ export interface TripsFilterState {
     endDate?: string
     operationalStatus?: string[]
     destinations?: string[]
-    sortBy?: 'data_viagem_inicio' | 'created_at' | 'valor_estimado'
+    sortBy?: 'data_viagem_inicio' | 'created_at' | 'valor_estimado' | 'valor_display'
     sortDirection?: 'asc' | 'desc'
 }
 

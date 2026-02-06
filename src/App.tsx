@@ -16,6 +16,7 @@ import ProposalBuilderV4 from './pages/ProposalBuilderV4'
 import ProposalsPage from './pages/ProposalsPage'
 import ProposalView from './pages/public/ProposalView'
 import Analytics from './pages/Analytics'
+import MondePreviewPage from './pages/MondePreviewPage'
 
 
 import ProposalReview from './pages/public/ProposalReview'
@@ -76,6 +77,7 @@ function App() {
                   <Route path="/trips" element={<Cards />} />
                   <Route path="/cards" element={<Navigate to="/trips" replace />} />
                   <Route path="/cards/:id" element={<CardDetail />} />
+                  <Route path="/cards/:id/monde-preview" element={<MondePreviewPage />} />
                   <Route path="/people" element={<People />} />
                   <Route path="/proposals" element={<ProposalsPage />} />
                   <Route path="/analytics" element={<Analytics />} />

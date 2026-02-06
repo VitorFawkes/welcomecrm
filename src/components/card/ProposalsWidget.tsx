@@ -62,8 +62,12 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
         if (!confirm('Tem certeza que deseja excluir esta proposta?')) return
         try {
             await deleteProposal.mutateAsync(proposalId)
+            toast.success('Proposta excluída!')
         } catch (error) {
             console.error('Error deleting proposal:', error)
+            toast.error('Erro ao excluir proposta', {
+                description: error instanceof Error ? error.message : 'Tente novamente.',
+            })
         }
     }
 

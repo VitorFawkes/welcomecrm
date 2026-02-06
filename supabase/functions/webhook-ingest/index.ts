@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -53,7 +52,7 @@ function parseACPayload(payload: Record<string, unknown>): {
     return { entity_type, event_type, external_id };
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
@@ -192,28 +191,48 @@ serve(async (req) => {
             });
         }
 
-        // 6. AUTO-PROCESS: Call integration-process immediately (fire-and-forget)
-        // This makes processing automatic without waiting for a cron job
+        // 6. AUTO-PROCESS: Call integration-process with retry
+        // Non-blocking for the webhook response, but with retry to ensure reliability
         if (insertedEvent?.id) {
             const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
             const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+            const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
 
-            // Fire and forget - don't await, let it process in background
-            fetch(`${supabaseUrl}/functions/v1/integration-process`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${serviceKey}`
-                },
-                body: JSON.stringify({
-                    integration_id: integrationId,
-                    event_ids: [insertedEvent.id]
-                })
-            }).then(res => {
-                console.log(`Auto-process triggered for event ${insertedEvent.id}: ${res.status}`);
-            }).catch(err => {
-                console.error(`Auto-process failed for event ${insertedEvent.id}:`, err);
-            });
+            const autoProcess = async (eventId: string) => {
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    try {
+                        const controller = new AbortController();
+                        const timeout = setTimeout(() => controller.abort(), 10000);
+
+                        const res = await fetch(`${supabaseUrl}/functions/v1/integration-process`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${serviceKey}`,
+                                'x-internal-secret': cronSecret
+                            },
+                            body: JSON.stringify({
+                                integration_id: integrationId,
+                                event_ids: [eventId]
+                            }),
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeout);
+
+                        if (res.ok) {
+                            console.log(`Auto-process OK for event ${eventId} (attempt ${attempt})`);
+                            return;
+                        }
+                        console.warn(`Auto-process attempt ${attempt} for event ${eventId}: ${res.status}`);
+                    } catch (err) {
+                        console.warn(`Auto-process attempt ${attempt} for event ${eventId} failed:`, err);
+                    }
+                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+                }
+            };
+
+            // Non-blocking: don't await, but retry logic runs in background
+            autoProcess(insertedEvent.id);
         }
 
         return new Response(JSON.stringify({ message: "Accepted" }), {

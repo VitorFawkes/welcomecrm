@@ -4,11 +4,9 @@ import { IntegrationList } from './IntegrationList';
 import { IntegrationBuilder } from './IntegrationBuilder';
 import { IntegrationFieldExplorer } from './IntegrationFieldExplorer';
 import { IntegrationSettings } from './IntegrationSettings';
-import { IntegrationStatusDashboard } from './IntegrationStatusDashboard';
-import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { OutboundLogsTab } from './OutboundLogsTab';
 
-// New unified components
+// Unified components
 import { IntegrationOverviewTab } from './IntegrationOverviewTab';
 import { UnifiedMappingTab } from './UnifiedMappingTab';
 import { UnifiedRulesTab } from './UnifiedRulesTab';
@@ -19,10 +17,9 @@ import { Button } from '@/components/ui/Button';
 import {
     ArrowLeft,
     LayoutDashboard,
-    GitBranch,
     Settings,
     Zap,
-    ArrowUpRight,
+    Send,
     Map
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,7 +27,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/ca
 const AC_INTEGRATION_ID = 'a2141b92-561f-4514-92b4-9412a068d236';
 
 export function IntegrationsPage() {
-    const [view, setView] = useState<'list' | 'builder' | 'inspector' | 'explorer' | 'active_campaign' | 'api_keys' | 'api_docs'>('list');
+    const [view, setView] = useState<'list' | 'builder' | 'explorer' | 'active_campaign'>('list');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<IntegrationType>('input');
@@ -59,16 +56,15 @@ export function IntegrationsPage() {
                     </Button>
                     <div className="flex-1">
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            ActiveCampaign Integration
+                            Integração ActiveCampaign
                         </h1>
                         <p className="text-slate-500 text-sm">
                             Gerencie a sincronização bidirecional de deals em uma única central de controle.
                         </p>
                     </div>
-                    <IntegrationStatusDashboard />
                 </div>
 
-                {/* Main Tabs - Simplified to 5 */}
+                {/* Main Tabs - Simplified to 4 + Settings */}
                 <Tabs defaultValue="overview" className="space-y-6">
                     <TabsList className="bg-slate-100 p-1 rounded-lg">
                         <TabsTrigger
@@ -96,8 +92,8 @@ export function IntegrationsPage() {
                             value="outbound"
                             className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                         >
-                            <ArrowUpRight className="w-4 h-4" />
-                            Fila de Saída
+                            <Send className="w-4 h-4" />
+                            Fila de Eventos
                         </TabsTrigger>
                         <TabsTrigger
                             value="settings"
@@ -123,26 +119,9 @@ export function IntegrationsPage() {
                         <UnifiedRulesTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 4: Outbound Queue + Stage Mapping */}
-                    <TabsContent value="outbound" className="space-y-6">
-                        <Tabs defaultValue="queue" className="space-y-4">
-                            <TabsList className="bg-slate-50">
-                                <TabsTrigger value="queue" className="text-sm">
-                                    Fila de Eventos
-                                </TabsTrigger>
-                                <TabsTrigger value="stages" className="text-sm">
-                                    Mapeamento de Etapas (Saída)
-                                </TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="queue">
-                                <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-
-                            <TabsContent value="stages">
-                                <OutboundStageMappingTab integrationId={AC_INTEGRATION_ID} />
-                            </TabsContent>
-                        </Tabs>
+                    {/* Tab 4: Outbound Queue (Fila de Eventos) */}
+                    <TabsContent value="outbound">
+                        <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
                     {/* Tab 5: Settings */}

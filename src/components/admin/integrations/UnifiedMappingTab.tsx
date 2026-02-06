@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { IntegrationMapping } from './IntegrationMapping';
 import { InboundFieldMappingTab } from './InboundFieldMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
+import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { ACFieldManager } from './ACFieldManager';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -12,12 +13,13 @@ import {
     GitBranch,
     FileText,
     Users,
-    ArrowRightLeft,
+    Layers,
     Check,
     AlertTriangle,
     Map,
     ArrowDownLeft,
-    ArrowUpRight
+    ArrowUpRight,
+    ArrowRightLeft
 } from 'lucide-react';
 
 interface UnifiedMappingTabProps {
@@ -31,8 +33,10 @@ interface MappingStats {
     fields: { inbound: number; outbound: number };
 }
 
+type MappingTabValue = 'structure' | 'stages-out' | 'fields-in' | 'fields-out' | 'catalog';
+
 export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
-    const [activeTab, setActiveTab] = useState<'structure' | 'fields-in' | 'fields-out' | 'catalog'>('structure');
+    const [activeTab, setActiveTab] = useState<MappingTabValue>('structure');
 
     // Fetch mapping stats for visual feedback
     const { data: stats } = useQuery({
@@ -54,8 +58,8 @@ export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
                 supabase.from('integration_stage_map').select('id').eq('integration_id', integrationId),
                 supabase.from('integration_catalog').select('id').eq('integration_id', integrationId).eq('entity_type', 'user'),
                 supabase.from('integration_user_map').select('id').eq('integration_id', integrationId),
-                supabase.from('integration_field_mappings').select('id').eq('integration_id', integrationId).eq('direction', 'inbound'),
-                supabase.from('integration_field_mappings').select('id').eq('integration_id', integrationId).eq('direction', 'outbound')
+                supabase.from('integration_field_map').select('id').eq('integration_id', integrationId).eq('direction', 'inbound'),
+                supabase.from('integration_field_map').select('id').eq('integration_id', integrationId).eq('direction', 'outbound')
             ]);
 
             return {
@@ -218,16 +222,26 @@ export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
             </Card>
 
             {/* Tabs de Mapeamento */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'structure' | 'fields-in' | 'fields-out' | 'catalog')} className="space-y-4">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MappingTabValue)} className="space-y-4">
                 <TabsList className="bg-slate-100 p-1 rounded-lg h-auto flex-wrap">
                     <TabsTrigger
                         value="structure"
                         className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                     >
                         <GitBranch className="w-4 h-4" />
-                        Estrutura
-                        <Badge variant="outline" className="text-xs">
-                            {stats?.pipelines.total || 0} + {stats?.stages.total || 0} + {stats?.users.total || 0}
+                        Estrutura (Entrada)
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                            AC → CRM
+                        </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="stages-out"
+                        className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
+                    >
+                        <Layers className="w-4 h-4 text-blue-600" />
+                        Etapas (Saída)
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            CRM → AC
                         </Badge>
                     </TabsTrigger>
                     <TabsTrigger
@@ -235,7 +249,7 @@ export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
                         className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                     >
                         <ArrowDownLeft className="w-4 h-4 text-green-600" />
-                        Campos de Entrada
+                        Campos (Entrada)
                         <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                             AC → CRM
                         </Badge>
@@ -245,7 +259,7 @@ export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
                         className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                     >
                         <ArrowUpRight className="w-4 h-4 text-blue-600" />
-                        Campos de Saída
+                        Campos (Saída)
                         <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                             CRM → AC
                         </Badge>
@@ -259,9 +273,14 @@ export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Estrutura (Pipelines, Stages, Users) */}
+                {/* Estrutura (Pipelines, Stages, Users) - Entrada */}
                 <TabsContent value="structure" className="mt-6">
                     <IntegrationMapping integrationId={integrationId} />
+                </TabsContent>
+
+                {/* Etapas de Saída (Welcome → AC) */}
+                <TabsContent value="stages-out" className="mt-6">
+                    <OutboundStageMappingTab integrationId={integrationId} />
                 </TabsContent>
 
                 {/* Campos de Entrada */}
