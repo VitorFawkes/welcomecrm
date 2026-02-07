@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { SyncGovernancePanel } from './SyncGovernancePanel';
-import { IntegrationLogs } from './IntegrationLogs';
 import {
     AlertTriangle,
     Clock,
@@ -55,7 +54,7 @@ export function IntegrationOverviewTab({ integrationId }: IntegrationOverviewTab
     const [processing, setProcessing] = useState(false);
     const [syncing, setSyncing] = useState(false);
 
-    // Fetch comprehensive stats
+    // Fetch comprehensive stats using server-side counts (avoids downloading all rows)
     const { data: stats, isLoading, refetch } = useQuery({
         queryKey: ['integration-overview', integrationId],
         queryFn: async (): Promise<OverviewStats> => {
@@ -64,56 +63,67 @@ export function IntegrationOverviewTab({ integrationId }: IntegrationOverviewTab
             const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
             const [
-                inboundEventsRes,
+                inboundTotalRes,
+                inboundPendingRes,
+                inboundProcessedRes,
+                inboundProcessedShadowRes,
+                inboundFailedRes,
+                inboundIgnoredRes,
+                outboundTotalRes,
+                outboundPendingRes,
+                outboundSentRes,
+                outboundFailedRes,
                 inboundTodayRes,
                 inboundWeekRes,
-                outboundQueueRes,
                 outboundTodayRes,
                 inboundRulesRes,
-                outboundRulesRes
+                outboundRulesRes,
+                lastEventRes
             ] = await Promise.all([
-                supabase.from('integration_events').select('status').eq('integration_id', integrationId),
-                supabase.from('integration_events').select('id').eq('integration_id', integrationId).gte('created_at', todayStart),
-                supabase.from('integration_events').select('id').eq('integration_id', integrationId).gte('created_at', weekStart),
-                supabase.from('integration_outbound_queue').select('status'),
-                supabase.from('integration_outbound_queue').select('id').gte('created_at', todayStart),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId).eq('status', 'pending'),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId).eq('status', 'processed'),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId).eq('status', 'processed_shadow'),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId).eq('status', 'failed'),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId).eq('status', 'ignored'),
+                supabase.from('integration_outbound_queue').select('*', { count: 'exact', head: true }),
+                supabase.from('integration_outbound_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+                supabase.from('integration_outbound_queue').select('*', { count: 'exact', head: true }).eq('status', 'sent'),
+                supabase.from('integration_outbound_queue').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId).gte('created_at', todayStart),
+                supabase.from('integration_events').select('*', { count: 'exact', head: true }).eq('integration_id', integrationId).gte('created_at', weekStart),
+                supabase.from('integration_outbound_queue').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
                 supabase.from('integration_inbound_triggers').select('id, is_active').eq('integration_id', integrationId),
-                supabase.from('integration_outbound_triggers').select('id, is_active').eq('integration_id', integrationId)
+                supabase.from('integration_outbound_triggers').select('id, is_active').eq('integration_id', integrationId),
+                supabase.from('integration_events')
+                    .select('created_at')
+                    .eq('integration_id', integrationId)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
             ]);
-
-            // Get last event
-            const { data: lastEvent } = await supabase
-                .from('integration_events')
-                .select('created_at')
-                .eq('integration_id', integrationId)
-                .order('created_at', { ascending: false })
-                .limit(1);
-
-            const inboundEvents = inboundEventsRes.data || [];
-            const outboundQueue = outboundQueueRes.data || [];
 
             return {
                 inbound: {
-                    total: inboundEvents.length,
-                    pending: inboundEvents.filter(e => e.status === 'pending').length,
-                    processed: inboundEvents.filter(e => e.status === 'processed' || e.status === 'processed_shadow').length,
-                    failed: inboundEvents.filter(e => e.status === 'failed').length,
-                    ignored: inboundEvents.filter(e => e.status === 'ignored').length,
-                    today: inboundTodayRes.data?.length || 0,
-                    thisWeek: inboundWeekRes.data?.length || 0
+                    total: inboundTotalRes.count || 0,
+                    pending: inboundPendingRes.count || 0,
+                    processed: (inboundProcessedRes.count || 0) + (inboundProcessedShadowRes.count || 0),
+                    failed: inboundFailedRes.count || 0,
+                    ignored: inboundIgnoredRes.count || 0,
+                    today: inboundTodayRes.count || 0,
+                    thisWeek: inboundWeekRes.count || 0
                 },
                 outbound: {
-                    total: outboundQueue.length,
-                    pending: outboundQueue.filter(e => e.status === 'pending').length,
-                    sent: outboundQueue.filter(e => e.status === 'sent').length,
-                    failed: outboundQueue.filter(e => e.status === 'failed').length,
-                    today: outboundTodayRes.data?.length || 0
+                    total: outboundTotalRes.count || 0,
+                    pending: outboundPendingRes.count || 0,
+                    sent: outboundSentRes.count || 0,
+                    failed: outboundFailedRes.count || 0,
+                    today: outboundTodayRes.count || 0
                 },
                 rules: {
                     inboundActive: inboundRulesRes.data?.filter(r => r.is_active).length || 0,
                     outboundActive: outboundRulesRes.data?.filter(r => r.is_active).length || 0
                 },
-                lastActivity: lastEvent?.[0]?.created_at || null
+                lastActivity: lastEventRes.data?.[0]?.created_at || null
             };
         },
         refetchInterval: 30000
@@ -359,21 +369,6 @@ export function IntegrationOverviewTab({ integrationId }: IntegrationOverviewTab
                 </CardContent>
             </Card>
 
-            {/* Recent Events */}
-            <Card className="border-slate-200">
-                <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-slate-400" />
-                        Eventos Recentes
-                    </CardTitle>
-                    <CardDescription>
-                        Últimos eventos processados pela integração
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <IntegrationLogs mode="inbox" />
-                </CardContent>
-            </Card>
         </div>
     );
 }

@@ -15,7 +15,12 @@ import {
     Play,
     Loader2,
     AlertTriangle,
-    Trash2
+    Trash2,
+    FlaskConical,
+    ChevronDown,
+    ChevronUp,
+    Check,
+    X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -34,6 +39,15 @@ interface OutboundEvent {
     triggered_by: string;
     created_at: string;
     processed_at: string | null;
+    response_data?: {
+        deal?: {
+            value?: string;
+            title?: string;
+            status?: number;
+            fields?: Array<{ customFieldId: string; fieldValue: string }>;
+            [key: string]: unknown;
+        };
+    } | null;
     cards?: {
         titulo: string;
         pessoa_principal?: {
@@ -66,6 +80,8 @@ export function OutboundLogsTab({ integrationId }: OutboundLogsTabProps) {
     const queryClient = useQueryClient();
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [eventTypeFilter, setEventTypeFilter] = useState<string>('all');
+    const [showValidation, setShowValidation] = useState<boolean>(false);
+    const [expandedValidation, setExpandedValidation] = useState<string | null>(null);
 
     // Fetch outbound events
     const { data: events, isLoading, refetch } = useQuery({
@@ -74,7 +90,9 @@ export function OutboundLogsTab({ integrationId }: OutboundLogsTabProps) {
             let query = supabase
                 .from('integration_outbound_queue')
                 .select(`
-                    *,
+                    id, card_id, integration_id, external_id, event_type, payload,
+                    status, processing_log, attempts, max_attempts, triggered_by,
+                    created_at, processed_at, response_data,
                     cards:card_id(titulo, pessoa_principal:pessoa_principal_id(nome))
                 `)
                 .eq('integration_id', integrationId)
@@ -143,6 +161,58 @@ export function OutboundLogsTab({ integrationId }: OutboundLogsTabProps) {
         failed: events?.filter(e => e.status === 'failed').length || 0
     };
 
+    // Events with response_data for validation
+    const eventsWithResponse = events?.filter(
+        e => e.status === 'sent' && e.response_data
+    ) || [];
+
+    // Helper to compare sent vs received values
+    const compareFieldValues = (event: OutboundEvent) => {
+        if (!event.payload || !event.response_data?.deal) return [];
+
+        const comparisons: Array<{
+            field: string;
+            sent: string;
+            received: string;
+            match: boolean;
+        }> = [];
+
+        const deal = event.response_data.deal;
+        const fieldsArray = deal.fields || [];
+
+        for (const [key, sentValue] of Object.entries(event.payload)) {
+            if (key === 'shadow_mode') continue;
+
+            const sentStr = String(sentValue ?? '');
+            let receivedStr = '';
+            let fieldLabel = key;
+
+            // Check if it's a standard field (deal[xxx] format)
+            const standardMatch = key.match(/^deal\[(\w+)\]$/);
+            if (standardMatch) {
+                const fieldName = standardMatch[1];
+                fieldLabel = `deal.${fieldName}`;
+                receivedStr = String(deal[fieldName] ?? '');
+            } else {
+                // Custom field - look in fields array
+                const customField = fieldsArray.find(
+                    (f: { customFieldId: string; fieldValue: string }) => f.customFieldId === key
+                );
+                fieldLabel = `Campo ${key}`;
+                receivedStr = customField?.fieldValue ?? '';
+            }
+
+            comparisons.push({
+                field: fieldLabel,
+                sent: sentStr,
+                received: receivedStr,
+                match: sentStr === receivedStr
+            });
+        }
+
+        return comparisons;
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -204,6 +274,112 @@ export function OutboundLogsTab({ integrationId }: OutboundLogsTabProps) {
                     <div className="text-xs text-red-600">Falhas</div>
                 </div>
             </div>
+
+            {/* Validation Section (TEMPORARY) */}
+            <Card className="border-2 border-amber-300 bg-amber-50/50">
+                <CardHeader className="py-3 cursor-pointer" onClick={() => setShowValidation(!showValidation)}>
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2 text-amber-700 text-base">
+                            <FlaskConical className="w-5 h-5" />
+                            Validacao de Sync (Temporario)
+                            <Badge className="bg-amber-200 text-amber-800 text-xs">
+                                {eventsWithResponse.length} eventos
+                            </Badge>
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" className="text-amber-700">
+                            {showValidation ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </Button>
+                    </div>
+                    <CardDescription className="text-amber-600 text-xs">
+                        Compare o que foi enviado vs. o que a API do Active Campaign retornou
+                    </CardDescription>
+                </CardHeader>
+
+                {showValidation && (
+                    <CardContent className="pt-0">
+                        {eventsWithResponse.length === 0 ? (
+                            <div className="text-center py-4 text-amber-600 text-sm">
+                                Nenhum evento enviado com resposta da API ainda.
+                                <br />
+                                <span className="text-xs">Processe eventos pendentes e aguarde a resposta.</span>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                                {eventsWithResponse.slice(0, 10).map(event => {
+                                    const comparisons = compareFieldValues(event);
+                                    const allMatch = comparisons.every(c => c.match);
+                                    const isExpanded = expandedValidation === event.id;
+                                    const eventTime = new Date(event.processed_at || event.created_at).toLocaleString('pt-BR');
+
+                                    return (
+                                        <div
+                                            key={event.id}
+                                            className={cn(
+                                                "border rounded-lg overflow-hidden",
+                                                allMatch ? "border-green-300 bg-green-50/50" : "border-red-300 bg-red-50/50"
+                                            )}
+                                        >
+                                            <div
+                                                className="p-3 flex items-center justify-between cursor-pointer"
+                                                onClick={() => setExpandedValidation(isExpanded ? null : event.id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    {allMatch ? (
+                                                        <Check className="w-4 h-4 text-green-600" />
+                                                    ) : (
+                                                        <X className="w-4 h-4 text-red-600" />
+                                                    )}
+                                                    <span className="font-medium text-sm">
+                                                        Deal {event.external_id}
+                                                    </span>
+                                                    <Badge variant="outline" className="text-xs">
+                                                        {EVENT_TYPE_LABELS[event.event_type] || event.event_type}
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <span>{eventTime}</span>
+                                                    {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                </div>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div className="border-t px-3 py-2 bg-white/50">
+                                                    <table className="w-full text-xs">
+                                                        <thead>
+                                                            <tr className="text-muted-foreground">
+                                                                <th className="text-left py-1 font-medium">Campo</th>
+                                                                <th className="text-left py-1 font-medium">Enviado</th>
+                                                                <th className="text-left py-1 font-medium">Retornado</th>
+                                                                <th className="text-center py-1 font-medium w-16">Status</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {comparisons.map((comp, idx) => (
+                                                                <tr key={idx} className="border-t border-slate-100">
+                                                                    <td className="py-1.5 font-mono text-slate-600">{comp.field}</td>
+                                                                    <td className="py-1.5 font-mono">{comp.sent || '-'}</td>
+                                                                    <td className="py-1.5 font-mono">{comp.received || '-'}</td>
+                                                                    <td className="py-1.5 text-center">
+                                                                        {comp.match ? (
+                                                                            <Check className="w-4 h-4 text-green-600 mx-auto" />
+                                                                        ) : (
+                                                                            <X className="w-4 h-4 text-red-600 mx-auto" />
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </CardContent>
+                )}
+            </Card>
 
             {/* Filters */}
             <Card>

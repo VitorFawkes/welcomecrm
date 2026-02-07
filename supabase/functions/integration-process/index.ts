@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import postgres from "https://deno.land/x/postgresjs@v3.4.4/mod.js"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -108,6 +109,25 @@ Deno.serve(async (req) => {
                 .eq('id', eventId);
             return error;
         }
+
+        // Direct Postgres connection for card updates (loop prevention)
+        // SET LOCAL app.update_source = 'integration' prevents the outbound trigger from firing
+        const databaseUrl = Deno.env.get('SUPABASE_DB_URL');
+        const pgSql = databaseUrl ? postgres(databaseUrl, { ssl: 'require' }) : null;
+
+        const updateCardSafe = async (cardId: string, payload: Record<string, any>) => {
+            if (!pgSql) {
+                console.warn('[integration-process] SUPABASE_DB_URL not set, using REST (loop prevention disabled)');
+                const { error } = await supabase.from('cards').update(payload).eq('id', cardId);
+                if (error) throw new Error(`Card Update Error: ${error.message}`);
+                return;
+            }
+            const columns = Object.keys(payload);
+            await pgSql.begin(async (tx: any) => {
+                await tx`SELECT set_config('app.update_source', 'integration', true)`;
+                await tx`UPDATE cards SET ${pgSql(payload, columns)} WHERE id = ${cardId}::uuid`;
+            });
+        };
 
         // Parse body
         let body: Record<string, any> = {};
@@ -282,7 +302,14 @@ Deno.serve(async (req) => {
                 // Check entity type
                 const entityMatch = t.entity_types.includes(entityType === 'deal' ? 'deal' : 'contact');
 
-                return pipelineMatch && stageMatch && ownerMatch && entityMatch;
+                // Check action_type compatibility WITHIN the find criteria
+                // This ensures create_only triggers don't steal matches from update_only triggers
+                const actionType = t.action_type || 'all';
+                const actionMatch = actionType === 'all'
+                    || (actionType === 'create_only' && eventType === 'deal_add')
+                    || (actionType === 'update_only' && eventType !== 'deal_add');
+
+                return pipelineMatch && stageMatch && ownerMatch && entityMatch && actionMatch;
             });
 
             if (!matchingTrigger) {
@@ -292,26 +319,6 @@ Deno.serve(async (req) => {
                     allowed: true,
                     reason: `No specific trigger matched - allowing by default (Pipeline ${pipelineId}, Stage ${stageId}${ownerId ? `, Owner ${ownerId}` : ''})`,
                     trigger: null
-                };
-            }
-
-            // Check action_type restrictions:
-            // - 'create_only': only allows deal_add (create new card)
-            // - 'update_only': only allows deal_update and deal_state (update existing card)
-            // - 'all': allows everything
-            if (matchingTrigger.action_type === 'create_only' && eventType !== 'deal_add') {
-                return {
-                    allowed: false,
-                    reason: `Trigger is create_only, but event is ${eventType}`,
-                    trigger: matchingTrigger
-                };
-            }
-
-            if (matchingTrigger.action_type === 'update_only' && eventType === 'deal_add') {
-                return {
-                    allowed: false,
-                    reason: `Trigger is update_only, but event is deal_add (creates new cards)`,
-                    trigger: matchingTrigger
                 };
             }
 
@@ -531,15 +538,11 @@ Deno.serve(async (req) => {
                                         cardUpdates.produto_data = produtoData;
                                         cardUpdates.updated_at = new Date().toISOString();
 
-                                        const { error: cardUpdateErr } = await supabase
-                                            .from('cards')
-                                            .update(cardUpdates)
-                                            .eq('id', card.id);
-
-                                        if (cardUpdateErr) {
-                                            console.error(`Failed to update card ${card.id} with contact fields:`, cardUpdateErr);
-                                        } else {
+                                        try {
+                                            await updateCardSafe(card.id, cardUpdates);
                                             log += ` | Updated Card ${card.id} with ${Object.keys(marketingData).length} mapped fields`;
+                                        } catch (cardUpdateErr) {
+                                            console.error(`Failed to update card ${card.id} with contact fields:`, cardUpdateErr);
                                         }
                                     }
                                 }
@@ -1084,12 +1087,7 @@ Deno.serve(async (req) => {
                     }
 
                     if (existingCard) {
-                        const { error: uErr } = await supabase
-                            .from('cards')
-                            .update(cardPayload)
-                            .eq('id', existingCard.id);
-
-                        if (uErr) throw new Error(`Card Update Error: ${uErr.message}`);
+                        await updateCardSafe(existingCard.id, cardPayload);
                         log = `Updated Card ${existingCard.id} (Pipeline: ${topology?.pipelineName})`;
 
                     } else {
@@ -1127,6 +1125,8 @@ Deno.serve(async (req) => {
                 results.push({ id: event.id, status: 'failed', error: err.message });
             }
         }
+
+        if (pgSql) await pgSql.end();
 
         return new Response(JSON.stringify({
             message: `Processed ${stats.updated + stats.processed_shadow} events`,
