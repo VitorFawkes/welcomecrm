@@ -94,7 +94,13 @@ Deno.serve(async (req) => {
         )
 
         // Helper to update event status
-        const updateEventStatus = async (eventId: string, status: string, log: string, triggerId?: string | null) => {
+        const updateEventStatus = async (
+            eventId: string,
+            status: string,
+            log: string,
+            triggerId?: string | null,
+            retryInfo?: { attempts: number; next_retry_at: string | null }
+        ) => {
             const update: Record<string, unknown> = {
                 status,
                 processing_log: log,
@@ -103,12 +109,22 @@ Deno.serve(async (req) => {
             if (triggerId !== undefined) {
                 update.matched_trigger_id = triggerId;
             }
+            if (retryInfo) {
+                update.attempts = retryInfo.attempts;
+                update.next_retry_at = retryInfo.next_retry_at;
+            }
             const { error } = await supabase
                 .from('integration_events')
                 .update(update)
                 .eq('id', eventId);
             return error;
         }
+
+        // Errors that should NOT be retried (need config fix, not retry)
+        const isRetryableError = (message: string): boolean => {
+            const permanentErrors = ['Unmapped Stage', 'Topology Error', 'Integration not found'];
+            return !permanentErrors.some(pe => message.includes(pe));
+        };
 
         // Direct Postgres connection for card updates (loop prevention)
         // SET LOCAL app.update_source = 'integration' prevents the outbound trigger from firing
@@ -145,10 +161,13 @@ Deno.serve(async (req) => {
             .in('key', ['SHADOW_MODE_ENABLED', 'WRITE_MODE_ENABLED', 'ALLOWED_EVENT_TYPES']);
 
         const shadowModeSetting = settings?.find(s => s.key === 'SHADOW_MODE_ENABLED')?.value === 'true';
-        const writeModeSetting = settings?.find(s => s.key === 'WRITE_MODE_ENABLED')?.value === 'true';
+        const writeModeSetting = settings?.find(s => s.key === 'WRITE_MODE_ENABLED')?.value;
         const allowedEventTypesSetting = settings?.find(s => s.key === 'ALLOWED_EVENT_TYPES')?.value;
         const allowedEventTypes = allowedEventTypesSetting ? allowedEventTypesSetting.split(',').map((t: string) => t.trim()) : ['deal_add', 'deal_update', 'deal_state'];
-        const isShadowMode = shadowModeSetting || !writeModeSetting;
+        // FIX: Default to WRITE mode. Shadow only if EXPLICITLY enabled or writes EXPLICITLY disabled.
+        // Before: !writeModeSetting caused shadow mode when setting didn't exist in DB
+        const isShadowMode = shadowModeSetting || writeModeSetting === 'false';
+        console.log(`[integration-process] Mode: ${isShadowMode ? 'SHADOW' : 'WRITE'} (shadow=${shadowModeSetting}, write=${writeModeSetting || 'not_set'})`);
 
         // 1. Fetch Events to Process
         let query = supabase
@@ -157,11 +176,14 @@ Deno.serve(async (req) => {
             .order('created_at', { ascending: true });
 
         // If specific event IDs provided, fetch those (any status) without limit;
-        // otherwise fetch pending with limit of 50
+        // otherwise fetch pending with limit of 50, respecting retry backoff
         if (event_ids && Array.isArray(event_ids) && event_ids.length > 0) {
             query = query.in('id', event_ids);
         } else {
-            query = query.eq('status', 'pending').limit(50);
+            const now = new Date().toISOString();
+            query = query.eq('status', 'pending')
+                .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
+                .limit(50);
         }
 
         if (integration_id) {
@@ -313,11 +335,12 @@ Deno.serve(async (req) => {
             });
 
             if (!matchingTrigger) {
-                // Non-blocking: allow events even when no specific trigger matches
-                // This prevents silent drops - events flow through and can be monitored
+                // FIX: When triggers ARE configured for this integration, treat them as an allowlist.
+                // Events that don't match any trigger should be BLOCKED, not allowed.
+                // This ensures rules like "create_only from Stage 42" are actually enforced.
                 return {
-                    allowed: true,
-                    reason: `No specific trigger matched - allowing by default (Pipeline ${pipelineId}, Stage ${stageId}${ownerId ? `, Owner ${ownerId}` : ''})`,
+                    allowed: false,
+                    reason: `No trigger matched (Pipeline ${pipelineId}, Stage ${stageId}, Event ${eventType}${ownerId ? `, Owner ${ownerId}` : ''})`,
                     trigger: null
                 };
             }
@@ -1120,9 +1143,36 @@ Deno.serve(async (req) => {
 
             } catch (err: any) {
                 console.error(`Event ${event.id} failed:`, err);
-                await updateEventStatus(event.id, 'failed', err.message, matchedTrigger?.id || null);
+
+                const MAX_RETRIES = 3;
+                const currentAttempts = (event.attempts || 0) + 1;
+                const retryable = isRetryableError(err.message);
+                const isFinalFailure = currentAttempts >= MAX_RETRIES || !retryable;
+                const newStatus = isFinalFailure ? 'failed' : 'pending';
+
+                // Exponential backoff: 2min, 8min, 32min (capped at 30min)
+                const retryDelayMs = retryable
+                    ? Math.min(2 * 60 * 1000 * Math.pow(4, currentAttempts - 1), 30 * 60 * 1000)
+                    : 0;
+
+                const logPrefix = isFinalFailure
+                    ? `[FINAL attempt ${currentAttempts}/${MAX_RETRIES}]`
+                    : `[Retry ${currentAttempts}/${MAX_RETRIES}, next in ${Math.round(retryDelayMs / 60000)}min]`;
+
+                await updateEventStatus(
+                    event.id,
+                    newStatus,
+                    `${logPrefix} ${err.message}`,
+                    matchedTrigger?.id || null,
+                    {
+                        attempts: currentAttempts,
+                        next_retry_at: retryable && !isFinalFailure
+                            ? new Date(Date.now() + retryDelayMs).toISOString()
+                            : null
+                    }
+                );
                 stats.errors++;
-                results.push({ id: event.id, status: 'failed', error: err.message });
+                results.push({ id: event.id, status: newStatus, error: err.message, attempt: currentAttempts });
             }
         }
 

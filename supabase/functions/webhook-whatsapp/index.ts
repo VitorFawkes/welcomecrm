@@ -195,17 +195,28 @@ Deno.serve(async (req) => {
             .eq("id", platform.id);
 
         // 7.5 Forward to n8n Julia agent (fire-and-forget)
-        // Only for Echo provider with new (non-duplicate) events.
-        // The n8n workflow handles its own filtering (from_me, groups, AI active check).
+        // Only for Echo provider with new (non-duplicate) events from allowed lines.
+        // Reads JULIA_PHONE_LABELS from integration_settings (configurable via CRM admin).
         if (provider === "echo" && insertedIds.length > 0) {
             const n8nUrl = Deno.env.get("N8N_JULIA_WEBHOOK_URL");
             if (n8nUrl) {
-                for (const singlePayload of payloads) {
-                    fetch(n8nUrl, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(singlePayload),
-                    }).catch((err) => console.error("n8n forward error:", err));
+                const { data: labelSetting } = await supabaseClient
+                    .from("integration_settings")
+                    .select("value")
+                    .eq("key", "JULIA_PHONE_LABELS")
+                    .single();
+                const allowedLabels = (labelSetting?.value || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+                if (allowedLabels.length > 0) {
+                    for (const singlePayload of payloads) {
+                        const phoneLabel = singlePayload?.phone_number || singlePayload?.data?.phone_number;
+                        if (phoneLabel && allowedLabels.includes(phoneLabel)) {
+                            fetch(n8nUrl, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(singlePayload),
+                            }).catch((err) => console.error("n8n forward error:", err));
+                        }
+                    }
                 }
             }
         }

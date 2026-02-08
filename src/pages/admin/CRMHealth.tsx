@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { AlertTriangle, Clock, CalendarX, ArrowRight, Activity, Wifi } from 'lucide-react'
+import { AlertTriangle, Clock, CalendarX, ArrowRight, Activity, Wifi, Bot } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { Database } from '../../database.types'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useHealthAlerts } from '@/hooks/useIntegrationHealth'
 import IntegrationHealthTab from '@/components/admin/health/IntegrationHealthTab'
+import JuliaIAConfig from '@/components/admin/JuliaIAConfig'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
 export default function CRMHealth() {
     const [searchParams] = useSearchParams()
-    const defaultTab = searchParams.get('tab') === 'integrations' ? 'integrations' : 'operational'
+    const tabParam = searchParams.get('tab')
+    const defaultTab = tabParam === 'integrations' ? 'integrations' : tabParam === 'julia' ? 'julia' : 'operational'
 
     const { data: cards, isLoading } = useQuery({
         queryKey: ['crm-health-cards'],
@@ -65,6 +67,10 @@ export default function CRMHealth() {
                                 {activeAlertCount}
                             </span>
                         )}
+                    </TabsTrigger>
+                    <TabsTrigger value="julia" className="gap-2 text-sm">
+                        <Bot className="w-4 h-4" />
+                        Julia IA
                     </TabsTrigger>
                 </TabsList>
 
@@ -139,6 +145,10 @@ export default function CRMHealth() {
 
                 <TabsContent value="integrations">
                     <IntegrationHealthTab />
+                </TabsContent>
+
+                <TabsContent value="julia">
+                    <JuliaIAConfig />
                 </TabsContent>
             </Tabs>
         </div>

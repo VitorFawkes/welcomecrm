@@ -67,8 +67,9 @@ Deno.serve(async (req) => {
         const integrationId = url.searchParams.get("id");
 
         if (!integrationId) {
-            return new Response(JSON.stringify({ error: "Missing integration_id" }), {
-                status: 400,
+            console.warn("Webhook received without integration_id");
+            return new Response(JSON.stringify({ message: "Accepted" }), {
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
@@ -81,8 +82,9 @@ Deno.serve(async (req) => {
             .single();
 
         if (fetchError || !integration) {
-            return new Response(JSON.stringify({ error: "Integration not found" }), {
-                status: 404,
+            console.warn(`Integration not found: ${integrationId}`);
+            return new Response(JSON.stringify({ message: "Accepted" }), {
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
@@ -108,8 +110,9 @@ Deno.serve(async (req) => {
         }
 
         if (!integration.is_active) {
-            return new Response(JSON.stringify({ error: "Integration is inactive" }), {
-                status: 403,
+            console.log(`Integration ${integrationId} is inactive, ignoring webhook`);
+            return new Response(JSON.stringify({ message: "Accepted" }), {
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
@@ -185,8 +188,8 @@ Deno.serve(async (req) => {
 
         if (insertError) {
             console.error("Failed to insert event:", insertError);
-            return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-                status: 500,
+            return new Response(JSON.stringify({ message: "Accepted" }), {
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
@@ -199,10 +202,12 @@ Deno.serve(async (req) => {
             const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
 
             const autoProcess = async (eventId: string) => {
-                for (let attempt = 1; attempt <= 2; attempt++) {
+                const MAX_ATTEMPTS = 3;
+                const BACKOFFS = [2000, 5000]; // 2s, 5s between retries
+                for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
                     try {
                         const controller = new AbortController();
-                        const timeout = setTimeout(() => controller.abort(), 10000);
+                        const timeout = setTimeout(() => controller.abort(), 25000); // 25s (edge fn limit is 30s)
 
                         const res = await fetch(`${supabaseUrl}/functions/v1/integration-process`, {
                             method: 'POST',
@@ -223,12 +228,13 @@ Deno.serve(async (req) => {
                             console.log(`Auto-process OK for event ${eventId} (attempt ${attempt})`);
                             return;
                         }
-                        console.warn(`Auto-process attempt ${attempt} for event ${eventId}: ${res.status}`);
+                        console.warn(`Auto-process attempt ${attempt}/${MAX_ATTEMPTS} for event ${eventId}: ${res.status}`);
                     } catch (err) {
-                        console.warn(`Auto-process attempt ${attempt} for event ${eventId} failed:`, err);
+                        console.warn(`Auto-process attempt ${attempt}/${MAX_ATTEMPTS} for event ${eventId} failed:`, err);
                     }
-                    if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+                    if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, BACKOFFS[attempt - 1]));
                 }
+                console.error(`Auto-process FAILED for event ${eventId} after ${MAX_ATTEMPTS} attempts - will be picked up by cron`);
             };
 
             // Non-blocking: don't await, but retry logic runs in background
@@ -241,9 +247,9 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        console.error("Error:", error);
-        return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-            status: 500,
+        console.error("Webhook ingest error:", error);
+        return new Response(JSON.stringify({ message: "Accepted" }), {
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }

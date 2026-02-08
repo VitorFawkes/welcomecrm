@@ -65,7 +65,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Pipeline | KanbanBoard, PipelineListView, CreateCardModal, FilterDrawer |
 | Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements, FinanceiroWidget |
 | Propostas | ProposalBuilder, SectionEditor, AddItemMenu, VersionHistory |
-| Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings |
+| Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings, JuliaIAConfig |
 | Health | IntegrationHealthTab, PulseGrid, ActiveAlertsList, HealthRulesConfig |
 | Pessoas | PeopleGrid, PersonDetailDrawer, ContactForm |
 | Leads | LeadsTable, LeadsFilters, LeadsBulkActions |
