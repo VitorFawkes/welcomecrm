@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle, MessageSquare } from 'lucide-react'
+import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle, MessageSquare, Clock } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { SmartTaskModal } from './SmartTaskModal'
@@ -11,6 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../ui/Button'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
+import type { Database } from '../../database.types'
+
+type Tarefa = Database['public']['Tables']['tarefas']['Row']
+type TarefaUpdate = Database['public']['Tables']['tarefas']['Update']
+type TaskOutcome = Database['public']['Tables']['task_type_outcomes']['Row']
 
 interface CardTasksProps {
     cardId: string
@@ -18,12 +23,12 @@ interface CardTasksProps {
 
 export default function CardTasks({ cardId }: CardTasksProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
-    const [editingTask, setEditingTask] = useState<any>(null)
+    const [editingTask, setEditingTask] = useState<Tarefa | null>(null)
     const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reschedule'>('create')
 
     // Outcome Modal State
     const [outcomeModalOpen, setOutcomeModalOpen] = useState(false)
-    const [taskToComplete, setTaskToComplete] = useState<any>(null)
+    const [taskToComplete, setTaskToComplete] = useState<Tarefa | null>(null)
     const [outcomeResult, setOutcomeResult] = useState<string>('realizada')
     const [outcomeFeedback, setOutcomeFeedback] = useState('')
 
@@ -42,19 +47,22 @@ export default function CardTasks({ cardId }: CardTasksProps) {
 
             if (error) throw error
 
-            // Custom sort: Active first, then by Created At DESC (Newest First)
+            // Custom sort: Active mudanças first, then active, then completed
             return data.sort((a, b) => {
-                // 1. Active vs Completed
                 const aIsActive = !a.concluida;
                 const bIsActive = !b.concluida;
+                const aIsMudanca = a.tipo === 'solicitacao_mudanca';
+                const bIsMudanca = b.tipo === 'solicitacao_mudanca';
 
-                if (aIsActive && !bIsActive) return -1;
-                if (!aIsActive && bIsActive) return 1;
+                // 1. Active mudanças first
+                const aGroup = aIsActive && aIsMudanca ? 0 : aIsActive ? 1 : 2;
+                const bGroup = bIsActive && bIsMudanca ? 0 : bIsActive ? 1 : 2;
 
-                // 2. Sort by Created At DESC
+                if (aGroup !== bGroup) return aGroup - bGroup;
+
+                // 2. Within same group: newest first
                 const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
                 const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-
                 return timeB - timeA;
             });
         },
@@ -92,12 +100,12 @@ export default function CardTasks({ cardId }: CardTasksProps) {
     const getResponsibleName = (id: string) => {
         if (!profiles) return null
         const profile = profiles.find(p => p.id === id)
-        return profile ? (profile.nome || profile.email) : null
+        return profile ? String(profile.nome || profile.email || '') : null
     }
 
     // Mutations
     const updateTaskMutation = useMutation({
-        mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
+        mutationFn: async ({ id, updates }: { id: string, updates: TarefaUpdate }) => {
             // Validar ID antes de tentar atualizar
             if (!id || typeof id !== 'string' || id.trim() === '') {
                 throw new Error('ID da tarefa inválido ou não fornecido')
@@ -144,11 +152,11 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         }
     })
 
-    const handleToggleComplete = (task: any) => {
+    const handleToggleComplete = (task: Tarefa) => {
         const isCompleted = !task.concluida
 
         // Intercept Completion if outcomes exist for this type
-        const taskOutcomes = outcomes?.filter((o: any) => o.tipo === task.tipo) || []
+        const taskOutcomes = outcomes?.filter((o) => o.tipo === task.tipo) || []
 
         if (isCompleted && taskOutcomes.length > 0) {
             setTaskToComplete(task)
@@ -180,13 +188,13 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         })
     }
 
-    const handleEdit = (task: any) => {
+    const handleEdit = (task: Tarefa) => {
         setEditingTask(task)
         setModalMode('edit')
         setIsModalOpen(true)
     }
 
-    const handleReschedule = (task: any) => {
+    const handleReschedule = (task: Tarefa) => {
         setEditingTask(task)
         setModalMode('reschedule')
         setIsModalOpen(true)
@@ -216,7 +224,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
             case 'enviar_proposta': return 'Proposta'
             case 'followup': return 'Follow-up'
             case 'ligacao': return 'Ligação'
-            case 'solicitacao_mudanca': return 'Mudança de Destino'
+            case 'solicitacao_mudanca': return 'Mudança'
             case 'tarefa': return 'Tarefa'
             default: return type?.replace('_', ' ')
         }
@@ -233,7 +241,26 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         }
     }
 
-    const isRescheduled = (task: any) => task.rescheduled_from_id !== null
+    const isRescheduled = (task: Tarefa) => task.rescheduled_from_id !== null
+
+    const formatDuration = (createdAt: string, completedAt: string) => {
+        const ms = new Date(completedAt).getTime() - new Date(createdAt).getTime()
+        const mins = Math.floor(ms / 60000)
+        if (mins < 60) return `${mins}min`
+        const hours = Math.floor(mins / 60)
+        if (hours < 24) return `${hours}h ${mins % 60}min`
+        const days = Math.floor(hours / 24)
+        return `${days}d`
+    }
+
+    const getCategoryLabel = (key: string) => {
+        const map: Record<string, string> = {
+            voo: 'Voo', hotel: 'Hotel', datas: 'Datas', financeiro: 'Financeiro',
+            transfer: 'Transfer', passeio: 'Passeio', erro: 'Erro Op.',
+            fornecedor: 'Fornecedor', upsell: 'Upsell', outro: 'Outro'
+        }
+        return map[key] || key
+    }
 
     const formatTaskDate = (dateStr: string) => {
         const date = new Date(dateStr)
@@ -242,8 +269,8 @@ export default function CardTasks({ cardId }: CardTasksProps) {
         return format(date, "dd/MM", { locale: ptBR })
     }
 
-    const renderOutcomeButtons = (filteredOutcomes: any[]) => {
-        return filteredOutcomes.map((outcome: any) => (
+    const renderOutcomeButtons = (filteredOutcomes: TaskOutcome[]) => {
+        return filteredOutcomes.map((outcome) => (
             <button
                 key={outcome.outcome_key}
                 onClick={() => setOutcomeResult(outcome.outcome_key)}
@@ -275,7 +302,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     Agenda & Tarefas
                     {tasks && tasks.length > 0 && (
                         <span className="bg-gray-200 text-gray-700 text-[10px] px-1.5 py-0.5 rounded-full font-medium">
-                            {tasks.filter((t: any) => !t.concluida).length}
+                            {tasks.filter((t) => !t.concluida).length}
                         </span>
                     )}
                 </h3>
@@ -309,15 +336,22 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                         </button>
                     </div>
                 ) : (
-                    tasks?.map((task: any) => {
-                        const isLate = isPast(new Date(task.data_vencimento)) && !isToday(new Date(task.data_vencimento)) && !task.concluida
+                    tasks?.map((task) => {
+                        const isLate = task.data_vencimento ? isPast(new Date(task.data_vencimento)) && !isToday(new Date(task.data_vencimento)) && !task.concluida : false
                         const responsibleName = task.responsavel_id ? getResponsibleName(task.responsavel_id) : null
+
+                        const isMudanca = task.tipo === 'solicitacao_mudanca'
+                        const changeCategory = (task.metadata as Record<string, unknown> | null)?.change_category as string | undefined
 
                         return (
                             <div
                                 key={task.id}
                                 onClick={() => handleEdit(task)}
-                                className={`p-3 hover:bg-gray-50 transition-colors group relative cursor-pointer ${task.concluida ? (isRescheduled(task) ? 'opacity-75 bg-gray-50/30' : 'opacity-60 bg-gray-50/50') : ''}`}
+                                className={`p-3 hover:bg-gray-50 transition-colors group relative cursor-pointer ${
+                                    isMudanca && !task.concluida
+                                        ? 'border-l-4 border-l-orange-400 bg-orange-50/40'
+                                        : ''
+                                } ${task.concluida ? (isRescheduled(task) ? 'opacity-75 bg-gray-50/30' : 'opacity-60 bg-gray-50/50') : ''}`}
                             >
                                 <div className="flex items-start gap-3">
                                     {/* Checkbox / Toggle */}
@@ -333,9 +367,9 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                             <p className={`text-sm font-medium text-gray-900 truncate pr-2 ${task.concluida && !isRescheduled(task) ? 'line-through text-gray-500' : ''}`}>
                                                 {task.titulo}
                                             </p>
-                                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border flex-shrink-0 capitalize ${getTypeColor(task.tipo)} flex items-center gap-1`}>
-                                                {getTypeIcon(task.tipo)}
-                                                {getTypeLabel(task.tipo)}
+                                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border flex-shrink-0 capitalize ${getTypeColor(task.tipo || '')} flex items-center gap-1`}>
+                                                {getTypeIcon(task.tipo || '')}
+                                                {getTypeLabel(task.tipo || '')}
                                             </span>
                                         </div>
 
@@ -368,14 +402,30 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 </div>
                                             )}
 
+                                            {/* Category Badge (mudança only) */}
+                                            {isMudanca && changeCategory && (
+                                                <div className="flex items-center gap-1 text-xs text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
+                                                    <span className="font-medium">{getCategoryLabel(String(changeCategory))}</span>
+                                                </div>
+                                            )}
+
                                             {/* Outcome Badge */}
                                             {task.concluida && task.resultado && (
-                                                <div className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${task.resultado === 'realizada' ? 'text-green-600 bg-green-50 border-green-200' :
-                                                    task.resultado === 'cancelada' ? 'text-red-600 bg-red-50 border-red-200' :
-                                                        task.resultado === 'adiada' ? 'text-orange-600 bg-orange-50 border-orange-200' :
-                                                            'text-gray-600 bg-gray-50 border-gray-200'
+                                                <div className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${task.resultado === 'realizada' || task.resultado === 'resolvido' ? 'text-green-600 bg-green-50 border-green-200' :
+                                                    task.resultado === 'cancelada' || task.resultado === 'cancelado_cliente' ? 'text-red-600 bg-red-50 border-red-200' :
+                                                        task.resultado === 'adiada' || task.resultado === 'escalado' ? 'text-orange-600 bg-orange-50 border-orange-200' :
+                                                            task.resultado === 'resolvido_com_custo' ? 'text-amber-600 bg-amber-50 border-amber-200' :
+                                                                'text-gray-600 bg-gray-50 border-gray-200'
                                                     }`}>
-                                                    <span className="font-medium capitalize">{task.resultado.replace('_', ' ')}</span>
+                                                    <span className="font-medium capitalize">{task.resultado.replace(/_/g, ' ')}</span>
+                                                </div>
+                                            )}
+
+                                            {/* Duration Badge (completed mudança) */}
+                                            {isMudanca && task.concluida && task.concluida_em && task.created_at && (
+                                                <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                                    <Clock className="w-3 h-3" />
+                                                    <span>{formatDuration(task.created_at, task.concluida_em)}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -465,7 +515,7 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 <span>WHATSAPP</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
-                                                {renderOutcomeButtons(outcomes?.filter((o: any) => ['respondido', 'visualizado', 'enviado'].includes(o.outcome_key)) || [])}
+                                                {renderOutcomeButtons(outcomes?.filter((o) => ['respondido', 'visualizado', 'enviado'].includes(o.outcome_key)) || [])}
                                             </div>
                                         </div>
                                         <div>
@@ -474,13 +524,13 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                                                 <span>LIGAÇÃO</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
-                                                {renderOutcomeButtons(outcomes?.filter((o: any) => ['atendeu', 'nao_atendeu', 'caixa_postal', 'numero_invalido'].includes(o.outcome_key)) || [])}
+                                                {renderOutcomeButtons(outcomes?.filter((o) => ['atendeu', 'nao_atendeu', 'caixa_postal', 'numero_invalido'].includes(o.outcome_key)) || [])}
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-2 gap-3">
-                                        {taskToComplete && renderOutcomeButtons(outcomes?.filter((o: any) => o.tipo === taskToComplete.tipo) || [])}
+                                        {taskToComplete && renderOutcomeButtons(outcomes?.filter((o) => o.tipo === taskToComplete.tipo) || [])}
                                     </div>
                                 )}
                             </div>

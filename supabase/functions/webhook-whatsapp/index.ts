@@ -194,6 +194,22 @@ Deno.serve(async (req) => {
             .update({ last_event_at: new Date().toISOString() })
             .eq("id", platform.id);
 
+        // 7.5 Forward to n8n Julia agent (fire-and-forget)
+        // Only for Echo provider with new (non-duplicate) events.
+        // The n8n workflow handles its own filtering (from_me, groups, AI active check).
+        if (provider === "echo" && insertedIds.length > 0) {
+            const n8nUrl = Deno.env.get("N8N_JULIA_WEBHOOK_URL");
+            if (n8nUrl) {
+                for (const singlePayload of payloads) {
+                    fetch(n8nUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(singlePayload),
+                    }).catch((err) => console.error("n8n forward error:", err));
+                }
+            }
+        }
+
         // 8. Return response
         if (errors.length > 0 && insertedIds.length === 0) {
             return new Response(

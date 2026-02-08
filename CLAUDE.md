@@ -35,7 +35,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Usuários | admin/UserManagement.tsx | Gestão de usuários/roles |
 | Categorias | admin/CategoryManagement.tsx | Categorias/tags |
 | Motivos Perda | admin/LossReasonManagement.tsx | Config motivos de perda |
-| Saúde CRM | admin/CRMHealth.tsx | Monitoramento do sistema |
+| Saúde CRM | admin/CRMHealth.tsx | Monitoramento do sistema + integrações (tabs) |
 | Cadência | admin/cadence/* | Motor de automação de vendas v3 |
 | Lixeira | admin/Lixeira.tsx | Itens deletados |
 | Proposta Pública | public/ProposalView.tsx | Visualização do cliente |
@@ -55,6 +55,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | useLeadsQuery | 5+ | Fetch de dados de leads |
 | useSubCards | 5+ | Cards filhos (viagem grupo) |
 | useQualityGate | 4+ | Validação de mudança de stage |
+| useIntegrationHealth | 3+ | Alertas, regras e pulse de saúde das integrações |
 | useStageRequirements | 4+ | Campos obrigatórios por stage |
 
 ### Componentes Principais (src/components/)
@@ -62,9 +63,10 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 |------|-------------------|
 | Layout | Header, Sidebar, Layout, ProductSwitcher, NotificationCenter |
 | Pipeline | KanbanBoard, PipelineListView, CreateCardModal, FilterDrawer |
-| Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements |
+| Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements, FinanceiroWidget |
 | Propostas | ProposalBuilder, SectionEditor, AddItemMenu, VersionHistory |
 | Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings |
+| Health | IntegrationHealthTab, PulseGrid, ActiveAlertsList, HealthRulesConfig |
 | Pessoas | PeopleGrid, PersonDetailDrawer, ContactForm |
 | Leads | LeadsTable, LeadsFilters, LeadsBulkActions |
 | Trips | TripsTaxBadge, group/* (GroupDashboard, GroupTravelersList) |
@@ -89,6 +91,35 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | integration_outbound_queue | Fila de sync externo | → cards |
 | cadence_instances | Cadências ativas | → cards, cadence_templates |
 | monde_sales | Dados Monde | → cards |
+| integration_health_rules | Regras de monitoramento | — |
+| integration_health_alerts | Alertas gerados | → integration_health_rules, profiles |
+| integration_health_pulse | Cache de ultimo evento por canal | — |
+
+### Campos IA no Cards (Agente WhatsApp)
+| Coluna | Tipo | Propósito |
+|--------|------|-----------|
+| `ai_resumo` | TEXT | Resumo de informações do cliente mantido pelo agente IA |
+| `ai_contexto` | TEXT | Contexto cronológico da conversa mantido pelo agente IA |
+| `ai_responsavel` | TEXT (default 'ia') | Quem responde: 'ia' ou 'humano' |
+
+### Scripts (scripts/)
+| Script | O que faz |
+|--------|-----------|
+| create-n8n-travel-agent.js | Cria workflow n8n do agente Julia (WhatsApp AI) por transformação do modelo |
+
+### Docs Extras (docs/)
+| Arquivo | O que faz |
+|---------|-----------|
+| welcome-trips-faq.md | FAQ da Welcome Trips para ferramenta Info do Agent 3 (Julia) |
+
+### Workflow n8n — Agente Julia (WhatsApp AI)
+- **Workflow ID:** `tvh1SN7VDgy8V3VI`
+- **Webhook:** `https://n8n-n8n.ymnmx7.easypanel.host/webhook/welcome-trips-agent`
+- **61 nós** — Pipeline: Echo webhook → Process → Lookup/Create contato+card → Check AI Active → Media routing → Redis debounce → Agent 1 (contexto) → Agent 2 (dados) → Agent 3 (Julia responde) → Format → Send via Meta Cloud API (save outbound com external_id no loop)
+- **Dedup:** Unique index `(platform_id, external_id)` + ON CONFLICT no `process_whatsapp_raw_event_v2` + human takeover automático via `ecko_agent_id`
+- **Persona:** Julia, Consultora de Viagens
+- **Objetivo:** Qualificar viagem → Convite taxa R$ 500 → Agendar reunião (via tarefa CRM)
+- **Meta Phone Number ID:** `775282882337610` (Trips)
 
 ### Views Importantes
 - `view_dashboard_funil` — Métricas do funil
@@ -160,6 +191,12 @@ npx supabase gen types typescript --project-id szyrzxvlptqqheizyrxu > src/databa
 # Qualidade
 npm run build          # build completo (inclui typecheck)
 npm run sync:fix       # atualizar CODEBASE.md automaticamente
+```
+
+## n8n Workflow (Agente Julia)
+```bash
+# Recriar workflow do agente Julia (WhatsApp AI)
+source .env && node scripts/create-n8n-travel-agent.js
 ```
 
 ## Referências Detalhadas

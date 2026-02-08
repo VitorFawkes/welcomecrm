@@ -1,136 +1,198 @@
-import { useState } from 'react';
-import { Bell, Info, AlertTriangle, XCircle, CheckCircle } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { Button } from '../ui/Button';
+import { Bell, AlertCircle, AlertTriangle, Info, MessageSquare, Zap, ArrowUpRight, Building2, Timer } from 'lucide-react'
+import { cn } from '../../lib/utils'
+import { Button } from '../ui/Button'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useHealthAlerts, type HealthAlert } from '@/hooks/useIntegrationHealth'
 
-// Mock Notifications - Should come from DB 'notifications' table
-const MOCK_NOTIFICATIONS = [
-    {
-        id: '1',
-        title: 'SLA Atrasado',
-        message: 'O card "Viagem Disney" está na etapa "Novo Lead" há mais de 2 horas.',
-        type: 'warning',
-        read: false,
-        created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString() // 30 mins ago
-    },
-    {
-        id: '2',
-        title: 'Novo Lead Atribuído',
-        message: 'Você recebeu um novo lead: "João Silva".',
-        type: 'info',
-        read: false,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() // 2 hours ago
-    },
-    {
-        id: '3',
-        title: 'Tarefa Concluída',
-        message: 'A tarefa "Enviar Orçamento" foi marcada como feita.',
-        type: 'success',
-        read: true,
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString() // 1 day ago
+const SEVERITY_ICON = {
+    critical: { icon: AlertCircle,   color: 'text-red-500' },
+    warning:  { icon: AlertTriangle, color: 'text-amber-500' },
+    info:     { icon: Info,          color: 'text-blue-500' },
+}
+
+const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+    whatsapp:       { label: 'WhatsApp',       icon: MessageSquare, color: 'text-green-600 bg-green-50' },
+    activecampaign: { label: 'ActiveCampaign', icon: Zap,           color: 'text-blue-600 bg-blue-50' },
+    outbound:       { label: 'Outbound',       icon: ArrowUpRight,  color: 'text-indigo-600 bg-indigo-50' },
+    monde:          { label: 'Monde',          icon: Building2,     color: 'text-purple-600 bg-purple-50' },
+    system:         { label: 'Sistema',        icon: Timer,         color: 'text-slate-600 bg-slate-100' },
+}
+
+function formatTimeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60_000)
+    if (mins < 1) return 'agora'
+    if (mins < 60) return `${mins}min`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h`
+    const days = Math.floor(hours / 24)
+    return `${days}d`
+}
+
+function alertSummary(alert: HealthAlert): string {
+    const ctx = alert.context
+    if (ctx.hours_since != null && ctx.threshold_hours != null) {
+        const h = Number(ctx.hours_since)
+        if (h >= 24) {
+            const days = Math.floor(h / 24)
+            return `${days} dia${days > 1 ? 's' : ''} sem atividade (limite: ${ctx.threshold_hours}h)`
+        }
+        return `${ctx.hours_since}h sem atividade (limite: ${ctx.threshold_hours}h)`
     }
-];
+    if (ctx.stuck_pending_count != null || ctx.stuck_count != null) {
+        const count = ctx.stuck_pending_count ?? ctx.stuck_count
+        return `${count} itens parados ha ${ctx.threshold_hours ?? '?'}h+`
+    }
+    if (ctx.overdue_count != null) {
+        return `${ctx.overdue_count} itens atrasados na fila`
+    }
+    if (ctx.failed_count != null && ctx.error_rate_percent != null) {
+        return `${ctx.failed_count} falhas (${ctx.error_rate_percent}% de erro)`
+    }
+    if (ctx.failed_count != null) {
+        return `${ctx.failed_count} falhas recentes`
+    }
+    return 'Atencao necessaria'
+}
+
+function alertDetail(alert: HealthAlert): string | null {
+    const ctx = alert.context
+    if (ctx.last_event_at) {
+        const d = new Date(String(ctx.last_event_at))
+        return `Ultimo: ${d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+    }
+    return null
+}
+
+function AlertItem({ alert, onNavigate }: { alert: HealthAlert; onNavigate: () => void }) {
+    const severity = (alert.rule?.severity ?? 'warning') as keyof typeof SEVERITY_ICON
+    const config = SEVERITY_ICON[severity]
+    const Icon = config.icon
+    const isUnread = alert.status === 'active'
+    const category = CATEGORY_CONFIG[alert.rule?.category ?? '']
+    const detail = alertDetail(alert)
+
+    return (
+        <div
+            className={cn(
+                'p-3 hover:bg-slate-50 transition-colors cursor-pointer',
+                isUnread && 'bg-blue-50/50'
+            )}
+            onClick={onNavigate}
+        >
+            <div className="flex gap-2.5">
+                <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', config.color)} />
+                <div className="flex-1 min-w-0">
+                    {/* Categoria + Tempo */}
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                        {category && (
+                            <span className={cn('text-[9px] font-bold px-1.5 py-0 rounded', category.color)}>
+                                {category.label}
+                            </span>
+                        )}
+                        <span className="text-[11px] text-slate-400 ml-auto">
+                            {formatTimeAgo(alert.fired_at)}
+                        </span>
+                    </div>
+                    {/* Nome da regra */}
+                    <p className={cn('text-sm text-slate-900 leading-snug', isUnread && 'font-semibold')}>
+                        {alert.rule?.label ?? alert.rule_key}
+                    </p>
+                    {/* Resumo do contexto */}
+                    <p className="text-xs text-slate-600 mt-0.5 leading-snug">
+                        {alertSummary(alert)}
+                    </p>
+                    {/* Detalhe extra */}
+                    {detail && (
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                            {detail}
+                        </p>
+                    )}
+                </div>
+                {isUnread && (
+                    <span className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 shrink-0" />
+                )}
+            </div>
+        </div>
+    )
+}
 
 export default function NotificationCenter({ triggerClassName }: { triggerClassName?: string }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+    const [isOpen, setIsOpen] = useState(false)
+    const navigate = useNavigate()
+    const { data: alerts } = useHealthAlerts(false)
 
-    const unreadCount = notifications.filter(n => !n.read).length;
+    const unreadCount = alerts?.filter(a => a.status === 'active').length ?? 0
+    const criticalCount = alerts?.filter(a => a.rule?.severity === 'critical').length ?? 0
 
-    const handleMarkAsRead = (id: string) => {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    };
-
-    const handleMarkAllRead = () => {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    };
+    const handleNavigateToHealth = () => {
+        setIsOpen(false)
+        navigate('/settings/operations/health?tab=integrations')
+    }
 
     return (
         <div className="relative">
             <Button
                 variant="ghost"
                 size="icon"
-                className={cn("relative text-gray-500 hover:text-gray-700", triggerClassName)}
+                className={cn('relative text-gray-500 hover:text-gray-700', triggerClassName)}
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
-                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                    <span className={cn(
+                        'absolute top-2 right-2 h-2 w-2 rounded-full ring-2 ring-white',
+                        criticalCount > 0 ? 'bg-red-500' : 'bg-amber-500'
+                    )} />
                 )}
             </Button>
 
             {isOpen && (
                 <>
-                    <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setIsOpen(false)}
-                    />
-                    <div className="absolute left-0 bottom-full mb-2 w-80 z-50 rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black ring-opacity-5 animate-in fade-in-0 zoom-in-95 duration-100">
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                            <h3 className="text-sm font-semibold text-gray-900">Notificações</h3>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                    <div className="absolute left-0 bottom-full mb-2 w-96 z-50 rounded-lg border border-slate-200 bg-white shadow-lg ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 duration-100">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                            <h3 className="text-sm font-semibold text-slate-900">Alertas de Integracao</h3>
                             {unreadCount > 0 && (
-                                <button
-                                    onClick={handleMarkAllRead}
-                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                    Marcar todas como lidas
-                                </button>
+                                <span className={cn(
+                                    'text-xs font-medium px-2 py-0.5 rounded-full',
+                                    criticalCount > 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                                )}>
+                                    {unreadCount} ativo{unreadCount > 1 ? 's' : ''}
+                                </span>
                             )}
                         </div>
                         <div className="max-h-96 overflow-y-auto">
-                            {notifications.length === 0 ? (
-                                <div className="p-4 text-center text-sm text-gray-500">
-                                    Nenhuma notificação.
+                            {!alerts?.length ? (
+                                <div className="p-6 text-center text-sm text-slate-500">
+                                    Nenhum alerta ativo. Integracoes funcionando.
                                 </div>
                             ) : (
-                                <div className="divide-y divide-gray-100">
-                                    {notifications.map((notification) => (
-                                        <div
-                                            key={notification.id}
-                                            className={cn(
-                                                "p-4 hover:bg-gray-50 transition-colors",
-                                                !notification.read && "bg-blue-50/50"
-                                            )}
-                                        >
-                                            <div className="flex gap-3">
-                                                <div className="flex-shrink-0 mt-0.5">
-                                                    {notification.type === 'warning' && <AlertTriangle className="h-5 w-5 text-yellow-500" />}
-                                                    {notification.type === 'error' && <XCircle className="h-5 w-5 text-red-500" />}
-                                                    {notification.type === 'success' && <CheckCircle className="h-5 w-5 text-green-500" />}
-                                                    {notification.type === 'info' && <Info className="h-5 w-5 text-blue-500" />}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className={cn("text-sm font-medium text-gray-900", !notification.read && "font-semibold")}>
-                                                        {notification.title}
-                                                    </p>
-                                                    <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
-                                                        {notification.message}
-                                                    </p>
-                                                    <p className="text-xs text-gray-400 mt-1">
-                                                        {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </p>
-                                                </div>
-                                                {!notification.read && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleMarkAsRead(notification.id);
-                                                        }}
-                                                        className="flex-shrink-0 text-blue-600 hover:text-blue-800"
-                                                        title="Marcar como lida"
-                                                    >
-                                                        <div className="h-2 w-2 rounded-full bg-blue-600" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
+                                <div className="divide-y divide-slate-100">
+                                    {alerts.map(alert => (
+                                        <AlertItem
+                                            key={alert.id}
+                                            alert={alert}
+                                            onNavigate={handleNavigateToHealth}
+                                        />
                                     ))}
                                 </div>
                             )}
                         </div>
+                        {(alerts?.length ?? 0) > 0 && (
+                            <div className="border-t border-slate-100 p-2">
+                                <button
+                                    onClick={handleNavigateToHealth}
+                                    className="w-full text-center text-xs text-blue-600 hover:text-blue-800 font-medium py-1.5"
+                                >
+                                    Ver todos os detalhes
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </>
             )}
         </div>
-    );
+    )
 }

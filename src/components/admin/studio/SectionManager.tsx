@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useSections, useSectionMutations, type Section } from '../../../hooks/useSections'
-import { Plus, Trash2, GripVertical, Edit2, Check, X } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Edit2, Check, X, Lock } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { Button } from '../../ui/Button'
 import { Input } from '../../ui/Input'
@@ -39,6 +39,10 @@ const COLOR_PRESETS = [
     { value: 'bg-orange-50 text-orange-700 border-orange-100', label: 'Laranja', preview: 'bg-orange-500' },
     { value: 'bg-gray-50 text-gray-700 border-gray-100', label: 'Cinza', preview: 'bg-gray-500' },
 ]
+
+// Section keys with dedicated hardcoded components in CardDetail
+// These sections cannot have their position/order changed via SectionManager
+const HARDCODED_SECTION_KEYS = ['agenda_tarefas', 'historico_conversas', 'people']
 
 const ICON_OPTIONS = [
     { value: 'layers', label: 'Layers' },
@@ -111,8 +115,8 @@ export default function SectionManager() {
             try {
                 await reorderSections.mutateAsync(updates)
                 toast({ title: 'Ordem atualizada', type: 'success' })
-            } catch (err: any) {
-                toast({ title: 'Erro ao reordenar', description: err.message, type: 'error' })
+            } catch (err: unknown) {
+                toast({ title: 'Erro ao reordenar', description: err instanceof Error ? err.message : 'Erro desconhecido', type: 'error' })
             }
         }
     }
@@ -131,12 +135,12 @@ export default function SectionManager() {
             await createSection.mutateAsync({
                 ...formData,
                 key
-            } as any)
+            } as SectionFormData & { key: string })
             toast({ title: 'Seção criada com sucesso', type: 'success' })
             setIsAdding(false)
             setFormData(defaultFormData)
-        } catch (err: any) {
-            toast({ title: 'Erro ao criar seção', description: err.message, type: 'error' })
+        } catch (err: unknown) {
+            toast({ title: 'Erro ao criar seção', description: err instanceof Error ? err.message : 'Erro desconhecido', type: 'error' })
         }
     }
 
@@ -148,8 +152,8 @@ export default function SectionManager() {
             toast({ title: 'Seção atualizada', type: 'success' })
             setEditingId(null)
             setFormData(defaultFormData)
-        } catch (err: any) {
-            toast({ title: 'Erro ao atualizar seção', description: err.message, type: 'error' })
+        } catch (err: unknown) {
+            toast({ title: 'Erro ao atualizar seção', description: err instanceof Error ? err.message : 'Erro desconhecido', type: 'error' })
         }
     }
 
@@ -166,8 +170,8 @@ export default function SectionManager() {
         try {
             await deleteSection.mutateAsync(section.id)
             toast({ title: 'Seção excluída', type: 'success' })
-        } catch (err: any) {
-            toast({ title: 'Erro ao excluir seção', description: err.message, type: 'error' })
+        } catch (err: unknown) {
+            toast({ title: 'Erro ao excluir seção', description: err instanceof Error ? err.message : 'Erro desconhecido', type: 'error' })
         }
     }
 
@@ -253,7 +257,7 @@ export default function SectionManager() {
                             <label className="text-sm font-medium text-foreground">Posição no CardDetail</label>
                             <Select
                                 value={formData.position}
-                                onChange={val => setFormData({ ...formData, position: val as any })}
+                                onChange={val => setFormData({ ...formData, position: val as SectionFormData['position'] })}
                                 options={POSITION_OPTIONS}
                             />
                         </div>
@@ -395,6 +399,8 @@ interface SortableSectionCardProps {
 }
 
 function SortableSectionCard({ section, isEditing, onEdit, onDelete }: SortableSectionCardProps) {
+    const isHardcoded = HARDCODED_SECTION_KEYS.includes(section.key)
+
     const {
         attributes,
         listeners,
@@ -402,9 +408,9 @@ function SortableSectionCard({ section, isEditing, onEdit, onDelete }: SortableS
         transform,
         transition,
         isDragging
-    } = useSortable({ id: section.id })
+    } = useSortable({ id: section.id, disabled: isHardcoded })
 
-    const style = {
+    const style: React.CSSProperties = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
@@ -417,22 +423,29 @@ function SortableSectionCard({ section, isEditing, onEdit, onDelete }: SortableS
     return (
         <div
             ref={setNodeRef}
-            style={style as any}
+            style={style}
             className={cn(
                 "flex items-center gap-3 p-3 rounded-lg border transition-all bg-card",
                 isEditing ? "ring-2 ring-primary border-primary" : "border-border hover:shadow-sm",
-                isDragging && "shadow-lg"
+                isDragging && "shadow-lg",
+                isHardcoded && "opacity-60"
             )}
         >
-            {/* Drag Handle */}
-            <button
-                {...attributes}
-                {...listeners}
-                className="p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
-                title="Arrastar para reordenar"
-            >
-                <GripVertical className="w-4 h-4" />
-            </button>
+            {/* Drag Handle or Lock */}
+            {isHardcoded ? (
+                <div className="p-1 text-muted-foreground/40" title="Posição fixa no CardDetail">
+                    <Lock className="w-4 h-4" />
+                </div>
+            ) : (
+                <button
+                    {...attributes}
+                    {...listeners}
+                    className="p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+                    title="Arrastar para reordenar"
+                >
+                    <GripVertical className="w-4 h-4" />
+                </button>
+            )}
 
             {/* Color Badge */}
             <div className={cn("w-3 h-3 rounded-full flex-shrink-0", bgClass.replace('-50', '-500'))} />
@@ -441,11 +454,14 @@ function SortableSectionCard({ section, isEditing, onEdit, onDelete }: SortableS
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                     <span className="font-medium text-foreground truncate">{section.label}</span>
-                    {section.is_system && (
+                    {isHardcoded && (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-amber-300 text-amber-600 bg-amber-50">FIXA</Badge>
+                    )}
+                    {section.is_system && !isHardcoded && (
                         <Badge variant="outline" className="text-[10px] py-0 px-1.5">SISTEMA</Badge>
                     )}
                     {section.is_governable && (
-                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">Governável</Badge>
+                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">Governavel</Badge>
                     )}
                 </div>
                 <span className="text-xs text-muted-foreground font-mono">{section.key}</span>

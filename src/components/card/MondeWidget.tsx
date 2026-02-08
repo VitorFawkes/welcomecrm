@@ -12,8 +12,10 @@ import {
     Eye
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import { supabase } from '@/lib/supabase'
 import {
     useMondeSalesByCard,
     useCancelMondeSale,
@@ -26,16 +28,39 @@ import MondeCreateSaleModal from './MondeCreateSaleModal'
 
 interface MondeWidgetProps {
     cardId: string
+    /** @deprecated Now fetched internally. Kept for backward-compat during migration. */
     proposalId?: string | null
-    hasAcceptedProposal: boolean
+    /** @deprecated Now derived internally. Kept for backward-compat during migration. */
+    hasAcceptedProposal?: boolean
+    card?: unknown
 }
 
 export default function MondeWidget({
     cardId,
-    proposalId,
-    hasAcceptedProposal
+    proposalId: externalProposalId,
+    hasAcceptedProposal: externalHasAccepted,
 }: MondeWidgetProps) {
     const navigate = useNavigate()
+
+    // Fetch accepted proposal internally (fallback if not passed from parent)
+    const { data: fetchedProposal } = useQuery({
+        queryKey: ['card-accepted-proposal', cardId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('proposals')
+                .select('id, status')
+                .eq('card_id', cardId)
+                .eq('status', 'accepted')
+                .limit(1)
+                .maybeSingle()
+            if (error) return null
+            return data
+        },
+        enabled: !!cardId && externalProposalId === undefined,
+    })
+
+    const proposalId = externalProposalId ?? fetchedProposal?.id ?? null
+    const hasAcceptedProposal = externalHasAccepted ?? !!fetchedProposal
     const { data: sales, isLoading } = useMondeSalesByCard(cardId)
     const { mutate: cancelSale, isPending: isCancelling } = useCancelMondeSale()
     const { mutate: retrySale, isPending: isRetrying } = useRetryMondeSale()
