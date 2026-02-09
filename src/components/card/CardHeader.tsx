@@ -73,13 +73,16 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     // Stage selection
     const [showStageDropdown, setShowStageDropdown] = useState(false)
-    const { validateMoveSync } = useQualityGate()
+    const { validateMove } = useQualityGate()
+    const [isValidatingStage, setIsValidatingStage] = useState(false)
     const [qualityGateModalOpen, setQualityGateModalOpen] = useState(false)
     const [stageChangeModalOpen, setStageChangeModalOpen] = useState(false)
     const [pendingStageChange, setPendingStageChange] = useState<{
         stageId: string,
         targetStageName: string,
         missingFields?: { key: string, label: string }[],
+        missingProposals?: { label: string, min_status: string }[],
+        missingTasks?: { label: string, task_tipo: string }[],
         currentOwnerId?: string,
         sdrName?: string
     } | null>(null)
@@ -139,7 +142,6 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     useEffect(() => {
         // Sync local title state when card data changes (e.g. after save or refetch)
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional sync of derived state
         setEditedTitle(card.titulo || '')
     }, [card.titulo])
 
@@ -298,15 +300,29 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
     })
 
-    const handleStageSelect = (stageId: string, stageName: string, stageFase: string) => {
-        // 1. Validate Move
-        const validation = validateMoveSync(card, stageId)
+    const handleStageSelect = async (stageId: string, stageName: string, stageFase: string) => {
+        if (isValidatingStage) return
+        setIsValidatingStage(true)
+
+        try {
+        // 1. Validate Move (async - checks fields, proposals, tasks, rules)
+        const validation = await validateMove(card, stageId)
+
+        // Check for Lost Reason Rule
+        if (validation.missingRules?.some(r => r.key === 'lost_reason_required')) {
+            setPendingLossMove({ stageId, stageName })
+            setLossReasonModalOpen(true)
+            setShowStageDropdown(false)
+            return
+        }
 
         if (!validation.valid) {
             setPendingStageChange({
                 stageId,
                 targetStageName: stageName,
-                missingFields: validation.missingFields
+                missingFields: validation.missingFields,
+                missingProposals: validation.missingProposals,
+                missingTasks: validation.missingTasks
             })
             setQualityGateModalOpen(true)
             setShowStageDropdown(false)
@@ -334,6 +350,9 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
         // 3. Proceed if valid
         updateStageMutation.mutate(stageId)
+        } finally {
+            setIsValidatingStage(false)
+        }
     }
 
     const updateStatusMutation = useMutation({
@@ -969,6 +988,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 isOpen={qualityGateModalOpen}
                 onClose={() => setQualityGateModalOpen(false)}
                 missingFields={pendingStageChange?.missingFields || []}
+                missingProposals={pendingStageChange?.missingProposals || []}
+                missingTasks={pendingStageChange?.missingTasks || []}
                 onConfirm={handleConfirmQualityGate}
                 targetStageName={pendingStageChange?.targetStageName || ''}
                 cardId={card.id!}
