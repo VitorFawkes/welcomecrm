@@ -190,9 +190,14 @@ Deno.serve(async (req) => {
                             const acStandardMatch = acFieldId.match(/^deal\[(\w+)\]$/);
                             if (acStandardMatch) {
                                 const stdField = acStandardMatch[1];
-                                let stdValue = (value !== null && typeof value === 'object')
-                                    ? JSON.stringify(value)
-                                    : value;
+                                let stdValue: unknown;
+                                if (Array.isArray(value)) {
+                                    stdValue = value.join(', ');
+                                } else if (value !== null && typeof value === 'object') {
+                                    stdValue = JSON.stringify(value);
+                                } else {
+                                    stdValue = value;
+                                }
                                 // AC stores deal[value] in cents
                                 if (stdField === 'value' && typeof stdValue === 'number') {
                                     stdValue = stdValue * 100;
@@ -200,9 +205,15 @@ Deno.serve(async (req) => {
                                 standardFields[stdField] = stdValue;
                             } else {
                                 // Custom field - AC expects numeric ID
-                                const fieldValue = (value !== null && typeof value === 'object')
-                                    ? JSON.stringify(value)
-                                    : String(value ?? '');
+                                // Arrays (e.g. destinos: ["Japão", "Brasil"]) → comma-separated string
+                                let fieldValue: string;
+                                if (Array.isArray(value)) {
+                                    fieldValue = value.join(', ');
+                                } else if (value !== null && typeof value === 'object') {
+                                    fieldValue = JSON.stringify(value);
+                                } else {
+                                    fieldValue = String(value ?? '');
+                                }
                                 customFields.push({
                                     customFieldId: parseInt(acFieldId, 10) || 0,
                                     fieldValue

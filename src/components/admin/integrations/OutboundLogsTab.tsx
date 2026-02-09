@@ -83,6 +83,20 @@ export function OutboundLogsTab({ integrationId }: OutboundLogsTabProps) {
     const [showValidation, setShowValidation] = useState<boolean>(false);
     const [expandedValidation, setExpandedValidation] = useState<string | null>(null);
 
+    // Fetch outbound field map for enriching display
+    const { data: fieldMap } = useQuery({
+        queryKey: ['outbound-field-map', integrationId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('integration_outbound_field_map')
+                .select('internal_field, internal_field_label, external_field_id, external_field_name')
+                .eq('integration_id', integrationId)
+                .eq('is_active', true);
+            if (error) throw error;
+            return new Map((data || []).map(m => [m.internal_field, m]));
+        }
+    });
+
     // Fetch outbound events
     const { data: events, isLoading, refetch } = useQuery({
         queryKey: ['outbound-events', integrationId, statusFilter, eventTypeFilter],
@@ -493,6 +507,11 @@ export function OutboundLogsTab({ integrationId }: OutboundLogsTabProps) {
 
                                                 <p className="text-xs text-muted-foreground mt-1">
                                                     AC Deal ID: {event.external_id}
+                                                    {event.payload && (event.payload as { matched_rule?: string }).matched_rule && (
+                                                        <span className="ml-2 text-indigo-600">
+                                                            • Regra: {(event.payload as { matched_rule?: string }).matched_rule}
+                                                        </span>
+                                                    )}
                                                 </p>
 
                                                 {/* Payload Preview */}
@@ -504,12 +523,27 @@ export function OutboundLogsTab({ integrationId }: OutboundLogsTabProps) {
                                                             </span>
                                                         )}
                                                         {event.event_type === 'field_update' && (
-                                                            <span>
+                                                            <div className="space-y-0.5">
                                                                 {Object.entries(event.payload)
-                                                                    .filter(([k]) => k !== 'shadow_mode')
-                                                                    .map(([k, v]) => `${k}: ${v}`)
-                                                                    .join(', ')}
-                                                            </span>
+                                                                    .filter(([k]) => !['shadow_mode', 'matched_rule'].includes(k))
+                                                                    .map(([k, v]) => {
+                                                                        const mapping = fieldMap?.get(k);
+                                                                        const displayValue = Array.isArray(v) ? v.join(', ') : String(v ?? '');
+                                                                        const fieldLabel = mapping?.internal_field_label || k;
+                                                                        const acInfo = mapping
+                                                                            ? `${mapping.external_field_name} (AC #${mapping.external_field_id})`
+                                                                            : null;
+                                                                        return (
+                                                                            <div key={k}>
+                                                                                <span className="text-slate-900 font-semibold">{fieldLabel}:</span>{' '}
+                                                                                <span>{displayValue}</span>
+                                                                                {acInfo && (
+                                                                                    <span className="text-slate-400 ml-1">→ {acInfo}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                            </div>
                                                         )}
                                                         {(event.event_type === 'won' || event.event_type === 'lost') && (
                                                             <span>
