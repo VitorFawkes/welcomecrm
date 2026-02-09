@@ -191,14 +191,15 @@ Deno.serve(async (req) => {
         // 7. Update platform last_event_at
         await supabaseClient
             .from("whatsapp_platforms")
-            .update({ last_event_at: new Date().toISOString() })
+            .update({ last_event_at: new Date().toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).replace(' ', 'T') + '-03:00' })
             .eq("id", platform.id);
 
-        // 7.5 Forward to n8n Julia agent (fire-and-forget)
+        // 7.5 Forward to n8n Julia agent (awaited)
         // Only for Echo provider with new (non-duplicate) events from allowed lines.
         // Reads JULIA_PHONE_LABELS from integration_settings (configurable via CRM admin).
         if (provider === "echo" && insertedIds.length > 0) {
             const n8nUrl = Deno.env.get("N8N_JULIA_WEBHOOK_URL");
+            console.log("n8n forward check:", { n8nUrl: n8nUrl ? "SET" : "MISSING", insertedIds: insertedIds.length });
             if (n8nUrl) {
                 const { data: labelSetting } = await supabaseClient
                     .from("integration_settings")
@@ -206,15 +207,23 @@ Deno.serve(async (req) => {
                     .eq("key", "JULIA_PHONE_LABELS")
                     .single();
                 const allowedLabels = (labelSetting?.value || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+                console.log("n8n forward labels:", { allowedLabels, payloadCount: payloads.length });
                 if (allowedLabels.length > 0) {
                     for (const singlePayload of payloads) {
                         const phoneLabel = singlePayload?.phone_number || singlePayload?.data?.phone_number;
                         if (phoneLabel && allowedLabels.includes(phoneLabel)) {
-                            fetch(n8nUrl, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify(singlePayload),
-                            }).catch((err) => console.error("n8n forward error:", err));
+                            try {
+                                const fwdRes = await fetch(n8nUrl, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify(singlePayload),
+                                });
+                                console.log("n8n forward response:", fwdRes.status, await fwdRes.text().catch(() => ""));
+                            } catch (err) {
+                                console.error("n8n forward error:", err);
+                            }
+                        } else {
+                            console.log("n8n forward skip: phoneLabel", phoneLabel, "not in", allowedLabels);
                         }
                     }
                 }

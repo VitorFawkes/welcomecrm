@@ -189,12 +189,23 @@ Deno.serve(async (req) => {
                             // Check if it's a standard AC field (deal.value, deal.title, etc.)
                             const acStandardMatch = acFieldId.match(/^deal\[(\w+)\]$/);
                             if (acStandardMatch) {
-                                standardFields[acStandardMatch[1]] = value;
+                                const stdField = acStandardMatch[1];
+                                let stdValue = (value !== null && typeof value === 'object')
+                                    ? JSON.stringify(value)
+                                    : value;
+                                // AC stores deal[value] in cents
+                                if (stdField === 'value' && typeof stdValue === 'number') {
+                                    stdValue = stdValue * 100;
+                                }
+                                standardFields[stdField] = stdValue;
                             } else {
                                 // Custom field - AC expects numeric ID
+                                const fieldValue = (value !== null && typeof value === 'object')
+                                    ? JSON.stringify(value)
+                                    : String(value ?? '');
                                 customFields.push({
                                     customFieldId: parseInt(acFieldId, 10) || 0,
-                                    fieldValue: String(value ?? '')
+                                    fieldValue
                                 });
                             }
                         } else {
