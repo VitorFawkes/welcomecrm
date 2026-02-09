@@ -35,10 +35,18 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
         }
     })
 
+    // Aguardar auth antes de disparar query para evitar busca sem filtro de dono (timeout)
+    const needsAuth = (viewMode === 'AGENT' && subView === 'MY_QUEUE') ||
+        (viewMode === 'MANAGER' && subView === 'TEAM_VIEW')
+    const isAuthReady = !!session?.user?.id
+    const isTeamReady = subView !== 'TEAM_VIEW' || (myTeamMembers && myTeamMembers.length > 0)
+
     const query = useQuery({
         queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers],
         placeholderData: keepPreviousData,
+        enabled: !needsAuth || (isAuthReady && isTeamReady),
         queryFn: async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- query builder perde tipo com encadeamento dinâmico
             let query = (supabase.from('view_cards_acoes') as any)
                 .select('*')
 
