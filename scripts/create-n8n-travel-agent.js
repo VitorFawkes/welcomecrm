@@ -11,6 +11,7 @@
 const N8N_API_URL = 'https://n8n-n8n.ymnmx7.easypanel.host';
 const API_KEY = process.env.N8N_API_KEY;
 const SOURCE_WORKFLOW_ID = '4NVYBmoAmbVM3FoF';
+const TARGET_WORKFLOW_ID = 'tvh1SN7VDgy8V3VI'; // Existing Julia workflow to update
 
 if (!API_KEY) {
   console.error('N8N_API_KEY is required. Usage: N8N_API_KEY=<key> node scripts/create-n8n-travel-agent.js');
@@ -437,8 +438,7 @@ function transformWorkflow(workflow) {
   // ---- 4. If node (adapt for Code node getClient returning { found: true/false }) ----
   transformIfExists(nodeMap['If']);
 
-  // ---- 5. CreateUser (create contato + card) ----
-  transformCreateUser(nodeMap['CreateUser']);
+  // ---- 5. CreateUser removed (trigger creates contact+card synchronously) ----
 
   // ---- 6. NotFromMe1 ----
   transformNotFromMe(nodeMap['NotFromMe1']);
@@ -517,6 +517,9 @@ function transformWorkflow(workflow) {
   // transform them here.
   transformMemory(w, nodeMap);
 
+  // ---- 26. Remove nodes now handled by DB trigger ----
+  removeRedundantNodes(w);
+
   // ---- Global: Replace all remaining old Supabase refs ----
   const wStr = JSON.stringify(w);
   const replaced = wStr
@@ -575,7 +578,8 @@ function transformGetClient(node) {
     specifyBody: 'json',
     jsonBody: `={
   "p_phone_with_9": "{{ $('Process Webhook Data2').item.json.phone_with_9 }}",
-  "p_phone_without_9": "{{ $('Process Webhook Data2').item.json.phone_without_9 }}"
+  "p_phone_without_9": "{{ $('Process Webhook Data2').item.json.phone_without_9 }}",
+  "p_conversation_id": "{{ $('Process Webhook Data2').item.json.conversation_id || '' }}"
 }`,
     options: { neverError: true },
   };
@@ -773,44 +777,54 @@ function transformProcessWebhookData(node) {
         value: "={{ $('Webhook').item.json.body.document?.filename || null }}" },
       { id: 'mime_type', name: 'mime_type', type: 'string',
         value: "={{ $('Webhook').item.json.body.image?.mime_type || $('Webhook').item.json.body.document?.mime_type || null }}" },
+      { id: 'conversation_id', name: 'conversation_id', type: 'string',
+        value: "={{ $('Webhook').item.json.body.conversation?.id || $('Webhook').item.json.body.conversation_id || '' }}" },
       { id: 'timestamp', name: 'timestamp', type: 'string', value: '={{ new Date().toISOString() }}' },
     ],
   };
+
+  // Fix: n8n Webhook v1 puts POST body directly at $json, not $json.body
+  for (const a of node.parameters.assignments.assignments) {
+    if (a.value && typeof a.value === 'string') {
+      a.value = a.value.replace(/\$\('Webhook'\)\.item\.json\.body/g, "$('Webhook').item.json");
+    }
+  }
 }
 
-function transformCreateUser(node) {
-  if (!node) return;
-  // HTTP Request calling RPC create_user_and_card (replaces Code node with fetch)
-  node.type = 'n8n-nodes-base.httpRequest';
-  node.typeVersion = 4.2;
-  delete node.parameters.operation;
-  delete node.parameters.tableId;
-  delete node.parameters.fieldsUi;
-  delete node.parameters.jsCode;
-  node.credentials = {
-    supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
-  };
-  node.parameters = {
-    method: 'POST',
-    url: `${NEW_SUPABASE_URL}/rest/v1/rpc/create_user_and_card`,
-    authentication: 'predefinedCredentialType',
-    nodeCredentialType: 'supabaseApi',
-    sendHeaders: true,
-    headerParameters: {
-      parameters: [
-        { name: 'Content-Type', value: 'application/json' },
-        { name: 'Accept', value: 'application/json' },
-      ],
-    },
-    sendBody: true,
-    specifyBody: 'json',
-    jsonBody: `={
-  "p_name": "{{ $('Process Webhook Data2').item.json.push_name || 'Visitante' }}",
-  "p_phone": "{{ $('Process Webhook Data2').item.json.phone_with_9 }}",
-  "p_pipeline_stage_id": "${STAGES.NOVO_LEAD}"
-}`,
-    options: { neverError: true },
-  };
+function removeRedundantNodes(w) {
+  // Nodes handled by the DB trigger (process_whatsapp_raw_event_v2):
+  // - CreateUser: trigger creates contact+card synchronously
+  // - atualiza_lead1: trigger sets ai_responsavel='humano' on human takeover
+  // - Cria msg owner_human: trigger persists human outbound messages
+  const removeNames = ['CreateUser', 'atualiza_lead1', 'Cria msg owner_human'];
+
+  // Remove nodes from array
+  w.nodes = w.nodes.filter(n => !removeNames.includes(n.name));
+
+  // Remove outgoing connections
+  for (const name of removeNames) {
+    delete w.connections[name];
+  }
+
+  // Clear If FALSE path (make it dead-end — CreateUser was there)
+  if (w.connections['If']?.main?.[1]) {
+    w.connections['If'].main[1] = [];
+  }
+
+  // Clean any references to removed nodes in all connections
+  for (const [, conns] of Object.entries(w.connections)) {
+    for (const connType of Object.keys(conns)) {
+      if (Array.isArray(conns[connType])) {
+        for (let i = 0; i < conns[connType].length; i++) {
+          if (Array.isArray(conns[connType][i])) {
+            conns[connType][i] = conns[connType][i].filter(
+              c => !removeNames.includes(c.node)
+            );
+          }
+        }
+      }
+    }
+  }
 }
 
 function transformNotFromMe(node) {
@@ -841,13 +855,15 @@ function transformProcessWebhookDataSecondary(node) {
       if (a.value && typeof a.value === 'string') {
         a.value = a.value
           .replace(/\$\('Webhook'\)\.item\.json\.body\.data\.key\.remoteJid/g,
-            "$('Webhook').item.json.body.from")
+            "$('Webhook').item.json.from")
           .replace(/\$\('Webhook'\)\.item\.json\.body\.data\.key\.fromMe/g,
-            "$('Webhook').item.json.body.is_from_me")
+            "$('Webhook').item.json.is_from_me")
           .replace(/\$\('Webhook'\)\.item\.json\.body\.data\.pushName/g,
-            "$('Webhook').item.json.body.customer_name")
+            "$('Webhook').item.json.customer_name")
           .replace(/@s\.whatsapp\.net/g, '')
-          .replace(/@g\.us/g, '');
+          .replace(/@g\.us/g, '')
+          // Fix remaining .body references for Webhook v1
+          .replace(/\$\('Webhook'\)\.item\.json\.body/g, "$('Webhook').item.json");
       }
     }
   }
@@ -917,106 +933,57 @@ function transformMessageStorage(nodeMap) {
     };
   }
 
-  // atualiza_lead → HTTP Request PATCH cards (update updated_at)
+  // atualiza_lead → HTTP Request to update cards.updated_at (neverError to handle null card_id gracefully)
   const al = nodeMap['atualiza_lead'];
   if (al) {
     al.type = 'n8n-nodes-base.httpRequest';
     al.typeVersion = 4.2;
-    delete al.parameters.operation;
-    delete al.parameters.tableId;
-    delete al.parameters.filters;
-    delete al.parameters.fieldsUi;
-    delete al.parameters.jsCode;
+    delete al.parameters;
     al.credentials = {
       supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
     };
     al.parameters = {
       method: 'PATCH',
-      url: `=${NEW_SUPABASE_URL}/rest/v1/cards?id=eq.{{ $json.id || $('getClient').item.json.card_id }}`,
+      url: `${NEW_SUPABASE_URL}/rest/v1/cards?id=eq.{{ $('getClient').item.json.card_id }}`,
       authentication: 'predefinedCredentialType',
       nodeCredentialType: 'supabaseApi',
       sendHeaders: true,
       headerParameters: {
         parameters: [
-          { name: 'Prefer', value: 'return=representation' },
           { name: 'Content-Type', value: 'application/json' },
+          { name: 'Prefer', value: 'return=minimal' },
         ],
       },
       sendBody: true,
       specifyBody: 'json',
-      jsonBody: '={ "updated_at": "{{ $now }}" }',
+      jsonBody: '={"updated_at": "{{ $now }}"}',
       options: { neverError: true },
     };
   }
 
-  // atualiza_lead1 (outbound/human path) → HTTP Request PATCH cards (ai_responsavel=humano)
-  const al1 = nodeMap['atualiza_lead1'];
-  if (al1) {
-    al1.type = 'n8n-nodes-base.httpRequest';
-    al1.typeVersion = 4.2;
-    delete al1.parameters.operation;
-    delete al1.parameters.tableId;
-    delete al1.parameters.filters;
-    delete al1.parameters.fieldsUi;
-    delete al1.parameters.jsCode;
-    al1.credentials = {
-      supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
-    };
-    al1.parameters = {
-      method: 'PATCH',
-      url: `=${NEW_SUPABASE_URL}/rest/v1/cards?id=eq.{{ $('getClient').item.json.card_id }}`,
-      authentication: 'predefinedCredentialType',
-      nodeCredentialType: 'supabaseApi',
-      sendHeaders: true,
-      headerParameters: {
-        parameters: [
-          { name: 'Prefer', value: 'return=representation' },
-          { name: 'Content-Type', value: 'application/json' },
-        ],
-      },
-      sendBody: true,
-      specifyBody: 'json',
-      jsonBody: '={ "ai_responsavel": "humano", "updated_at": "{{ $now }}" }',
-      options: { neverError: true },
-    };
-  }
+  // atualiza_lead1 + Cria msg owner_human → REMOVED
+  // Trigger handles both: human takeover detection + message persistence
 
-  // Cria msg owner_human → noOp (outbound human persistence handled by edge function)
-  const cmoh = nodeMap['Cria msg owner_human'];
-  if (cmoh) {
-    cmoh.type = 'n8n-nodes-base.noOp';
-    cmoh.typeVersion = 1;
-    delete cmoh.parameters.tableId;
-    delete cmoh.parameters.fieldsUi;
-    delete cmoh.parameters.jsCode;
-    delete cmoh.credentials;
-    cmoh.parameters = {};
-  }
-
-  // pega_mensagens → HTTP Request GET whatsapp_messages
+  // pega_mensagens → Supabase getAll whatsapp_messages
   const pm = nodeMap['pega_mensagens'];
   if (pm) {
-    pm.type = 'n8n-nodes-base.httpRequest';
-    pm.typeVersion = 4.2;
-    delete pm.parameters.operation;
-    delete pm.parameters.tableId;
-    delete pm.parameters.filters;
-    delete pm.parameters.jsCode;
+    pm.type = 'n8n-nodes-base.supabase';
+    pm.typeVersion = 1;
     pm.credentials = {
       supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
     };
     pm.parameters = {
-      method: 'GET',
-      url: `=${NEW_SUPABASE_URL}/rest/v1/whatsapp_messages?card_id=eq.{{ $json.id || $('getClient').item.json.card_id }}&order=created_at.desc&limit=50`,
-      authentication: 'predefinedCredentialType',
-      nodeCredentialType: 'supabaseApi',
-      sendHeaders: true,
-      headerParameters: {
-        parameters: [
-          { name: 'Accept', value: 'application/json' },
-        ],
+      operation: 'getAll',
+      tableId: 'whatsapp_messages',
+      returnAll: false,
+      limit: 50,
+      filters: {
+        conditions: [{
+          keyName: 'card_id',
+          condition: 'eq',
+          keyValue: "={{ $json.id || $('getClient').item.json.card_id }}",
+        }],
       },
-      options: { neverError: true },
     };
     pm.alwaysOutputData = true;
   }
@@ -1057,7 +1024,7 @@ function transformPreparaDados(node) {
       { id: 'pipeline_stage_id', name: 'pipeline_stage_id', type: 'string',
         value: "={{ $('getClient').item.json.pipeline_stage_id || '' }}" },
       { id: 'ultima_mensagem_lead', name: 'ultima_mensagem_lead', type: 'string',
-        value: "={{ $('Deleta').item.json.messages.map(buffer => { try { return JSON.parse(buffer).message; } catch { return buffer; } }).join('\\n') }}" },
+        value: "={{ $('Process Webhook Data2').item.json.message_content || '' }}" },
       { id: 'ultima_mensagem_bot', name: 'ultima_mensagem_bot', type: 'string',
         value: "={{ '' }}" },
       { id: 'sessionId', name: 'sessionId', type: 'string',
@@ -1214,8 +1181,9 @@ function transformInfoTool(node, w) {
 }
 
 function transformMemory(w, nodeMap) {
-  // Replace Redis Chat Memory with n8n native Simple Memory (memoryBufferWindow)
-  // for the Agent 3 (Responde Lead) chat memory.
+  // ================================================================
+  // 1. Agent chat memory: Redis Chat Memory → Simple Memory (in-memory)
+  // ================================================================
   const redisMem = nodeMap['Redis Chat Memory'];
   if (redisMem) {
     redisMem.name = 'Simple Memory1';
@@ -1226,107 +1194,138 @@ function transformMemory(w, nodeMap) {
       sessionIdType: 'customKey',
       sessionKey: "={{ $('Historico Texto').item.json.Telefone }}_{{ $('Historico Texto').item.json.card_id }}",
     };
-    // Update connections: rename node reference
-    const oldConns = w.connections['Redis Chat Memory'];
-    if (oldConns) {
-      w.connections['Simple Memory1'] = oldConns;
-      delete w.connections['Redis Chat Memory'];
-    }
-    // Update any connections pointing to the old name
-    for (const [key, val] of Object.entries(w.connections)) {
-      const json = JSON.stringify(val);
-      if (json.includes('Redis Chat Memory')) {
-        w.connections[key] = JSON.parse(json.replace(/Redis Chat Memory/g, 'Simple Memory1'));
-      }
-    }
+    renameNodeEverywhere(w, 'Redis Chat Memory', 'Simple Memory1');
   }
 
-  // Replace Redis debouncer nodes with native memory manager nodes.
-  // The model has: Empilha Mensagem (redis push), Obtem Mensagens (redis get),
-  //                Deleta Lista Redis (redis delete), Verifica Debouncer (switch)
-  // These were manually replaced by the user with:
-  //   Simple Memory (memoryBufferWindow) → Empilha/Obtem/Deleta (memoryManager)
-  // Transform the old Redis nodes:
+  // ================================================================
+  // 2. Debounce: Replace Redis 5-node loop with Wait+Supabase 3 nodes
+  // ================================================================
+  //
+  // SOURCE (Redis — doesn't work without Redis credentials):
+  //   Empilha Mensagem Processada (RPUSH) → Obtem Mensagens Empilhadas (GET) →
+  //   Verifica Debouncer (Switch) →
+  //     [0] nada_a_fazer → dead end
+  //     [1] proceder → Deleta Lista Redis (DEL) → Cria lead_message
+  //     [2] esperar → Wait Debouncer (20s) → Obtem (loop)
+  //
+  // TARGET (Wait + Supabase query — no Redis needed):
+  //   Wait Debounce (20s) → Check Latest Msg (HTTP→Supabase) →
+  //   Am I Latest? (IF) →
+  //     TRUE → Cria lead_message
+  //     FALSE → dead end (stale execution)
+  //
+  // Works because inbound messages are already persisted by the Echo edge
+  // function (process_whatsapp_raw_event_v2) before n8n processes them.
 
-  const empilhaNode = nodeMap['Empilha Mensagem'];
-  if (empilhaNode) {
-    empilhaNode.name = 'Empilha';
-    empilhaNode.type = '@n8n/n8n-nodes-langchain.memoryManager';
-    empilhaNode.typeVersion = 1.1;
-    delete empilhaNode.credentials;
-    empilhaNode.parameters = { options: { groupMessages: true } };
-    // Rename in connections
-    if (w.connections['Empilha Mensagem']) {
-      w.connections['Empilha'] = w.connections['Empilha Mensagem'];
-      delete w.connections['Empilha Mensagem'];
-    }
-    for (const [key, val] of Object.entries(w.connections)) {
-      const json = JSON.stringify(val);
-      if (json.includes('Empilha Mensagem')) {
-        w.connections[key] = JSON.parse(json.replace(/Empilha Mensagem/g, 'Empilha'));
-      }
-    }
+  // --- Save what comes after the debounce ---
+  const afterDebounce = w.connections['Deleta Lista Redis']?.main?.[0]
+    || [{ node: 'Cria lead_message', type: 'main', index: 0 }];
+
+  // --- Transform Empilha Mensagem Processada → Wait Debounce (Wait 20s) ---
+  const empilha = nodeMap['Empilha Mensagem Processada'];
+  if (empilha) {
+    empilha.name = 'Wait Debounce';
+    empilha.type = 'n8n-nodes-base.wait';
+    empilha.typeVersion = 1.1;
+    delete empilha.credentials;
+    empilha.parameters = { amount: 20, unit: 'seconds' };
+    renameNodeEverywhere(w, 'Empilha Mensagem Processada', 'Wait Debounce');
   }
 
-  const obtemNode = nodeMap['Obtem Mensagens'];
-  if (obtemNode) {
-    obtemNode.name = 'Obtem';
-    obtemNode.type = '@n8n/n8n-nodes-langchain.memoryManager';
-    obtemNode.typeVersion = 1.1;
-    delete obtemNode.credentials;
-    obtemNode.parameters = { simplifyOutput: false, options: { groupMessages: true } };
-    if (w.connections['Obtem Mensagens']) {
-      w.connections['Obtem'] = w.connections['Obtem Mensagens'];
-      delete w.connections['Obtem Mensagens'];
-    }
-    for (const [key, val] of Object.entries(w.connections)) {
-      const json = JSON.stringify(val);
-      if (json.includes('Obtem Mensagens')) {
-        w.connections[key] = JSON.parse(json.replace(/Obtem Mensagens/g, 'Obtem'));
-      }
-    }
-  }
-
-  const deletaNode = nodeMap['Deleta Lista Redis'];
-  if (deletaNode) {
-    deletaNode.name = 'Deleta';
-    deletaNode.type = '@n8n/n8n-nodes-langchain.memoryManager';
-    deletaNode.typeVersion = 1.1;
-    delete deletaNode.credentials;
-    deletaNode.parameters = { mode: 'delete', deleteMode: 'all' };
-    if (w.connections['Deleta Lista Redis']) {
-      w.connections['Deleta'] = w.connections['Deleta Lista Redis'];
-      delete w.connections['Deleta Lista Redis'];
-    }
-    for (const [key, val] of Object.entries(w.connections)) {
-      const json = JSON.stringify(val);
-      if (json.includes('Deleta Lista Redis')) {
-        w.connections[key] = JSON.parse(json.replace(/Deleta Lista Redis/g, 'Deleta'));
-      }
-    }
-  }
-
-  // Add Simple Memory node for the debouncer (shared by Empilha/Obtem/Deleta)
-  // Only add if it doesn't already exist
-  if (!nodeMap['Simple Memory']) {
-    const basePos = (empilhaNode || obtemNode || deletaNode)?.position || [0, 0];
-    const simpleMemNode = {
-      id: 'simple-memory-debouncer-' + Date.now(),
-      name: 'Simple Memory',
-      type: '@n8n/n8n-nodes-langchain.memoryBufferWindow',
-      typeVersion: 1.3,
-      position: [basePos[0], basePos[1] + 200],
-      parameters: { contextWindowLength: 10 },
+  // --- Transform Obtem Mensagens Empilhadas → Check Latest Msg (HTTP) ---
+  const obtem = nodeMap['Obtem Mensagens Empilhadas'];
+  if (obtem) {
+    obtem.name = 'Check Latest Msg';
+    obtem.type = 'n8n-nodes-base.httpRequest';
+    obtem.typeVersion = 4.2;
+    delete obtem.credentials;
+    obtem.credentials = {
+      supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
     };
-    w.nodes.push(simpleMemNode);
-    // Connect Simple Memory to Empilha, Obtem, Deleta via ai_memory
-    w.connections['Simple Memory'] = {
-      ai_memory: [[
-        { node: 'Obtem', type: 'ai_memory', index: 0 },
-        { node: 'Empilha', type: 'ai_memory', index: 0 },
-        { node: 'Deleta', type: 'ai_memory', index: 0 },
-      ]],
+    obtem.parameters = {
+      method: 'GET',
+      url: `=${NEW_SUPABASE_URL}/rest/v1/whatsapp_messages?card_id=eq.{{ $('getClient').item.json.card_id }}&direction=eq.inbound&order=created_at.desc&limit=1&select=external_id`,
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'supabaseApi',
+      sendHeaders: true,
+      headerParameters: {
+        parameters: [{ name: 'Accept', value: 'application/json' }],
+      },
+      options: { neverError: true },
     };
+    obtem.alwaysOutputData = true;
+    renameNodeEverywhere(w, 'Obtem Mensagens Empilhadas', 'Check Latest Msg');
+  }
+
+  // --- Transform Verifica Debouncer → Am I Latest? (IF) ---
+  const verifica = nodeMap['Verifica Debouncer'];
+  if (verifica) {
+    verifica.name = 'Am I Latest?';
+    verifica.type = 'n8n-nodes-base.if';
+    verifica.typeVersion = 2;
+    verifica.parameters = {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '' },
+        conditions: [{
+          id: 'isLatest',
+          leftValue: "={{ !$json.external_id || $json.external_id === $('Process Webhook Data2').item.json.message_id }}",
+          rightValue: true,
+          operator: { type: 'boolean', operation: 'equals' },
+        }],
+        combinator: 'and',
+      },
+    };
+    renameNodeEverywhere(w, 'Verifica Debouncer', 'Am I Latest?');
+  }
+
+  // --- Remove nodes no longer needed ---
+  const removeNames = ['Wait Debouncer', 'Deleta Lista Redis'];
+  w.nodes = w.nodes.filter(n => !removeNames.includes(n.name));
+  for (const name of removeNames) {
+    delete w.connections[name];
+  }
+  // Clean references to removed nodes from all connections
+  for (const [key, conns] of Object.entries(w.connections)) {
+    for (const connType of Object.keys(conns)) {
+      if (Array.isArray(conns[connType])) {
+        for (let i = 0; i < conns[connType].length; i++) {
+          if (Array.isArray(conns[connType][i])) {
+            conns[connType][i] = conns[connType][i].filter(
+              c => !removeNames.includes(c.node)
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // --- Set explicit connection chain for the new debounce ---
+  w.connections['Wait Debounce'] = {
+    main: [[{ node: 'Check Latest Msg', type: 'main', index: 0 }]],
+  };
+  w.connections['Check Latest Msg'] = {
+    main: [[{ node: 'Am I Latest?', type: 'main', index: 0 }]],
+  };
+  w.connections['Am I Latest?'] = {
+    main: [
+      afterDebounce,  // TRUE → Cria lead_message (continue AI pipeline)
+      [],             // FALSE → dead end (stale execution)
+    ],
+  };
+}
+
+// Helper: rename a node in all connection references (outgoing key + incoming targets)
+function renameNodeEverywhere(w, oldName, newName) {
+  if (w.connections[oldName]) {
+    w.connections[newName] = w.connections[oldName];
+    delete w.connections[oldName];
+  }
+  const escaped = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const [key, val] of Object.entries(w.connections)) {
+    const json = JSON.stringify(val);
+    if (json.includes(oldName)) {
+      w.connections[key] = JSON.parse(json.replace(new RegExp(escaped, 'g'), newName));
+    }
   }
 }
 
@@ -1367,35 +1366,29 @@ function transformEnviarTexto(node, w) {
 }
 
 function transformPostSend(nodeMap) {
-  // Mensagem_Bot → HTTP Request PATCH cards (update updated_at after bot sends)
+  // Mensagem_Bot → Supabase update cards (updated_at after bot sends)
   const mb = nodeMap['Mensagem_Bot'];
   if (mb) {
-    mb.type = 'n8n-nodes-base.httpRequest';
-    mb.typeVersion = 4.2;
-    delete mb.parameters.operation;
-    delete mb.parameters.tableId;
-    delete mb.parameters.filters;
-    delete mb.parameters.fieldsUi;
-    delete mb.parameters.jsCode;
+    mb.type = 'n8n-nodes-base.supabase';
+    mb.typeVersion = 1;
     mb.credentials = {
       supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
     };
     mb.parameters = {
-      method: 'PATCH',
-      url: `=${NEW_SUPABASE_URL}/rest/v1/cards?id=eq.{{ $('Historico Texto').item.json.card_id }}`,
-      authentication: 'predefinedCredentialType',
-      nodeCredentialType: 'supabaseApi',
-      sendHeaders: true,
-      headerParameters: {
-        parameters: [
-          { name: 'Content-Type', value: 'application/json' },
-          { name: 'Prefer', value: 'return=representation' },
+      operation: 'update',
+      tableId: 'cards',
+      filters: {
+        conditions: [{
+          keyName: 'id',
+          condition: 'eq',
+          keyValue: "={{ $('Historico Texto').item.json.card_id }}",
+        }],
+      },
+      fieldsUi: {
+        fieldValues: [
+          { fieldId: 'updated_at', fieldValue: '={{ $now }}' },
         ],
       },
-      sendBody: true,
-      specifyBody: 'json',
-      jsonBody: '={ "updated_at": "{{ $now }}" }',
-      options: { neverError: true },
     };
   }
 
@@ -1491,10 +1484,10 @@ async function main() {
   const transformed = transformWorkflow(sourceWorkflow);
   console.log(`Transformed workflow: "${transformed.name}" with ${transformed.nodes.length} nodes`);
 
-  // Create new workflow
-  console.log('Creating new workflow...');
-  const createRes = await fetch(`${N8N_API_URL}/api/v1/workflows`, {
-    method: 'POST',
+  // Update existing workflow (do NOT activate)
+  console.log(`Updating existing workflow ${TARGET_WORKFLOW_ID}...`);
+  const updateRes = await fetch(`${N8N_API_URL}/api/v1/workflows/${TARGET_WORKFLOW_ID}`, {
+    method: 'PUT',
     headers: {
       'X-N8N-API-KEY': API_KEY,
       'Content-Type': 'application/json',
@@ -1502,9 +1495,9 @@ async function main() {
     body: JSON.stringify(transformed),
   });
 
-  if (!createRes.ok) {
-    const errorText = await createRes.text();
-    console.error('Failed to create workflow:', createRes.status, errorText);
+  if (!updateRes.ok) {
+    const errorText = await updateRes.text();
+    console.error('Failed to update workflow:', updateRes.status, errorText);
 
     // Save transformed workflow for debugging
     const fs = await import('fs');
@@ -1514,26 +1507,15 @@ async function main() {
     process.exit(1);
   }
 
-  const created = await createRes.json();
-  console.log(`Workflow created successfully!`);
-  console.log(`  ID: ${created.id}`);
-  console.log(`  Name: ${created.name}`);
-  console.log(`  Nodes: ${created.nodes?.length || 'N/A'}`);
-  console.log(`  URL: ${N8N_API_URL}/workflow/${created.id}`);
-
-  // Activate workflow
-  console.log('Activating workflow...');
-  const activateRes = await fetch(`${N8N_API_URL}/api/v1/workflows/${created.id}/activate`, {
-    method: 'POST',
-    headers: { 'X-N8N-API-KEY': API_KEY },
-  });
-
-  if (activateRes.ok) {
-    console.log('Workflow activated!');
-    console.log(`Webhook URL: ${N8N_API_URL}/webhook/welcome-trips-agent`);
-  } else {
-    console.log('Could not activate (may need manual activation):', activateRes.status);
-  }
+  const updated = await updateRes.json();
+  console.log(`Workflow updated successfully!`);
+  console.log(`  ID: ${updated.id}`);
+  console.log(`  Name: ${updated.name}`);
+  console.log(`  Nodes: ${updated.nodes?.length || 'N/A'}`);
+  console.log(`  Active: ${updated.active || false}`);
+  console.log(`  URL: ${N8N_API_URL}/workflow/${updated.id}`);
+  console.log('');
+  console.log('Workflow NOT activated. Activate manually when ready.');
 }
 
 main().catch(err => {

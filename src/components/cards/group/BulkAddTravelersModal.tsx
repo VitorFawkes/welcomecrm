@@ -60,7 +60,7 @@ export default function BulkAddTravelersModal({
                 .select('pessoa_principal_id')
                 .eq('parent_card_id', parentCardId)
                 .in('pessoa_principal_id', contactIds)
-                .neq('status_comercial', 'lost') // Ignore lost deals
+                .neq('status_comercial', 'perdido') // Ignore lost deals
 
             const existingContactIds = new Set(existingCards?.map(c => c.pessoa_principal_id) || [])
 
@@ -73,6 +73,7 @@ export default function BulkAddTravelersModal({
         }
 
         checkDuplicates()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedContacts.length, parentCardId])
 
     const createCardsMutation = useMutation({
@@ -81,6 +82,7 @@ export default function BulkAddTravelersModal({
             if (validContacts.length === 0) return
 
             // Get the first stage for the parent's product pipeline
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data: pipeline } = await (supabase.from('pipelines') as any)
                 .select('id')
                 .eq('produto', parentProduct)
@@ -88,6 +90,7 @@ export default function BulkAddTravelersModal({
 
             if (!pipeline) throw new Error('Pipeline not found')
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data: firstStage } = await (supabase.from('pipeline_stages') as any)
                 .select('id')
                 .eq('pipeline_id', pipeline.id)
@@ -116,6 +119,7 @@ export default function BulkAddTravelersModal({
                 // If destination is stored in JSON or specific fields, adapt here.
             }))
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error } = await (supabase.from('cards') as any)
                 .insert(cardsToInsert)
 

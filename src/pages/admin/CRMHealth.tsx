@@ -23,8 +23,8 @@ export default function CRMHealth() {
                 .select('*')
                 .eq('produto', 'TRIPS')
                 .neq('fase', 'Pós-venda')
-                .neq('status_comercial', 'lost')
-                .neq('status_comercial', 'won')
+                .neq('status_comercial', 'perdido')
+                .neq('status_comercial', 'ganho')
 
             if (error) throw error
             return data as Card[]
