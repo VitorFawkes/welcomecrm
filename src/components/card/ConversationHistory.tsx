@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { MessageSquare, Mail, ChevronDown, ChevronUp, Sparkles, Video } from 'lucide-react'
+import { MessageSquare, Mail, ChevronDown, ChevronUp, Sparkles, Video, Bot } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import AIChat from './AIChat'
 import { MeetingTimeline } from './MeetingTimeline'
@@ -18,6 +18,42 @@ type Tab = 'email' | 'meetings' | 'ai' | 'whatsapp'
 export default function ConversationHistory({ cardId, contactId }: ConversationHistoryProps) {
     const [isExpanded, setIsExpanded] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>('whatsapp')
+    const [toggling, setToggling] = useState(false)
+    const queryClient = useQueryClient()
+
+    // Fetch AI status for this card
+    const { data: aiStatus } = useQuery({
+        queryKey: ['card-ai-status', cardId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('cards')
+                .select('ai_responsavel')
+                .eq('id', cardId)
+                .single()
+            if (error) return null
+            return (data as unknown as { ai_responsavel: string | null })?.ai_responsavel || 'ia'
+        },
+        enabled: !!cardId,
+    })
+
+    const aiActive = aiStatus === 'ia'
+
+    const toggleAI = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (toggling) return
+        setToggling(true)
+        try {
+            const newValue = aiActive ? 'humano' : 'ia'
+            await supabase
+                .from('cards')
+                .update({ ai_responsavel: newValue } as Record<string, unknown>)
+                .eq('id', cardId)
+            queryClient.invalidateQueries({ queryKey: ['card-ai-status', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] })
+        } finally {
+            setToggling(false)
+        }
+    }
 
     // Fetch Email conversations (Legacy)
     const { data: emailData } = useQuery({
@@ -118,18 +154,38 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                             Reuniões
                         </button>
 
-                        <button
-                            onClick={() => setActiveTab('ai')}
-                            className={cn(
-                                "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ml-auto whitespace-nowrap",
-                                activeTab === 'ai'
-                                    ? "border-indigo-500 text-indigo-700 bg-white"
-                                    : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        {/* Julia IA Toggle + Chat com IA tab — right-aligned */}
+                        <div className="flex items-center gap-2 ml-auto">
+                            {aiStatus !== undefined && (
+                                <button
+                                    onClick={toggleAI}
+                                    disabled={toggling}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors",
+                                        toggling && "opacity-50 cursor-not-allowed",
+                                        aiActive
+                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                            : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
+                                    )}
+                                >
+                                    <Bot className="h-3.5 w-3.5" />
+                                    {aiActive ? 'Julia IA Ativa' : 'Julia IA Pausada'}
+                                </button>
                             )}
-                        >
-                            <Sparkles className="h-4 w-4" />
-                            Chat com IA
-                        </button>
+
+                            <button
+                                onClick={() => setActiveTab('ai')}
+                                className={cn(
+                                    "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                    activeTab === 'ai'
+                                        ? "border-indigo-500 text-indigo-700 bg-white"
+                                        : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                                )}
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                Chat com IA
+                            </button>
+                        </div>
                     </div>
 
                     {/* Content Area */}
@@ -142,6 +198,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
 
                         {activeTab === 'email' && (
                             <div className="p-4 space-y-3">
+                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                 {emailData?.map((item: any) => (
                                     <div key={item.id} className="border rounded-lg p-3 hover:bg-gray-50">
                                         <div className="flex items-center gap-2 mb-2">

@@ -1,338 +1,206 @@
-# WelcomeCRM - Claude Code
+# WelcomeCRM - Instruções
 
-> Este arquivo define como o Claude opera neste projeto.
+**Supabase Project:** `szyrzxvlptqqheizyrxu`
+**Stack:** React + Vite + TailwindCSS + Supabase (PostgreSQL + Edge Functions) + TypeScript Strict
+
+## Regras Invioláveis
+- IMPORTANT: NUNCA hardcode secrets. Use `import.meta.env.VITE_*` ou variáveis de ambiente
+- IMPORTANT: NUNCA modifique view/trigger/function SQL sem ler docs/SQL_SOP.md primeiro
+- IMPORTANT: Antes de criar qualquer hook, componente ou página, verifique no Mapa do Projeto abaixo se já existe algo similar
+- IMPORTANT: Ao criar hook/página/componente novo, ATUALIZAR o MAPA DO PROJETO abaixo antes de finalizar
+- Commits em português. Co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
+
+## Arquitetura (3 Suns)
+Toda entidade orbita 3 entidades centrais: `cards`, `contatos`, `profiles`.
+Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 
 ---
 
-## 🗄️ SUPABASE - ACESSO NATIVO (VIA CLI)
+## MAPA DO PROJETO
 
-**Project ID:** `szyrzxvlptqqheizyrxu`
-**Dashboard:** https://supabase.com/dashboard/project/szyrzxvlptqqheizyrxu
+### Páginas (src/pages/)
+| Página | Arquivo | O que faz |
+|--------|---------|-----------|
+| Dashboard | Dashboard.tsx | Stats, gráfico funil, atividade recente |
+| Pipeline | Pipeline.tsx | Kanban + lista de cards/deals |
+| Card Detail | CardDetail.tsx | Detalhes completos de card/viagem |
+| Leads | Leads.tsx | Gestão de leads com tabela e filtros |
+| Pessoas | People.tsx | Gestão de contatos com inteligência |
+| Grupos | GroupsPage.tsx | Gestão de viagens em grupo |
+| Propostas | ProposalsPage.tsx | Listagem de propostas |
+| Editor Proposta | ProposalBuilderV4.tsx | Editor moderno de propostas |
+| Analytics | Analytics.tsx | Dashboard analítico |
+| Monde Preview | MondePreviewPage.tsx | Preview integração Monde |
+| Pipeline Studio | admin/PipelineStudio.tsx | Config de pipeline (stages, phases) |
+| Usuários | admin/UserManagement.tsx | Gestão de usuários/roles |
+| Categorias | admin/CategoryManagement.tsx | Categorias/tags |
+| Motivos Perda | admin/LossReasonManagement.tsx | Config motivos de perda |
+| Saúde CRM | admin/CRMHealth.tsx | Monitoramento do sistema + integrações (tabs) |
+| Cadência | admin/cadence/* | Motor de automação de vendas v3 |
+| Lixeira | admin/Lixeira.tsx | Itens deletados |
+| Proposta Pública | public/ProposalView.tsx | Visualização do cliente |
 
-> **NUNCA coloque tokens diretamente neste arquivo. Use variaveis de ambiente.**
+### Hooks Mais Usados (src/hooks/)
+| Hook | Usado em | O que faz |
+|------|----------|-----------|
+| useProposalBuilder | 30+ componentes | Estado/lógica do editor de propostas |
+| useProposal | 12+ | Dados de uma proposta |
+| usePipelineStages | 11+ | Definições de stages |
+| useLibrary | 11+ | Itens da biblioteca de conteúdo |
+| useFilterOptions | 10+ | Opções de filtros dropdown |
+| usePipelinePhases | 9+ | Definições de phases |
+| useReceitaPermission | 8+ | Permissão Receita Federal |
+| useFieldConfig | 6+ | Configuração dinâmica de campos |
+| usePeopleIntelligence | 6+ | Analytics de contatos |
+| useLeadsQuery | 5+ | Fetch de dados de leads |
+| useSubCards | 5+ | Cards filhos (viagem grupo) |
+| useQualityGate | 4+ | Validação de mudança de stage |
+| useIntegrationHealth | 3+ | Alertas, regras e pulse de saúde das integrações |
+| useStageRequirements | 4+ | Campos obrigatórios por stage |
 
-### Setup Inicial (usuario faz uma vez):
-```bash
-# Criar arquivo de ambiente (FORA do repo)
-echo 'export SUPABASE_ACCESS_TOKEN="seu_token_aqui"' >> ~/.welcomecrm-env
-echo 'export SUPABASE_PROJECT_REF="szyrzxvlptqqheizyrxu"' >> ~/.welcomecrm-env
+### Componentes Principais (src/components/)
+| Área | Componentes-chave |
+|------|-------------------|
+| Layout | Header, Sidebar, Layout, ProductSwitcher, NotificationCenter |
+| Pipeline | KanbanBoard, PipelineListView, CreateCardModal, FilterDrawer |
+| Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements, FinanceiroWidget |
+| Propostas | ProposalBuilder, SectionEditor, AddItemMenu, VersionHistory |
+| Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings, JuliaIAConfig |
+| Health | IntegrationHealthTab, PulseGrid, ActiveAlertsList, HealthRulesConfig |
+| Pessoas | PeopleGrid, PersonDetailDrawer, ContactForm |
+| Leads | LeadsTable, LeadsFilters, LeadsBulkActions |
+| Trips | TripsTaxBadge, group/* (GroupDashboard, GroupTravelersList) |
+| Monde | MondeWidget |
+| UI Base | src/components/ui/ — 29 componentes Radix UI (Button, Dialog, Select, etc.) |
 
-# Adicionar ao shell profile
-echo '[ -f ~/.welcomecrm-env ] && source ~/.welcomecrm-env' >> ~/.zshrc
-source ~/.zshrc
+### Tabelas do Banco (principais)
+| Tabela | Papel | FK principais |
+|--------|-------|---------------|
+| **cards** | Central — deals/viagens | → pipeline_stages, contatos, cards (parent) |
+| **contatos** | Central — pessoas | — |
+| **profiles** | Central — usuários | → teams |
+| proposals | Propostas comerciais | → cards |
+| pipeline_stages | Stages do funil | → pipeline_phases, pipelines |
+| pipeline_phases | Fases (SDR/Vendas/Pós) | → pipelines |
+| activities | Log de atividades | → cards |
+| tarefas | Tasks/tarefas | → cards |
+| mensagens | Mensagens | → cards |
+| cards_contatos | N:N cards↔contatos | → cards, contatos |
+| participacoes | Participantes | → cards |
+| stage_field_config | Campos dinâmicos por stage | → pipeline_stages |
+| integration_outbound_queue | Fila de sync externo | → cards |
+| cadence_instances | Cadências ativas | → cards, cadence_templates |
+| monde_sales | Dados Monde | → cards |
+| integration_health_rules | Regras de monitoramento | — |
+| integration_health_alerts | Alertas gerados | → integration_health_rules, profiles |
+| integration_health_pulse | Cache de ultimo evento por canal | — |
+
+### Campos IA no Cards (Agente WhatsApp)
+| Coluna | Tipo | Propósito |
+|--------|------|-----------|
+| `ai_resumo` | TEXT | Resumo de informações do cliente mantido pelo agente IA |
+| `ai_contexto` | TEXT | Contexto cronológico da conversa mantido pelo agente IA |
+| `ai_responsavel` | TEXT (default 'ia') | Quem responde: 'ia' ou 'humano' |
+
+### Scripts (scripts/)
+| Script | O que faz |
+|--------|-----------|
+| create-n8n-travel-agent.js | Cria workflow n8n do agente Julia (WhatsApp AI) por transformação do modelo |
+
+### Docs Extras (docs/)
+| Arquivo | O que faz |
+|---------|-----------|
+| welcome-trips-faq.md | FAQ da Welcome Trips para ferramenta Info do Agent 3 (Julia) |
+
+### Workflow n8n — Agente Julia (WhatsApp AI)
+- **Workflow ID:** `tvh1SN7VDgy8V3VI`
+- **Webhook:** `https://n8n-n8n.ymnmx7.easypanel.host/webhook/welcome-trips-agent`
+- **61 nós** — Pipeline: Echo webhook → Process → Lookup/Create contato+card → Check AI Active → Media routing → Redis debounce → Agent 1 (contexto) → Agent 2 (dados) → Agent 3 (Julia responde) → Format → Send via Meta Cloud API (save outbound com external_id no loop)
+- **Dedup:** Unique index `(platform_id, external_id)` + ON CONFLICT no `process_whatsapp_raw_event_v2` + human takeover automático via `ecko_agent_id`
+- **Persona:** Julia, Consultora de Viagens
+- **Objetivo:** Qualificar viagem → Convite taxa R$ 500 → Agendar reunião (via tarefa CRM)
+- **Meta Phone Number ID:** `775282882337610` (Trips)
+
+### Views Importantes
+- `view_dashboard_funil` — Métricas do funil
+- `view_cards_contatos_summary` — Cards com resumo de contatos
+- `v_proposal_analytics` — Performance de propostas
+- `view_profiles_complete` — Perfis com team/role
+- `view_integration_*` — Roteamento e auditoria de integrações
+
+### Relacionamentos-Chave
+```
+cards → pipeline_stages (etapa_funil_id)
+cards → contatos (pessoa_principal_id + cards_contatos M:N)
+cards → cards (parent_card_id) — viagens grupo
+activities/tarefas/mensagens → cards (card_id)
+proposals → cards (card_id)
+cadence_instances → cards (card_id)
+profiles → teams (team_id)
+pipeline_stages → pipeline_phases (phase_id)
 ```
 
-### Comandos (via API REST - SEMPRE FUNCIONA):
-```bash
-# Carregar credenciais do .env
-source .env
+---
 
-# Query simples (listar cards)
-curl -s "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/cards?select=id,titulo&limit=5" \
+## Antes de Modificar Código
+1. Leia os arquivos que vai mudar
+2. Busque usages do que vai modificar (grep imports e referências)
+3. Se criar hook/page/componente novo → atualize o MAPA DO PROJETO acima
+
+## Padrões de Código
+- Hooks React: prefixo `use`, em `src/hooks/`
+- Páginas: em `src/pages/`, com rota em App.tsx
+- Componentes: PascalCase, em `src/components/`
+
+## Design & UI (OBRIGATÓRIO)
+**Princípio:** Light Mode First. Se o texto não é legível em fundo branco, está errado.
+
+**Cards/Containers:**
+- USAR: `bg-white border border-slate-200 shadow-sm rounded-xl`
+- NUNCA: `bg-white/10 backdrop-blur` em fundo branco (invisível)
+- NUNCA: `text-white` sem container escuro explícito
+
+**Cores (SEMPRE tokens semânticos):**
+- Surface: `bg-white` | Background: `bg-slate-50`
+- Text: `text-slate-900` (principal) / `text-slate-500` (secundário)
+- Border: `border-slate-200` | Brand: `text-indigo-600` / `bg-indigo-600`
+- NUNCA cores hex hardcoded — sempre classes Tailwind
+
+**Glassmorphism — APENAS em:**
+- Overlays/modais: `bg-black/20 backdrop-blur-sm`
+- Headers sticky: `bg-white/80 backdrop-blur-md border-b border-slate-200`
+- Seções explicitamente escuras (sidebar)
+
+**Tipografia:** `tracking-tight` headings | `text-sm` padrão | `font-medium` interativos
+
+## Comandos Úteis
+```bash
+source .env  # carregar credenciais
+
+# Query rápida ao banco
+curl -s "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/{tabela}?select=*&limit=5" \
   -H "apikey: $VITE_SUPABASE_ANON_KEY" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
 
-# Contar registros
-curl -s "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/cards?select=count" \
-  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-  -H "Prefer: count=exact" -I | grep content-range
+# Deploy Edge Function
+npx supabase functions deploy {NOME} --project-ref szyrzxvlptqqheizyrxu
 
-# Query SQL via RPC (se existir funcao)
-curl -s "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/rpc/nome_funcao" \
-  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"param1": "valor"}'
-```
-
-### Deploy de Edge Function:
-```bash
-export SUPABASE_ACCESS_TOKEN="sbp_SEU_TOKEN" && \
-npx supabase functions deploy NOME_FUNCTION --project-ref szyrzxvlptqqheizyrxu
-```
-
-### Regenerar Types:
-```bash
+# Regenerar Types
 npx supabase gen types typescript --project-id szyrzxvlptqqheizyrxu > src/database.types.ts
+
+# Qualidade
+npm run build          # build completo (inclui typecheck)
+npm run sync:fix       # atualizar CODEBASE.md automaticamente
 ```
 
-### Para queries SQL complexas:
-Usar o Dashboard: https://supabase.com/dashboard/project/szyrzxvlptqqheizyrxu/sql
-
----
-
-## 🐙 GITHUB - ACESSO NATIVO
-
-### Git ja esta configurado com PAT. Comandos funcionam:
+## n8n Workflow (Agente Julia)
 ```bash
-git status
-git add .
-git commit -m "mensagem"
-git push origin main
-git pull origin main
+# Recriar workflow do agente Julia (WhatsApp AI)
+source .env && node scripts/create-n8n-travel-agent.js
 ```
 
-### Para PRs e Issues (se gh CLI estiver instalado):
-```bash
-# Verificar se gh esta disponivel
-gh --version
-
-# PRs
-gh pr create --title "..." --body "..."
-gh pr list
-
-# Issues
-gh issue list
-```
-
-### Se gh nao estiver instalado:
-- Criar PRs pelo Dashboard: https://github.com/VitorFawkes/welcomecrm/pulls
-- Ou instalar: `brew install gh && gh auth login`
-
----
-
-## 🧠 Comportamento Automatico (SEMPRE)
-
-### 1. Classificar a Tarefa
-
-| Tipo | Trigger | Acao |
-|------|---------|------|
-| **PERGUNTA** | "o que e", "como funciona" | Responder diretamente |
-| **EXPLORACAO** | "analisar", "listar", "overview" | Investigar sem editar |
-| **CODIGO SIMPLES** | "corrigir", "adicionar" (1 arquivo) | Editar diretamente |
-| **CODIGO COMPLEXO** | "criar", "implementar", "refatorar" | Socratic Gate -> Agent |
-| **DESIGN/UI** | "design", "UI", "pagina" | Socratic Gate -> Agent |
-
-### 2. Socratic Gate (Tarefas Complexas)
-
-**Para tarefas COMPLEXAS ou DESIGN, PARE e pergunte:**
-- Qual o objetivo principal?
-- Quais sao os edge cases?
-- Ha preferencias de implementacao?
-
-> Minimo 2-3 perguntas antes de implementar.
-
-### 3. Routing Automatico de Agents
-
-| Tipo de Tarefa | Agent |
-|----------------|-------|
-| SQL, banco, migrations | `database-architect` |
-| Frontend, React, UI | `frontend-specialist` |
-| Backend, API, Edge Functions | `backend-specialist` |
-| Debug, investigar erro | `debugger` |
-| Testes, QA | `test-engineer` |
-| Planejar feature | `project-planner` |
-| Codigo legado, refactor | `code-archaeologist` |
-| Performance | `performance-optimizer` |
-| Seguranca | `security-auditor` |
-| **Mobile (RN, Flutter)** | `mobile-developer` - NAO usar frontend! |
-
-**Ao ativar um agent:**
-```
-Aplicando conhecimento de `{agent}`...
-```
-
-### 4. Carregar Skills do Agent
-
-Cada agent tem campo `skills:` no header. Ler em:
-`.agent/skills/<nome>/SKILL.md`
-
-### 5. Consultar Documentacao
-
-- `.agent/CODEBASE.md` -> Entidades, hooks, paginas
-- `docs/SYSTEM_CONTEXT.md` -> Arquitetura, patterns
-- `docs/SQL_SOP.md` -> Antes de modificar views/triggers
-
----
-
-## 🔒 TRIPLE-LOCK PROTOCOL (OBRIGATORIO)
-
-> **BLOQUEANTE:** Cada lock deve ser completado com OUTPUT VISIVEL antes de prosseguir.
-
----
-
-### 🔒 LOCK 1: REALITY SNAPSHOT (Antes de qualquer codigo)
-
-**O agente DEVE produzir esta tabela verificando estado REAL:**
-
-```markdown
-## REALITY SNAPSHOT - [DATA/HORA]
-
-### Verificacao ao Vivo
-| Asset | CODEBASE.md | Realidade | Delta | Status |
-|-------|-------------|-----------|-------|--------|
-| Hooks | {doc}       | {scan}    | +/-N  | FRESH/STALE |
-| Pages | {doc}       | {scan}    | +/-N  | FRESH/STALE |
-| Tables| {doc}       | {query}   | +/-N  | FRESH/STALE |
-
-### Comandos Executados:
-find src/hooks -name "*.ts" -type f | wc -l
-find src/pages -name "*.tsx" -type f | wc -l
-
-### Entidades Envolvidas na Tarefa:
-- {lista das tabelas/hooks/pages que serao tocados}
-```
-
-**Se Delta > 5:** Agente DEVE avisar que CODEBASE.md esta desatualizado.
-
----
-
-### 🔒 LOCK 2: BLAST RADIUS (Antes de modificar)
-
-**O agente DEVE produzir analise de impacto com PROVA:**
-
-```markdown
-## BLAST RADIUS - Analise de Impacto
-
-### Dependencias Diretas (VAO QUEBRAR)
-| Dependencia | Tipo | Por que Quebra | Severidade |
-|-------------|------|----------------|------------|
-| {nome}      | Hook/Page | {razao} | CRITICO/ALTO/MEDIO |
-
-### Comandos de Verificacao Executados:
-grep -r "ENTIDADE" src/hooks/
-grep -r "ENTIDADE" src/pages/
-grep -r "ENTIDADE" src/components/
-
-### Resultado do Grep:
-{colar output real}
-
-### Plano de Mitigacao:
-1. {passo para evitar quebra}
-2. {arquivos que precisam ser atualizados junto}
-```
-
----
-
-### 🔒 LOCK 3: SYNC CERTIFICATE (Antes de dizer "pronto")
-
-**O agente DEVE provar que atualizou a documentacao:**
-
-```markdown
-## SYNC CERTIFICATE
-
-### Itens Criados/Modificados
-| Item | Tipo | Secao CODEBASE.md | Status |
-|------|------|-------------------|--------|
-| {nome} | Hook/Page/Table | Secao X.Y | ADICIONADO |
-
-### Prova de Atualizacao:
-grep "{nome_criado}" .agent/CODEBASE.md
-# Output: {mostrar linha encontrada}
-
-### Stats Atualizados:
-- Antes: X hooks | Y pages
-- Depois: X+1 hooks | Y pages
-- Header atualizado: SIM/NAO
-
-### Assinatura:
-- Agent: {nome}
-- Timestamp: {ISO}
-```
-
-**Se grep nao encontrar:** BLOQUEADO. Nao pode finalizar sem atualizar CODEBASE.md.
-
----
-
-## 🎯 TRIGGERS DE VERIFICACAO (Usuario pode cobrar)
-
-| Comando do Usuario | O que o Agente DEVE Fazer |
-|--------------------|---------------------------|
-| **"State check"** | Rodar contagem ao vivo e comparar com CODEBASE.md |
-| **"Show me the blast radius"** | Mostrar analise de impacto com grep |
-| **"Prove you synced"** | Mostrar Sync Certificate com grep de prova |
-| **"Protocol audit"** | Relatorio completo de compliance dos 3 locks |
-
-### Resposta ao "Protocol audit":
-```markdown
-## PROTOCOL COMPLIANCE AUDIT
-
-### Lock 1 (Grounding): {PASS/FAIL}
-- Reality Snapshot produzido: SIM/NAO
-- Contagens verificadas ao vivo: SIM/NAO
-
-### Lock 2 (Impact): {PASS/FAIL}
-- Blast Radius produzido: SIM/NAO
-- Grep de dependencias executado: SIM/NAO
-
-### Lock 3 (Sync): {PASS/FAIL}
-- Sync Certificate produzido: SIM/NAO
-- Grep de prova executado: SIM/NAO
-- CODEBASE.md atualizado: SIM/NAO
-
-### Compliance Geral: {PASS/FAIL}
-```
-
----
-
-## 🔐 Rules Globais
-
-| Rule | Proposito |
-|------|-----------|
-| `01-mandatory-context.md` | Protocolo entrada/saida |
-| `00-project-context.md` | IDs Supabase, stack |
-| `10-secrets-protection.md` | **NUNCA hardcodar tokens** |
-| `20-supabase-safety.md` | Seguranca SQL |
-| `90-project-architecture.md` | Arquitetura (3 Suns) |
-| `91-project-design.md` | Design system |
-| `95-excellence-enforcement.md` | Qualidade |
-| `99-qa-guardian.md` | QA obrigatorio |
-
----
-
-## 🔑 Secrets
-
-**NUNCA** hardcodar tokens:
-```typescript
-// PROIBIDO
-const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
-
-// CORRETO
-const KEY = process.env.SUPABASE_KEY;
-```
-
----
-
-## ⚠️ SQL Safety (OBRIGATORIO)
-
-Antes de modificar View/Function/Trigger:
-1. Ler `docs/SQL_SOP.md`
-2. Consultar estado LIVE: `SELECT definition FROM pg_views WHERE viewname = '...'`
-3. Verificar apos aplicar
-
-**Violacao = Critical Engineering Failure**
-
----
-
-## 🔄 Workflows
-
-| Comando | Quando usar |
-|---------|-------------|
-| `/plan` | Planejar feature |
-| `/create` | Criar funcionalidade |
-| `/debug` | Investigar bug |
-| `/enhance` | Melhorar codigo |
-| `/test` | Criar/rodar testes |
-| `/deploy` | Preparar deploy |
-| `/sync` | Sincronizar CODEBASE.md |
-
----
-
-## 🔄 Commits
-
-- Mensagens em portugues
-- Co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
-- Branch: `main`
-- Lint antes: `npm run lint`
-
----
-
-## 🏁 Verificacao Final
-
-Quando solicitado "verificacao final" ou "final checks":
-```bash
-python .agent/scripts/checklist.py .
-```
-
-Ordem de prioridade: Security -> Lint -> Schema -> Tests -> UX -> SEO
+## Referências Detalhadas
+- .agent/CODEBASE.md → Inventário completo e detalhado
+- docs/SQL_SOP.md → Procedimentos SQL (OBRIGATÓRIO antes de views/triggers)
+- docs/SYSTEM_CONTEXT.md → Decisões arquiteturais
+- docs/DESIGN_SYSTEM.md → Regras de UI

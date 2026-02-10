@@ -287,7 +287,7 @@ export default function Pipeline() {
                             productFilter={currentProduct}
                             viewMode={viewMode}
                             subView={subView}
-                            filters={usePipelineFilters().filters}
+                            filters={filters}
                             className="h-full px-8 pb-4" // Shared horizontal padding
                         />
                     ) : (
@@ -295,7 +295,7 @@ export default function Pipeline() {
                             productFilter={currentProduct}
                             viewMode={viewMode}
                             subView={subView}
-                            filters={usePipelineFilters().filters}
+                            filters={filters}
                             onCardClick={(cardId) => {
                                 // For now, maybe navigate? Or just log.
                                 // Ideally open CardDetail.

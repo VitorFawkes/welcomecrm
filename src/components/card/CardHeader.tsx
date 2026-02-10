@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock, Pencil } from 'lucide-react'
+import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock, Pencil, TrendingUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
@@ -29,7 +29,7 @@ interface TripsProdutoData {
         ano?: number
         display?: string
     }
-    destinos?: any[]
+    destinos?: Record<string, unknown>[]
 }
 import OwnerHistoryModal from './OwnerHistoryModal'
 import ActionButtons from './ActionButtons'
@@ -46,7 +46,17 @@ import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { SystemPhase } from '@/types/pipeline'
 
-type Card = Database['public']['Tables']['cards']['Row']
+type CardBase = Database['public']['Tables']['cards']['Row']
+
+// Extended card type including fields from views (e.g. cards_complete_view)
+type Card = CardBase & {
+    proxima_tarefa?: { data_vencimento?: string; titulo?: string } | null
+    ganho_sdr?: boolean | null
+    ganho_planner?: boolean | null
+    ganho_pos?: boolean | null
+    motivo_perda_id?: string | null
+    motivo_perda_comentario?: string | null
+}
 
 interface CardHeaderProps {
     card: Card
@@ -63,13 +73,16 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     // Stage selection
     const [showStageDropdown, setShowStageDropdown] = useState(false)
-    const { validateMoveSync } = useQualityGate()
+    const { validateMove } = useQualityGate()
+    const [isValidatingStage, setIsValidatingStage] = useState(false)
     const [qualityGateModalOpen, setQualityGateModalOpen] = useState(false)
     const [stageChangeModalOpen, setStageChangeModalOpen] = useState(false)
     const [pendingStageChange, setPendingStageChange] = useState<{
         stageId: string,
         targetStageName: string,
         missingFields?: { key: string, label: string }[],
+        missingProposals?: { label: string, min_status: string }[],
+        missingTasks?: { label: string, task_tipo: string }[],
         currentOwnerId?: string,
         sdrName?: string
     } | null>(null)
@@ -104,8 +117,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
             // Sort by phase order_index first, then by stage ordem within phase
             return (data || []).sort((a, b) => {
-                const phaseOrderA = (a.pipeline_phases as any)?.order_index ?? 999
-                const phaseOrderB = (b.pipeline_phases as any)?.order_index ?? 999
+                const phaseOrderA = (a.pipeline_phases as { order_index?: number } | null)?.order_index ?? 999
+                const phaseOrderB = (b.pipeline_phases as { order_index?: number } | null)?.order_index ?? 999
                 if (phaseOrderA !== phaseOrderB) return phaseOrderA - phaseOrderB
                 return a.ordem - b.ordem
             }) as { id: string; nome: string; ordem: number; fase: string; is_lost?: boolean; is_won?: boolean }[]
@@ -128,8 +141,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
         : null
 
     useEffect(() => {
+        // Sync local title state when card data changes (e.g. after save or refetch)
         setEditedTitle(card.titulo || '')
-        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [card.titulo])
 
     // Fetch active change requests
@@ -162,8 +175,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
 
         // 2. Task Status Logic
-        if ((card as any).proxima_tarefa) {
-            const task = (card as any).proxima_tarefa as any
+        if (card.proxima_tarefa) {
+            const task = card.proxima_tarefa
             if (task.data_vencimento) {
                 const today = new Date()
                 today.setHours(0, 0, 0, 0)
@@ -235,10 +248,9 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     const updateOwnerMutation = useMutation({
         mutationFn: async ({ field, userId }: { field: 'dono_atual_id' | 'sdr_owner_id' | 'vendas_owner_id' | 'pos_owner_id', userId: string | null }) => {
-            const updateData: any = {}
-            updateData[field] = userId || null
+            const updateData: Partial<CardBase> = { [field]: userId || null }
 
-            const { error } = await (supabase.from('cards') as any)
+            const { error } = await supabase.from('cards')
                 .update(updateData)
                 .eq('id', card.id)
 
@@ -258,7 +270,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     const updateTitleMutation = useMutation({
         mutationFn: async (newTitle: string) => {
-            const { error } = await (supabase.from('cards') as any)
+            const { error } = await supabase.from('cards')
                 .update({ titulo: newTitle })
                 .eq('id', card.id)
             if (error) throw error
@@ -274,7 +286,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
     const updateStageMutation = useMutation({
         mutationFn: async (stageId: string) => {
-            const { error } = await (supabase.from('cards') as any)
+            const { error } = await supabase.from('cards')
                 .update({ pipeline_stage_id: stageId })
                 .eq('id', card.id)
             if (error) throw error
@@ -288,15 +300,29 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
     })
 
-    const handleStageSelect = (stageId: string, stageName: string, stageFase: string) => {
-        // 1. Validate Move
-        const validation = validateMoveSync(card, stageId)
+    const handleStageSelect = async (stageId: string, stageName: string, stageFase: string) => {
+        if (isValidatingStage) return
+        setIsValidatingStage(true)
+
+        try {
+        // 1. Validate Move (async - checks fields, proposals, tasks, rules)
+        const validation = await validateMove(card, stageId)
+
+        // Check for Lost Reason Rule
+        if (validation.missingRules?.some(r => r.key === 'lost_reason_required')) {
+            setPendingLossMove({ stageId, stageName })
+            setLossReasonModalOpen(true)
+            setShowStageDropdown(false)
+            return
+        }
 
         if (!validation.valid) {
             setPendingStageChange({
                 stageId,
                 targetStageName: stageName,
-                missingFields: validation.missingFields
+                missingFields: validation.missingFields,
+                missingProposals: validation.missingProposals,
+                missingTasks: validation.missingTasks
             })
             setQualityGateModalOpen(true)
             setShowStageDropdown(false)
@@ -324,11 +350,14 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
         // 3. Proceed if valid
         updateStageMutation.mutate(stageId)
+        } finally {
+            setIsValidatingStage(false)
+        }
     }
 
     const updateStatusMutation = useMutation({
         mutationFn: async (vars: { status: string, motivoId?: string, comentario?: string }) => {
-            const updateData: any = { status_comercial: vars.status }
+            const updateData: Partial<CardBase> = { status_comercial: vars.status }
 
             if (vars.status === 'ganho') {
                 updateData.taxa_data_status = new Date().toISOString()
@@ -337,7 +366,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 updateData.motivo_perda_comentario = vars.comentario
             }
 
-            const { error } = await (supabase.from('cards') as any)
+            const { error } = await supabase.from('cards')
                 .update(updateData)
                 .eq('id', card.id)
 
@@ -639,21 +668,35 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 onSelect={handleStatusSelect}
                             />
 
-                            {/* Section Won Badges */}
-                            {(card as any).ganho_sdr && (
-                                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium">
-                                    SDR
-                                </span>
-                            )}
-                            {(card as any).ganho_planner && (
-                                <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-xs font-medium">
-                                    Planner
-                                </span>
-                            )}
-                            {(card as any).ganho_pos && (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium">
-                                    Pós
-                                </span>
+                            {/* Marcos do Funil (ganhos por fase) */}
+                            {(card.ganho_sdr || card.ganho_planner || card.ganho_pos) && (
+                                <div className="flex items-center gap-1" title="Marcos alcançados no funil de vendas">
+                                    <span className="text-[10px] text-gray-400 uppercase tracking-wide mr-1">Marcos:</span>
+                                    {card.ganho_sdr && (
+                                        <span
+                                            className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-medium"
+                                            title="Qualificado pelo SDR"
+                                        >
+                                            SDR
+                                        </span>
+                                    )}
+                                    {card.ganho_planner && (
+                                        <span
+                                            className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-medium"
+                                            title="Venda fechada - viagem confirmada"
+                                        >
+                                            Planner
+                                        </span>
+                                    )}
+                                    {card.ganho_pos && (
+                                        <span
+                                            className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-medium"
+                                            title="Viagem concluída com sucesso"
+                                        >
+                                            Pós
+                                        </span>
+                                    )}
+                                </div>
                             )}
 
                             {/* Mark as Lost Button OR Loss Reason Display */}
@@ -669,8 +712,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             {/* Loss Reason Display - when card is lost */}
                             {card.status_comercial === 'perdido' && (
                                 <LossReasonBadge
-                                    motivoId={(card as any).motivo_perda_id}
-                                    comentario={(card as any).motivo_perda_comentario}
+                                    motivoId={card.motivo_perda_id}
+                                    comentario={card.motivo_perda_comentario}
                                     onClick={() => {
                                         setPendingLossMove({
                                             stageId: card.pipeline_stage_id || '',
@@ -688,7 +731,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             {(() => {
                                 // Parse both produto_data and briefing_inicial - priority to produto_data
                                 const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data || '{}') : card.produto_data || {}) as TripsProdutoData
-                                const briefingData = (typeof (card as any).briefing_inicial === 'string' ? JSON.parse((card as any).briefing_inicial || '{}') : (card as any).briefing_inicial || {}) as TripsProdutoData
+                                const briefingData = (typeof card.briefing_inicial === 'string' ? JSON.parse(card.briefing_inicial || '{}') : card.briefing_inicial || {}) as TripsProdutoData
 
                                 // Merge: produto_data takes priority, fallback to briefing_inicial
                                 const mergedData: TripsProdutoData = {
@@ -698,15 +741,6 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                     orcamento: productData?.orcamento || briefingData?.orcamento,
                                     epoca_viagem: productData?.epoca_viagem || briefingData?.epoca_viagem
                                 }
-
-                                // Debug: Log data structure
-                                console.log('[CardHeader DEBUG]', {
-                                    cardProduto: card.produto,
-                                    productDataKeys: productData ? Object.keys(productData) : [],
-                                    briefingDataKeys: briefingData ? Object.keys(briefingData) : [],
-                                    mergedOrcamento: mergedData?.orcamento,
-                                    mergedEpocaViagem: mergedData?.epoca_viagem
-                                })
 
                                 // Check for TRIPS (including null/undefined which defaults to TRIPS behavior)
                                 if (card.produto === 'TRIPS' || !card.produto) {
@@ -756,6 +790,28 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 return null
                             })()}
 
+                            {/* Receita - Visível para todos */}
+                            {card.receita != null && (
+                                <>
+                                    <div className="h-4 w-px bg-gray-300 mx-1" />
+                                    <div
+                                        className="flex items-center gap-1.5 text-amber-700 font-medium"
+                                        title="Receita/Margem da viagem"
+                                    >
+                                        <TrendingUp className="h-3.5 w-3.5 text-amber-500" />
+                                        {new Intl.NumberFormat('pt-BR', {
+                                            style: 'currency',
+                                            currency: 'BRL'
+                                        }).format(card.receita)}
+                                        {card.receita_source === 'calculated' && (
+                                            <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                                Auto
+                                            </span>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
                             {/* Trip Date - Always show when data exists */}
                             {(() => {
                                 let tripDate: Date | null = null
@@ -764,7 +820,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 if (card.produto === 'TRIPS' || !card.produto) {
                                     // Parse both produto_data and briefing_inicial - priority to produto_data
                                     const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data || '{}') : card.produto_data || {}) as TripsProdutoData
-                                    const briefingData = (typeof (card as any).briefing_inicial === 'string' ? JSON.parse((card as any).briefing_inicial || '{}') : (card as any).briefing_inicial || {}) as TripsProdutoData
+                                    const briefingData = (typeof card.briefing_inicial === 'string' ? JSON.parse(card.briefing_inicial || '{}') : card.briefing_inicial || {}) as TripsProdutoData
 
                                     // Merge: produto_data.epoca_viagem takes priority, fallback to briefing_inicial
                                     const epocaViagem = productData?.epoca_viagem || briefingData?.epoca_viagem
@@ -831,18 +887,19 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
                             {/* Extra Dynamic Header Fields from config */}
                             {headerFields.filter(f => !['orcamento', 'valor_estimado', 'epoca_viagem', 'data_viagem_inicio'].includes(f.key)).map(field => {
-                                let value = (card as any)[field.key]
+                                let value = card[field.key as keyof Card]
 
                                 if (card.produto === 'TRIPS' && !value) {
-                                    const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as any
-                                    value = productData?.[field.key]
+                                    const productData = (typeof card.produto_data === 'string' ? JSON.parse(card.produto_data) : card.produto_data) as Record<string, unknown> | null
+                                    value = productData?.[field.key] as typeof value
                                 }
 
                                 if (!value) return null
 
-                                let displayValue = value
+                                let displayValue: string
                                 if (Array.isArray(value)) displayValue = value.join(', ')
-                                if (typeof value === 'boolean') displayValue = value ? 'Sim' : 'Não'
+                                else if (typeof value === 'boolean') displayValue = value ? 'Sim' : 'Não'
+                                else displayValue = String(value)
 
                                 return (
                                     <div key={field.key} className="flex items-center gap-2">
@@ -931,6 +988,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 isOpen={qualityGateModalOpen}
                 onClose={() => setQualityGateModalOpen(false)}
                 missingFields={pendingStageChange?.missingFields || []}
+                missingProposals={pendingStageChange?.missingProposals || []}
+                missingTasks={pendingStageChange?.missingTasks || []}
                 onConfirm={handleConfirmQualityGate}
                 targetStageName={pendingStageChange?.targetStageName || ''}
                 cardId={card.id!}
@@ -954,8 +1013,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 onConfirm={handleLossConfirm}
                 targetStageId={pendingLossMove?.stageId || card.pipeline_stage_id || ''}
                 targetStageName={pendingLossMove?.stageName || 'Perdido'}
-                initialMotivoId={(card as any).motivo_perda_id}
-                initialComentario={(card as any).motivo_perda_comentario}
+                initialMotivoId={card.motivo_perda_id}
+                initialComentario={card.motivo_perda_comentario}
                 isEditing={card.status_comercial === 'perdido'}
             />
         </>
@@ -1020,7 +1079,7 @@ function StatusSelector({ currentStatus, onSelect }: { currentStatus: string | n
         { value: 'pausado', label: 'Pausado', color: 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200' }
     ]
 
-    const statusColors: any = {
+    const statusColors: Record<string, string> = {
         'aberto': 'bg-yellow-100 text-yellow-800 border-yellow-200',
         'ganho': 'bg-green-100 text-green-800 border-green-200',
         'perdido': 'bg-red-100 text-red-800 border-red-200',

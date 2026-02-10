@@ -1,15 +1,13 @@
-import { useAuth } from '@/contexts/AuthContext'
-
-const RECEITA_VIEW_ROLES = ['admin', 'gestor', 'financeiro']
-const RECEITA_EDIT_ROLES = ['admin', 'gestor']
-
+/**
+ * useReceitaPermission
+ *
+ * Desde 2026-02: TODOS podem ver e editar receita.
+ * O Planner precisa inserir custos e ver margem para fechar vendas.
+ * Hook mantido para compatibilidade com os 8 arquivos que o usam.
+ */
 export function useReceitaPermission() {
-  const { profile } = useAuth()
-
-  const role = profile?.role ?? ''
-
   return {
-    canView: !!profile?.is_admin || RECEITA_VIEW_ROLES.includes(role),
-    canEdit: !!profile?.is_admin || RECEITA_EDIT_ROLES.includes(role),
+    canView: true,
+    canEdit: true,
   }
 }

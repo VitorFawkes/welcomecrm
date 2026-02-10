@@ -68,7 +68,8 @@ Deno.serve(async (req) => {
         }), { status: 200 });
     }
 
-    // 1. Fetch pending outbound events
+    // 1. Fetch pending outbound events (respecting retry backoff)
+    const now = new Date().toISOString();
     const { data: events, error: fetchError } = await supabase
         .from('integration_outbound_queue')
         .select(`
@@ -76,6 +77,7 @@ Deno.serve(async (req) => {
             integrations:integrations(config)
         `)
         .eq('status', 'pending')
+        .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
         .order('created_at')
         .limit(50);
 
@@ -90,6 +92,23 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[integration-dispatch] Processing ${events.length} events...`);
+
+    // 1b. Load outbound field mappings for field_update translation (CRM field → AC field ID)
+    const { data: outboundFieldMaps } = await supabase
+        .from('integration_outbound_field_map')
+        .select('internal_field, external_field_id, external_field_name, is_active')
+        .eq('is_active', true);
+
+    const fieldMapLookup = new Map<string, string>();
+    for (const m of outboundFieldMaps || []) {
+        if (m.internal_field && m.external_field_id) {
+            fieldMapLookup.set(m.internal_field, m.external_field_id);
+        }
+    }
+
+    // Metadata fields from the trigger payload that should never be sent to AC
+    const METADATA_FIELDS = new Set(['shadow_mode', 'matched_rule', 'old_stage_id', 'new_stage_id',
+        'target_external_stage_id', 'target_external_stage_name', 'status', 'motivo_perda']);
 
     const results: Array<{ id: string; status: string; error?: string }> = [];
 
@@ -148,39 +167,86 @@ Deno.serve(async (req) => {
                 case 'field_update': {
                     endpoint = `/api/3/deals/${event.external_id}`;
 
-                    // Separate standard fields from custom fields
-                    // Standard fields use format "deal[fieldname]" (e.g., "deal[value]", "deal[title]")
-                    // Custom fields use numeric IDs (e.g., "21", "24")
+                    // Translate CRM field names → AC field IDs using integration_outbound_field_map
                     const standardFields: Record<string, unknown> = {};
-                    const customFields: Array<{ customFieldId: string; fieldValue: string }> = [];
+                    const customFields: Array<{ customFieldId: number; fieldValue: string }> = [];
+                    let skippedFields: string[] = [];
 
                     for (const [fieldId, value] of Object.entries(event.payload || {})) {
-                        // Skip metadata fields
-                        if (fieldId === 'shadow_mode') continue;
+                        // Skip trigger metadata fields
+                        if (METADATA_FIELDS.has(fieldId)) continue;
 
-                        // Check if it's a standard field (deal[fieldname] format)
+                        // Check if it's already in AC format (deal[fieldname])
                         const standardMatch = fieldId.match(/^deal\[(\w+)\]$/);
                         if (standardMatch) {
-                            // Standard field - add directly to deal object
-                            const fieldName = standardMatch[1];
-                            standardFields[fieldName] = value;
+                            standardFields[standardMatch[1]] = value;
+                            continue;
+                        }
+
+                        // Translate CRM field → AC field using the outbound field map
+                        const acFieldId = fieldMapLookup.get(fieldId);
+                        if (acFieldId) {
+                            // Check if it's a standard AC field (deal.value, deal.title, etc.)
+                            const acStandardMatch = acFieldId.match(/^deal\[(\w+)\]$/);
+                            if (acStandardMatch) {
+                                const stdField = acStandardMatch[1];
+                                let stdValue: unknown;
+                                if (Array.isArray(value)) {
+                                    stdValue = value.join(', ');
+                                } else if (value !== null && typeof value === 'object') {
+                                    stdValue = JSON.stringify(value);
+                                } else {
+                                    stdValue = value;
+                                }
+                                // AC stores deal[value] in cents
+                                if (stdField === 'value' && typeof stdValue === 'number') {
+                                    stdValue = stdValue * 100;
+                                }
+                                standardFields[stdField] = stdValue;
+                            } else {
+                                // Custom field - AC expects numeric ID
+                                // Arrays (e.g. destinos: ["Japão", "Brasil"]) → comma-separated string
+                                let fieldValue: string;
+                                if (Array.isArray(value)) {
+                                    fieldValue = value.join(', ');
+                                } else if (value !== null && typeof value === 'object') {
+                                    fieldValue = JSON.stringify(value);
+                                } else {
+                                    fieldValue = String(value ?? '');
+                                }
+                                customFields.push({
+                                    customFieldId: parseInt(acFieldId, 10) || 0,
+                                    fieldValue
+                                });
+                            }
                         } else {
-                            // Custom field - add to fields array
-                            customFields.push({
-                                customFieldId: fieldId,
-                                fieldValue: String(value)
-                            });
+                            skippedFields.push(fieldId);
                         }
                     }
 
-                    // Build the deal object
+                    if (skippedFields.length > 0) {
+                        console.warn(`[integration-dispatch] Skipped unmapped fields: ${skippedFields.join(', ')}`);
+                    }
+
+                    // Only send if we have actual fields to update
+                    if (Object.keys(standardFields).length === 0 && customFields.length === 0) {
+                        console.warn(`[integration-dispatch] No mapped fields for event ${event.id}, skipping`);
+                        await supabase.from('integration_outbound_queue').update({
+                            status: 'sent',
+                            processed_at: new Date().toISOString(),
+                            processing_log: `Skipped: No mapped fields (unmapped: ${skippedFields.join(', ')})`
+                        }).eq('id', event.id);
+                        results.push({ id: event.id, status: 'sent' });
+                        continue;
+                    }
+
                     const dealObject: Record<string, unknown> = { ...standardFields };
                     if (customFields.length > 0) {
                         dealObject.fields = customFields;
                     }
 
                     body = { deal: dealObject };
-                    console.log(`[integration-dispatch] Field update: Deal ${event.external_id}, ${Object.keys(standardFields).length} standard fields, ${customFields.length} custom fields`);
+                    console.log(`[integration-dispatch] Field update: Deal ${event.external_id}, ${Object.keys(standardFields).length} standard, ${customFields.length} custom, ${skippedFields.length} skipped`);
                     break;
                 }
 
@@ -225,13 +291,22 @@ Deno.serve(async (req) => {
                 throw new Error(`ActiveCampaign API Error: ${apiResponse.status} - ${errorText}`);
             }
 
-            // 6. Mark as sent
+            // 6. Parse response for validation
+            let responseData = null;
+            try {
+                responseData = await apiResponse.json();
+            } catch (parseErr) {
+                console.warn(`[integration-dispatch] Could not parse API response: ${parseErr}`);
+            }
+
+            // 7. Mark as sent with response data for validation
             await supabase
                 .from('integration_outbound_queue')
                 .update({
                     status: 'sent',
                     processed_at: new Date().toISOString(),
-                    processing_log: `Success: ${apiResponse.status}`
+                    processing_log: `Success: ${apiResponse.status}`,
+                    response_data: responseData
                 })
                 .eq('id', event.id);
 

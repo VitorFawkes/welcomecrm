@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import postgres from "https://deno.land/x/postgresjs@v3.4.4/mod.js"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -93,7 +94,13 @@ Deno.serve(async (req) => {
         )
 
         // Helper to update event status
-        const updateEventStatus = async (eventId: string, status: string, log: string, triggerId?: string | null) => {
+        const updateEventStatus = async (
+            eventId: string,
+            status: string,
+            log: string,
+            triggerId?: string | null,
+            retryInfo?: { attempts: number; next_retry_at: string | null }
+        ) => {
             const update: Record<string, unknown> = {
                 status,
                 processing_log: log,
@@ -102,12 +109,41 @@ Deno.serve(async (req) => {
             if (triggerId !== undefined) {
                 update.matched_trigger_id = triggerId;
             }
+            if (retryInfo) {
+                update.attempts = retryInfo.attempts;
+                update.next_retry_at = retryInfo.next_retry_at;
+            }
             const { error } = await supabase
                 .from('integration_events')
                 .update(update)
                 .eq('id', eventId);
             return error;
         }
+
+        // Errors that should NOT be retried (need config fix, not retry)
+        const isRetryableError = (message: string): boolean => {
+            const permanentErrors = ['Unmapped Stage', 'Topology Error', 'Integration not found'];
+            return !permanentErrors.some(pe => message.includes(pe));
+        };
+
+        // Direct Postgres connection for card updates (loop prevention)
+        // SET LOCAL app.update_source = 'integration' prevents the outbound trigger from firing
+        const databaseUrl = Deno.env.get('SUPABASE_DB_URL');
+        const pgSql = databaseUrl ? postgres(databaseUrl, { ssl: 'require' }) : null;
+
+        const updateCardSafe = async (cardId: string, payload: Record<string, any>) => {
+            if (!pgSql) {
+                console.warn('[integration-process] SUPABASE_DB_URL not set, using REST (loop prevention disabled)');
+                const { error } = await supabase.from('cards').update(payload).eq('id', cardId);
+                if (error) throw new Error(`Card Update Error: ${error.message}`);
+                return;
+            }
+            const columns = Object.keys(payload);
+            await pgSql.begin(async (tx: any) => {
+                await tx`SELECT set_config('app.update_source', 'integration', true)`;
+                await tx`UPDATE cards SET ${pgSql(payload, columns)} WHERE id = ${cardId}::uuid`;
+            });
+        };
 
         // Parse body
         let body: Record<string, any> = {};
@@ -125,10 +161,13 @@ Deno.serve(async (req) => {
             .in('key', ['SHADOW_MODE_ENABLED', 'WRITE_MODE_ENABLED', 'ALLOWED_EVENT_TYPES']);
 
         const shadowModeSetting = settings?.find(s => s.key === 'SHADOW_MODE_ENABLED')?.value === 'true';
-        const writeModeSetting = settings?.find(s => s.key === 'WRITE_MODE_ENABLED')?.value === 'true';
+        const writeModeSetting = settings?.find(s => s.key === 'WRITE_MODE_ENABLED')?.value;
         const allowedEventTypesSetting = settings?.find(s => s.key === 'ALLOWED_EVENT_TYPES')?.value;
         const allowedEventTypes = allowedEventTypesSetting ? allowedEventTypesSetting.split(',').map((t: string) => t.trim()) : ['deal_add', 'deal_update', 'deal_state'];
-        const isShadowMode = shadowModeSetting || !writeModeSetting;
+        // FIX: Default to WRITE mode. Shadow only if EXPLICITLY enabled or writes EXPLICITLY disabled.
+        // Before: !writeModeSetting caused shadow mode when setting didn't exist in DB
+        const isShadowMode = shadowModeSetting || writeModeSetting === 'false';
+        console.log(`[integration-process] Mode: ${isShadowMode ? 'SHADOW' : 'WRITE'} (shadow=${shadowModeSetting}, write=${writeModeSetting || 'not_set'})`);
 
         // 1. Fetch Events to Process
         let query = supabase
@@ -137,11 +176,14 @@ Deno.serve(async (req) => {
             .order('created_at', { ascending: true });
 
         // If specific event IDs provided, fetch those (any status) without limit;
-        // otherwise fetch pending with limit of 50
+        // otherwise fetch pending with limit of 50, respecting retry backoff
         if (event_ids && Array.isArray(event_ids) && event_ids.length > 0) {
             query = query.in('id', event_ids);
         } else {
-            query = query.eq('status', 'pending').limit(50);
+            const now = new Date().toISOString();
+            query = query.eq('status', 'pending')
+                .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
+                .limit(50);
         }
 
         if (integration_id) {
@@ -282,36 +324,24 @@ Deno.serve(async (req) => {
                 // Check entity type
                 const entityMatch = t.entity_types.includes(entityType === 'deal' ? 'deal' : 'contact');
 
-                return pipelineMatch && stageMatch && ownerMatch && entityMatch;
+                // Check action_type compatibility WITHIN the find criteria
+                // This ensures create_only triggers don't steal matches from update_only triggers
+                const actionType = t.action_type || 'all';
+                const actionMatch = actionType === 'all'
+                    || (actionType === 'create_only' && eventType === 'deal_add')
+                    || (actionType === 'update_only' && eventType !== 'deal_add');
+
+                return pipelineMatch && stageMatch && ownerMatch && entityMatch && actionMatch;
             });
 
             if (!matchingTrigger) {
-                // Non-blocking: allow events even when no specific trigger matches
-                // This prevents silent drops - events flow through and can be monitored
+                // FIX: When triggers ARE configured for this integration, treat them as an allowlist.
+                // Events that don't match any trigger should be BLOCKED, not allowed.
+                // This ensures rules like "create_only from Stage 42" are actually enforced.
                 return {
-                    allowed: true,
-                    reason: `No specific trigger matched - allowing by default (Pipeline ${pipelineId}, Stage ${stageId}${ownerId ? `, Owner ${ownerId}` : ''})`,
+                    allowed: false,
+                    reason: `No trigger matched (Pipeline ${pipelineId}, Stage ${stageId}, Event ${eventType}${ownerId ? `, Owner ${ownerId}` : ''})`,
                     trigger: null
-                };
-            }
-
-            // Check action_type restrictions:
-            // - 'create_only': only allows deal_add (create new card)
-            // - 'update_only': only allows deal_update and deal_state (update existing card)
-            // - 'all': allows everything
-            if (matchingTrigger.action_type === 'create_only' && eventType !== 'deal_add') {
-                return {
-                    allowed: false,
-                    reason: `Trigger is create_only, but event is ${eventType}`,
-                    trigger: matchingTrigger
-                };
-            }
-
-            if (matchingTrigger.action_type === 'update_only' && eventType === 'deal_add') {
-                return {
-                    allowed: false,
-                    reason: `Trigger is update_only, but event is deal_add (creates new cards)`,
-                    trigger: matchingTrigger
                 };
             }
 
@@ -531,15 +561,11 @@ Deno.serve(async (req) => {
                                         cardUpdates.produto_data = produtoData;
                                         cardUpdates.updated_at = new Date().toISOString();
 
-                                        const { error: cardUpdateErr } = await supabase
-                                            .from('cards')
-                                            .update(cardUpdates)
-                                            .eq('id', card.id);
-
-                                        if (cardUpdateErr) {
-                                            console.error(`Failed to update card ${card.id} with contact fields:`, cardUpdateErr);
-                                        } else {
+                                        try {
+                                            await updateCardSafe(card.id, cardUpdates);
                                             log += ` | Updated Card ${card.id} with ${Object.keys(marketingData).length} mapped fields`;
+                                        } catch (cardUpdateErr) {
+                                            console.error(`Failed to update card ${card.id} with contact fields:`, cardUpdateErr);
                                         }
                                     }
                                 }
@@ -1084,12 +1110,7 @@ Deno.serve(async (req) => {
                     }
 
                     if (existingCard) {
-                        const { error: uErr } = await supabase
-                            .from('cards')
-                            .update(cardPayload)
-                            .eq('id', existingCard.id);
-
-                        if (uErr) throw new Error(`Card Update Error: ${uErr.message}`);
+                        await updateCardSafe(existingCard.id, cardPayload);
                         log = `Updated Card ${existingCard.id} (Pipeline: ${topology?.pipelineName})`;
 
                     } else {
@@ -1122,11 +1143,40 @@ Deno.serve(async (req) => {
 
             } catch (err: any) {
                 console.error(`Event ${event.id} failed:`, err);
-                await updateEventStatus(event.id, 'failed', err.message, matchedTrigger?.id || null);
+
+                const MAX_RETRIES = 3;
+                const currentAttempts = (event.attempts || 0) + 1;
+                const retryable = isRetryableError(err.message);
+                const isFinalFailure = currentAttempts >= MAX_RETRIES || !retryable;
+                const newStatus = isFinalFailure ? 'failed' : 'pending';
+
+                // Exponential backoff: 2min, 8min, 32min (capped at 30min)
+                const retryDelayMs = retryable
+                    ? Math.min(2 * 60 * 1000 * Math.pow(4, currentAttempts - 1), 30 * 60 * 1000)
+                    : 0;
+
+                const logPrefix = isFinalFailure
+                    ? `[FINAL attempt ${currentAttempts}/${MAX_RETRIES}]`
+                    : `[Retry ${currentAttempts}/${MAX_RETRIES}, next in ${Math.round(retryDelayMs / 60000)}min]`;
+
+                await updateEventStatus(
+                    event.id,
+                    newStatus,
+                    `${logPrefix} ${err.message}`,
+                    matchedTrigger?.id || null,
+                    {
+                        attempts: currentAttempts,
+                        next_retry_at: retryable && !isFinalFailure
+                            ? new Date(Date.now() + retryDelayMs).toISOString()
+                            : null
+                    }
+                );
                 stats.errors++;
-                results.push({ id: event.id, status: 'failed', error: err.message });
+                results.push({ id: event.id, status: newStatus, error: err.message, attempt: currentAttempts });
             }
         }
+
+        if (pgSql) await pgSql.end();
 
         return new Response(JSON.stringify({
             message: `Processed ${stats.updated + stats.processed_shadow} events`,

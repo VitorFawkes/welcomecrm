@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, no-case-declarations */
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Calendar, DollarSign, MapPin, Users, CheckSquare, AlertCircle, Clock, Link, Building, MoreVertical, Trash2 } from 'lucide-react'
@@ -359,11 +360,20 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 </div>
             )
         }
-        if (fieldId === 'destinos' && Array.isArray(value)) {
+        if (fieldId === 'destinos' && value) {
+            let displayValue = ''
+            if (Array.isArray(value)) {
+                displayValue = value.map(v => typeof v === 'object' ? (v.nome || v.name || JSON.stringify(v)) : String(v)).join(', ')
+            } else if (typeof value === 'string') {
+                displayValue = value
+            } else if (typeof value === 'object') {
+                displayValue = value.nome || value.name || Object.values(value).filter(Boolean).join(', ') || ''
+            }
+            if (!displayValue) return null
             return (
                 <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                     <MapPin className="mr-1.5 h-3 w-3 flex-shrink-0" />
-                    <span className="truncate block flex-1">{value.join(', ')}</span>
+                    <span className="truncate block flex-1">{displayValue}</span>
                 </div>
             )
         }
@@ -423,10 +433,16 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 if (fieldId === 'dias_ate_viagem') Icon = Calendar
                 if (fieldId === 'forma_pagamento') Icon = DollarSign
 
+                // Guard: never render raw objects
+                const displayStr = (typeof value === 'object' && value !== null)
+                    ? (Array.isArray(value) ? value.join(', ') : '')
+                    : String(value)
+                if (!displayStr) return null
+
                 return (
                     <div key={fieldId} className="flex items-center text-xs text-gray-500 mt-1">
                         {Icon && <Icon className="mr-1.5 h-3 w-3 flex-shrink-0 text-gray-400" />}
-                        <span className="truncate block flex-1 text-gray-600">{String(value)}</span>
+                        <span className="truncate block flex-1 text-gray-600">{displayStr}</span>
                     </div>
                 )
         }

@@ -48,8 +48,11 @@ interface TripInformationProps {
         fase?: string | null
         pipeline_stage_id?: string | null
         // TODO: Define strict Json type matching Supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         briefing_inicial?: any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         marketing_data?: any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         produto_data?: any
         [key: string]: unknown
     }
@@ -189,6 +192,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                 return {}
             }
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return (card.produto_data as any) || EMPTY_OBJECT
     }, [card.produto_data])
 
@@ -201,6 +205,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                 return {}
             }
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return (card.briefing_inicial as any) || EMPTY_OBJECT
     }, [card.briefing_inicial])
     // Marketing data is now accessed via DynamicSectionWidget from produto_data
@@ -228,6 +233,7 @@ export default function TripInformation({ card }: TripInformationProps) {
     // Sync ViewMode with Card Stage - FIX: Use pipeline_stage_id to get fase
     // The card object from 'cards' table doesn't have 'fase' field,
     // only the view_cards_acoes has it via join with pipeline_stages
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         if (!phases || !stages) return
 
@@ -248,18 +254,19 @@ export default function TripInformation({ card }: TripInformationProps) {
             const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
             if (sdrPhase && sdrPhase.slug) setViewMode(sdrPhase.slug)
         }
-        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [card.pipeline_stage_id, phases, stages])
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // Determine which data to display/edit based on ViewMode and CorrectionMode
     // SDR View: Shows briefingData (or productData if briefing is empty/synced)
     // Planner View: Shows productData (Proposal) AND briefingData (History)
     const activeData = (viewMode === SystemPhase.SDR || correctionMode) ? briefingData : productData
 
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         setEditedData(activeData)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
     }, [activeData, viewMode, correctionMode])
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const updateCardMutation = useMutation({
         mutationFn: async ({ newData, target }: { newData: TripsProdutoData, target: 'produto_data' | 'briefing_inicial' }) => {
@@ -299,6 +306,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                         }
                     } else {
                         // Legacy fallback
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const legacy = epoca as any
                         if (legacy.inicio || legacy.fim) {
                             updates.data_viagem_inicio = legacy.inicio || null
@@ -332,6 +340,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                 }
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error } = await (supabase.from('cards') as any)
                 .update(updates)
                 .eq('id', card.id!)
@@ -351,8 +360,21 @@ export default function TripInformation({ card }: TripInformationProps) {
         // 2. View Mode -> SDR = 'briefing_inicial', Planner = 'produto_data'
         const target = (correctionMode || viewMode === SystemPhase.SDR) ? 'briefing_inicial' : 'produto_data'
 
+        // Flush any pending destinosInput before saving
+        let dataToSave = editedData
+        if (editingField === 'destinos' && destinosInput.trim()) {
+            const val = destinosInput.trim().replace(/,/g, '')
+            if (val) {
+                const current = dataToSave.destinos || []
+                if (!current.includes(val)) {
+                    dataToSave = { ...dataToSave, destinos: [...current, val] }
+                }
+            }
+            setDestinosInput('')
+        }
+
         updateCardMutation.mutate({
-            newData: editedData,
+            newData: dataToSave,
             target
         })
     }
@@ -510,6 +532,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                 {!['sdr', 'planner', 'pos_venda', 'marketing'].includes(viewMode) && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Render ALL visible fields for this dynamic phase */}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {getVisibleFields(card.pipeline_stage_id!).map((field: any) => (
                             <FieldCard
                                 key={field.key}
@@ -587,9 +610,10 @@ export default function TripInformation({ card }: TripInformationProps) {
                             onChange={(e) => setDestinosInput(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ',') {
-                                    e.preventDefault()
                                     const val = destinosInput.trim().replace(/,/g, '')
                                     if (val) {
+                                        e.preventDefault()
+                                        e.stopPropagation()
                                         const current = editedData.destinos || []
                                         if (!current.includes(val)) setEditedData({ ...editedData, destinos: [...current, val] })
                                         setDestinosInput('')

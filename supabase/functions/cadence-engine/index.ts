@@ -711,6 +711,18 @@ async function executeTaskStep(
         assignToId = config.assign_to_user_id;
     }
 
+    // Calcular data de vencimento respeitando business hours do template
+    const template = instance.template || {};
+    let taskDueDate = new Date();
+    if (template.respect_business_hours) {
+        const businessConfig: BusinessHoursConfig = {
+            start: template.business_hours_start ?? BUSINESS_HOURS_START,
+            end: template.business_hours_end ?? BUSINESS_HOURS_END,
+            allowedWeekdays: template.allowed_weekdays ?? [1, 2, 3, 4, 5]
+        };
+        taskDueDate = calculateBusinessTime(new Date(), 0, businessConfig);
+    }
+
     // Criar tarefa
     const { data: task, error: taskError } = await supabaseClient
         .from("tarefas")
@@ -721,7 +733,7 @@ async function executeTaskStep(
             descricao: config.descricao || '',
             responsavel_id: assignToId,
             prioridade: mapPrioridade(config.prioridade),
-            data_vencimento: new Date().toISOString(),
+            data_vencimento: taskDueDate.toISOString(),
             metadata: {
                 cadence_instance_id: instance.id,
                 cadence_step_id: step.id,

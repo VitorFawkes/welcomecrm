@@ -5,6 +5,7 @@ import { IntegrationBuilder } from './IntegrationBuilder';
 import { IntegrationFieldExplorer } from './IntegrationFieldExplorer';
 import { IntegrationSettings } from './IntegrationSettings';
 import { OutboundLogsTab } from './OutboundLogsTab';
+import { IntegrationLogs } from './IntegrationLogs';
 
 // Unified components
 import { IntegrationOverviewTab } from './IntegrationOverviewTab';
@@ -16,10 +17,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/Button';
 import {
     ArrowLeft,
+    ArrowDownLeft,
+    ArrowUpRight,
     LayoutDashboard,
     Settings,
     Zap,
-    Send,
     Map
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -89,11 +91,18 @@ export function IntegrationsPage() {
                             Regras
                         </TabsTrigger>
                         <TabsTrigger
+                            value="inbound"
+                            className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
+                        >
+                            <ArrowDownLeft className="w-4 h-4" />
+                            Entrada (AC → CRM)
+                        </TabsTrigger>
+                        <TabsTrigger
                             value="outbound"
                             className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                         >
-                            <Send className="w-4 h-4" />
-                            Fila de Eventos
+                            <ArrowUpRight className="w-4 h-4" />
+                            Saída (CRM → AC)
                         </TabsTrigger>
                         <TabsTrigger
                             value="settings"
@@ -119,12 +128,17 @@ export function IntegrationsPage() {
                         <UnifiedRulesTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 4: Outbound Queue (Fila de Eventos) */}
+                    {/* Tab 4: Inbound Events (AC → CRM) */}
+                    <TabsContent value="inbound">
+                        <IntegrationLogs mode="inbox" />
+                    </TabsContent>
+
+                    {/* Tab 5: Outbound Queue (CRM → AC) */}
                     <TabsContent value="outbound">
                         <OutboundLogsTab integrationId={AC_INTEGRATION_ID} />
                     </TabsContent>
 
-                    {/* Tab 5: Settings */}
+                    {/* Tab 6: Settings */}
                     <TabsContent value="settings">
                         <IntegrationSettings />
                     </TabsContent>

@@ -50,6 +50,12 @@ update_card_contact.ts
 # Backup files (local rollback data)
 .backup/
 
+# Supabase temp files
+supabase/.temp/
+
+# Referência local (não é código)
+Exemplo Colunas Mondee/
+
 # Reports and temporary files
 *.docx
 *_REPORT.md

@@ -9,7 +9,7 @@
  * - Respects field visibility rules from stage_field_config
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Check, Loader2, Layers } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -17,19 +17,29 @@ import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { useSections } from '../../hooks/useSections'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
 import { cn } from '../../lib/utils'
-import type { Database } from '../../database.types'
+import type { Database, Json } from '../../database.types'
 import * as Icons from 'lucide-react'
 import { ProposalsWidget } from './ProposalsWidget'
+import MondeWidget from './MondeWidget'
+import FinanceiroWidget from './FinanceiroWidget'
+import ObservacoesEstruturadas from './ObservacoesEstruturadas'
+import TripInformation from './TripInformation'
+
+type Card = Database['public']['Tables']['cards']['Row']
 
 // ═══════════════════════════════════════════════════════════
 // WIDGET REGISTRY - Maps widget_component values to React components
-// Add new widgets here when creating specialized section components
+// Widgets receive { cardId, card } — use what you need
 // ═══════════════════════════════════════════════════════════
-const WIDGET_REGISTRY: Record<string, React.ComponentType<{ cardId: string }>> = {
-    proposals: ProposalsWidget,
-}
 
-type Card = Database['public']['Tables']['cards']['Row']
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const WIDGET_REGISTRY: Record<string, React.ComponentType<any>> = {
+    proposals: ProposalsWidget,
+    monde: MondeWidget,
+    financeiro: FinanceiroWidget,
+    observacoes_criticas: ObservacoesEstruturadas,
+    trip_info: TripInformation,
+}
 
 interface DynamicSectionWidgetProps {
     card: Card
@@ -60,7 +70,7 @@ export default function DynamicSectionWidget({
                 return {}
             }
         }
-        return (card.produto_data as Record<string, any>) || {}
+        return (card.produto_data as Record<string, Json>) || {}
     }, [card.produto_data])
 
     const marketingData = useMemo(() => {
@@ -72,12 +82,12 @@ export default function DynamicSectionWidget({
                 return {}
             }
         }
-        return (card.marketing_data as Record<string, any>) || {}
+        return (card.marketing_data as Record<string, Json>) || {}
     }, [card.marketing_data])
 
     // State
-    const [editedData, setEditedData] = useState<Record<string, any>>({})
-    const [lastSavedData, setLastSavedData] = useState<Record<string, any>>({})
+    const [editedData, setEditedData] = useState<Record<string, Json>>({})
+    const [lastSavedData, setLastSavedData] = useState<Record<string, Json>>({})
     const [isDirty, setIsDirty] = useState(false)
 
     // Fetch section metadata
@@ -96,7 +106,7 @@ export default function DynamicSectionWidget({
     // Get current data for this section's fields from produto_data AND marketing_data
     // Priority: produto_data (user edits) > marketing_data (from integrations)
     const sectionData = useMemo(() => {
-        const data: Record<string, any> = {}
+        const data: Record<string, Json> = {}
         fields.forEach(field => {
             // First check produto_data (user edits), then fall back to marketing_data
             if (productData[field.key] !== undefined && productData[field.key] !== null && productData[field.key] !== '') {
@@ -110,15 +120,19 @@ export default function DynamicSectionWidget({
         return data
     }, [productData, marketingData, fields])
 
-    // Sync local state when sectionData changes
-    useEffect(() => {
+    // Sync local state when sectionData changes (render-time pattern per React docs)
+    const [prevSectionDataStr, setPrevSectionDataStr] = useState('')
+    const sectionDataStr = JSON.stringify(sectionData)
+    if (prevSectionDataStr !== sectionDataStr) {
+        setPrevSectionDataStr(sectionDataStr)
         setEditedData(sectionData)
         setLastSavedData(sectionData)
         setIsDirty(false)
-    }, [sectionData])
+    }
 
     // Mutation to save changes - writes to TOP level of produto_data
     const updateCard = useMutation({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         mutationFn: async (newData: Record<string, any>) => {
             const { error } = await supabase
                 .from('cards')
@@ -148,7 +162,7 @@ export default function DynamicSectionWidget({
         }
     }
 
-    const handleChange = useCallback((key: string, value: any) => {
+    const handleChange = useCallback((key: string, value: Json) => {
         setEditedData(prev => {
             const next = { ...prev, [key]: value }
             setIsDirty(JSON.stringify(next) !== JSON.stringify(lastSavedData))
@@ -163,13 +177,11 @@ export default function DynamicSectionWidget({
         }
     }
 
-    // Get dynamic icon component
-    const IconComponent = useMemo(() => {
-        if (!section?.icon) return Layers
-        const iconName = section.icon.charAt(0).toUpperCase() +
-            section.icon.slice(1).replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
-        return (Icons as any)[iconName] || Layers
-    }, [section?.icon])
+    // Get dynamic icon name for lookup
+    const iconName = section?.icon
+        ? section.icon.charAt(0).toUpperCase() +
+          section.icon.slice(1).replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
+        : null
 
     // Loading state
     if (loadingFields || loadingSections) {
@@ -206,7 +218,11 @@ export default function DynamicSectionWidget({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className={cn("p-1.5 rounded-lg", iconBgClass)}>
-                            <IconComponent className={cn("h-4 w-4", textClass)} />
+                            {(() => {
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const Icon = (iconName ? (Icons as any)[iconName] : null) || Layers
+                                return <Icon className={cn("h-4 w-4", textClass)} />
+                            })()}
                         </div>
                         <h3 className="text-sm font-semibold text-gray-900">
                             {section?.label || sectionKey}
@@ -249,7 +265,7 @@ export default function DynamicSectionWidget({
                                 field={{
                                     key: field.key,
                                     label: field.label,
-                                    type: field.type as any,
+                                    type: field.type,
                                     options: field.options
                                 }}
                                 value={editedData[field.key]}
@@ -305,7 +321,7 @@ export function DynamicSectionsList({ card, position, excludeKeys = [] }: Dynami
                 // If section has a custom widget, render it
                 if (section.widget_component && WIDGET_REGISTRY[section.widget_component]) {
                     const WidgetComponent = WIDGET_REGISTRY[section.widget_component]
-                    return <WidgetComponent key={section.key} cardId={card.id!} />
+                    return <WidgetComponent key={section.key} cardId={card.id!} card={card} />
                 }
 
                 // Otherwise render as dynamic fields section

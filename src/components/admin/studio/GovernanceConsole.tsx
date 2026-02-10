@@ -55,6 +55,7 @@ interface ActionRequirement {
 //     { value: 'api', label: 'API Externa' }
 // ]
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const SPECIAL_RULES = [
     { key: 'lost_reason_required', label: 'Motivo de Perda Obrigatório', icon: ShieldAlert }
 ]
@@ -74,7 +75,7 @@ export default function GovernanceConsole() {
 
     // 1. Fetch Phases & Stages
     const { data: phasesData } = usePipelinePhases()
-    const phases = phasesData || []
+    const phases = useMemo(() => phasesData || [], [phasesData])
 
     const { data: stages, isLoading: loadingStages } = useQuery({
         queryKey: ['pipeline-stages-governance'],
@@ -94,7 +95,7 @@ export default function GovernanceConsole() {
             const { data } = await supabase
                 .from('stage_field_config')
                 .select('*')
-                .in('requirement_type', ['proposal', 'task', 'field'])
+                .in('requirement_type', ['proposal', 'task', 'field', 'rule'])
             return (data || []) as ActionRequirement[]
         }
     })
@@ -122,7 +123,7 @@ export default function GovernanceConsole() {
 
             // Deduplicate by type on client side since distinct on select might be tricky with outcome_label
             const uniqueTypes = new Map<string, string>()
-            data?.forEach((item: any) => {
+            data?.forEach((item: { tipo: string; outcome_label: string }) => {
                 // Use a nice label if available, or capitalize type
                 if (!uniqueTypes.has(item.tipo)) {
                     uniqueTypes.set(item.tipo, item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1))
@@ -159,9 +160,11 @@ export default function GovernanceConsole() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['action-requirements-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-field-config-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-requirements'] })
             toast.success('Regra adicionada com sucesso')
         },
-        onError: (err: any) => toast.error(`Erro: ${err.message}`)
+        onError: (err: Error) => toast.error(`Erro: ${err.message}`)
     })
 
     const deleteMutation = useMutation({
@@ -171,10 +174,12 @@ export default function GovernanceConsole() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['action-requirements-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-field-config-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-requirements'] })
             toast.success('Regras removidas com sucesso')
             setSelectedRuleIds(new Set())
         },
-        onError: (err: any) => toast.error(`Erro ao remover: ${err.message}`)
+        onError: (err: Error) => toast.error(`Erro ao remover: ${err.message}`)
     })
 
     const replicateMutation = useMutation({
@@ -188,10 +193,17 @@ export default function GovernanceConsole() {
                     // Check if already exists (client-side check for now, DB constraint might catch it too)
                     // We'll just try to insert and ignore duplicates if possible, or filter here.
                     // Let's construct the new rule
-                    const { id, created_at, updated_at, ...ruleData } = rule as any
                     newRules.push({
-                        ...ruleData,
-                        stage_id: targetId
+                        stage_id: targetId,
+                        requirement_type: rule.requirement_type,
+                        requirement_label: rule.requirement_label,
+                        is_required: rule.is_required,
+                        is_blocking: rule.is_blocking,
+                        proposal_min_status: rule.proposal_min_status,
+                        task_tipo: rule.task_tipo,
+                        task_require_completed: rule.task_require_completed,
+                        field_key: rule.field_key,
+                        bypass_sources: rule.bypass_sources,
                     })
                 }
             }
@@ -203,12 +215,14 @@ export default function GovernanceConsole() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['action-requirements-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-field-config-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-requirements'] })
             toast.success('Regras replicadas com sucesso')
             setIsReplicating(false)
             setTargetStageIds(new Set())
             setSelectedRuleIds(new Set())
         },
-        onError: (err: any) => toast.error(`Erro ao replicar: ${err.message}`)
+        onError: (err: Error) => toast.error(`Erro ao replicar: ${err.message}`)
     })
 
     // Derived State
@@ -231,9 +245,12 @@ export default function GovernanceConsole() {
         ? { id: 'all', nome: 'Todas as Etapas', fase: 'Visão Global' }
         : stages?.find(s => s.id === selectedStageId)
 
-    const stageRules = selectedStageId === 'all'
-        ? requirements || []
-        : requirements?.filter(r => r.stage_id === selectedStageId) || []
+    const stageRules = useMemo(() =>
+        selectedStageId === 'all'
+            ? requirements || []
+            : requirements?.filter(r => r.stage_id === selectedStageId) || [],
+        [selectedStageId, requirements]
+    )
 
     // Hydrate Rules (Self-Healing)
     const hydratedRules = useMemo(() => {
@@ -667,7 +684,7 @@ export default function GovernanceConsole() {
 }
 
 
-function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: any, stageName?: string, selected: boolean, onToggle: () => void, onDelete: () => void }) {
+function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: ActionRequirement & { _label: string; _isInvalid: boolean }, stageName?: string, selected: boolean, onToggle: () => void, onDelete: () => void }) {
     return (
         <div className={cn(
             "group flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm transition-all cursor-pointer",
