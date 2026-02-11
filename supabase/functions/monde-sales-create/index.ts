@@ -11,6 +11,8 @@ interface CreateSaleRequest {
     card_id: string;
     proposal_id?: string | null;
     sale_date: string; // YYYY-MM-DD
+    travel_start_date?: string | null; // YYYY-MM-DD
+    travel_end_date?: string | null;   // YYYY-MM-DD
     items: Array<{
         proposal_item_id?: string;
         proposal_flight_id?: string;
@@ -97,7 +99,7 @@ Deno.serve(async (req) => {
 
         // Parse request body
         const body: CreateSaleRequest = await req.json();
-        const { card_id, proposal_id, sale_date, items } = body;
+        const { card_id, proposal_id, sale_date, travel_start_date, travel_end_date, items } = body;
 
         // Validate required fields (proposal_id is now optional)
         if (!card_id || !sale_date || !items?.length) {
@@ -124,7 +126,7 @@ Deno.serve(async (req) => {
         // 1. Verify card exists and user has access
         const { data: card, error: cardError } = await supabaseAdmin
             .from('cards')
-            .select('id, titulo, produto_data')
+            .select('id, titulo, produto_data, data_viagem_inicio, data_viagem_fim')
             .eq('id', card_id)
             .single();
 
@@ -242,7 +244,11 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 5. Create monde_sales record
+        // 5. Resolve travel dates with fallback from card
+        const resolvedTravelStart = travel_start_date || card.data_viagem_inicio || null;
+        const resolvedTravelEnd = travel_end_date || card.data_viagem_fim || null;
+
+        // 6. Create monde_sales record
         const idempotencyKey = crypto.randomUUID();
 
         const { data: sale, error: saleError } = await supabaseAdmin
@@ -251,6 +257,8 @@ Deno.serve(async (req) => {
                 card_id,
                 proposal_id: proposal_id || null,
                 sale_date,
+                travel_start_date: resolvedTravelStart,
+                travel_end_date: resolvedTravelEnd,
                 idempotency_key: idempotencyKey,
                 status: 'pending',
                 created_by: user.id,

@@ -47,12 +47,25 @@ export default function MondeCreateSaleModal({
 }: MondeCreateSaleModalProps) {
     const [step, setStep] = useState<Step>('select')
     const [selectedItems, setSelectedItems] = useState<Record<string, { selected: boolean; supplier: string }>>({})
-    const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
+    const [saleDateManual, setSaleDateManual] = useState<string | null>(null)
 
     const hasProposal = !!proposalId
     const { data: proposal, isLoading: isLoadingProposal } = useProposal(proposalId || '')
     const { data: sentItems, isLoading: isLoadingSent } = useSentProposalItems(cardId)
     const { mutate: createSale, isPending: isCreating } = useCreateMondeSale()
+
+    // Fetch card dates for sale_date default and travel dates
+    const { data: cardDates } = useQuery({
+        queryKey: ['card-dates', cardId],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('cards')
+                .select('data_fechamento, data_viagem_inicio, data_viagem_fim, ganho_planner_at')
+                .eq('id', cardId)
+                .single()
+            return data
+        },
+    })
 
     // Fetch card_financial_items when no proposal
     const { data: cardFinancialItems, isLoading: isLoadingFinancial } = useQuery({
@@ -69,6 +82,16 @@ export default function MondeCreateSaleModal({
     })
 
     const isLoading = (hasProposal ? isLoadingProposal || isLoadingSent : isLoadingFinancial)
+
+    // Derived sale_date: manual override > ganho_planner_at > data_fechamento > today
+    const saleDate = useMemo(() => {
+        if (saleDateManual !== null) return saleDateManual
+        if (cardDates) {
+            const d = cardDates.ganho_planner_at || cardDates.data_fechamento || ''
+            return d ? d.split('T')[0] : new Date().toISOString().split('T')[0]
+        }
+        return new Date().toISOString().split('T')[0]
+    }, [saleDateManual, cardDates])
 
     // Build selectable items from proposal OR card_financial_items
     const selectableItems = useMemo(() => {
@@ -210,7 +233,9 @@ export default function MondeCreateSaleModal({
         createSale({
             card_id: cardId,
             proposal_id: proposalId || null,
-            sale_date: saleDate,
+            sale_date: saleDate || new Date().toISOString().split('T')[0],
+            travel_start_date: cardDates?.data_viagem_inicio?.split('T')[0] || null,
+            travel_end_date: cardDates?.data_viagem_fim?.split('T')[0] || null,
             items
         }, {
             onSuccess: () => {
@@ -426,7 +451,7 @@ export default function MondeCreateSaleModal({
                                 <Input
                                     type="date"
                                     value={saleDate}
-                                    onChange={(e) => setSaleDate(e.target.value)}
+                                    onChange={(e) => setSaleDateManual(e.target.value)}
                                     className="w-full max-w-xs"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">

@@ -12,6 +12,8 @@ interface MondeSale {
     card_id: string;
     proposal_id: string | null;
     sale_date: string;
+    travel_start_date: string | null;
+    travel_end_date: string | null;
     total_value: number;
     idempotency_key: string;
     status: string;
@@ -148,7 +150,8 @@ Deno.serve(async (req) => {
     const { data: sales, error: fetchError } = await supabase
         .from('monde_sales')
         .select(`
-            id, card_id, proposal_id, sale_date, total_value, idempotency_key, status, attempts, max_attempts,
+            id, card_id, proposal_id, sale_date, travel_start_date, travel_end_date,
+            total_value, idempotency_key, status, attempts, max_attempts,
             cards:cards(id, titulo, produto_data)
         `)
         .eq('status', 'pending')
@@ -371,6 +374,10 @@ function buildMondePayload(
     const transfers: MondeSalePayload['ground_transportations'] = [];
     const insurances: MondeSalePayload['insurances'] = [];
 
+    // Travel dates fallback chain: metadata → travel_start/end_date → sale_date
+    const travelStart = sale.travel_start_date || sale.sale_date;
+    const travelEnd = sale.travel_end_date || travelStart;
+
     for (const item of items) {
         const metadata = item.item_metadata || {};
 
@@ -378,8 +385,8 @@ function buildMondePayload(
             case 'hotel':
             case 'accommodation':
                 hotels.push({
-                    check_in: (metadata.check_in as string) || sale.sale_date,
-                    check_out: (metadata.check_out as string) || sale.sale_date,
+                    check_in: (metadata.check_in as string) || travelStart,
+                    check_out: (metadata.check_out as string) || travelEnd,
                     supplier_name: item.supplier || 'Não informado',
                     city: (metadata.city as string) || (metadata.destination as string),
                     rooms: (metadata.rooms as number) || 1,
@@ -389,7 +396,7 @@ function buildMondePayload(
 
             case 'flight':
                 airlineTickets.push({
-                    departure_date: (metadata.departure_datetime as string)?.substring(0, 10) || sale.sale_date,
+                    departure_date: (metadata.departure_datetime as string)?.substring(0, 10) || travelStart,
                     arrival_date: (metadata.arrival_datetime as string)?.substring(0, 10),
                     origin: (metadata.origin_airport as string) || (metadata.origin as string) || 'N/A',
                     destination: (metadata.destination_airport as string) || (metadata.destination as string) || 'N/A',
@@ -402,7 +409,7 @@ function buildMondePayload(
             case 'transfer':
             case 'ground_transportation':
                 transfers.push({
-                    date: (metadata.date as string) || sale.sale_date,
+                    date: (metadata.date as string) || travelStart,
                     origin: metadata.origin as string,
                     destination: metadata.destination as string,
                     supplier_name: item.supplier,
@@ -412,8 +419,8 @@ function buildMondePayload(
 
             case 'insurance':
                 insurances.push({
-                    start_date: (metadata.start_date as string) || sale.sale_date,
-                    end_date: metadata.end_date as string,
+                    start_date: (metadata.start_date as string) || travelStart,
+                    end_date: (metadata.end_date as string) || travelEnd,
                     supplier_name: item.supplier,
                     value: item.total_price
                 });

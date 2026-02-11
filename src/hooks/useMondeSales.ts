@@ -61,6 +61,8 @@ export interface CreateSaleInput {
     card_id: string
     proposal_id?: string | null
     sale_date: string
+    travel_start_date?: string | null
+    travel_end_date?: string | null
     items: Array<{
         proposal_item_id?: string
         proposal_flight_id?: string

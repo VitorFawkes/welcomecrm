@@ -30,8 +30,9 @@ const DEAL_FIELDS = [
     { key: 'cpf', label: 'CPF', required: false },
     { key: 'telefone', label: 'Telefone/Celular', required: false },
     { key: 'nome_contato', label: 'Nome do Pagante', required: false },
-    { key: 'data_viagem_inicio', label: 'Data Início Viagem', required: false },
-    { key: 'data_viagem_fim', label: 'Data Fim Viagem', required: false },
+    { key: 'data_fechamento', label: 'Data da Venda', required: false },
+    { key: 'data_viagem_inicio', label: 'Data Início (uso produto)', required: false },
+    { key: 'data_viagem_fim', label: 'Data Fim (uso produto)', required: false },
     { key: 'passageiros', label: 'Passageiros (vírgula)', required: false },
     { key: 'produtos', label: 'Produtos (vírgula)', required: false },
     { key: 'fornecedores', label: 'Fornecedores (vírgula)', required: false },
@@ -98,18 +99,19 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
     const handleDownloadTemplate = () => {
         const template = [
             {
-                'Título da Venda': 'Viagem Maceió - João Silva',
+                'Titulo da Venda': 'Viagem Maceió - João Silva',
                 'Valor Total (Faturamento)': 64918,
                 'Receita (Margem)': 5747.44,
                 'Email do Contato': 'cliente@email.com',
                 'CPF': '12345678900',
                 'Telefone': '41996717848',
                 'Nome do Pagante': 'João Silva',
-                'Data Início Viagem': '2024-02-07',
+                'Data Venda': '2024-01-15',
+                'Data Inicio Viagem': '2024-02-07',
                 'Data Fim Viagem': '2024-02-11',
-                'Passageiros (vírgula)': 'João Silva, Maria Silva',
-                'Produtos (vírgula)': 'Diárias de Hospedagem, Transfer',
-                'Fornecedores (vírgula)': 'Hotel Resort, Transfer Service',
+                'Passageiros': 'João Silva, Maria Silva',
+                'Produtos': 'Diárias de Hospedagem, Transfer',
+                'Fornecedores': 'Hotel Resort, Transfer Service',
                 'Consultora/Vendedor': 'Ana Consultora',
             }
         ]
@@ -151,8 +153,13 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                 cpf: ['cpf', 'documento'],
                 telefone: ['telefone', 'celular', 'phone', 'tel', 'whatsapp'],
                 nome_contato: ['pagante', 'nome contato', 'nome cliente', 'cliente', 'comprador'],
-                data_viagem_inicio: ['data inicio', 'data início', 'inicio viagem', 'início viagem', 'check-in', 'checkin', 'ida', 'data venda', 'data saida', 'data saída', 'embarque', 'partida'],
-                data_viagem_fim: ['data fim', 'data final', 'fim viagem', 'check-out', 'checkout', 'volta', 'retorno', 'data retorno', 'chegada'],
+                data_fechamento: ['data venda', 'data da venda', 'data fechamento', 'data do fechamento',
+                                  'sale date', 'closing date', 'data pagamento', 'fechamento'],
+                data_viagem_inicio: ['data inicio', 'data início', 'inicio viagem', 'início viagem',
+                                     'check-in', 'checkin', 'ida', 'data saida', 'data saída',
+                                     'embarque', 'partida', 'data embarque', 'departure'],
+                data_viagem_fim: ['data fim', 'data final', 'fim viagem', 'check-out', 'checkout',
+                                  'volta', 'retorno', 'data retorno', 'chegada', 'arrival'],
                 passageiros: ['passageiro', 'viajante', 'pax', 'traveler'],
                 produtos: ['produto', 'serviço', 'servico', 'item', 'product'],
                 fornecedores: ['fornecedor', 'supplier', 'operador', 'operadora'],
@@ -212,6 +219,11 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
 
         const num = Number(str)
         return isNaN(num) ? 0 : num
+    }
+
+    const formatDateBR = (iso: string): string => {
+        const [y, m, d] = iso.split('-')
+        return `${d}/${m}/${y}`
     }
 
     const cleanPhone = (phone: unknown) => String(phone || '').replace(/\D/g, '')
@@ -406,7 +418,23 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                     const valorTotal = parseBRNumber(row['valor'])
                     const receita = parseBRNumber(row['receita'])
                     console.log(`[Import] Row ${i + 2}: valor raw="${row['valor']}" (${typeof row['valor']}) → ${valorTotal}, receita raw="${row['receita']}" (${typeof row['receita']}) → ${receita}`)
+
+                    // Parse all 3 dates separately
+                    const dataFechamento = excelDateToISO(row['data_fechamento'])
                     const dataInicio = excelDateToISO(row['data_viagem_inicio'])
+                    const dataFim = excelDateToISO(row['data_viagem_fim'])
+
+                    // Build epoca_viagem JSON for TripInformation.tsx
+                    const epocaViagem = dataInicio ? {
+                        tipo: 'data_exata',
+                        data_inicio: dataInicio,
+                        data_fim: dataFim || dataInicio,
+                        ano: parseInt(dataInicio.split('-')[0]),
+                        display: dataFim && dataFim !== dataInicio
+                            ? `${formatDateBR(dataInicio)} a ${formatDateBR(dataFim)}`
+                            : formatDateBR(dataInicio),
+                        flexivel: false
+                    } : { tipo: 'indefinido', display: 'A definir' }
 
                     // 4. Create Card
                     const cardData: Record<string, unknown> = {
@@ -419,9 +447,19 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         valor_final: valorTotal,
                         receita: receita,
                         receita_source: 'manual',
+                        // Datas separadas corretamente
+                        data_fechamento: dataFechamento || new Date().toISOString().split('T')[0],
                         data_viagem_inicio: dataInicio,
-                        data_viagem_fim: excelDateToISO(row['data_viagem_fim']),
-                        data_fechamento: dataInicio || new Date().toISOString(),
+                        data_viagem_fim: dataFim,
+                        epoca_tipo: epocaViagem.tipo,
+                        // ganho_planner_at = data da venda (canônica para Monde)
+                        // Seguro: "Viagem Concluída" tem is_planner_won=false, trigger não sobrescreve
+                        ganho_planner: true,
+                        ganho_planner_at: dataFechamento || new Date().toISOString(),
+                        // JSON para TripInformation.tsx
+                        produto_data: {
+                            epoca_viagem: epocaViagem
+                        },
                         origem: 'manual',
                         status_comercial: 'ganho',
                         estado_operacional: 'finalizado',
