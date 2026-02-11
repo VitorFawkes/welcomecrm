@@ -41,6 +41,19 @@ const DEAL_FIELDS = [
 
 type RowData = Record<string, unknown>
 
+/** Fix UTF-8 double-encoding (mojibake): "Ã¡" → "á", "Ã§" → "ç", etc. */
+function fixMojibake(str: string): string {
+    try {
+        const bytes = new Uint8Array([...str].map(c => c.charCodeAt(0)))
+        // If any codepoint > 255, can't be Latin-1 mojibake
+        if ([...str].some(c => c.charCodeAt(0) > 255)) return str
+        const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+        return decoded !== str ? decoded : str
+    } catch {
+        return str
+    }
+}
+
 export default function DealImportModal({ isOpen, onClose, onSuccess, currentProduct }: DealImportModalProps) {
     const { session } = useAuth()
     const [step, setStep] = useState<'upload' | 'mapping' | 'importing' | 'results'>('upload')
@@ -128,7 +141,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         const reader = new FileReader()
         reader.onload = (evt) => {
             const arrayBuffer = evt.target?.result
-            const wb = XLSX.read(arrayBuffer, { type: 'array' })
+            const wb = XLSX.read(arrayBuffer, { type: 'array', codepage: 65001 })
             const wsname = wb.SheetNames[0]
             const ws = wb.Sheets[wsname]
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
@@ -138,8 +151,16 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                 return
             }
 
-            const sheetHeaders = (rows[0] as unknown[]).map(h => String(h || '').trim()).filter(h => h !== '')
-            const parsedData = XLSX.utils.sheet_to_json(ws) as RowData[]
+            const sheetHeaders = (rows[0] as unknown[]).map(h => fixMojibake(String(h || '').trim())).filter(h => h !== '')
+            const rawData = XLSX.utils.sheet_to_json(ws) as RowData[]
+            // Fix mojibake in all string values from Excel
+            const parsedData = rawData.map(row => {
+                const fixed: RowData = {}
+                for (const [key, val] of Object.entries(row)) {
+                    fixed[fixMojibake(key)] = typeof val === 'string' ? fixMojibake(val) : val
+                }
+                return fixed
+            })
 
             setHeaders(sheetHeaders)
             setFileData(parsedData)
