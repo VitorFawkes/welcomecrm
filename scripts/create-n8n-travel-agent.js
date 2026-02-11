@@ -430,6 +430,7 @@ function transformWorkflow(workflow) {
   // ---- 1. Webhook ----
   if (nodeMap['Webhook']) {
     nodeMap['Webhook'].parameters.path = 'welcome-trips-agent';
+    nodeMap['Webhook'].parameters.responseMode = 'onReceived';
   }
 
   // ---- 2. Process Webhook Data2 (adapt for Echo format) ----
@@ -720,9 +721,9 @@ function transformProcessWebhookData(node) {
   node.parameters.assignments = {
     assignments: [
       { id: 'skip', name: 'skip', type: 'boolean',
-        value: "={{ $('Webhook').item.json.body.from_me === true }}" },
+        value: "={{ $('Webhook').item.json.body.event !== 'message.received' }}" },
       { id: 'skip_reason', name: 'skip_reason', type: 'string',
-        value: "={{ $('Webhook').item.json.body.from_me === true ? 'from_me' : '' }}" },
+        value: "={{ $('Webhook').item.json.body.event !== 'message.received' ? $('Webhook').item.json.body.event : '' }}" },
       { id: 'message_id', name: 'message_id', type: 'string',
         value: "={{ $('Webhook').item.json.body.whatsapp_message_id || $('Webhook').item.json.body.message_id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }}" },
       { id: 'instance', name: 'instance', type: 'string', value: 'WelcomeTrips' },
