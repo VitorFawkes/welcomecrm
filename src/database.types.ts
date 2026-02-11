@@ -131,6 +131,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_extraction_field_config: {
+        Row: {
+          allowed_values: Json | null
+          created_at: string | null
+          field_key: string
+          field_type: string
+          id: string
+          is_active: boolean | null
+          label: string
+          prompt_examples: string | null
+          prompt_extract_when: string | null
+          prompt_format: string | null
+          prompt_question: string
+          section: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          allowed_values?: Json | null
+          created_at?: string | null
+          field_key: string
+          field_type: string
+          id?: string
+          is_active?: boolean | null
+          label: string
+          prompt_examples?: string | null
+          prompt_extract_when?: string | null
+          prompt_format?: string | null
+          prompt_question: string
+          section: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          allowed_values?: Json | null
+          created_at?: string | null
+          field_key?: string
+          field_type?: string
+          id?: string
+          is_active?: boolean | null
+          label?: string
+          prompt_examples?: string | null
+          prompt_extract_when?: string | null
+          prompt_format?: string | null
+          prompt_question?: string
+          section?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           created_at: string | null
@@ -1504,6 +1555,9 @@ export type Database = {
       }
       cards: {
         Row: {
+          ai_contexto: string | null
+          ai_responsavel: string | null
+          ai_resumo: string | null
           archived_at: string | null
           archived_by: string | null
           briefing_inicial: Json | null
@@ -1592,6 +1646,9 @@ export type Database = {
           vendas_owner_id: string | null
         }
         Insert: {
+          ai_contexto?: string | null
+          ai_responsavel?: string | null
+          ai_resumo?: string | null
           archived_at?: string | null
           archived_by?: string | null
           briefing_inicial?: Json | null
@@ -1680,6 +1737,9 @@ export type Database = {
           vendas_owner_id?: string | null
         }
         Update: {
+          ai_contexto?: string | null
+          ai_responsavel?: string | null
+          ai_resumo?: string | null
           archived_at?: string | null
           archived_by?: string | null
           briefing_inicial?: Json | null
@@ -3010,6 +3070,152 @@ export type Database = {
           },
         ]
       }
+      integration_health_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          context: Json
+          created_at: string
+          fired_at: string
+          id: string
+          resolved_at: string | null
+          rule_id: string
+          rule_key: string
+          status: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          context?: Json
+          created_at?: string
+          fired_at?: string
+          id?: string
+          resolved_at?: string | null
+          rule_id: string
+          rule_key: string
+          status?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          context?: Json
+          created_at?: string
+          fired_at?: string
+          id?: string
+          resolved_at?: string | null
+          rule_id?: string
+          rule_key?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_health_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_health_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "integration_health_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_health_alerts_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_health_pulse: {
+        Row: {
+          channel: string
+          error_count_24h: number | null
+          event_count_24h: number | null
+          event_count_7d: number | null
+          label: string
+          last_error_at: string | null
+          last_event_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          error_count_24h?: number | null
+          event_count_24h?: number | null
+          event_count_7d?: number | null
+          label: string
+          last_error_at?: string | null
+          last_event_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          error_count_24h?: number | null
+          event_count_24h?: number | null
+          event_count_7d?: number | null
+          label?: string
+          last_error_at?: string | null
+          last_event_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      integration_health_rules: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_enabled: boolean
+          label: string
+          rule_key: string
+          severity: string
+          threshold_count: number | null
+          threshold_hours: number
+          threshold_percent: number | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          label: string
+          rule_key: string
+          severity?: string
+          threshold_count?: number | null
+          threshold_hours?: number
+          threshold_percent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          label?: string
+          rule_key?: string
+          severity?: string
+          threshold_count?: number | null
+          threshold_hours?: number
+          threshold_percent?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       integration_inbound_triggers: {
         Row: {
           action_type: string
@@ -3196,6 +3402,7 @@ export type Database = {
           payload: Json
           processed_at: string | null
           processing_log: string | null
+          response_data: Json | null
           status: string | null
           triggered_by: string | null
         }
@@ -3213,6 +3420,7 @@ export type Database = {
           payload: Json
           processed_at?: string | null
           processing_log?: string | null
+          response_data?: Json | null
           status?: string | null
           triggered_by?: string | null
         }
@@ -3230,6 +3438,7 @@ export type Database = {
           payload?: Json
           processed_at?: string | null
           processing_log?: string | null
+          response_data?: Json | null
           status?: string | null
           triggered_by?: string | null
         }
@@ -3909,6 +4118,7 @@ export type Database = {
       }
       monde_sale_items: {
         Row: {
+          card_financial_item_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -3926,6 +4136,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          card_financial_item_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -3943,6 +4154,7 @@ export type Database = {
           unit_price?: number
         }
         Update: {
+          card_financial_item_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -3960,6 +4172,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "monde_sale_items_card_financial_item_id_fkey"
+            columns: ["card_financial_item_id"]
+            isOneToOne: false
+            referencedRelation: "card_financial_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "monde_sale_items_proposal_flight_id_fkey"
             columns: ["proposal_flight_id"]
@@ -4160,6 +4379,78 @@ export type Database = {
           nome?: string
         }
         Relationships: []
+      }
+      n8n_ai_extraction_queue: {
+        Row: {
+          card_id: string
+          created_at: string | null
+          first_message_at: string | null
+          id: string
+          last_message_at: string | null
+          message_count: number | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          card_id: string
+          created_at?: string | null
+          first_message_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count?: number | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          card_id?: string
+          created_at?: string | null
+          first_message_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count?: number | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "n8n_ai_extraction_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "n8n_ai_extraction_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_archived_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "n8n_ai_extraction_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "n8n_ai_extraction_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "n8n_ai_extraction_queue_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_settings: {
         Row: {
@@ -7690,6 +7981,7 @@ export type Database = {
           pessoa_nome: string | null
           pessoa_principal_id: string | null
           pessoa_telefone: string | null
+          pessoa_telefone_normalizado: string | null
           pipeline_id: string | null
           pipeline_nome: string | null
           pipeline_stage_id: string | null
@@ -7969,12 +8261,17 @@ export type Database = {
       calculate_business_due_date: {
         Args: {
           p_allowed_weekdays?: number[]
-          p_business_end?: number
-          p_business_start?: number
+          p_bh_end?: number
+          p_bh_start?: number
           p_delay_minutes: number
-          p_from_date: string
+          p_delay_type?: string
+          p_from: string
         }
         Returns: string
+      }
+      calculate_flight_base_price: {
+        Args: { p_rich_content: Json }
+        Returns: number
       }
       cancelar_sub_card: {
         Args: { p_motivo?: string; p_sub_card_id: string }
@@ -7999,6 +8296,10 @@ export type Database = {
           sync_field_mode: string
           sync_fields: string[]
         }[]
+      }
+      create_user_and_card: {
+        Args: { p_name: string; p_phone: string; p_pipeline_stage_id?: string }
+        Returns: Json
       }
       criar_sub_card: {
         Args: {
@@ -8039,6 +8340,7 @@ export type Database = {
         }
       }
       fix_orphan_conversations: { Args: never; Returns: Json }
+      fn_check_integration_health: { Args: never; Returns: Json }
       generate_api_key: {
         Args: {
           p_expires_at?: string
@@ -8061,6 +8363,7 @@ export type Database = {
         Returns: string
       }
       generate_proposal_public_token: { Args: never; Returns: string }
+      get_ai_extraction_config: { Args: never; Returns: Json }
       get_all_tables: {
         Args: never
         Returns: {
@@ -8073,7 +8376,27 @@ export type Database = {
           view_name: string
         }[]
       }
+      get_client_by_phone: {
+        Args: {
+          p_conversation_id?: string
+          p_phone_with_9: string
+          p_phone_without_9: string
+        }
+        Returns: Json
+      }
       get_invite_details: { Args: { token_input: string }; Returns: Json }
+      get_monde_sales_by_card: {
+        Args: { p_card_id: string }
+        Returns: {
+          created_at: string
+          items_count: number
+          monde_sale_id: string
+          sale_date: string
+          sale_id: string
+          status: string
+          total_value: number
+        }[]
+      }
       get_outbound_external_field_id: {
         Args: { p_integration_id: string; p_internal_field: string }
         Returns: string
@@ -8085,6 +8408,13 @@ export type Database = {
           cnt: number
           status: string
           trigger_id: string
+        }[]
+      }
+      get_schema_summary: {
+        Args: never
+        Returns: {
+          count: number
+          resource_type: string
         }[]
       }
       get_sub_cards: { Args: { p_parent_id: string }; Returns: Json }
@@ -8218,6 +8548,10 @@ export type Database = {
         Returns: Json
       }
       recalcular_receita_card: { Args: { p_card_id: string }; Returns: Json }
+      reprocess_orphan_whatsapp_for_phone: {
+        Args: { p_phone: string }
+        Returns: Json
+      }
       reprocess_pending_whatsapp_events: {
         Args: { batch_size?: number }
         Returns: Json
@@ -8271,6 +8605,14 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       unaccent: { Args: { "": string }; Returns: string }
+      update_card_from_ai_extraction: {
+        Args: {
+          p_briefing_inicial: Json
+          p_card_id: string
+          p_produto_data: Json
+        }
+        Returns: Json
+      }
       validate_api_key: {
         Args: { p_key: string }
         Returns: {

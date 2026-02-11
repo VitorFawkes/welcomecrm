@@ -45,11 +45,11 @@ export function useGlobalSearch() {
                 })
             }
 
-            // Search Contacts
+            // Search Contacts (nome, email e telefone)
             const { data: contacts } = await supabase
                 .from('contatos')
                 .select('id, nome, email, telefone')
-                .or(`nome.ilike.${searchTerm},email.ilike.${searchTerm}`)
+                .or(`nome.ilike.${searchTerm},email.ilike.${searchTerm},telefone.ilike.${searchTerm}`)
                 .limit(5)
 
             if (contacts) {

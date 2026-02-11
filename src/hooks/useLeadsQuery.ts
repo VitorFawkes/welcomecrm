@@ -50,17 +50,14 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
                         `external_id.ilike.%${original}%`
                     ]
 
-                    // Busca de telefone melhorada - suporta formatos variados
+                    // Busca de telefone — usa coluna normalizada (digits-only) para match cross-formato
                     if (normalized) {
-                        // Telefone completo: busca normalizado e original
-                        textFields.push(`pessoa_telefone.ilike.%${normalized}%`)
+                        textFields.push(`pessoa_telefone_normalizado.ilike.%${normalized}%`)
                         textFields.push(`pessoa_telefone.ilike.%${original}%`)
                     } else if (digitsOnly) {
-                        // Busca parcial: apenas dígitos (ex: "9999", "11", "+55")
-                        textFields.push(`pessoa_telefone.ilike.%${digitsOnly}%`)
+                        textFields.push(`pessoa_telefone_normalizado.ilike.%${digitsOnly}%`)
                         textFields.push(`pessoa_telefone.ilike.%${original}%`)
                     } else {
-                        // Fallback: busca pelo termo original
                         textFields.push(`pessoa_telefone.ilike.%${original}%`)
                     }
 
