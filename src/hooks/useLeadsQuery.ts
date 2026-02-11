@@ -1,5 +1,6 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { type LeadsFilterState } from './useLeadsFilters'
 import type { Database } from '../database.types'
 import { prepareSearchTerms } from '../lib/utils'
@@ -20,15 +21,18 @@ interface LeadsQueryResult {
 }
 
 export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
+    const { session } = useAuth()
+    const isAuthReady = !!session?.user?.id
+
     return useQuery({
         queryKey: ['leads', filters],
-        enabled,
+        enabled: enabled && isAuthReady,
         placeholderData: keepPreviousData,
         queryFn: async (): Promise<LeadsQueryResult> => {
             const page = filters.page || 1
             const pageSize = filters.pageSize || 50
 
-            // Build base query for filtering
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- query builder perde tipo com encadeamento dinâmico
             let query = (supabase.from('view_cards_acoes') as any)
                 .select('*', { count: 'exact' })
 
