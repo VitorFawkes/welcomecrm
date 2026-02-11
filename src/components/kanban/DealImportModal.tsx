@@ -142,17 +142,37 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
             setHeaders(sheetHeaders)
             setFileData(data)
 
-            // Auto-mapping
+            // Auto-mapping with extra keyword aliases for common Brazilian headers
+            const fieldAliases: Record<string, string[]> = {
+                valor: ['valor', 'faturamento', 'valor total', 'total venda', 'valor venda', 'preco', 'preço', 'price', 'total'],
+                receita: ['receita', 'margem', 'lucro', 'markup', 'comissão', 'comissao', 'profit'],
+                titulo: ['titulo', 'título', 'nome venda', 'deal', 'venda'],
+                email_contato: ['email', 'e-mail'],
+                cpf: ['cpf', 'documento'],
+                telefone: ['telefone', 'celular', 'phone', 'tel', 'whatsapp'],
+                nome_contato: ['pagante', 'nome contato', 'nome cliente', 'cliente', 'comprador'],
+                data_viagem_inicio: ['data inicio', 'data início', 'inicio viagem', 'início viagem', 'check-in', 'checkin', 'ida'],
+                data_viagem_fim: ['data fim', 'data final', 'fim viagem', 'check-out', 'checkout', 'volta'],
+                passageiros: ['passageiro', 'viajante', 'pax', 'traveler'],
+                produtos: ['produto', 'serviço', 'servico', 'item', 'product'],
+                fornecedores: ['fornecedor', 'supplier', 'operador', 'operadora'],
+                consultor: ['consultor', 'vendedor', 'assessor', 'responsavel', 'responsável'],
+            }
+
             const initialMapping: Mapping = {}
             DEAL_FIELDS.forEach(field => {
                 const match = sheetHeaders.find(h => {
-                    const hl = h.toLowerCase()
+                    const hl = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                     const fl = field.label.toLowerCase()
                     const fk = field.key.toLowerCase()
+                    // Exact match
                     if (hl === fl || hl === fk) return true
+                    // Substring match
                     if (hl.includes(fl) || fl.includes(hl)) return true
                     if (fk.length > 3 && hl.includes(fk)) return true
-                    return false
+                    // Alias keywords match
+                    const aliases = fieldAliases[field.key] || []
+                    return aliases.some(alias => hl.includes(alias))
                 })
                 if (match) initialMapping[field.key] = match
             })
@@ -160,6 +180,38 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
             setStep('mapping')
         }
         reader.readAsBinaryString(file)
+    }
+
+    // Parse Brazilian number formats: "R$ 64.918,00", "64.918,00", "5.747,44", "64918", etc.
+    const parseBRNumber = (value: unknown): number => {
+        if (value === null || value === undefined) return 0
+        if (typeof value === 'number') return isNaN(value) ? 0 : value
+
+        let str = String(value).trim()
+        // Remove currency symbol and whitespace
+        str = str.replace(/^R\$\s*/i, '').trim()
+        if (!str) return 0
+
+        const hasComma = str.includes(',')
+        const hasDot = str.includes('.')
+
+        if (hasComma && hasDot) {
+            // Both: determine order to detect format
+            if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+                // Comma after dot → BR: "64.918,00" → remove dots, comma→dot
+                str = str.replace(/\./g, '').replace(',', '.')
+            } else {
+                // Dot after comma → US: "64,918.00" → remove commas
+                str = str.replace(/,/g, '')
+            }
+        } else if (hasComma) {
+            // Only comma → BR decimal: "5747,44" → comma→dot
+            str = str.replace(',', '.')
+        }
+        // Only dot or no separator → already valid for Number()
+
+        const num = Number(str)
+        return isNaN(num) ? 0 : num
     }
 
     const cleanPhone = (phone: unknown) => String(phone || '').replace(/\D/g, '')
@@ -351,8 +403,9 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                     // 3. Resolve Consultor
                     const consultorId = await resolveConsultor(row['consultor'] as string | null)
 
-                    const valorTotal = Number(row['valor']) || 0
-                    const receita = Number(row['receita']) || 0
+                    const valorTotal = parseBRNumber(row['valor'])
+                    const receita = parseBRNumber(row['receita'])
+                    console.log(`[Import] Row ${i + 2}: valor raw="${row['valor']}" (${typeof row['valor']}) → ${valorTotal}, receita raw="${row['receita']}" (${typeof row['receita']}) → ${receita}`)
                     const dataInicio = excelDateToISO(row['data_viagem_inicio'])
 
                     // 4. Create Card
@@ -541,11 +594,15 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                                         const header = mapping[field.key]
                                         const value = header ? fileData[0][header] : null
                                         const isEmpty = !value && value !== 0
+                                        const isNumeric = field.key === 'valor' || field.key === 'receita'
+                                        const parsedNum = isNumeric && !isEmpty ? parseBRNumber(value) : null
                                         return (
                                             <div key={field.key} className="flex justify-between text-sm py-0.5">
                                                 <span className="text-slate-600">{field.label}</span>
                                                 <span className={isEmpty ? 'text-red-400 italic text-xs' : 'text-slate-900 font-medium'}>
-                                                    {isEmpty ? '(vazio)' : String(value)}
+                                                    {isEmpty ? '(vazio)' : isNumeric && parsedNum !== null
+                                                        ? `${parsedNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (raw: ${String(value)})`
+                                                        : String(value)}
                                                 </span>
                                             </div>
                                         )
