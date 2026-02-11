@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Search, Filter, Plane, UploadCloud } from 'lucide-react'
-import DealImportModal from '../components/kanban/DealImportModal'
+import { Search, Filter, Plane } from 'lucide-react'
 import { useTripsFilters } from '../hooks/useTripsFilters'
 import TripsGrid from '../components/trips/TripsGrid'
 import TripsFilterDrawer from '../components/trips/TripsFilterDrawer'
@@ -10,7 +9,6 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 export default function Cards() {
     const { filters, setFilters } = useTripsFilters()
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
     return (
         <ErrorBoundary>
@@ -47,13 +45,6 @@ export default function Cards() {
                         {/* Actions */}
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => setIsImportModalOpen(true)}
-                                className="flex items-center px-4 py-2 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 border border-gray-200 rounded-lg shadow-sm transition-all"
-                            >
-                                <UploadCloud className="h-4 w-4 mr-1.5" />
-                                Importar
-                            </button>
-                            <button
                                 onClick={() => setIsFilterDrawerOpen(true)}
                                 className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
                             >
@@ -75,15 +66,6 @@ export default function Cards() {
 
                 {/* Filter Drawer */}
                 <TripsFilterDrawer isOpen={isFilterDrawerOpen} onClose={() => setIsFilterDrawerOpen(false)} />
-
-                <DealImportModal
-                    isOpen={isImportModalOpen}
-                    onClose={() => setIsImportModalOpen(false)}
-                    currentProduct={'TRIPS'}
-                    onSuccess={() => {
-                        window.location.reload()
-                    }}
-                />
             </div>
         </ErrorBoundary>
     )

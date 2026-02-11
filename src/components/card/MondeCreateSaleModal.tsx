@@ -15,18 +15,20 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
 import { useProposal } from '@/hooks/useProposal'
 import { useCreateMondeSale, useSentProposalItems } from '@/hooks/useMondeSales'
 
 interface MondeCreateSaleModalProps {
     cardId: string
-    proposalId: string
+    proposalId?: string | null
     onClose: () => void
 }
 
 interface SelectableItem {
     id: string
-    type: 'proposal_item' | 'proposal_flight'
+    type: 'proposal_item' | 'proposal_flight' | 'card_financial_item'
     itemType: string
     title: string
     description?: string
@@ -47,35 +49,74 @@ export default function MondeCreateSaleModal({
     const [selectedItems, setSelectedItems] = useState<Record<string, { selected: boolean; supplier: string }>>({})
     const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
 
-    const { data: proposal, isLoading: isLoadingProposal } = useProposal(proposalId)
+    const hasProposal = !!proposalId
+    const { data: proposal, isLoading: isLoadingProposal } = useProposal(proposalId || '')
     const { data: sentItems, isLoading: isLoadingSent } = useSentProposalItems(cardId)
     const { mutate: createSale, isPending: isCreating } = useCreateMondeSale()
 
-    const isLoading = isLoadingProposal || isLoadingSent
+    // Fetch card_financial_items when no proposal
+    const { data: cardFinancialItems, isLoading: isLoadingFinancial } = useQuery({
+        queryKey: ['card-financial-items', cardId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('card_financial_items')
+                .select('*')
+                .eq('card_id', cardId)
+            if (error) return []
+            return data || []
+        },
+        enabled: !hasProposal,
+    })
 
-    // Build selectable items from proposal
+    const isLoading = (hasProposal ? isLoadingProposal || isLoadingSent : isLoadingFinancial)
+
+    // Build selectable items from proposal OR card_financial_items
     const selectableItems = useMemo(() => {
-        if (!proposal?.active_version) return []
+        // Path A: From proposal
+        if (hasProposal && proposal?.active_version) {
+            const items: SelectableItem[] = []
+            const sentItemIds = new Set(sentItems?.itemIds || [])
+            const sentFlightIds = new Set(sentItems?.flightIds || [])
 
-        const items: SelectableItem[] = []
-        const sentItemIds = new Set(sentItems?.itemIds || [])
-        const sentFlightIds = new Set(sentItems?.flightIds || [])
+            const sections = proposal.active_version.sections || []
+            for (const section of sections) {
+                for (const item of section.items || []) {
+                    const isSold = sentItemIds.has(item.id)
+                    const soldDetail = sentItems?.details?.find(d => d.proposal_item_id === item.id)
 
-        // Add proposal items
-        const sections = proposal.active_version.sections || []
-        for (const section of sections) {
-            for (const item of section.items || []) {
-                const isSold = sentItemIds.has(item.id)
-                const soldDetail = sentItems?.details?.find(d => d.proposal_item_id === item.id)
+                    items.push({
+                        id: item.id,
+                        type: 'proposal_item',
+                        itemType: item.item_type,
+                        title: item.title,
+                        description: item.description || undefined,
+                        supplier: item.supplier || (item.rich_content as Record<string, string>)?.supplier || null,
+                        price: item.base_price || 0,
+                        isSold,
+                        soldInfo: soldDetail && soldDetail.sale_date ? {
+                            saleDate: soldDetail.sale_date,
+                            mondeSaleId: soldDetail.monde_sale_id || ''
+                        } : undefined
+                    })
+                }
+            }
+
+            const flights = proposal.active_version.flights || []
+            for (const flight of flights) {
+                if (!flight.is_selected) continue
+                const isSold = sentFlightIds.has(flight.id)
+                const soldDetail = sentItems?.details?.find(d => d.proposal_flight_id === flight.id)
 
                 items.push({
-                    id: item.id,
-                    type: 'proposal_item',
-                    itemType: item.item_type,
-                    title: item.title,
-                    description: item.description || undefined,
-                    supplier: item.supplier || (item.rich_content as Record<string, string>)?.supplier || null,
-                    price: item.base_price || 0,
+                    id: flight.id,
+                    type: 'proposal_flight',
+                    itemType: 'flight',
+                    title: `${flight.origin_city || flight.origin_airport} → ${flight.destination_city || flight.destination_airport}`,
+                    description: flight.flight_number
+                        ? `Voo ${flight.flight_number} - ${flight.airline_name || 'N/A'}`
+                        : flight.airline_name || undefined,
+                    supplier: flight.airline_name || null,
+                    price: flight.price_total || flight.price_per_person || 0,
                     isSold,
                     soldInfo: soldDetail && soldDetail.sale_date ? {
                         saleDate: soldDetail.sale_date,
@@ -83,37 +124,26 @@ export default function MondeCreateSaleModal({
                     } : undefined
                 })
             }
+
+            return items
         }
 
-        // Add flights
-        const flights = proposal.active_version.flights || []
-        for (const flight of flights) {
-            // Only include selected flights
-            if (!flight.is_selected) continue
-
-            const isSold = sentFlightIds.has(flight.id)
-            const soldDetail = sentItems?.details?.find(d => d.proposal_flight_id === flight.id)
-
-            items.push({
-                id: flight.id,
-                type: 'proposal_flight',
-                itemType: 'flight',
-                title: `${flight.origin_city || flight.origin_airport} → ${flight.destination_city || flight.destination_airport}`,
-                description: flight.flight_number
-                    ? `Voo ${flight.flight_number} - ${flight.airline_name || 'N/A'}`
-                    : flight.airline_name || undefined,
-                supplier: flight.airline_name || null,
-                price: flight.price_total || flight.price_per_person || 0,
-                isSold,
-                soldInfo: soldDetail && soldDetail.sale_date ? {
-                    saleDate: soldDetail.sale_date,
-                    mondeSaleId: soldDetail.monde_sale_id || ''
-                } : undefined
-            })
+        // Path B: From card_financial_items (no proposal)
+        if (!hasProposal && cardFinancialItems) {
+            return cardFinancialItems.map((fi): SelectableItem => ({
+                id: fi.id,
+                type: 'card_financial_item',
+                itemType: fi.product_type || 'custom',
+                title: fi.description || 'Item financeiro',
+                description: undefined,
+                supplier: null,
+                price: fi.sale_value || 0,
+                isSold: false,
+            }))
         }
 
-        return items
-    }, [proposal, sentItems])
+        return []
+    }, [hasProposal, proposal, sentItems, cardFinancialItems])
 
     // Group items by type
     const groupedItems = useMemo(() => {
@@ -172,13 +202,14 @@ export default function MondeCreateSaleModal({
             .map(item => ({
                 proposal_item_id: item.type === 'proposal_item' ? item.id : undefined,
                 proposal_flight_id: item.type === 'proposal_flight' ? item.id : undefined,
+                card_financial_item_id: item.type === 'card_financial_item' ? item.id : undefined,
                 supplier: selectedItems[item.id]?.supplier || undefined
             }))
-            .filter(item => item.proposal_item_id || item.proposal_flight_id)
+            .filter(item => item.proposal_item_id || item.proposal_flight_id || item.card_financial_item_id)
 
         createSale({
             card_id: cardId,
-            proposal_id: proposalId,
+            proposal_id: proposalId || null,
             sale_date: saleDate,
             items
         }, {
@@ -380,7 +411,7 @@ export default function MondeCreateSaleModal({
 
                             {selectableItems.length === 0 && (
                                 <div className="text-center py-8 text-gray-500">
-                                    Nenhum item encontrado na proposta
+                                    {hasProposal ? 'Nenhum item encontrado na proposta' : 'Nenhum item financeiro encontrado'}
                                 </div>
                             )}
                         </div>

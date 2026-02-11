@@ -9,13 +9,22 @@ const corsHeaders = {
 
 interface CreateSaleRequest {
     card_id: string;
-    proposal_id: string;
+    proposal_id?: string | null;
     sale_date: string; // YYYY-MM-DD
     items: Array<{
         proposal_item_id?: string;
         proposal_flight_id?: string;
+        card_financial_item_id?: string;
         supplier?: string; // Override supplier
     }>;
+}
+
+interface CardFinancialItem {
+    id: string;
+    product_type: string;
+    description: string | null;
+    sale_value: number;
+    supplier_cost: number;
 }
 
 interface ProposalItem {
@@ -90,11 +99,11 @@ Deno.serve(async (req) => {
         const body: CreateSaleRequest = await req.json();
         const { card_id, proposal_id, sale_date, items } = body;
 
-        // Validate required fields
-        if (!card_id || !proposal_id || !sale_date || !items?.length) {
+        // Validate required fields (proposal_id is now optional)
+        if (!card_id || !sale_date || !items?.length) {
             return new Response(JSON.stringify({
                 error: 'Missing required fields',
-                details: 'card_id, proposal_id, sale_date, and items are required'
+                details: 'card_id, sale_date, and items are required'
             }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -126,27 +135,31 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 2. Verify proposal exists and is accepted
-        const { data: proposal, error: proposalError } = await supabaseAdmin
-            .from('proposals')
-            .select('id, status, accepted_total')
-            .eq('id', proposal_id)
-            .eq('card_id', card_id)
-            .single();
+        // 2. Verify proposal exists (only if proposal_id provided)
+        if (proposal_id) {
+            const { data: proposal, error: proposalError } = await supabaseAdmin
+                .from('proposals')
+                .select('id, status, accepted_total')
+                .eq('id', proposal_id)
+                .eq('card_id', card_id)
+                .single();
 
-        if (proposalError || !proposal) {
-            return new Response(JSON.stringify({ error: 'Proposal not found' }), {
-                status: 404,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
+            if (proposalError || !proposal) {
+                return new Response(JSON.stringify({ error: 'Proposal not found' }), {
+                    status: 404,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
         }
 
-        // 3. Fetch proposal items
+        // 3. Fetch source items based on type
         const proposalItemIds = items.filter(i => i.proposal_item_id).map(i => i.proposal_item_id);
         const proposalFlightIds = items.filter(i => i.proposal_flight_id).map(i => i.proposal_flight_id);
+        const financialItemIds = items.filter(i => i.card_financial_item_id).map(i => i.card_financial_item_id);
 
         let proposalItems: ProposalItem[] = [];
         let proposalFlights: ProposalFlight[] = [];
+        let financialItems: CardFinancialItem[] = [];
 
         if (proposalItemIds.length > 0) {
             const { data } = await supabaseAdmin
@@ -162,6 +175,14 @@ Deno.serve(async (req) => {
                 .select('id, airline_name, flight_number, origin_city, destination_city, departure_datetime, arrival_datetime, price_total')
                 .in('id', proposalFlightIds);
             proposalFlights = (data || []) as ProposalFlight[];
+        }
+
+        if (financialItemIds.length > 0) {
+            const { data } = await supabaseAdmin
+                .from('card_financial_items')
+                .select('id, product_type, description, sale_value, supplier_cost')
+                .in('id', financialItemIds);
+            financialItems = (data || []) as CardFinancialItem[];
         }
 
         // 4. Check for already sold items
@@ -195,6 +216,20 @@ Deno.serve(async (req) => {
                     alreadySold.push(proposalFlight?.airline_name || item.proposal_flight_id);
                 }
             }
+
+            if (item.card_financial_item_id) {
+                const { data: existing } = await supabaseAdmin
+                    .from('monde_sale_items')
+                    .select('id, monde_sales!inner(status)')
+                    .eq('card_financial_item_id', item.card_financial_item_id)
+                    .eq('monde_sales.status', 'sent')
+                    .limit(1);
+
+                if (existing && existing.length > 0) {
+                    const finItem = financialItems.find(fi => fi.id === item.card_financial_item_id);
+                    alreadySold.push(finItem?.description || item.card_financial_item_id);
+                }
+            }
         }
 
         if (alreadySold.length > 0) {
@@ -214,7 +249,7 @@ Deno.serve(async (req) => {
             .from('monde_sales')
             .insert({
                 card_id,
-                proposal_id,
+                proposal_id: proposal_id || null,
                 sale_date,
                 idempotency_key: idempotencyKey,
                 status: 'pending',
@@ -242,6 +277,7 @@ Deno.serve(async (req) => {
             sale_id: string;
             proposal_item_id?: string;
             proposal_flight_id?: string;
+            card_financial_item_id?: string;
             item_type: string;
             title: string;
             description?: string;
@@ -293,6 +329,28 @@ Deno.serve(async (req) => {
                             flight_number: proposalFlight.flight_number,
                             departure_datetime: proposalFlight.departure_datetime,
                             arrival_datetime: proposalFlight.arrival_datetime
+                        }
+                    });
+                }
+            }
+
+            // Handle card_financial_items (no-proposal path)
+            if (item.card_financial_item_id) {
+                const finItem = financialItems.find(fi => fi.id === item.card_financial_item_id);
+                if (finItem) {
+                    saleItems.push({
+                        sale_id: sale.id,
+                        card_financial_item_id: item.card_financial_item_id,
+                        item_type: finItem.product_type || 'custom',
+                        title: finItem.description || 'Item financeiro',
+                        supplier: item.supplier || undefined,
+                        unit_price: finItem.sale_value || 0,
+                        quantity: 1,
+                        total_price: finItem.sale_value || 0,
+                        item_metadata: {
+                            source: 'card_financial_item',
+                            card_financial_item_id: finItem.id,
+                            supplier_cost: finItem.supplier_cost
                         }
                     });
                 }

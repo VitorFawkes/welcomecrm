@@ -24,19 +24,26 @@ interface Mapping {
 
 const DEAL_FIELDS = [
     { key: 'titulo', label: 'Título da Venda', required: true },
-    { key: 'valor', label: 'Valor (Estimado/Final)', required: false },
-    { key: 'categoria', label: 'Categoria (Ex: Aéreo, Hotel)', required: false },
-    { key: 'email_contato', label: 'Email do Contato (Prioridade 1)', required: false },
-    { key: 'cpf', label: 'CPF (Prioridade 2)', required: false },
-    { key: 'telefone', label: 'Telefone/Celular (Prioridade 3)', required: false },
-    { key: 'nome_contato', label: 'Nome do Contato (Prioridade 4)', required: false },
-    { key: 'data_viagem_inicio', label: 'Data Viagem (Início)', required: false },
+    { key: 'valor', label: 'Valor Total (Faturamento)', required: false },
+    { key: 'receita', label: 'Receita (Margem)', required: false },
+    { key: 'email_contato', label: 'Email do Contato', required: false },
+    { key: 'cpf', label: 'CPF', required: false },
+    { key: 'telefone', label: 'Telefone/Celular', required: false },
+    { key: 'nome_contato', label: 'Nome do Pagante', required: false },
+    { key: 'data_viagem_inicio', label: 'Data Início Viagem', required: false },
+    { key: 'data_viagem_fim', label: 'Data Fim Viagem', required: false },
+    { key: 'passageiros', label: 'Passageiros (vírgula)', required: false },
+    { key: 'produtos', label: 'Produtos (vírgula)', required: false },
+    { key: 'fornecedores', label: 'Fornecedores (vírgula)', required: false },
+    { key: 'consultor', label: 'Consultora/Vendedor', required: false },
 ]
 
-export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess, currentProduct }: DealImportModalProps) {
+type RowData = Record<string, unknown>
+
+export default function DealImportModal({ isOpen, onClose, onSuccess, currentProduct }: DealImportModalProps) {
     const { session } = useAuth()
     const [step, setStep] = useState<'upload' | 'mapping' | 'importing' | 'results'>('upload')
-    const [fileData, setFileData] = useState<any[]>([])
+    const [fileData, setFileData] = useState<RowData[]>([])
     const [headers, setHeaders] = useState<string[]>([])
     const [mapping, setMapping] = useState<Mapping>({})
     const [isImporting, setIsImporting] = useState(false)
@@ -90,14 +97,19 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
     const handleDownloadTemplate = () => {
         const template = [
             {
-                'Título da Venda': 'Viagem Paris 2024',
-                'Valor': 15000,
-                'Categoria': 'Pacote Completo',
+                'Título da Venda': 'Viagem Maceió - João Silva',
+                'Valor Total (Faturamento)': 64918,
+                'Receita (Margem)': 5747.44,
                 'Email do Contato': 'cliente@email.com',
-                'CPF': '123.456.789-00',
-                'Telefone': '11999999999',
-                'Nome do Contato': 'João Silva',
-                'Data Viagem (Início)': '2024-12-01'
+                'CPF': '12345678900',
+                'Telefone': '41996717848',
+                'Nome do Pagante': 'João Silva',
+                'Data Início Viagem': '2024-02-07',
+                'Data Fim Viagem': '2024-02-11',
+                'Passageiros (vírgula)': 'João Silva, Maria Silva',
+                'Produtos (vírgula)': 'Diárias de Hospedagem, Transfer',
+                'Fornecedores (vírgula)': 'Hotel Resort, Transfer Service',
+                'Consultora/Vendedor': 'Ana Consultora',
             }
         ]
         const ws = XLSX.utils.json_to_sheet(template)
@@ -116,15 +128,15 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
             const wb = XLSX.read(bstr, { type: 'binary' })
             const wsname = wb.SheetNames[0]
             const ws = wb.Sheets[wsname]
-            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
 
             if (rows.length === 0) {
                 toast.error('O arquivo está vazio')
                 return
             }
 
-            const sheetHeaders = (rows[0] as any[]).map(h => String(h || '').trim()).filter(h => h !== '')
-            const data = XLSX.utils.sheet_to_json(ws)
+            const sheetHeaders = (rows[0] as unknown[]).map(h => String(h || '').trim()).filter(h => h !== '')
+            const data = XLSX.utils.sheet_to_json(ws) as RowData[]
 
             setHeaders(sheetHeaders)
             setFileData(data)
@@ -144,9 +156,15 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
         reader.readAsBinaryString(file)
     }
 
-    const cleanPhone = (phone: any) => String(phone || '').replace(/\D/g, '')
+    const cleanPhone = (phone: unknown) => String(phone || '').replace(/\D/g, '')
 
-    const findContact = async (row: any) => {
+    const splitName = (fullName: string) => {
+        const parts = fullName.trim().split(/\s+/)
+        if (parts.length <= 1) return { nome: parts[0] || '', sobrenome: '' }
+        return { nome: parts[0], sobrenome: parts.slice(1).join(' ') }
+    }
+
+    const findContact = async (row: RowData) => {
         // Priority 1: Email
         const email = row['email_contato'] ? String(row['email_contato']).trim() : null
         if (email) {
@@ -157,15 +175,13 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
         // Priority 2: CPF
         const cpfRaw = row['cpf'] ? String(row['cpf']).replace(/\D/g, '') : null
         if (cpfRaw && cpfRaw.length >= 11) {
-            const { data } = await supabase.from('contatos').select('id').eq('cpf', cpfRaw).maybeSingle() // Assuming CPF is stored raw or we need to fuzzy match? Usually stored formatted or raw. Let's try direct match first.
-            // Actually, CPFs can be messy. Let's rely on flexible comparison if possible, but exact match is safer for now.
+            const { data } = await supabase.from('contatos').select('id').eq('cpf', cpfRaw).maybeSingle()
             if (data) return data.id
         }
 
         // Priority 3: Phone (Last 8 digits)
         const phoneRaw = cleanPhone(row['telefone'])
         if (phoneRaw && phoneRaw.length >= 8) {
-            // Try 'telefone' field (using ilike for partial match on last 8 digits)
             const { data: dataTel } = await supabase.from('contatos').select('id').ilike('telefone', `%${phoneRaw.slice(-8)}`).limit(1)
             if (dataTel && dataTel.length > 0) return dataTel[0].id
         }
@@ -178,6 +194,74 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
         }
 
         return null
+    }
+
+    const findOrCreateContact = async (row: RowData): Promise<string | null> => {
+        const existingId = await findContact(row)
+        if (existingId) return existingId
+
+        // Create new contact from available data
+        const name = row['nome_contato'] ? String(row['nome_contato']).trim() : null
+        if (!name) return null
+
+        const { nome, sobrenome } = splitName(name)
+        const cpfRaw = row['cpf'] ? String(row['cpf']).replace(/\D/g, '') : null
+        const email = row['email_contato'] ? String(row['email_contato']).trim() : null
+        const telefone = cleanPhone(row['telefone']) || null
+
+        const { data, error } = await supabase.from('contatos').insert({
+            nome,
+            sobrenome: sobrenome || null,
+            cpf: cpfRaw && cpfRaw.length >= 11 ? cpfRaw : null,
+            email,
+            telefone,
+        }).select('id').single()
+
+        if (error) {
+            console.error('Erro ao criar contato:', error)
+            return null
+        }
+        return data.id
+    }
+
+    const findOrCreatePassenger = async (fullName: string): Promise<string | null> => {
+        const trimmed = fullName.trim()
+        if (!trimmed) return null
+
+        // Try to find by name
+        const { nome, sobrenome } = splitName(trimmed)
+        const { data: existing } = await supabase
+            .from('contatos')
+            .select('id')
+            .ilike('nome', nome)
+            .ilike('sobrenome', sobrenome || '')
+            .limit(1)
+        if (existing && existing.length > 0) return existing[0].id
+
+        // Create with just name
+        const { data, error } = await supabase.from('contatos').insert({
+            nome,
+            sobrenome: sobrenome || null,
+        }).select('id').single()
+
+        if (error) {
+            console.error('Erro ao criar passageiro:', error)
+            return null
+        }
+        return data.id
+    }
+
+    const resolveConsultor = async (consultorName: string | null): Promise<string | null> => {
+        if (!consultorName) return null
+        const trimmed = String(consultorName).trim()
+        if (!trimmed) return null
+
+        const { data } = await supabase
+            .from('profiles')
+            .select('id')
+            .or(`nome.ilike.%${trimmed}%,email.ilike.%${trimmed}%`)
+            .limit(1)
+        return data && data.length > 0 ? data[0].id : null
     }
 
     const handleImport = async () => {
@@ -203,7 +287,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
             // Process sequentially to be safe with async lookups
             for (let i = 0; i < fileData.length; i++) {
                 const rawRow = fileData[i]
-                const row: any = {}
+                const row: RowData = {}
 
                 // Extract mapped values
                 Object.keys(mapping).forEach(key => {
@@ -211,86 +295,117 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
                 })
 
                 try {
-                    // 1. Resolve Contact
-                    const contactId = await findContact(row)
+                    // 1. Resolve Contact (find or create)
+                    const contactId = await findOrCreateContact(row)
 
                     if (!contactId) {
                         skippedCount++
-                        errors.push(`Linha ${i + 2}: Contato não encontrado (Email: ${row['email_contato']}, CPF: ${row['cpf']}, Nome: ${row['nome_contato']})`)
+                        errors.push(`Linha ${i + 2}: Sem dados suficientes para criar contato (Nome: ${row['nome_contato']})`)
                         continue
                     }
 
-                    // 2. Resolve Stage - use "Viagem Concluída" stage for imported sales
-                    let stageId = viagemConcluidaStage?.id || stages?.[0]?.id || null
-                    if (row['stage_name']) {
-                        const foundStage = stages?.find(s => s.nome.toLowerCase() === String(row['stage_name']).toLowerCase())
-                        if (foundStage) stageId = foundStage.id
-                    }
+                    // 2. Resolve Stage
+                    const stageId = viagemConcluidaStage?.id || stages?.[0]?.id || null
 
-                    const excelDateToISO = (serial: any) => {
+                    const excelDateToISO = (serial: unknown) => {
                         if (!serial) return null
-
-                        // If it's already a string that looks like a date, try to use it
-                        if (typeof serial === 'string' && (serial.includes('-') || serial.includes('/'))) {
-                            // Basic check, ideally use a lib or more robust parsing if needed
-                            // But Excel often gives integers like 44505
-                            return serial
-                        }
-
-                        // If it's a number (Excel Serial Date)
+                        if (typeof serial === 'string' && (serial.includes('-') || serial.includes('/'))) return serial
                         const serialNum = Number(serial)
                         if (!isNaN(serialNum)) {
-                            // Excel base date is Dec 30, 1899 usually (weird history)
-                            // 25569 is the diff between 1970 and 1900. 
-                            // Formula: (serial - 25569) * 86400 * 1000
-                            const date = new Date((serialNum - (25567 + 2)) * 86400 * 1000)
-                            return date.toISOString().split('T')[0] // Return YYYY-MM-DD
+                            const date = new Date((serialNum - 25569) * 86400 * 1000)
+                            return date.toISOString().split('T')[0]
                         }
-
                         return null
                     }
 
-                    // 3. Create Card
-                    const cardData: any = {
+                    // 3. Resolve Consultor
+                    const consultorId = await resolveConsultor(row['consultor'] as string | null)
+
+                    const valorTotal = Number(row['valor']) || 0
+                    const receita = Number(row['receita']) || 0
+                    const dataInicio = excelDateToISO(row['data_viagem_inicio'])
+
+                    // 4. Create Card
+                    const cardData: Record<string, unknown> = {
                         titulo: row['titulo'],
                         pessoa_principal_id: contactId,
                         pipeline_id: pipeline.id,
-                        pipeline_stage_id: stageId, // Can be null
+                        pipeline_stage_id: stageId,
                         produto: effectiveProduct,
-                        valor_estimado: Number(row['valor']) || 0,
-                        valor_final: Number(row['valor']) || 0,
-                        data_viagem_inicio: excelDateToISO(row['data_viagem_inicio']),
-                        origem: 'manual', // Must be one of allowed values (manual, api, etc)
+                        valor_estimado: valorTotal,
+                        valor_final: valorTotal,
+                        receita: receita,
+                        receita_source: 'manual',
+                        data_viagem_inicio: dataInicio,
+                        data_viagem_fim: excelDateToISO(row['data_viagem_fim']),
+                        data_fechamento: dataInicio || new Date().toISOString(),
+                        origem: 'manual',
                         status_comercial: 'ganho',
-                        estado_operacional: 'finalizado', // Viagem Concluída
-                        data_fechamento: new Date().toISOString(),
+                        estado_operacional: 'finalizado',
                         moeda: 'BRL',
-                        dono_atual_id: currentUserId, // Atribui ao usuário que importou
+                        dono_atual_id: consultorId || currentUserId,
+                        vendas_owner_id: consultorId || null,
                         briefing_inicial: {
                             importado_em: new Date().toISOString(),
-                            categoria: row['categoria'] || 'Geral',
-                            // Store budget in format expected by CardHeader display
-                            orcamento: row['valor'] ? {
-                                total: Number(row['valor']),
-                                display: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(row['valor']))
-                            } : undefined
+                            produtos: row['produtos'] || null,
+                            fornecedores: row['fornecedores'] || null,
                         }
                     }
 
-                    // Remove undefined/null keys if they cause issues (optional, but safe)
-                    // if (!stageId) delete cardData.pipeline_stage_id
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const { data: insertedCard, error } = await supabase.from('cards').insert(cardData as any).select('id').single()
 
-                    const { error } = await supabase.from('cards').insert(cardData)
-
-                    if (error) {
+                    if (error || !insertedCard) {
                         console.error('Erro detalhado Supabase (Insert Card):', error)
-                        throw error
+                        throw error || new Error('Card insert retornou null')
                     }
+
+                    const cardId = insertedCard.id
+
+                    // 5. Link pagante as titular in cards_contatos
+                    await supabase.from('cards_contatos').insert({
+                        card_id: cardId,
+                        contato_id: contactId,
+                        tipo_viajante: 'titular',
+                    })
+
+                    // 6. Link passengers
+                    if (row['passageiros']) {
+                        const paganteName = row['nome_contato'] ? String(row['nome_contato']).trim().toLowerCase() : ''
+                        const passengers = String(row['passageiros']).split(',').map((p: string) => p.trim()).filter(Boolean)
+
+                        for (const passengerName of passengers) {
+                            if (passengerName.toLowerCase() === paganteName) continue
+                            const passengerId = await findOrCreatePassenger(passengerName)
+                            if (passengerId) {
+                                await supabase.from('cards_contatos').insert({
+                                    card_id: cardId,
+                                    contato_id: passengerId,
+                                    tipo_viajante: 'acompanhante',
+                                })
+                            }
+                        }
+                    }
+
+                    // 7. Create financial item + recalculate (uses existing infra)
+                    if (valorTotal > 0) {
+                        const supplierCost = valorTotal - receita
+                        await supabase.from('card_financial_items').insert({
+                            card_id: cardId,
+                            product_type: 'custom',
+                            description: String(row['produtos'] || 'Importação histórica'),
+                            sale_value: valorTotal,
+                            supplier_cost: supplierCost > 0 ? supplierCost : 0,
+                        })
+                        await supabase.rpc('recalcular_financeiro_manual', { p_card_id: cardId })
+                    }
+
                     successCount++
 
-                } catch (err: any) {
+                } catch (err: unknown) {
                     skippedCount++
-                    const errorMsg = err.details || err.message || JSON.stringify(err)
+                    const e = err as Record<string, string>
+                    const errorMsg = e.details || e.message || JSON.stringify(err)
                     errors.push(`Linha ${i + 2}: Erro ao criar venda - ${errorMsg}`)
                 }
             }
@@ -302,9 +417,9 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
                 // onSuccess() can be called when closing or manually
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Import fatal error:', error)
-            toast.error(`Erro fatal na importação: ${error.message}`)
+            toast.error(`Erro fatal na importação: ${error instanceof Error ? error.message : String(error)}`)
             setStep('mapping')
         } finally {
             setIsImporting(false)
@@ -325,10 +440,10 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-semibold text-slate-900">Importar Vendas (Excel)</DialogTitle>
                     <DialogDescription>
-                        Importe vendas e associe automaticamente a contatos existentes.
+                        Importe vendas históricas com contatos, passageiros e dados financeiros.
                         <br />
-                        <span className="text-yellow-600 font-medium text-xs">
-                            Nota: Linhas sem contatos correspondentes (Email, CPF, Tel ou Nome) serão ignoradas.
+                        <span className="text-emerald-600 font-medium text-xs">
+                            Contatos não encontrados serão criados automaticamente. Passageiros serão vinculados à viagem.
                         </span>
                     </DialogDescription>
                 </DialogHeader>
@@ -407,7 +522,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
                                 </div>
                                 <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg text-center">
                                     <div className="text-2xl font-bold text-amber-600">{importResults.skipped}</div>
-                                    <div className="text-sm text-amber-800">Ignorados (Contato não achado)</div>
+                                    <div className="text-sm text-amber-800">Ignorados / Erros</div>
                                 </div>
                             </div>
 
@@ -417,7 +532,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess: _onSuccess
                                 </div>
                             )}
 
-                            <Button onClick={onClose} className="w-full">Concluir</Button>
+                            <Button onClick={() => { onSuccess(); onClose() }} className="w-full">Concluir</Button>
                         </div>
                     )}
                 </div>

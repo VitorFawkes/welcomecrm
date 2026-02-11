@@ -61,6 +61,24 @@ export default function MondeWidget({
 
     const proposalId = externalProposalId ?? fetchedProposal?.id ?? null
     const hasAcceptedProposal = externalHasAccepted ?? !!fetchedProposal
+
+    // Check if card has financial items (no-proposal path)
+    const { data: financialItems } = useQuery({
+        queryKey: ['card-financial-items-count', cardId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('card_financial_items')
+                .select('id')
+                .eq('card_id', cardId)
+                .limit(1)
+            if (error) return []
+            return data || []
+        },
+        enabled: !!cardId && !hasAcceptedProposal,
+    })
+    const hasFinancialItems = (financialItems || []).length > 0
+    const canCreateSale = (hasAcceptedProposal && !!proposalId) || hasFinancialItems
+
     const { data: sales, isLoading } = useMondeSalesByCard(cardId)
     const { mutate: cancelSale, isPending: isCancelling } = useCancelMondeSale()
     const { mutate: retrySale, isPending: isRetrying } = useRetryMondeSale()
@@ -98,17 +116,19 @@ export default function MondeWidget({
                     )}
                 </div>
 
-                {hasAcceptedProposal && proposalId && (
+                {canCreateSale && (
                     <div className="flex items-center gap-1">
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => navigate(`/cards/${cardId}/monde-preview?proposalId=${proposalId}`)}
-                            className="text-xs text-indigo-600 hover:text-indigo-800"
-                        >
-                            <Eye className="w-3 h-3 mr-1" />
-                            Preview
-                        </Button>
+                        {hasAcceptedProposal && proposalId && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => navigate(`/cards/${cardId}/monde-preview?proposalId=${proposalId}`)}
+                                className="text-xs text-indigo-600 hover:text-indigo-800"
+                            >
+                                <Eye className="w-3 h-3 mr-1" />
+                                Preview
+                            </Button>
+                        )}
                         <Button
                             size="sm"
                             variant="outline"
@@ -206,7 +226,7 @@ export default function MondeWidget({
                     <p className="text-sm text-gray-500">
                         Nenhuma venda enviada para o Monde
                     </p>
-                    {hasAcceptedProposal && proposalId ? (
+                    {canCreateSale ? (
                         <Button
                             size="sm"
                             variant="outline"
@@ -218,14 +238,14 @@ export default function MondeWidget({
                         </Button>
                     ) : (
                         <p className="text-xs text-gray-400 mt-1">
-                            Aceite uma proposta para enviar vendas
+                            Aceite uma proposta ou adicione itens financeiros para enviar vendas
                         </p>
                     )}
                 </div>
             )}
 
             {/* Create Modal */}
-            {showCreateModal && proposalId && (
+            {showCreateModal && canCreateSale && (
                 <MondeCreateSaleModal
                     cardId={cardId}
                     proposalId={proposalId}

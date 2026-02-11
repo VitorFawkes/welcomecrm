@@ -59,11 +59,12 @@ export interface MondeSaleWithItems extends MondeSale {
 
 export interface CreateSaleInput {
     card_id: string
-    proposal_id: string
+    proposal_id?: string | null
     sale_date: string
     items: Array<{
         proposal_item_id?: string
         proposal_flight_id?: string
+        card_financial_item_id?: string
         supplier?: string
     }>
 }
