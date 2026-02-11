@@ -262,12 +262,26 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         const trimmed = String(consultorName).trim()
         if (!trimmed) return null
 
+        // 1. Try exact substring match (handles "Daniele Adamo" → "Daniele Adamo")
         const { data } = await supabase
             .from('profiles')
             .select('id')
             .or(`nome.ilike.%${trimmed}%,email.ilike.%${trimmed}%`)
             .limit(1)
-        return data && data.length > 0 ? data[0].id : null
+        if (data && data.length > 0) return data[0].id
+
+        // 2. Fallback: match ALL words individually (handles "Tiago Abdul" → "Tiago de Mello Abdul Hak")
+        const words = trimmed.split(/\s+/).filter(w => w.length >= 3)
+        if (words.length >= 2) {
+            let query = supabase.from('profiles').select('id')
+            for (const word of words) {
+                query = query.ilike('nome', `%${word}%`)
+            }
+            const { data: wordMatch } = await query.limit(1)
+            if (wordMatch && wordMatch.length > 0) return wordMatch[0].id
+        }
+
+        return null
     }
 
     const handleImport = async () => {
