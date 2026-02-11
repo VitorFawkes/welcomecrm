@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
-import { Download, Upload, Check, Loader2, FileSpreadsheet } from 'lucide-react'
+import { Download, Upload, Check, Loader2, FileSpreadsheet, ExternalLink } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { supabase } from '../../lib/supabase'
@@ -48,6 +48,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
     const [mapping, setMapping] = useState<Mapping>({})
     const [isImporting, setIsImporting] = useState(false)
     const [importResults, setImportResults] = useState<{ success: number; skipped: number; errors: string[] }>({ success: 0, skipped: 0, errors: [] })
+    const [importedCards, setImportedCards] = useState<{ id: string; titulo: string; valor: number }[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Resolve effective product (default to TRIPS if ALL)
@@ -278,10 +279,13 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
 
         setIsImporting(true)
         setStep('importing')
+        setImportedCards([])
 
+        const batchId = `import-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`
         let successCount = 0
         let skippedCount = 0
         const errors: string[] = []
+        const createdCards: { id: string; titulo: string; valor: number }[] = []
 
         try {
             // Process sequentially to be safe with async lookups
@@ -307,9 +311,16 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                     // 2. Resolve Stage
                     const stageId = viagemConcluidaStage?.id || stages?.[0]?.id || null
 
-                    const excelDateToISO = (serial: unknown) => {
+                    const excelDateToISO = (serial: unknown): string | null => {
                         if (!serial) return null
-                        if (typeof serial === 'string' && (serial.includes('-') || serial.includes('/'))) return serial
+                        if (typeof serial === 'string') {
+                            // DD/MM/YYYY or D/M/YYYY (Brazilian format) → YYYY-MM-DD
+                            const brMatch = serial.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+                            if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`
+                            // Already YYYY-MM-DD
+                            if (/^\d{4}-\d{2}-\d{2}/.test(serial)) return serial.slice(0, 10)
+                            return serial
+                        }
                         const serialNum = Number(serial)
                         if (!isNaN(serialNum)) {
                             const date = new Date((serialNum - 25569) * 86400 * 1000)
@@ -347,6 +358,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         vendas_owner_id: consultorId || null,
                         briefing_inicial: {
                             importado_em: new Date().toISOString(),
+                            lote_importacao: batchId,
                             produtos: row['produtos'] || null,
                             fornecedores: row['fornecedores'] || null,
                         }
@@ -400,6 +412,11 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         await supabase.rpc('recalcular_financeiro_manual', { p_card_id: cardId })
                     }
 
+                    createdCards.push({
+                        id: cardId,
+                        titulo: String(row['titulo'] || ''),
+                        valor: valorTotal,
+                    })
                     successCount++
 
                 } catch (err: unknown) {
@@ -411,6 +428,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
             }
 
             setImportResults({ success: successCount, skipped: skippedCount, errors })
+            setImportedCards(createdCards)
             setStep('results')
             if (successCount > 0) {
                 // Do not instantly reload, let user see results
@@ -431,6 +449,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         setFileData([])
         setHeaders([])
         setMapping({})
+        setImportedCards([])
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
@@ -526,9 +545,39 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                                 </div>
                             </div>
 
+                            {importedCards.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-medium text-slate-700 mb-2">Cards importados</h4>
+                                    <div className="max-h-[200px] overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                        {importedCards.map((card) => (
+                                            <a
+                                                key={card.id}
+                                                href={`/cards/${card.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center justify-between px-3 py-2 hover:bg-slate-50 transition-colors group"
+                                            >
+                                                <span className="text-sm text-slate-700 truncate">{card.titulo}</span>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    {card.valor > 0 && (
+                                                        <span className="text-xs text-slate-500">
+                                                            {card.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </span>
+                                                    )}
+                                                    <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-indigo-500" />
+                                                </div>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {importResults.errors.length > 0 && (
-                                <div className="max-h-[200px] overflow-y-auto p-3 bg-red-50 border border-red-100 rounded text-xs font-mono text-red-700">
-                                    {importResults.errors.map((err, i) => <div key={i}>{err}</div>)}
+                                <div>
+                                    <h4 className="text-sm font-medium text-red-700 mb-2">Erros</h4>
+                                    <div className="max-h-[150px] overflow-y-auto p-3 bg-red-50 border border-red-100 rounded text-xs font-mono text-red-700">
+                                        {importResults.errors.map((err, i) => <div key={i}>{err}</div>)}
+                                    </div>
                                 </div>
                             )}
 
