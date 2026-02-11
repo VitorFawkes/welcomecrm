@@ -145,10 +145,15 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
             // Auto-mapping
             const initialMapping: Mapping = {}
             DEAL_FIELDS.forEach(field => {
-                const match = sheetHeaders.find(h =>
-                    h.toLowerCase() === field.label.toLowerCase() ||
-                    h.toLowerCase() === field.key.toLowerCase()
-                )
+                const match = sheetHeaders.find(h => {
+                    const hl = h.toLowerCase()
+                    const fl = field.label.toLowerCase()
+                    const fk = field.key.toLowerCase()
+                    if (hl === fl || hl === fk) return true
+                    if (hl.includes(fl) || fl.includes(hl)) return true
+                    if (fk.length > 3 && hl.includes(fk)) return true
+                    return false
+                })
                 if (match) initialMapping[field.key] = match
             })
             setMapping(initialMapping)
@@ -515,11 +520,30 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                                     </tbody>
                                 </table>
                             </div>
+                            {fileData.length > 0 && (
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <h4 className="text-xs font-medium text-slate-500 mb-2">Preview da linha 1</h4>
+                                    {DEAL_FIELDS.map(field => {
+                                        const header = mapping[field.key]
+                                        const value = header ? fileData[0][header] : null
+                                        const isEmpty = !value && value !== 0
+                                        return (
+                                            <div key={field.key} className="flex justify-between text-sm py-0.5">
+                                                <span className="text-slate-600">{field.label}</span>
+                                                <span className={isEmpty ? 'text-red-400 italic text-xs' : 'text-slate-900 font-medium'}>
+                                                    {isEmpty ? '(vazio)' : String(value)}
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+
                             <div className="flex justify-between pt-4">
                                 <Button variant="ghost" onClick={reset}>Voltar</Button>
                                 <Button onClick={handleImport} disabled={isImporting}>
                                     {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                                    Importar
+                                    Importar {fileData.length} linhas
                                 </Button>
                             </div>
                         </div>
