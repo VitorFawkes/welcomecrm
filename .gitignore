@@ -32,6 +32,9 @@ lint_output.txt
 .claude/secrets.json
 .claude/settings.local.json
 
+# Agent memory (local)
+.agent/
+
 # Scripts de debug com credenciais (NUNCA commitar!)
 debug_*.js
 debug_*.ts
