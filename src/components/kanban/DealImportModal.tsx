@@ -125,8 +125,8 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
 
         const reader = new FileReader()
         reader.onload = (evt) => {
-            const bstr = evt.target?.result
-            const wb = XLSX.read(bstr, { type: 'binary' })
+            const arrayBuffer = evt.target?.result
+            const wb = XLSX.read(arrayBuffer, { type: 'array' })
             const wsname = wb.SheetNames[0]
             const ws = wb.Sheets[wsname]
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
@@ -137,10 +137,10 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
             }
 
             const sheetHeaders = (rows[0] as unknown[]).map(h => String(h || '').trim()).filter(h => h !== '')
-            const data = XLSX.utils.sheet_to_json(ws) as RowData[]
+            const parsedData = XLSX.utils.sheet_to_json(ws) as RowData[]
 
             setHeaders(sheetHeaders)
-            setFileData(data)
+            setFileData(parsedData)
 
             // Auto-mapping with extra keyword aliases for common Brazilian headers
             const fieldAliases: Record<string, string[]> = {
@@ -151,8 +151,8 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                 cpf: ['cpf', 'documento'],
                 telefone: ['telefone', 'celular', 'phone', 'tel', 'whatsapp'],
                 nome_contato: ['pagante', 'nome contato', 'nome cliente', 'cliente', 'comprador'],
-                data_viagem_inicio: ['data inicio', 'data início', 'inicio viagem', 'início viagem', 'check-in', 'checkin', 'ida'],
-                data_viagem_fim: ['data fim', 'data final', 'fim viagem', 'check-out', 'checkout', 'volta'],
+                data_viagem_inicio: ['data inicio', 'data início', 'inicio viagem', 'início viagem', 'check-in', 'checkin', 'ida', 'data venda', 'data saida', 'data saída', 'embarque', 'partida'],
+                data_viagem_fim: ['data fim', 'data final', 'fim viagem', 'check-out', 'checkout', 'volta', 'retorno', 'data retorno', 'chegada'],
                 passageiros: ['passageiro', 'viajante', 'pax', 'traveler'],
                 produtos: ['produto', 'serviço', 'servico', 'item', 'product'],
                 fornecedores: ['fornecedor', 'supplier', 'operador', 'operadora'],
@@ -179,7 +179,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
             setMapping(initialMapping)
             setStep('mapping')
         }
-        reader.readAsBinaryString(file)
+        reader.readAsArrayBuffer(file)
     }
 
     // Parse Brazilian number formats: "R$ 64.918,00", "64.918,00", "5.747,44", "64918", etc.
@@ -527,7 +527,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-2xl bg-white/90 backdrop-blur-md border border-slate-200">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white/90 backdrop-blur-md border border-slate-200">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-semibold text-slate-900">Importar Vendas (Excel)</DialogTitle>
                     <DialogDescription>
