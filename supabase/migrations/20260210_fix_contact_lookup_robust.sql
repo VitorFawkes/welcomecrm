@@ -305,7 +305,7 @@ BEGIN
         'id', v_contato.id,
         'nome', COALESCE(v_contato.nome, ''),
         'sobrenome', COALESCE(v_contato.sobrenome, ''),
-        'telefone', COALESCE(v_contato.telefone, ''),
+        'telefone', COALESCE(normalize_phone(v_contato.telefone), ''),
         'email', COALESCE(v_contato.email, ''),
         'cpf', COALESCE(v_contato.cpf, ''),
         'passaporte', COALESCE(v_contato.passaporte, ''),
