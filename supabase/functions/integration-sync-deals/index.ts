@@ -306,6 +306,9 @@ Deno.serve(async (req) => {
                         ...acc,
                         [`contact[fields][${k}]`]: v
                     }), {}) : {}),
+                    // AC deal dates (for correct created_at on cards)
+                    cdate: deal.cdate,
+                    'deal[create_date]': deal.cdate,
                     import_mode: 'sync',
                     force_update: forceUpdate,
                     synced_at: new Date().toISOString()
@@ -380,6 +383,31 @@ Deno.serve(async (req) => {
             }
 
             console.log(`Auto-process completed: ${processedCount}/${allInsertedIds.length} events processed`);
+
+            // Verify actual event status if invoke reported errors (transient HTTP errors may mask success)
+            if (processError && allInsertedIds.length > 0) {
+                const { data: verifiedEvents } = await supabase
+                    .from('integration_events')
+                    .select('status')
+                    .in('id', allInsertedIds);
+
+                if (verifiedEvents) {
+                    const actualProcessed = verifiedEvents.filter(e => e.status === 'processed').length;
+                    if (actualProcessed === allInsertedIds.length) {
+                        console.log(`Post-verification: all ${actualProcessed} events processed despite invoke error. Clearing transient error.`);
+                        processError = null;
+                        processedCount = actualProcessed;
+                    } else if (actualProcessed > processedCount) {
+                        console.log(`Post-verification: ${actualProcessed}/${allInsertedIds.length} events actually processed (invoke reported ${processedCount})`);
+                        processedCount = actualProcessed;
+                        const pending = verifiedEvents.filter(e => e.status === 'pending').length;
+                        const failed = verifiedEvents.filter(e => e.status === 'failed').length;
+                        if (pending > 0 || failed > 0) {
+                            processError = `${failed} falharam, ${pending} pendentes (de ${allInsertedIds.length} total)`;
+                        }
+                    }
+                }
+            }
         }
 
         return new Response(JSON.stringify({

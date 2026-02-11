@@ -48,6 +48,9 @@ const OLD_STAGES = {
 
 const META_PHONE_NUMBER_ID = '775282882337610';
 const WHATSAPP_CREDENTIAL_ID = '1f4WC1TEGlGjsp03';
+const ECHO_API_URL = 'https://sueokszzizsxalfwyuav.supabase.co/functions/v1/echo-api/send-message';
+const ECHO_API_KEY = process.env.ECHO_API_KEY || 'wc_VosBwTyt0MRk3RvZdth47zvaHymTZX2H';
+const ECHO_PHONE_NUMBER_ID = '972645175930759';
 const OPENAI_CREDENTIAL_ID = 'klFbfWS7bi2oF0Uq';
 
 // ============================================================================
@@ -508,8 +511,9 @@ function transformWorkflow(workflow) {
   // ---- 23. Check AI Active (new IF node after NotFromMe1) ----
   addCheckAIActive(w, nodeMap);
 
-  // ---- 24. Save Outbound Msg (new node inside send loop) ----
-  addSaveOutboundMsg(w, nodeMap);
+  // ---- 24. Save Outbound Msg — NOT NEEDED ----
+  // Echo webhook reports sent messages back → edge function → trigger saves them
+  // No need for a separate save node in the send loop
 
   // ---- 25. Memory: Replace Redis Chat Memory with native Simple Memory ----
   // The user manually replaced Redis-based debouncer and chat memory with n8n's native
@@ -572,16 +576,20 @@ function transformGetClient(node) {
       parameters: [
         { name: 'Content-Type', value: 'application/json' },
         { name: 'Accept', value: 'application/json' },
+        { name: 'Prefer', value: 'return=representation' },
       ],
     },
     sendBody: true,
     specifyBody: 'json',
     jsonBody: `={
   "p_phone_with_9": "{{ $('Process Webhook Data2').item.json.phone_with_9 }}",
-  "p_phone_without_9": "{{ $('Process Webhook Data2').item.json.phone_without_9 }}",
-  "p_conversation_id": "{{ $('Process Webhook Data2').item.json.conversation_id || '' }}"
+  "p_phone_without_9": "{{ $('Process Webhook Data2').item.json.phone_without_9 }}"
 }`,
-    options: { neverError: true },
+    options: {
+      response: {
+        response: { neverError: true },
+      },
+    },
   };
 }
 
@@ -708,23 +716,23 @@ function addSaveOutboundMsg(w, nodeMap) {
 
 function transformProcessWebhookData(node) {
   if (!node) return;
-  // Rewrite assignments for Echo webhook format
+  // Rewrite assignments for Echo webhook format (synced with deployed workflow)
   node.parameters.assignments = {
     assignments: [
       { id: 'skip', name: 'skip', type: 'boolean',
-        value: "={{ $('Webhook').item.json.body.is_from_me === true || ($('Webhook').item.json.body.conversation?.type === 'group') }}" },
+        value: "={{ $('Webhook').item.json.body.from_me === true }}" },
       { id: 'skip_reason', name: 'skip_reason', type: 'string',
-        value: "={{ $('Webhook').item.json.body.conversation?.type === 'group' ? 'group_message' : ($('Webhook').item.json.body.is_from_me === true ? 'from_me' : '') }}" },
+        value: "={{ $('Webhook').item.json.body.from_me === true ? 'from_me' : '' }}" },
       { id: 'message_id', name: 'message_id', type: 'string',
-        value: "={{ $('Webhook').item.json.body.id || $('Webhook').item.json.body.whatsapp_message_id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }}" },
+        value: "={{ $('Webhook').item.json.body.whatsapp_message_id || $('Webhook').item.json.body.message_id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}` }}" },
       { id: 'instance', name: 'instance', type: 'string', value: 'WelcomeTrips' },
       { id: 'phone_number', name: 'phone_number', type: 'string',
-        value: "={{ ($('Webhook').item.json.body.from || $('Webhook').item.json.body.customer_phone || '').replace('+', '') }}" },
+        value: "={{ ($('Webhook').item.json.body.contact_phone || $('Webhook').item.json.body.contact?.phone || '').replace('+', '') }}" },
       { id: 'contact_phone', name: 'contact_phone', type: 'string',
-        value: "={{ ($('Webhook').item.json.body.from || $('Webhook').item.json.body.customer_phone || '').replace('+', '') }}" },
+        value: "={{ ($('Webhook').item.json.body.contact_phone || $('Webhook').item.json.body.contact?.phone || '').replace('+', '') }}" },
       { id: 'phone_with_9', name: 'phone_with_9', type: 'string',
         value: `={{ (function() {
-  let phone = ($('Webhook').item.json.body.from || $('Webhook').item.json.body.customer_phone || '').replace('+', '');
+  let phone = ($('Webhook').item.json.body.contact_phone || '').replace('+', '');
   if (phone.startsWith('55')) {
     const ddd = phone.substring(2, 4);
     const rest = phone.substring(4);
@@ -735,7 +743,7 @@ function transformProcessWebhookData(node) {
 })() }}` },
       { id: 'phone_without_9', name: 'phone_without_9', type: 'string',
         value: `={{ (function() {
-  let phone = ($('Webhook').item.json.body.from || $('Webhook').item.json.body.customer_phone || '').replace('+', '');
+  let phone = ($('Webhook').item.json.body.contact_phone || '').replace('+', '');
   if (phone.startsWith('55')) {
     const ddd = phone.substring(2, 4);
     const rest = phone.substring(4);
@@ -745,50 +753,30 @@ function transformProcessWebhookData(node) {
   return phone;
 })() }}` },
       { id: 'push_name', name: 'push_name', type: 'string',
-        value: "={{ $('Webhook').item.json.body.customer_name || $('Webhook').item.json.body.name || 'Visitante' }}" },
+        value: "={{ $('Webhook').item.json.body.contact?.name || $('Webhook').item.json.body.contact_phone || 'Visitante' }}" },
       { id: 'message_type', name: 'message_type', type: 'string',
-        value: `={{ (function() {
-  const body = $('Webhook').item.json.body;
-  const type = body.type || body.message?.type || '';
-  if (type === 'text' || body.text) return 'text';
-  if (type === 'audio' || body.audio) return 'audio';
-  if (type === 'image' || body.image) return 'image';
-  if (type === 'document' || body.document) return 'document';
-  if (type === 'video' || body.video) return 'video';
-  if (type === 'sticker') return 'sticker';
-  if (type === 'location') return 'location';
-  return body.text ? 'text' : 'unknown';
-})() }}` },
+        value: "={{ $('Webhook').item.json.body.message_type || 'text' }}" },
       { id: 'message_content', name: 'message_content', type: 'string',
         value: `={{ (function() {
-  const body = $('Webhook').item.json.body;
-  if (body.text?.body) return body.text.body;
-  if (typeof body.text === 'string') return body.text;
-  if (body.message?.text) return body.message.text;
-  if (body.audio) return '[Áudio recebido - processando transcrição...]';
-  if (body.image) return (body.image.caption || '[Imagem recebida - analisando conteúdo...]');
-  if (body.document) return '[Documento recebido: ' + (body.document.filename || 'arquivo') + ']';
-  if (body.video) return (body.video.caption || '[Vídeo recebido]');
-  return '[Tipo de mensagem não suportada]';
+  const msg = $('Webhook').item.json.body;
+  const type = msg.message_type || 'text';
+  if (type === 'text') return msg.text || '';
+  if (type === 'audio') return '[Áudio recebido - processando transcrição...]';
+  if (type === 'image') return (msg.media?.caption || '[Imagem recebida - analisando conteúdo...]');
+  if (type === 'document') return '[Documento recebido: ' + (msg.media?.filename || 'arquivo') + ']';
+  if (type === 'video') return (msg.media?.caption || '[Vídeo recebido]');
+  return msg.text || '[Tipo de mensagem não suportada]';
 })() }}` },
       { id: 'media_url', name: 'media_url', type: 'string',
-        value: "={{ $('Webhook').item.json.body.audio?.url || $('Webhook').item.json.body.image?.url || $('Webhook').item.json.body.document?.url || $('Webhook').item.json.body.video?.url || null }}" },
+        value: "={{ $('Webhook').item.json.body.media?.url || null }}" },
       { id: 'file_name', name: 'file_name', type: 'string',
-        value: "={{ $('Webhook').item.json.body.document?.filename || null }}" },
+        value: "={{ $('Webhook').item.json.body.media?.filename || null }}" },
       { id: 'mime_type', name: 'mime_type', type: 'string',
-        value: "={{ $('Webhook').item.json.body.image?.mime_type || $('Webhook').item.json.body.document?.mime_type || null }}" },
-      { id: 'conversation_id', name: 'conversation_id', type: 'string',
-        value: "={{ $('Webhook').item.json.body.conversation?.id || $('Webhook').item.json.body.conversation_id || '' }}" },
-      { id: 'timestamp', name: 'timestamp', type: 'string', value: '={{ new Date().toISOString() }}' },
+        value: "={{ $('Webhook').item.json.body.media?.mime_type || null }}" },
+      { id: 'timestamp', name: 'timestamp', type: 'string',
+        value: "={{ $('Webhook').item.json.body.ts_iso || new Date().toISOString() }}" },
     ],
   };
-
-  // Fix: n8n Webhook v1 puts POST body directly at $json, not $json.body
-  for (const a of node.parameters.assignments.assignments) {
-    if (a.value && typeof a.value === 'string') {
-      a.value = a.value.replace(/\$\('Webhook'\)\.item\.json\.body/g, "$('Webhook').item.json");
-    }
-  }
 }
 
 function removeRedundantNodes(w) {
@@ -796,7 +784,7 @@ function removeRedundantNodes(w) {
   // - CreateUser: trigger creates contact+card synchronously
   // - atualiza_lead1: trigger sets ai_responsavel='humano' on human takeover
   // - Cria msg owner_human: trigger persists human outbound messages
-  const removeNames = ['CreateUser', 'atualiza_lead1', 'Cria msg owner_human'];
+  const removeNames = ['CreateUser', 'atualiza_lead1', 'Cria msg owner_human', 'Cria Msg Bot'];
 
   // Remove nodes from array
   w.nodes = w.nodes.filter(n => !removeNames.includes(n.name));
@@ -855,15 +843,13 @@ function transformProcessWebhookDataSecondary(node) {
       if (a.value && typeof a.value === 'string') {
         a.value = a.value
           .replace(/\$\('Webhook'\)\.item\.json\.body\.data\.key\.remoteJid/g,
-            "$('Webhook').item.json.from")
+            "$('Webhook').item.json.body.contact_phone")
           .replace(/\$\('Webhook'\)\.item\.json\.body\.data\.key\.fromMe/g,
-            "$('Webhook').item.json.is_from_me")
+            "$('Webhook').item.json.body.from_me")
           .replace(/\$\('Webhook'\)\.item\.json\.body\.data\.pushName/g,
-            "$('Webhook').item.json.customer_name")
+            "$('Webhook').item.json.body.contact_name")
           .replace(/@s\.whatsapp\.net/g, '')
-          .replace(/@g\.us/g, '')
-          // Fix remaining .body references for Webhook v1
-          .replace(/\$\('Webhook'\)\.item\.json\.body/g, "$('Webhook').item.json");
+          .replace(/@g\.us/g, '');
       }
     }
   }
@@ -957,7 +943,7 @@ function transformMessageStorage(nodeMap) {
       sendBody: true,
       specifyBody: 'json',
       jsonBody: '={"updated_at": "{{ $now }}"}',
-      options: { neverError: true },
+      options: {},
     };
   }
 
@@ -1000,7 +986,7 @@ function transformPreparaDados(node) {
       { id: 'Nome', name: 'Nome', type: 'string',
         value: "={{ $('getClient').item.json.nome || $('getClient').first().json.nome }}" },
       { id: 'Telefone', name: 'Telefone', type: 'string',
-        value: "={{ $('getClient').item.json.telefone || $('getClient').first().json.telefone }}" },
+        value: "={{ $('Process Webhook Data2').first().json.contact_phone || $('getClient').first().json.telefone }}" },
       { id: 'Email', name: 'Email', type: 'string',
         value: "={{ $('getClient').item.json.email || $('getClient').first().json.email }}" },
       { id: 'contato_sobrenome', name: 'contato_sobrenome', type: 'string',
@@ -1028,7 +1014,7 @@ function transformPreparaDados(node) {
       { id: 'ultima_mensagem_bot', name: 'ultima_mensagem_bot', type: 'string',
         value: "={{ '' }}" },
       { id: 'sessionId', name: 'sessionId', type: 'string',
-        value: "={{ ($('getClient').item.json.telefone || '') + '_' + ($('getClient').item.json.card_id || '') }}" },
+        value: "={{ ($('Process Webhook Data2').first().json.contact_phone || '') + '_' + ($('getClient').first().json.card_id || '') }}" },
       { id: 'pipeline_id', name: 'pipeline_id', type: 'string',
         value: PIPELINE_ID },
     ],
@@ -1198,118 +1184,140 @@ function transformMemory(w, nodeMap) {
   }
 
   // ================================================================
-  // 2. Debounce: Replace Redis 5-node loop with Wait+Supabase 3 nodes
+  // 2. Debounce: Convert Redis nodes → n8n native Simple Memory
   // ================================================================
-  //
-  // SOURCE (Redis — doesn't work without Redis credentials):
+  // SOURCE (Redis — no credentials available):
   //   Empilha Mensagem Processada (RPUSH) → Obtem Mensagens Empilhadas (GET) →
-  //   Verifica Debouncer (Switch) →
+  //   Verifica Debouncer (Switch) → Wait Debouncer / Deleta Lista Redis
+  //
+  // TARGET (memoryManager + memoryBufferWindow):
+  //   Empilha (insert) → Obtem (get) → Verifica Debouncer (Switch) →
   //     [0] nada_a_fazer → dead end
-  //     [1] proceder → Deleta Lista Redis (DEL) → Cria lead_message
+  //     [1] proceder → Deleta (delete all) → Cria lead_message
   //     [2] esperar → Wait Debouncer (20s) → Obtem (loop)
-  //
-  // TARGET (Wait + Supabase query — no Redis needed):
-  //   Wait Debounce (20s) → Check Latest Msg (HTTP→Supabase) →
-  //   Am I Latest? (IF) →
-  //     TRUE → Cria lead_message
-  //     FALSE → dead end (stale execution)
-  //
-  // Works because inbound messages are already persisted by the Echo edge
-  // function (process_whatsapp_raw_event_v2) before n8n processes them.
+  //   Simple Memory (memoryBufferWindow) connected to Empilha/Obtem/Deleta
 
-  // --- Save what comes after the debounce ---
-  const afterDebounce = w.connections['Deleta Lista Redis']?.main?.[0]
-    || [{ node: 'Cria lead_message', type: 'main', index: 0 }];
-
-  // --- Transform Empilha Mensagem Processada → Wait Debounce (Wait 20s) ---
+  // --- 2a. Empilha Mensagem Processada (Redis RPUSH) → Empilha (memoryManager insert) ---
   const empilha = nodeMap['Empilha Mensagem Processada'];
   if (empilha) {
-    empilha.name = 'Wait Debounce';
-    empilha.type = 'n8n-nodes-base.wait';
+    empilha.name = 'Empilha';
+    empilha.type = '@n8n/n8n-nodes-langchain.memoryManager';
     empilha.typeVersion = 1.1;
     delete empilha.credentials;
-    empilha.parameters = { amount: 20, unit: 'seconds' };
-    renameNodeEverywhere(w, 'Empilha Mensagem Processada', 'Wait Debounce');
+    empilha.parameters = {
+      mode: 'insert',
+      messages: {
+        messageValues: [{
+          type: 'user',
+          message: `={{ JSON.stringify({ id: $('Process Webhook Data2').item.json.message_id, text: $json.message_content || $('Process Webhook Data2').item.json.message_content || '', ts: $now.toISO() }) }}`,
+        }],
+      },
+    };
+    renameNodeEverywhere(w, 'Empilha Mensagem Processada', 'Empilha');
   }
 
-  // --- Transform Obtem Mensagens Empilhadas → Check Latest Msg (HTTP) ---
+  // --- 2b. Obtem Mensagens Empilhadas (Redis GET) → Obtem (memoryManager get) ---
   const obtem = nodeMap['Obtem Mensagens Empilhadas'];
   if (obtem) {
-    obtem.name = 'Check Latest Msg';
-    obtem.type = 'n8n-nodes-base.httpRequest';
-    obtem.typeVersion = 4.2;
+    obtem.name = 'Obtem';
+    obtem.type = '@n8n/n8n-nodes-langchain.memoryManager';
+    obtem.typeVersion = 1.1;
     delete obtem.credentials;
-    obtem.credentials = {
-      supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
-    };
     obtem.parameters = {
-      method: 'GET',
-      url: `=${NEW_SUPABASE_URL}/rest/v1/whatsapp_messages?card_id=eq.{{ $('getClient').item.json.card_id }}&direction=eq.inbound&order=created_at.desc&limit=1&select=external_id`,
-      authentication: 'predefinedCredentialType',
-      nodeCredentialType: 'supabaseApi',
-      sendHeaders: true,
-      headerParameters: {
-        parameters: [{ name: 'Accept', value: 'application/json' }],
-      },
-      options: { neverError: true },
+      simplifyOutput: false,
+      options: { groupMessages: true },
     };
-    obtem.alwaysOutputData = true;
-    renameNodeEverywhere(w, 'Obtem Mensagens Empilhadas', 'Check Latest Msg');
+    renameNodeEverywhere(w, 'Obtem Mensagens Empilhadas', 'Obtem');
   }
 
-  // --- Transform Verifica Debouncer → Am I Latest? (IF) ---
+  // --- 2c. Deleta Lista Redis (Redis DEL) → Deleta (memoryManager delete all) ---
+  const deleta = nodeMap['Deleta Lista Redis'];
+  if (deleta) {
+    deleta.name = 'Deleta';
+    deleta.type = '@n8n/n8n-nodes-langchain.memoryManager';
+    deleta.typeVersion = 1.1;
+    delete deleta.credentials;
+    deleta.parameters = {
+      mode: 'delete',
+      deleteMode: 'all',
+    };
+    renameNodeEverywhere(w, 'Deleta Lista Redis', 'Deleta');
+  }
+
+  // --- 2d. Update Verifica Debouncer conditions for memoryManager output format ---
   const verifica = nodeMap['Verifica Debouncer'];
   if (verifica) {
-    verifica.name = 'Am I Latest?';
-    verifica.type = 'n8n-nodes-base.if';
-    verifica.typeVersion = 2;
     verifica.parameters = {
-      conditions: {
-        options: { caseSensitive: true, leftValue: '' },
-        conditions: [{
-          id: 'isLatest',
-          leftValue: "={{ !$json.external_id || $json.external_id === $('Process Webhook Data2').item.json.message_id }}",
-          rightValue: true,
-          operator: { type: 'boolean', operation: 'equals' },
-        }],
-        combinator: 'and',
+      rules: {
+        values: [
+          {
+            // Rule 0: No messages accumulated → nothing to do
+            conditions: {
+              options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+              conditions: [{
+                id: 'empty-check',
+                leftValue: '={{ ($json.messages || []).length }}',
+                rightValue: '0',
+                operator: { type: 'number', operation: 'equals' },
+              }],
+              combinator: 'and',
+            },
+            renameOutput: true,
+            outputKey: 'nada_a_fazer',
+          },
+          {
+            // Rule 1: Last message > 20s ago → debounce complete, proceed
+            conditions: {
+              options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+              conditions: [{
+                id: 'time-check',
+                leftValue: "={{ ($json.messages || []).length > 0 ? JSON.parse($json.messages[$json.messages.length - 1].kwargs.content).ts : $now.toISO() }}",
+                rightValue: "={{ $now.minus(20, 'seconds').toISO() }}",
+                operator: { type: 'dateTime', operation: 'before' },
+              }],
+              combinator: 'and',
+            },
+            renameOutput: true,
+            outputKey: 'proceder',
+          },
+        ],
+      },
+      options: {
+        fallbackOutput: 'extra',
+        renameFallbackOutput: 'esperar',
       },
     };
-    renameNodeEverywhere(w, 'Verifica Debouncer', 'Am I Latest?');
   }
 
-  // --- Remove nodes no longer needed ---
-  const removeNames = ['Wait Debouncer', 'Deleta Lista Redis'];
-  w.nodes = w.nodes.filter(n => !removeNames.includes(n.name));
-  for (const name of removeNames) {
-    delete w.connections[name];
-  }
-  // Clean references to removed nodes from all connections
-  for (const [key, conns] of Object.entries(w.connections)) {
-    for (const connType of Object.keys(conns)) {
-      if (Array.isArray(conns[connType])) {
-        for (let i = 0; i < conns[connType].length; i++) {
-          if (Array.isArray(conns[connType][i])) {
-            conns[connType][i] = conns[connType][i].filter(
-              c => !removeNames.includes(c.node)
-            );
-          }
-        }
-      }
-    }
+  // --- 2e. Wait Debouncer — keep as-is (already correct type) ---
+
+  // --- 2f. Add Simple Memory (memoryBufferWindow) for debouncer ---
+  const simpleMemNode = {
+    id: 'simple-memory-debouncer-' + Date.now(),
+    name: 'Simple Memory',
+    type: '@n8n/n8n-nodes-langchain.memoryBufferWindow',
+    typeVersion: 1.3,
+    position: [0, 0],
+    parameters: {
+      sessionIdType: 'customKey',
+      sessionKey: "={{ $('Process Webhook Data2').first().json.contact_phone }}",
+    },
+  };
+
+  // Position near Empilha
+  const empilhaNode = w.nodes.find(n => n.name === 'Empilha');
+  if (empilhaNode?.position) {
+    simpleMemNode.position = [empilhaNode.position[0], empilhaNode.position[1] + 150];
   }
 
-  // --- Set explicit connection chain for the new debounce ---
-  w.connections['Wait Debounce'] = {
-    main: [[{ node: 'Check Latest Msg', type: 'main', index: 0 }]],
-  };
-  w.connections['Check Latest Msg'] = {
-    main: [[{ node: 'Am I Latest?', type: 'main', index: 0 }]],
-  };
-  w.connections['Am I Latest?'] = {
-    main: [
-      afterDebounce,  // TRUE → Cria lead_message (continue AI pipeline)
-      [],             // FALSE → dead end (stale execution)
+  w.nodes.push(simpleMemNode);
+
+  // --- 2g. Wire Simple Memory to memoryManager nodes (ai_memory connections) ---
+  w.connections['Simple Memory'] = {
+    ai_memory: [
+      [{ node: 'Obtem', type: 'ai_memory', index: 0 }],
+      [{ node: 'Empilha', type: 'ai_memory', index: 0 }],
+      [{ node: 'Deleta', type: 'ai_memory', index: 0 }],
     ],
   };
 }
@@ -1331,36 +1339,29 @@ function renameNodeEverywhere(w, oldName, newName) {
 
 function transformEnviarTexto(node, w) {
   if (!node) return;
-  // Replace Evolution API with Meta Cloud API HTTP Request
+  // Send via Echo API (proxy to Meta Cloud API)
+  // Uses .first() instead of .item because paired item data is lost
+  // through debouncer → AI agents → Split Messages → Message Send Loop
   node.type = 'n8n-nodes-base.httpRequest';
   node.typeVersion = 4.2;
   delete node.credentials;
   node.parameters = {
     method: 'POST',
-    url: `https://graph.facebook.com/v21.0/${META_PHONE_NUMBER_ID}/messages`,
-    authentication: 'predefinedCredentialType',
-    nodeCredentialType: 'httpCustomAuth',
+    url: ECHO_API_URL,
     sendHeaders: true,
     headerParameters: {
       parameters: [
         { name: 'Content-Type', value: 'application/json' },
+        { name: 'x-api-key', value: ECHO_API_KEY },
       ],
     },
     sendBody: true,
     specifyBody: 'json',
-    jsonBody: `={
-  "messaging_product": "whatsapp",
-  "to": "{{ $('Process Webhook Data2').item.json.phone_number }}",
-  "type": "text",
-  "text": { "body": "{{ $json.message }}" }
-}`,
-    options: {},
-  };
-  // Set credential reference for WhatsApp
-  node.credentials = {
-    httpCustomAuth: {
-      id: WHATSAPP_CREDENTIAL_ID,
-      name: 'Welcome Trips',
+    jsonBody: `={{ JSON.stringify({ to: $('Process Webhook Data2').first().json.contact_phone, message: $json.message, phone_number_id: "${ECHO_PHONE_NUMBER_ID}" }) }}`,
+    options: {
+      response: {
+        response: { neverError: true },
+      },
     },
   };
 }
@@ -1381,7 +1382,7 @@ function transformPostSend(nodeMap) {
         conditions: [{
           keyName: 'id',
           condition: 'eq',
-          keyValue: "={{ $('Historico Texto').item.json.card_id }}",
+          keyValue: "={{ $('Historico Texto').first().json.card_id }}",
         }],
       },
       fieldsUi: {
@@ -1392,17 +1393,7 @@ function transformPostSend(nodeMap) {
     };
   }
 
-  // Cria Msg Bot → noOp passthrough (outbound save happens inside send loop via Save Outbound Msg)
-  const cmb = nodeMap['Cria Msg Bot'];
-  if (cmb) {
-    cmb.type = 'n8n-nodes-base.noOp';
-    cmb.typeVersion = 1;
-    delete cmb.parameters.tableId;
-    delete cmb.parameters.fieldsUi;
-    delete cmb.parameters.jsCode;
-    delete cmb.credentials;
-    cmb.parameters = {};
-  }
+  // Cria Msg Bot → removed via removeRedundantNodes (Echo webhook handles outbound save)
 }
 
 function transformCompileSentMessages(node) {

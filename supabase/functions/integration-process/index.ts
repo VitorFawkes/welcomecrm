@@ -226,9 +226,10 @@ Deno.serve(async (req) => {
             .eq('is_active', true);
         const { data: systemFields } = await supabase.from('system_fields').select('key, type, section');
 
-        // Load Topology (include fase for SDR owner assignment)
-        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome, fase');
+        // Load Topology (include fase for SDR owner assignment, is_lost/is_won for status routing, ordem/phase_id for anti-regression)
+        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome, fase, is_lost, is_won, ordem, phase_id');
         const { data: pipelines } = await supabase.from('pipelines').select('id, nome, produto');
+        const { data: pipelinePhases } = await supabase.from('pipeline_phases').select('id, order_index');
 
         // Load Inbound Trigger Rules (for selective entity creation)
         const { data: inboundTriggers } = await supabase
@@ -263,8 +264,42 @@ Deno.serve(async (req) => {
                 pipelineName: pipeline.nome,
                 produto: pipeline.produto,
                 stageName: stage.nome,
-                fase: (stage as any).fase || null  // Include fase for SDR owner assignment
+                fase: (stage as Record<string, unknown>).fase || null  // Include fase for SDR owner assignment
             };
+        };
+
+        // Helper: Get stage position for ordering comparison (phase order_index + stage ordem)
+        // Same pattern as CardHeader stage sorting logic (phase first, then ordem within phase)
+        const UNLINKED_PHASE_ORDER = 999; // Stages without phase_id sort last (same as Resolução phase)
+        const getStagePosition = (stageId: string): { phaseOrder: number; stageOrder: number } | null => {
+            const stage = pipelineStages?.find(s => s.id === stageId);
+            if (!stage) return null;
+            const phase = pipelinePhases?.find(p => p.id === (stage as any).phase_id);
+            return {
+                phaseOrder: phase?.order_index ?? UNLINKED_PHASE_ORDER,
+                stageOrder: (stage as any).ordem ?? 0
+            };
+        };
+
+        // Helper: Check if currentStage is more advanced than targetStage
+        const isStageMoreAdvanced = (currentStageId: string, targetStageId: string): boolean => {
+            const currentPos = getStagePosition(currentStageId);
+            const targetPos = getStagePosition(targetStageId);
+            if (!currentPos || !targetPos) {
+                console.warn(`[ANTI-REGRESSION] Cannot compare stages: current=${currentStageId}, target=${targetStageId}. Allowing update (fail-open).`);
+                return false;
+            }
+            if (currentPos.phaseOrder !== targetPos.phaseOrder) {
+                return currentPos.phaseOrder > targetPos.phaseOrder;
+            }
+            return currentPos.stageOrder > targetPos.stageOrder;
+        };
+
+        // Helper: Check if stage is terminal (won or lost)
+        const isTerminalStage = (stageId: string): boolean => {
+            const stage = pipelineStages?.find(s => s.id === stageId);
+            if (!stage) return false;
+            return (stage as any).is_lost === true || (stage as any).is_won === true;
         };
 
         // Helper: Map Status
@@ -435,6 +470,16 @@ Deno.serve(async (req) => {
                                 .single();
                             existingContact = byEmail;
                             contactCrmId = byEmail?.id || null;
+                        }
+
+                        // Tier 3: busca por telefone via matching robusto (variantes BR)
+                        if (!existingContact && phone) {
+                            const { data: byPhone } = await supabase
+                                .rpc('find_contact_by_whatsapp', { p_phone: phone, p_convo_id: '' });
+                            if (byPhone) {
+                                existingContact = { id: byPhone };
+                                contactCrmId = byPhone;
+                            }
                         }
 
                         if (existingContact) {
@@ -794,58 +839,79 @@ Deno.serve(async (req) => {
                 const acContactId = payload['deal[contactid]'] || payload.contactid || payload.contact_id;
 
                 if (!isShadowMode) {
-                    // UPSERT CONTACT
+                    // UPSERT CONTACT (3-tier dedup: external_id → email → telefone)
                     let contactId: string | null = null;
-                    if (contactEmail) {
-                        const { data: existingContact } = await supabase
+
+                    // Tier 1: external_id (mais confiável)
+                    if (acContactId) {
+                        const { data: byExtId } = await supabase
+                            .from('contatos')
+                            .select('id')
+                            .eq('external_id', String(acContactId))
+                            .eq('external_source', 'active_campaign')
+                            .single();
+                        if (byExtId) contactId = byExtId.id;
+                    }
+
+                    // Tier 2: email
+                    if (!contactId && contactEmail) {
+                        const { data: byEmail } = await supabase
                             .from('contatos')
                             .select('id')
                             .eq('email', contactEmail)
                             .single();
+                        if (byEmail) contactId = byEmail.id;
+                    }
 
-                        if (existingContact) {
-                            contactId = existingContact.id;
-                            // Update external_id if missing (linking existing contact to AC)
-                            if (acContactId) {
-                                await supabase
-                                    .from('contatos')
-                                    .update({
-                                        external_id: String(acContactId),
-                                        external_source: 'active_campaign'
-                                    })
-                                    .eq('id', contactId)
-                                    .is('external_id', null);
-                            }
-                        } else {
-                            const { data: newContact, error: cErr } = await supabase
-                                .from('contatos')
-                                .insert({
-                                    nome: contactNome,
-                                    sobrenome: contactSobrenome,
-                                    email: contactEmail,
-                                    telefone: contactPhone,
-                                    external_id: acContactId ? String(acContactId) : null,
-                                    external_source: acContactId ? 'active_campaign' : null,
-                                    tags: ['active_campaign'],
-                                    tipo_pessoa: 'adulto'
-                                })
-                                .select('id')
-                                .single();
-                            if (cErr) throw new Error(`Contact Create Error: ${cErr.message}`);
-                            contactId = newContact.id;
+                    // Tier 3: telefone via matching robusto (variantes BR)
+                    if (!contactId && contactPhone) {
+                        const { data: byPhone } = await supabase
+                            .rpc('find_contact_by_whatsapp', { p_phone: contactPhone, p_convo_id: '' });
+                        if (byPhone) contactId = byPhone;
+                    }
 
-                            // Populate contato_meios for WhatsApp matching
-                            if (contactPhone) {
-                                const normalizedPhone = contactPhone.replace(/\D/g, '');
-                                await supabase.from('contato_meios').upsert({
-                                    contato_id: contactId,
-                                    tipo: 'whatsapp',
-                                    valor: contactPhone,
-                                    valor_normalizado: normalizedPhone,
-                                    is_principal: true,
-                                    origem: 'active_campaign'
-                                }, { onConflict: 'tipo,valor_normalizado', ignoreDuplicates: true });
-                            }
+                    // Linkar external_id se encontrou contato existente sem vínculo AC
+                    if (contactId && acContactId) {
+                        await supabase
+                            .from('contatos')
+                            .update({
+                                external_id: String(acContactId),
+                                external_source: 'active_campaign'
+                            })
+                            .eq('id', contactId)
+                            .is('external_id', null);
+                    }
+
+                    // Se não encontrou em nenhum tier → criar novo
+                    if (!contactId) {
+                        const { data: newContact, error: cErr } = await supabase
+                            .from('contatos')
+                            .insert({
+                                nome: contactNome,
+                                sobrenome: contactSobrenome,
+                                email: contactEmail,
+                                telefone: contactPhone,
+                                external_id: acContactId ? String(acContactId) : null,
+                                external_source: acContactId ? 'active_campaign' : null,
+                                tags: ['active_campaign'],
+                                tipo_pessoa: 'adulto'
+                            })
+                            .select('id')
+                            .single();
+                        if (cErr) throw new Error(`Contact Create Error: ${cErr.message}`);
+                        contactId = newContact.id;
+
+                        // Populate contato_meios for WhatsApp matching
+                        if (contactPhone) {
+                            const normalizedPhone = contactPhone.replace(/\D/g, '');
+                            await supabase.from('contato_meios').upsert({
+                                contato_id: contactId,
+                                tipo: 'whatsapp',
+                                valor: contactPhone,
+                                valor_normalizado: normalizedPhone,
+                                is_principal: true,
+                                origem: 'active_campaign'
+                            }, { onConflict: 'tipo,valor_normalizado', ignoreDuplicates: true });
                         }
                     }
 
@@ -1090,7 +1156,51 @@ Deno.serve(async (req) => {
                     }
                     // ═══════════════════════════════════════════════════════════════════
 
-                    if (targetStageId && topology) {
+                    // If AC says deal is lost (status=2), force card to the is_lost stage
+                    if (status === 'perdido') {
+                        const lostStage = pipelineStages?.find(s => s.is_lost === true);
+                        if (lostStage) {
+                            targetStageId = lostStage.id;
+                            topology = resolveTopology(targetStageId);
+                            log += ' [AC status=lost -> forced to Fechado-Perdido]';
+                        }
+                    }
+
+                    // ═══════════════════════════════════════════════════════════════════
+                    // ANTI-REGRESSION: Don't move card backward if CRM is already more advanced
+                    // Comparison: (phase.order_index, stage.ordem) — phase weighs more than ordem
+                    // ═══════════════════════════════════════════════════════════════════
+                    let skipStageUpdate = false;
+
+                    if (existingCard && targetStageId && existingCard.pipeline_stage_id) {
+                        const currentCrmStageId = existingCard.pipeline_stage_id;
+
+                        // Status 'perdido' always forces to lost stage (handled above), skip regression check
+                        if (status !== 'perdido') {
+                            // Rule 1: If CRM card is at a terminal stage (won/lost), never allow AC to move it out
+                            if (isTerminalStage(currentCrmStageId)) {
+                                skipStageUpdate = true;
+                                const currentPos = getStagePosition(currentCrmStageId);
+                                log += ` [DONT_REGRESS: CRM at terminal stage (phase=${currentPos?.phaseOrder}, ordem=${currentPos?.stageOrder})]`;
+                            }
+                            // Rule 2: If CRM stage is more advanced than AC target, don't regress
+                            else if (isStageMoreAdvanced(currentCrmStageId, targetStageId)) {
+                                skipStageUpdate = true;
+                                const currentPos = getStagePosition(currentCrmStageId);
+                                const targetPos = getStagePosition(targetStageId);
+                                log += ` [DONT_REGRESS: CRM (phase=${currentPos?.phaseOrder}, ordem=${currentPos?.stageOrder}) > AC target (phase=${targetPos?.phaseOrder}, ordem=${targetPos?.stageOrder})]`;
+                            }
+                        }
+                    }
+
+                    // If skipping stage update and AC says 'ganho', don't set status_comercial
+                    // (let the DB trigger enforce status based on the actual CRM stage)
+                    if (skipStageUpdate && status === 'ganho') {
+                        delete cardPayload.status_comercial;
+                        log += ' [status_comercial deferred to CRM stage trigger]';
+                    }
+
+                    if (targetStageId && topology && !skipStageUpdate) {
                         cardPayload.pipeline_stage_id = targetStageId;
                         cardPayload.pipeline_id = topology.pipelineId;
                         cardPayload.produto = topology.produto;
@@ -1110,8 +1220,20 @@ Deno.serve(async (req) => {
                     }
 
                     if (existingCard) {
+                        // Correct created_at for AC cards if we have the original date
+                        const acCreateDateForUpdate = payload['deal[create_date]'] || payload.cdate;
+                        if (acCreateDateForUpdate && existingCard.external_source === 'active_campaign') {
+                            const parsedDate = new Date(acCreateDateForUpdate);
+                            if (!isNaN(parsedDate.getTime())) {
+                                const acTimestamp = parsedDate.toISOString();
+                                if (existingCard.created_at !== acTimestamp) {
+                                    cardPayload.created_at = acTimestamp;
+                                }
+                            }
+                        }
+
                         await updateCardSafe(existingCard.id, cardPayload);
-                        log = `Updated Card ${existingCard.id} (Pipeline: ${topology?.pipelineName})`;
+                        log += `Updated Card ${existingCard.id} (Pipeline: ${topology?.pipelineName})`;
 
                     } else {
                         if (!topology) throw new Error("Cannot create card: Missing Topology (Stage/Pipeline/Product)");
@@ -1120,7 +1242,13 @@ Deno.serve(async (req) => {
                         cardPayload.external_source = 'active_campaign';
                         cardPayload.origem = 'active_campaign';
                         cardPayload.pessoa_principal_id = contactId;
-                        cardPayload.created_at = new Date().toISOString();
+
+                        // Use AC deal creation date instead of current time
+                        const acCreateDate = payload['deal[create_date]'] || payload.cdate || payload.date_time;
+                        const parsedCreateDate = acCreateDate ? new Date(acCreateDate) : null;
+                        cardPayload.created_at = (parsedCreateDate && !isNaN(parsedCreateDate.getTime()))
+                            ? parsedCreateDate.toISOString()
+                            : new Date().toISOString();
 
                         const { error: iErr } = await supabase
                             .from('cards')

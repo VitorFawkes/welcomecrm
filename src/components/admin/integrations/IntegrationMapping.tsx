@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table';
-import { GitBranch, User, Check, Plus, Filter, AlertTriangle, X } from 'lucide-react';
+import { GitBranch, User, Check, Plus, Filter, AlertTriangle, X, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -266,7 +266,7 @@ export function IntegrationMapping({ integrationId: propId }: { integrationId?: 
                     integration_id: integrationId,
                     external_pipeline_id: externalPipelineId,
                     ac_pipeline_id: externalPipelineId, // Ensure PK is set
-                    pipeline_id: pipelineIdToSave as any,
+                    pipeline_id: pipelineIdToSave as string | null,
                     business_unit: 'TRIPS',
                     is_active: true
                 }, { onConflict: 'ac_pipeline_id' }); // Use correct PK constraint
@@ -648,6 +648,33 @@ export function IntegrationMapping({ integrationId: propId }: { integrationId?: 
                         >
                             <Plus className="w-4 h-4" /> Adicionar Stage
                         </Button>
+                    </div>
+
+                    {/* Regras automáticas de status (não dependem de mapeamento) */}
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <div className="flex items-start gap-3">
+                            <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                            <div className="space-y-1.5">
+                                <p className="text-sm font-medium text-blue-900">Regras automáticas de status (ActiveCampaign)</p>
+                                <p className="text-xs text-blue-700">
+                                    O status do deal no AC (campo <code className="bg-blue-100 px-1 rounded">status</code>) é processado automaticamente, independente do mapeamento de etapas:
+                                </p>
+                                <ul className="text-xs text-blue-800 space-y-1 mt-1">
+                                    <li className="flex items-center gap-2">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                                        <span><strong>Perdido</strong> (status=2) &rarr; Resolução &gt; Fechado - Perdido <span className="text-blue-600">(automático)</span></span>
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                                        <span><strong>Ganho</strong> (status=1) &rarr; Usa o mapeamento de etapas abaixo</span>
+                                    </li>
+                                    <li className="flex items-center gap-2">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+                                        <span><strong>Aberto</strong> (status=0) &rarr; Usa o mapeamento de etapas abaixo</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     {selectedPipelineFilter ? (
