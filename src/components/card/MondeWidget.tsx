@@ -53,6 +53,7 @@ interface CardContext {
     data_viagem_inicio: string | null
     data_viagem_fim: string | null
     valor_final: number | null
+    receita: number | null
     contato: {
         nome: string | null
         sobrenome: string | null
@@ -89,7 +90,7 @@ export default function MondeWidget({
             const { data: card, error } = await supabase
                 .from('cards')
                 .select(`
-                    titulo, data_viagem_inicio, data_viagem_fim, valor_final,
+                    titulo, data_viagem_inicio, data_viagem_fim, valor_final, receita,
                     contato:contatos!cards_pessoa_principal_id_fkey(nome, sobrenome, email, telefone, cpf),
                     agent:profiles!cards_vendas_owner_id_profiles_fkey(nome, email),
                     dono:profiles!cards_dono_atual_id_profiles_fkey(nome, email),
@@ -104,6 +105,7 @@ export default function MondeWidget({
                 data_viagem_inicio: card.data_viagem_inicio,
                 data_viagem_fim: card.data_viagem_fim,
                 valor_final: card.valor_final,
+                receita: card.receita,
                 contato: card.contato as unknown as CardContext['contato'],
                 agent: (card.agent || card.dono) as unknown as CardContext['agent'],
                 cards_contatos: card.cards_contatos as unknown as CardContext['cards_contatos'],
@@ -576,9 +578,15 @@ function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | n
         ])
     }
 
-    // Total
+    // Totals
     rows.push([''])
-    rows.push(['TOTAL', '', '', formatBRL(sale.total_value), '', '', ''])
+    rows.push(['TOTAL MONDE', '', '', formatBRL(sale.total_value), '', '', ''])
+    if (cardContext?.valor_final != null) {
+        rows.push(['VALOR TOTAL (FATURAMENTO)', '', '', formatBRL(Number(cardContext.valor_final)), '', '', ''])
+    }
+    if (cardContext?.receita != null) {
+        rows.push(['RECEITA', '', '', formatBRL(Number(cardContext.receita)), '', '', ''])
+    }
 
     const csvContent = rows
         .map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
@@ -881,10 +889,24 @@ function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardC
                 </>
             )}
 
-            {/* Total */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                <span className="text-xs font-medium text-gray-600">Total Monde</span>
-                <span className="text-sm font-semibold text-indigo-700">{formatBRL(sale.total_value)}</span>
+            {/* Totals */}
+            <div className="pt-2 border-t border-gray-100 space-y-1">
+                <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-600">Total Monde</span>
+                    <span className="text-sm font-semibold text-indigo-700">{formatBRL(sale.total_value)}</span>
+                </div>
+                {cardContext?.valor_final != null && (
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Valor Total (Faturamento)</span>
+                        <span className="text-xs font-medium text-gray-700">{formatBRL(Number(cardContext.valor_final))}</span>
+                    </div>
+                )}
+                {cardContext?.receita != null && (
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Receita</span>
+                        <span className="text-xs font-medium text-green-700">{formatBRL(Number(cardContext.receita))}</span>
+                    </div>
+                )}
             </div>
         </div>
     )
