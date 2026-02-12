@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
@@ -50,6 +50,11 @@ const TOGGLE_DEFINITIONS = [
         tooltip: 'Associa a mensagem à viagem em andamento do contato'
     },
     {
+        key: 'WHATSAPP_CREATE_CARD',
+        label: 'Criar card para contatos sem viagem ativa',
+        tooltip: 'Se habilitado, cria automaticamente um card quando uma mensagem chega de um contato sem card ativo'
+    },
+    {
         key: 'WHATSAPP_UPDATE_CONTACT',
         label: 'Atualizar dados do contato',
         tooltip: 'Atualiza nome se vier diferente do Ecko'
@@ -65,8 +70,8 @@ const PRODUTOS = [
 
 export function WhatsAppGovernanceTab() {
     const queryClient = useQueryClient();
-    const [toggles, setToggles] = useState<Record<string, boolean>>({});
-    const [linhas, setLinhas] = useState<LinhaConfig[]>([]);
+    const [toggleOverrides, setToggleOverrides] = useState<Record<string, boolean> | null>(null);
+    const [linhaOverrides, setLinhaOverrides] = useState<LinhaConfig[] | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
 
     // Fetch Toggles from integration_settings
@@ -97,22 +102,20 @@ export function WhatsAppGovernanceTab() {
         }
     });
 
-    // Sync state with remote data
-    useEffect(() => {
-        if (togglesData) {
-            const toggleMap: Record<string, boolean> = {};
-            togglesData.forEach(t => {
-                toggleMap[t.key] = t.value === 'true';
-            });
-            setToggles(toggleMap);
-        }
-    }, [togglesData]);
+    // Derive state from query data, with local overrides for unsaved changes
+    const toggles = useMemo(() => {
+        if (toggleOverrides) return toggleOverrides;
+        const toggleMap: Record<string, boolean> = {};
+        togglesData?.forEach(t => {
+            toggleMap[t.key] = t.value === 'true';
+        });
+        return toggleMap;
+    }, [togglesData, toggleOverrides]);
 
-    useEffect(() => {
-        if (linhasData) {
-            setLinhas(linhasData);
-        }
-    }, [linhasData]);
+    const linhas = useMemo(() => {
+        if (linhaOverrides) return linhaOverrides;
+        return linhasData ?? [];
+    }, [linhasData, linhaOverrides]);
 
     // Save toggles mutation
     const saveTogglesMutation = useMutation({
@@ -127,6 +130,7 @@ export function WhatsAppGovernanceTab() {
         },
         onSuccess: () => {
             toast.success('Toggles salvos com sucesso!');
+            setToggleOverrides(null);
             queryClient.invalidateQueries({ queryKey: ['whatsapp_toggles'] });
             setHasChanges(false);
         },
@@ -150,6 +154,7 @@ export function WhatsAppGovernanceTab() {
         },
         onSuccess: () => {
             toast.success('Linha atualizada!');
+            setLinhaOverrides(null);
             queryClient.invalidateQueries({ queryKey: ['whatsapp_linhas'] });
         },
         onError: (error) => {
@@ -158,12 +163,12 @@ export function WhatsAppGovernanceTab() {
     });
 
     const handleToggleChange = (key: string, value: boolean) => {
-        setToggles(prev => ({ ...prev, [key]: value }));
+        setToggleOverrides(prev => ({ ...(prev ?? toggles), [key]: value }));
         setHasChanges(true);
     };
 
     const handleLinhaChange = (id: string, field: keyof LinhaConfig, value: string | boolean | null) => {
-        setLinhas(prev => prev.map(l => {
+        setLinhaOverrides(prev => (prev ?? linhas).map(l => {
             if (l.id !== id) return l;
             return { ...l, [field]: value };
         }));
