@@ -101,6 +101,16 @@ BEGIN
     END IF;
 
     -- ========================================
+    -- FIX DIRECTION FOR STATUS EVENTS
+    -- message.status (delivered/read/failed) are ALWAYS about outbound messages
+    -- Echo does NOT include from_me/direction in these payloads
+    -- ========================================
+    IF v_platform.provider = 'echo' AND (v_payload->>'event') IN ('message.status', 'message.sent') THEN
+        v_from_me := true;
+        v_direction := 'outbound';
+    END IF;
+
+    -- ========================================
     -- IGNORE GROUP CHATS (@g.us)
     -- ========================================
     IF v_phone LIKE '%@g.us' THEN
@@ -272,7 +282,21 @@ END;
 $$;
 
 -- ============================================================
--- PARTE 2: Reprocessar eventos em erro
+-- PARTE 2: Fix direction for message.status events stored as inbound
+-- ============================================================
+
+UPDATE whatsapp_messages m
+SET direction = 'outbound',
+    is_from_me = true,
+    updated_at = NOW()
+FROM whatsapp_raw_events e
+WHERE m.raw_event_id = e.id
+  AND e.event_type = 'message.status'
+  AND m.direction = 'inbound'
+  AND m.is_from_me = false;
+
+-- ============================================================
+-- PARTE 3: Reprocessar eventos em erro
 -- ============================================================
 
 DO $$
