@@ -36,14 +36,32 @@ interface PreviewItem {
     field_mappings: MondeFieldMapping[];
 }
 
+// Monde API V3 payload types (see docs/MONDE_API.md)
 interface MondeSalePayload {
     company_identifier: string;
     sale_date: string;
     operation_id: string;
+    travel_agent: {
+        external_id?: string;
+        name: string;
+        cpf?: string;
+    };
+    payer: {
+        person_kind: 'individual' | 'company';
+        external_id?: string;
+        name: string;
+        cpf_cnpj?: string;
+        email?: string;
+        mobile_number?: string;
+    };
     hotels?: Array<Record<string, unknown>>;
     airline_tickets?: Array<Record<string, unknown>>;
     ground_transportations?: Array<Record<string, unknown>>;
     insurances?: Array<Record<string, unknown>>;
+    cruises?: Array<Record<string, unknown>>;
+    train_tickets?: Array<Record<string, unknown>>;
+    car_rentals?: Array<Record<string, unknown>>;
+    travel_packages?: Array<Record<string, unknown>>;
 }
 
 // ============================================
@@ -70,10 +88,15 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 1. Fetch card
+        // 1. Fetch card with owner + contato via FK hints
         const { data: card, error: cardError } = await supabase
             .from('cards')
-            .select('id, titulo, produto, vendas_owner_id, dono_atual_id, profiles:profiles!cards_vendas_owner_id_fkey(id, nome, email)')
+            .select(`
+                id, titulo, produto,
+                owner:profiles!cards_vendas_owner_id_profiles_fkey(id, nome, email),
+                dono:profiles!cards_dono_atual_id_profiles_fkey(id, nome, email),
+                contato:contatos!cards_pessoa_principal_id_fkey(id, nome, sobrenome, email, telefone, cpf)
+            `)
             .eq('id', cardId)
             .single();
 
@@ -117,7 +140,7 @@ Deno.serve(async (req) => {
             .order('trip_leg')
             .order('segment_order');
 
-        // 5. Load CNPJ setting
+        // 5. Load settings
         const { data: settings } = await supabase
             .from('integration_settings')
             .select('key, value')
@@ -182,6 +205,10 @@ Deno.serve(async (req) => {
         const airlineTickets: Array<Record<string, unknown>> = [];
         const transfers: Array<Record<string, unknown>> = [];
         const insurances: Array<Record<string, unknown>> = [];
+        const cruises: Array<Record<string, unknown>> = [];
+        const trainTickets: Array<Record<string, unknown>> = [];
+        const carRentals: Array<Record<string, unknown>> = [];
+        const travelPackages: Array<Record<string, unknown>> = [];
 
         const saleDate = new Date().toISOString().split('T')[0];
 
@@ -295,35 +322,169 @@ Deno.serve(async (req) => {
                     break;
                 }
 
-                default: {
+                case 'cruise': {
+                    const mondeObj = {
+                        departure_date: (rc.departure_date as string) || saleDate,
+                        arrival_date: (rc.arrival_date as string) || null,
+                        supplier_name: item.supplier || 'Nao informado',
+                        value: item.price,
+                    };
+                    cruises.push(mondeObj);
                     previewItems.push({
                         crm: item,
-                        monde_type: 'nao_mapeado',
-                        monde_object: { info: `Tipo "${item.item_type}" nao tem mapeamento direto no Monde` },
+                        monde_type: 'cruises',
+                        monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Tipo', crm_value: item.item_type, monde_field: '-', monde_value: 'Nao mapeado' },
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '-', monde_value: null },
-                            { crm_field: 'Valor', crm_value: item.price, monde_field: '-', monde_value: null },
+                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
+                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Partida', crm_value: rc.departure_date as string, monde_field: 'departure_date', monde_value: mondeObj.departure_date },
+                            { crm_field: 'Chegada', crm_value: rc.arrival_date as string, monde_field: 'arrival_date', monde_value: mondeObj.arrival_date },
+                            { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
+                        ],
+                    });
+                    break;
+                }
+
+                case 'train_ticket': {
+                    const mondeObj = {
+                        departure_date: (rc.departure_date as string) || saleDate,
+                        origin: (rc.origin as string) || 'N/A',
+                        destination: (rc.destination as string) || 'N/A',
+                        supplier_name: item.supplier || null,
+                        value: item.price,
+                    };
+                    trainTickets.push(mondeObj);
+                    previewItems.push({
+                        crm: item,
+                        monde_type: 'train_tickets',
+                        monde_object: mondeObj,
+                        field_mappings: [
+                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
+                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Partida', crm_value: rc.departure_date as string, monde_field: 'departure_date', monde_value: mondeObj.departure_date },
+                            { crm_field: 'Origem', crm_value: rc.origin as string, monde_field: 'origin', monde_value: mondeObj.origin },
+                            { crm_field: 'Destino', crm_value: rc.destination as string, monde_field: 'destination', monde_value: mondeObj.destination },
+                            { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
+                        ],
+                    });
+                    break;
+                }
+
+                case 'car_rental': {
+                    const mondeObj = {
+                        pickup_date: (rc.pickup_date as string) || saleDate,
+                        return_date: (rc.return_date as string) || null,
+                        pickup_location: (rc.pickup_location as string) || null,
+                        return_location: (rc.return_location as string) || null,
+                        supplier_name: item.supplier || 'Nao informado',
+                        value: item.price,
+                    };
+                    carRentals.push(mondeObj);
+                    previewItems.push({
+                        crm: item,
+                        monde_type: 'car_rentals',
+                        monde_object: mondeObj,
+                        field_mappings: [
+                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
+                            { crm_field: 'Locadora', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Retirada', crm_value: rc.pickup_date as string, monde_field: 'pickup_date', monde_value: mondeObj.pickup_date },
+                            { crm_field: 'Devoluçao', crm_value: rc.return_date as string, monde_field: 'return_date', monde_value: mondeObj.return_date },
+                            { crm_field: 'Local Retirada', crm_value: rc.pickup_location as string, monde_field: 'pickup_location', monde_value: mondeObj.pickup_location },
+                            { crm_field: 'Local Devoluçao', crm_value: rc.return_location as string, monde_field: 'return_location', monde_value: mondeObj.return_location },
+                            { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
+                        ],
+                    });
+                    break;
+                }
+
+                case 'travel_package': {
+                    const mondeObj = {
+                        start_date: (rc.start_date as string) || saleDate,
+                        end_date: (rc.end_date as string) || null,
+                        supplier_name: item.supplier || 'Nao informado',
+                        description: item.description || item.title,
+                        value: item.price,
+                    };
+                    travelPackages.push(mondeObj);
+                    previewItems.push({
+                        crm: item,
+                        monde_type: 'travel_packages',
+                        monde_object: mondeObj,
+                        field_mappings: [
+                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
+                            { crm_field: 'Operadora', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Inicio', crm_value: rc.start_date as string, monde_field: 'start_date', monde_value: mondeObj.start_date },
+                            { crm_field: 'Fim', crm_value: rc.end_date as string, monde_field: 'end_date', monde_value: mondeObj.end_date },
+                            { crm_field: 'Descricao', crm_value: item.description, monde_field: 'description', monde_value: mondeObj.description },
+                            { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
+                        ],
+                    });
+                    break;
+                }
+
+                default: {
+                    // Fallback: map unmapped types as travel_package (most flexible Monde type)
+                    const mondeObj = {
+                        start_date: saleDate,
+                        end_date: null,
+                        supplier_name: item.supplier || 'Nao informado',
+                        description: item.title || item.description || 'Servico',
+                        value: item.price,
+                    };
+                    travelPackages.push(mondeObj);
+                    previewItems.push({
+                        crm: item,
+                        monde_type: 'travel_packages',
+                        monde_object: mondeObj,
+                        field_mappings: [
+                            { crm_field: 'Tipo Original', crm_value: item.item_type, monde_field: 'travel_packages', monde_value: 'Mapeado como pacote' },
+                            { crm_field: 'Titulo', crm_value: item.title, monde_field: 'description', monde_value: mondeObj.description },
+                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
                 }
             }
         }
 
-        // 8. Build complete payload
+        // 8. Build travel_agent and payer from card context
+        const agent = (card as any).owner || (card as any).dono;
+        const contato = (card as any).contato;
+
+        const travelAgent = {
+            external_id: agent?.id,
+            name: agent?.nome || 'Agente nao informado',
+        };
+
+        const payerName = contato
+            ? [contato.nome, contato.sobrenome].filter(Boolean).join(' ')
+            : 'Pagante nao informado';
+        const payer = {
+            person_kind: 'individual' as const,
+            external_id: contato?.id,
+            name: payerName,
+            cpf_cnpj: contato?.cpf?.replace(/\D/g, '') || undefined,
+            email: contato?.email || undefined,
+            mobile_number: contato?.telefone?.replace(/\D/g, '') || undefined,
+        };
+
+        // 9. Build complete payload
         const payload: MondeSalePayload = {
             company_identifier: (config['MONDE_CNPJ'] || 'CNPJ_NAO_CONFIGURADO').replace(/\D/g, ''),
             sale_date: saleDate,
             operation_id: `WC-${cardId.substring(0, 8)}`,
+            travel_agent: travelAgent,
+            payer: payer,
         };
 
         if (hotels.length > 0) payload.hotels = hotels;
         if (airlineTickets.length > 0) payload.airline_tickets = airlineTickets;
         if (transfers.length > 0) payload.ground_transportations = transfers;
         if (insurances.length > 0) payload.insurances = insurances;
-
-        // 9. Profile info
-        const profile = (card as any).profiles;
+        if (cruises.length > 0) payload.cruises = cruises;
+        if (trainTickets.length > 0) payload.train_tickets = trainTickets;
+        if (carRentals.length > 0) payload.car_rentals = carRentals;
+        if (travelPackages.length > 0) payload.travel_packages = travelPackages;
 
         // 10. Return preview
         const totalValue = allItems.reduce((sum, i) => sum + i.price, 0);
@@ -339,10 +500,12 @@ Deno.serve(async (req) => {
                 accepted_at: proposal.accepted_at,
                 accepted_total: proposal.accepted_total,
             },
-            travel_agent: profile ? {
-                name: profile.nome,
-                email: profile.email,
-            } : null,
+            travel_agent: travelAgent,
+            payer: {
+                name: payer.name,
+                cpf_cnpj: payer.cpf_cnpj,
+                email: payer.email,
+            },
             shadow_mode: config['MONDE_SHADOW_MODE'] === 'true',
             cnpj_configured: !!config['MONDE_CNPJ'],
             total_value: totalValue,

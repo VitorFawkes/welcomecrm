@@ -83,8 +83,6 @@ export default function MondeWidget({
     const navigate = useNavigate()
 
     // Fetch card context for payer/agent display
-    // NOTE: vendas_owner_id and dono_atual_id have NO FK constraints,
-    // so we fetch profiles in a second query instead of PostgREST join
     const { data: cardContext } = useQuery({
         queryKey: ['card-monde-context', cardId],
         queryFn: async () => {
@@ -92,34 +90,23 @@ export default function MondeWidget({
                 .from('cards')
                 .select(`
                     titulo, data_viagem_inicio, data_viagem_fim, valor_final,
-                    vendas_owner_id, dono_atual_id,
                     contato:contatos!cards_pessoa_principal_id_fkey(nome, sobrenome, email, telefone, cpf),
+                    agent:profiles!cards_vendas_owner_id_profiles_fkey(nome, email),
+                    dono:profiles!cards_dono_atual_id_profiles_fkey(nome, email),
                     cards_contatos(contatos(nome, sobrenome))
                 `)
                 .eq('id', cardId)
                 .single()
             if (error || !card) return null
 
-            // Fetch agent profile separately (no FK exists for these columns)
-            const agentId = (card as Record<string, unknown>).vendas_owner_id || (card as Record<string, unknown>).dono_atual_id
-            let agent: { nome: string | null; email: string | null } | null = null
-            if (agentId) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('nome, email')
-                    .eq('id', agentId as string)
-                    .single()
-                agent = profile
-            }
-
             return {
                 titulo: card.titulo,
                 data_viagem_inicio: card.data_viagem_inicio,
                 data_viagem_fim: card.data_viagem_fim,
                 valor_final: card.valor_final,
-                contato: card.contato as CardContext['contato'],
-                agent,
-                cards_contatos: card.cards_contatos as CardContext['cards_contatos'],
+                contato: card.contato as unknown as CardContext['contato'],
+                agent: (card.agent || card.dono) as unknown as CardContext['agent'],
+                cards_contatos: card.cards_contatos as unknown as CardContext['cards_contatos'],
             }
         },
         enabled: !!cardId,
