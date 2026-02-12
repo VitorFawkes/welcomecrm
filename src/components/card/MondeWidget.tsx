@@ -60,11 +60,7 @@ interface CardContext {
         telefone: string | null
         cpf: string | null
     } | null
-    owner: {
-        nome: string | null
-        email: string | null
-    } | null
-    dono: {
+    agent: {
         nome: string | null
         email: string | null
     } | null
@@ -87,21 +83,44 @@ export default function MondeWidget({
     const navigate = useNavigate()
 
     // Fetch card context for payer/agent display
+    // NOTE: vendas_owner_id and dono_atual_id have NO FK constraints,
+    // so we fetch profiles in a second query instead of PostgREST join
     const { data: cardContext } = useQuery({
         queryKey: ['card-monde-context', cardId],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data: card, error } = await supabase
                 .from('cards')
                 .select(`
                     titulo, data_viagem_inicio, data_viagem_fim, valor_final,
+                    vendas_owner_id, dono_atual_id,
                     contato:contatos!cards_pessoa_principal_id_fkey(nome, sobrenome, email, telefone, cpf),
-                    owner:profiles!cards_vendas_owner_id_fkey(nome, email),
-                    dono:profiles!cards_dono_atual_id_fkey(nome, email),
                     cards_contatos(contatos(nome, sobrenome))
                 `)
                 .eq('id', cardId)
                 .single()
-            return data as CardContext | null
+            if (error || !card) return null
+
+            // Fetch agent profile separately (no FK exists for these columns)
+            const agentId = (card as Record<string, unknown>).vendas_owner_id || (card as Record<string, unknown>).dono_atual_id
+            let agent: { nome: string | null; email: string | null } | null = null
+            if (agentId) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('nome, email')
+                    .eq('id', agentId as string)
+                    .single()
+                agent = profile
+            }
+
+            return {
+                titulo: card.titulo,
+                data_viagem_inicio: card.data_viagem_inicio,
+                data_viagem_fim: card.data_viagem_fim,
+                valor_final: card.valor_final,
+                contato: card.contato as CardContext['contato'],
+                agent,
+                cards_contatos: card.cards_contatos as CardContext['cards_contatos'],
+            }
         },
         enabled: !!cardId,
     })
@@ -456,7 +475,7 @@ function getItemMondeFields(item: MondeSaleItem, sale: MondeSaleWithItems): Arra
 // ============================================
 function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | null) {
     const contato = cardContext?.contato
-    const agent = cardContext?.owner || cardContext?.dono
+    const agent = cardContext?.agent
     const operationId = `WC-${sale.card_id.substring(0, 8)}`
     const statusLabel = getMondeSaleStatusInfo(sale.status as MondeSaleStatus).label
 
@@ -795,7 +814,7 @@ function SaleItem({
 function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardContext?: CardContext | null }) {
     const operationId = `WC-${sale.card_id.substring(0, 8)}`
     const contato = cardContext?.contato
-    const agent = cardContext?.owner || cardContext?.dono
+    const agent = cardContext?.agent
     const travelers = (cardContext?.cards_contatos || [])
         .map(p => p.contatos)
         .filter(Boolean)

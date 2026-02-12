@@ -26,10 +26,12 @@ interface MondeSale {
         titulo: string;
         produto_data: Record<string, unknown> | null;
         pessoa_principal_id?: string;
+        vendas_owner_id?: string | null;
+        dono_atual_id?: string | null;
         contato?: { id: string; nome: string; sobrenome: string; email: string; telefone: string; cpf: string } | null;
-        owner?: { id: string; nome: string; email: string } | null;
-        dono?: { id: string; nome: string; email: string } | null;
     };
+    // Resolved separately (no FK constraint on vendas_owner_id / dono_atual_id)
+    _agent?: { id: string; nome: string; email: string } | null;
 }
 
 interface MondeSaleItem {
@@ -188,7 +190,9 @@ Deno.serve(async (req) => {
         });
     }
 
-    // 2. Fetch pending sales with card context (contato + owner for payer/travel_agent)
+    // 2. Fetch pending sales with card context (contato for payer)
+    // NOTE: vendas_owner_id and dono_atual_id have NO FK constraints in the DB,
+    // so we fetch profiles separately per sale instead of PostgREST join.
     const now = new Date().toISOString();
     const { data: sales, error: fetchError } = await supabase
         .from('monde_sales')
@@ -197,9 +201,8 @@ Deno.serve(async (req) => {
             total_value, idempotency_key, status, attempts, max_attempts,
             cards:cards(
                 id, titulo, produto_data, pessoa_principal_id,
-                contato:contatos!cards_pessoa_principal_id_fkey(id, nome, sobrenome, email, telefone, cpf),
-                owner:profiles!cards_vendas_owner_id_fkey(id, nome, email),
-                dono:profiles!cards_dono_atual_id_fkey(id, nome, email)
+                vendas_owner_id, dono_atual_id,
+                contato:contatos!cards_pessoa_principal_id_fkey(id, nome, sobrenome, email, telefone, cpf)
             )
         `)
         .eq('status', 'pending')
@@ -246,6 +249,17 @@ Deno.serve(async (req) => {
                 .eq('sale_id', sale.id);
 
             const saleItems = (items || []) as MondeSaleItem[];
+
+            // Resolve agent profile (no FK constraint on vendas_owner_id / dono_atual_id)
+            const agentId = sale.cards?.vendas_owner_id || sale.cards?.dono_atual_id;
+            if (agentId) {
+                const { data: agentProfile } = await supabase
+                    .from('profiles')
+                    .select('id, nome, email')
+                    .eq('id', agentId)
+                    .single();
+                sale._agent = agentProfile;
+            }
 
             // Build Monde payload
             const payload = buildMondePayload(sale, saleItems, mondeCnpj || '00000000000000');
@@ -411,10 +425,10 @@ function buildMondePayload(
     const card = sale.cards;
 
     // --- travel_agent (REQUIRED) from card owner ---
-    const owner = card?.owner || card?.dono;
+    const agent = sale._agent;
     const travelAgent: MondeTravelAgent = {
-        external_id: owner?.id,
-        name: owner?.nome || 'Agente não informado',
+        external_id: agent?.id,
+        name: agent?.nome || 'Agente não informado',
     };
 
     // --- payer (REQUIRED) from card's main contact ---
