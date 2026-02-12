@@ -470,8 +470,11 @@ function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | n
 
     const rows: string[][] = []
 
+    const suppliers = [...new Set((sale.items || []).map(i => i.supplier).filter(Boolean) as string[])]
+
     // Metadata section
     rows.push(['Campo', 'Valor'])
+    if (cardContext?.titulo) rows.push(['Titulo da Venda', cardContext.titulo])
     rows.push(['Data Venda', formatDateBR(sale.sale_date)])
     rows.push(['Status', statusLabel])
     rows.push(['Operation ID', operationId])
@@ -493,8 +496,8 @@ function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | n
 
     // Agent
     if (agent) {
-        rows.push(['Agente', agent.nome || '-'])
-        if (agent.email) rows.push(['Email Agente', agent.email])
+        rows.push(['Consultora/Vendedor', agent.nome || '-'])
+        if (agent.email) rows.push(['Email Consultor(a)', agent.email])
         rows.push([''])
     }
 
@@ -505,7 +508,13 @@ function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | n
         .map(c => [c!.nome, c!.sobrenome].filter(Boolean).join(' '))
         .filter(Boolean)
     if (travelers.length > 0) {
-        rows.push(['Viajantes', travelers.join(', ')])
+        rows.push(['Passageiros', travelers.join(', ')])
+        rows.push([''])
+    }
+
+    // Suppliers summary
+    if (suppliers.length > 0) {
+        rows.push(['Fornecedores', suppliers.join(', ')])
         rows.push([''])
     }
 
@@ -585,7 +594,7 @@ function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | n
         rows.push(['VALOR TOTAL (FATURAMENTO)', '', '', formatBRL(Number(cardContext.valor_final)), '', '', ''])
     }
     if (cardContext?.receita != null) {
-        rows.push(['RECEITA', '', '', formatBRL(Number(cardContext.receita)), '', '', ''])
+        rows.push(['RECEITA (MARGEM)', '', '', formatBRL(Number(cardContext.receita)), '', '', ''])
     }
 
     const csvContent = rows
@@ -815,11 +824,15 @@ function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardC
         .filter(Boolean)
         .map(c => [c!.nome, c!.sobrenome].filter(Boolean).join(' '))
         .filter(Boolean)
+    const suppliers = [...new Set((sale.items || []).map(i => i.supplier).filter(Boolean) as string[])]
 
     return (
         <div className="space-y-3 pt-2 border-t border-gray-100">
             {/* Sale Info */}
             <SectionHeader label="Informações da Venda" />
+            {cardContext?.titulo && (
+                <p className="text-xs font-semibold text-slate-900 -mt-1">{cardContext.titulo}</p>
+            )}
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                 <InfoField label="Data Venda" value={formatDateBR(sale.sale_date)} />
                 <InfoField label="Operation ID" value={operationId} mono />
@@ -877,6 +890,14 @@ function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardC
                 </>
             )}
 
+            {/* Suppliers summary */}
+            {suppliers.length > 0 && (
+                <>
+                    <SectionHeader label="Fornecedores" />
+                    <p className="text-xs text-slate-700 -mt-1">{suppliers.join(', ')}</p>
+                </>
+            )}
+
             {/* Items */}
             {sale.items && sale.items.length > 0 && (
                 <>
@@ -903,7 +924,7 @@ function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardC
                 )}
                 {cardContext?.receita != null && (
                     <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">Receita</span>
+                        <span className="text-xs text-gray-500">Receita (Margem)</span>
                         <span className="text-xs font-medium text-green-700">{formatBRL(Number(cardContext.receita))}</span>
                     </div>
                 )}
