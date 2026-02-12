@@ -151,10 +151,8 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 query = query.in('status_comercial', filters.statusComercial)
             }
 
-            // Archived Filter - DISABLED (colunas removidas no rollback)
-            // if (!filters.showArchived) {
-            //     query = query.is('archived_at', null)
-            // }
+            // Archived Filter — esconder cards arquivados do pipeline
+            query = query.is('archived_at', null)
 
             // Apply Sorting
             if (filters.sortBy && filters.sortBy !== 'data_proxima_tarefa') {

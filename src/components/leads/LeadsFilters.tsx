@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, X, ChevronDown, Calendar, User, Flag, Layers, SlidersHorizontal } from 'lucide-react'
+import { Search, X, ChevronDown, Calendar, User, Flag, Layers, SlidersHorizontal, Archive } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useLeadsFilters } from '../../hooks/useLeadsFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
@@ -28,7 +28,7 @@ const PRIORIDADE_OPTIONS = [
 ]
 
 export default function LeadsFilters() {
-    const { filters, setFilters, setSearch, toggleOwner, toggleStage, toggleStatus, togglePrioridade, clearFilters, hasActiveFilters } = useLeadsFilters()
+    const { filters, setFilters, setSearch, toggleOwner, toggleStage, toggleStatus, togglePrioridade, toggleArchived, clearFilters, hasActiveFilters } = useLeadsFilters()
     const { data: options } = useFilterOptions()
     const { data: stages } = usePipelineStages()
 
@@ -289,6 +289,20 @@ export default function LeadsFilters() {
                     </div>
                 </PopoverContent>
             </Popover>
+
+            {/* Archived Toggle */}
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleArchived}
+                className={cn(
+                    "h-9 gap-2",
+                    filters.showArchived && "border-amber-500 text-amber-700 bg-amber-50"
+                )}
+            >
+                <Archive className="h-4 w-4" />
+                Arquivados
+            </Button>
 
             {/* Advanced Filters Button */}
             <Button

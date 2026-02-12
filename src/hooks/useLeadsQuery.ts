@@ -126,6 +126,11 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
                 query = query.lte('tempo_sem_contato', filters.diasSemContatoMax)
             }
 
+            // Archived filter — por padrão esconde, toggle em LeadsFilters permite mostrar
+            if (!filters.showArchived) {
+                query = query.is('archived_at', null)
+            }
+
             // Exclude group parents
             query = query.eq('is_group_parent', false)
 
