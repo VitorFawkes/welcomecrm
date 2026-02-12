@@ -16,7 +16,9 @@ import {
     Plane,
     Car,
     Shield,
-    Package
+    Package,
+    Ship,
+    TrainFront,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -34,6 +36,9 @@ import {
 } from '@/hooks/useMondeSales'
 import MondeCreateSaleModal from './MondeCreateSaleModal'
 
+// ============================================
+// Types
+// ============================================
 interface MondeWidgetProps {
     cardId: string
     /** @deprecated Now fetched internally. Kept for backward-compat during migration. */
@@ -43,12 +48,63 @@ interface MondeWidgetProps {
     card?: unknown
 }
 
+interface CardContext {
+    titulo: string | null
+    data_viagem_inicio: string | null
+    data_viagem_fim: string | null
+    valor_final: number | null
+    contato: {
+        nome: string | null
+        sobrenome: string | null
+        email: string | null
+        telefone: string | null
+        cpf: string | null
+    } | null
+    owner: {
+        nome: string | null
+        email: string | null
+    } | null
+    dono: {
+        nome: string | null
+        email: string | null
+    } | null
+    participacoes: Array<{
+        contatos: {
+            nome: string | null
+            sobrenome: string | null
+        } | null
+    }> | null
+}
+
+// ============================================
+// Main Widget
+// ============================================
 export default function MondeWidget({
     cardId,
     proposalId: externalProposalId,
     hasAcceptedProposal: externalHasAccepted,
 }: MondeWidgetProps) {
     const navigate = useNavigate()
+
+    // Fetch card context for payer/agent display
+    const { data: cardContext } = useQuery({
+        queryKey: ['card-monde-context', cardId],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('cards')
+                .select(`
+                    titulo, data_viagem_inicio, data_viagem_fim, valor_final,
+                    contato:contatos!cards_pessoa_principal_id_fkey(nome, sobrenome, email, telefone, cpf),
+                    owner:profiles!cards_vendas_owner_id_fkey(nome, email),
+                    dono:profiles!cards_dono_atual_id_fkey(nome, email),
+                    participacoes(contatos(nome, sobrenome))
+                `)
+                .eq('id', cardId)
+                .single()
+            return data as CardContext | null
+        },
+        enabled: !!cardId,
+    })
 
     // Fetch accepted proposal internally (fallback if not passed from parent)
     const { data: fetchedProposal } = useQuery({
@@ -179,6 +235,7 @@ export default function MondeWidget({
                         <SaleItem
                             key={sale.id}
                             sale={sale}
+                            cardContext={cardContext}
                             onCancel={() => cancelSale({ saleId: sale.id, cardId })}
                             isCancelling={isCancelling}
                         />
@@ -200,6 +257,7 @@ export default function MondeWidget({
                         <SaleItem
                             key={sale.id}
                             sale={sale}
+                            cardContext={cardContext}
                             onRetry={() => retrySale({ saleId: sale.id, cardId })}
                             onCancel={() => cancelSale({ saleId: sale.id, cardId })}
                             isRetrying={isRetrying}
@@ -222,7 +280,7 @@ export default function MondeWidget({
                     defaultCollapsed
                 >
                     {sentSales.map(sale => (
-                        <SaleItem key={sale.id} sale={sale} />
+                        <SaleItem key={sale.id} sale={sale} cardContext={cardContext} />
                     ))}
                 </SalesSection>
             )}
@@ -274,13 +332,22 @@ function formatBRL(value: number) {
 function formatDateBR(dateStr: string | null | undefined): string {
     if (!dateStr) return '-'
     try {
-        const d = new Date(dateStr)
+        const d = new Date(dateStr + 'T12:00:00')
         return d.toLocaleDateString('pt-BR')
     } catch {
         return dateStr
     }
 }
 
+function formatCPF(cpf: string): string {
+    const digits = cpf.replace(/\D/g, '')
+    if (digits.length !== 11) return cpf
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+}
+
+// ============================================
+// Item Type Config
+// ============================================
 const ITEM_TYPE_CONFIG: Record<string, { label: string; icon: typeof Building; color: string; bgColor: string }> = {
     hotel: { label: 'Hotel', icon: Building, color: 'text-blue-700', bgColor: 'bg-blue-50 border-blue-200' },
     accommodation: { label: 'Hotel', icon: Building, color: 'text-blue-700', bgColor: 'bg-blue-50 border-blue-200' },
@@ -288,6 +355,10 @@ const ITEM_TYPE_CONFIG: Record<string, { label: string; icon: typeof Building; c
     transfer: { label: 'Transfer', icon: Car, color: 'text-orange-700', bgColor: 'bg-orange-50 border-orange-200' },
     ground_transportation: { label: 'Transfer', icon: Car, color: 'text-orange-700', bgColor: 'bg-orange-50 border-orange-200' },
     insurance: { label: 'Seguro', icon: Shield, color: 'text-green-700', bgColor: 'bg-green-50 border-green-200' },
+    cruise: { label: 'Cruzeiro', icon: Ship, color: 'text-cyan-700', bgColor: 'bg-cyan-50 border-cyan-200' },
+    train_ticket: { label: 'Trem', icon: TrainFront, color: 'text-amber-700', bgColor: 'bg-amber-50 border-amber-200' },
+    car_rental: { label: 'Locação Veículo', icon: Car, color: 'text-rose-700', bgColor: 'bg-rose-50 border-rose-200' },
+    travel_package: { label: 'Pacote', icon: Package, color: 'text-purple-700', bgColor: 'bg-purple-50 border-purple-200' },
     custom: { label: 'Outros', icon: Package, color: 'text-gray-700', bgColor: 'bg-gray-50 border-gray-200' },
 }
 
@@ -295,6 +366,9 @@ function getItemTypeConfig(type: string) {
     return ITEM_TYPE_CONFIG[type] || ITEM_TYPE_CONFIG.custom
 }
 
+// ============================================
+// Monde field mapping per item type
+// ============================================
 function getItemMondeFields(item: MondeSaleItem, sale: MondeSaleWithItems): Array<{ label: string; value: string }> {
     const meta = item.item_metadata || {}
     const travelStart = sale.travel_start_date || sale.sale_date
@@ -304,7 +378,7 @@ function getItemMondeFields(item: MondeSaleItem, sale: MondeSaleWithItems): Arra
         case 'hotel':
         case 'accommodation':
             return [
-                { label: 'Fornecedor', value: item.supplier || 'Nao informado' },
+                { label: 'Fornecedor', value: item.supplier || 'Não informado' },
                 { label: 'Check-in', value: formatDateBR((meta.check_in as string) || travelStart) },
                 { label: 'Check-out', value: formatDateBR((meta.check_out as string) || travelEnd) },
                 ...(meta.city ? [{ label: 'Cidade', value: meta.city as string }] : []),
@@ -313,7 +387,7 @@ function getItemMondeFields(item: MondeSaleItem, sale: MondeSaleWithItems): Arra
             ]
         case 'flight':
             return [
-                { label: 'Cia Aerea', value: item.supplier || 'Nao informado' },
+                { label: 'Cia Aérea', value: item.supplier || 'Não informado' },
                 { label: 'Data Partida', value: formatDateBR((meta.departure_datetime as string)?.substring(0, 10) || travelStart) },
                 { label: 'Origem', value: (meta.origin_airport as string) || (meta.origin as string) || 'N/A' },
                 { label: 'Destino', value: (meta.destination_airport as string) || (meta.destination as string) || 'N/A' },
@@ -332,22 +406,105 @@ function getItemMondeFields(item: MondeSaleItem, sale: MondeSaleWithItems): Arra
         case 'insurance':
             return [
                 ...(item.supplier ? [{ label: 'Fornecedor', value: item.supplier }] : []),
-                { label: 'Inicio', value: formatDateBR((meta.start_date as string) || travelStart) },
+                { label: 'Início', value: formatDateBR((meta.start_date as string) || travelStart) },
                 { label: 'Fim', value: formatDateBR((meta.end_date as string) || travelEnd) },
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        case 'cruise':
+            return [
+                { label: 'Companhia', value: item.supplier || 'Não informado' },
+                { label: 'Partida', value: formatDateBR((meta.departure_date as string) || travelStart) },
+                { label: 'Chegada', value: formatDateBR((meta.arrival_date as string) || travelEnd) },
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        case 'train_ticket':
+            return [
+                ...(item.supplier ? [{ label: 'Companhia', value: item.supplier }] : []),
+                { label: 'Data Partida', value: formatDateBR((meta.departure_date as string) || travelStart) },
+                ...(meta.origin ? [{ label: 'Origem', value: meta.origin as string }] : []),
+                ...(meta.destination ? [{ label: 'Destino', value: meta.destination as string }] : []),
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        case 'car_rental':
+            return [
+                { label: 'Locadora', value: item.supplier || 'Não informado' },
+                { label: 'Retirada', value: formatDateBR((meta.pickup_date as string) || travelStart) },
+                { label: 'Devolução', value: formatDateBR((meta.return_date as string) || travelEnd) },
+                ...(meta.pickup_location ? [{ label: 'Local Retirada', value: meta.pickup_location as string }] : []),
+                ...(meta.return_location ? [{ label: 'Local Devolução', value: meta.return_location as string }] : []),
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        case 'travel_package':
+            return [
+                { label: 'Operadora', value: item.supplier || 'Não informado' },
+                { label: 'Início', value: formatDateBR((meta.start_date as string) || travelStart) },
+                { label: 'Fim', value: formatDateBR((meta.end_date as string) || travelEnd) },
+                ...(item.description ? [{ label: 'Descrição', value: item.description }] : []),
                 { label: 'Valor', value: formatBRL(item.total_price) },
             ]
         default:
             return [
                 ...(item.supplier ? [{ label: 'Fornecedor', value: item.supplier }] : []),
-                ...(item.description ? [{ label: 'Descricao', value: item.description }] : []),
+                ...(item.description ? [{ label: 'Descrição', value: item.description }] : []),
                 { label: 'Valor', value: formatBRL(item.total_price) },
             ]
     }
 }
 
-function downloadSaleCSV(sale: MondeSaleWithItems) {
-    const headers = ['Tipo Monde', 'Titulo', 'Fornecedor', 'Valor', 'Data Inicio', 'Data Fim', 'Detalhes']
-    const rows = (sale.items || []).map(item => {
+// ============================================
+// CSV Download — includes card context
+// ============================================
+function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | null) {
+    const contato = cardContext?.contato
+    const agent = cardContext?.owner || cardContext?.dono
+    const operationId = `WC-${sale.card_id.substring(0, 8)}`
+    const statusLabel = getMondeSaleStatusInfo(sale.status as MondeSaleStatus).label
+
+    const rows: string[][] = []
+
+    // Metadata section
+    rows.push(['Campo', 'Valor'])
+    rows.push(['Data Venda', formatDateBR(sale.sale_date)])
+    rows.push(['Status', statusLabel])
+    rows.push(['Operation ID', operationId])
+    if (sale.monde_sale_id) rows.push(['Monde ID', sale.monde_sale_id])
+    if (sale.monde_sale_number) rows.push(['Monde #', sale.monde_sale_number])
+    rows.push(['Início Viagem', formatDateBR(sale.travel_start_date)])
+    rows.push(['Fim Viagem', formatDateBR(sale.travel_end_date)])
+    rows.push([''])
+
+    // Payer
+    if (contato) {
+        const payerName = [contato.nome, contato.sobrenome].filter(Boolean).join(' ')
+        rows.push(['Pagante', payerName || '-'])
+        if (contato.cpf) rows.push(['CPF', formatCPF(contato.cpf)])
+        if (contato.email) rows.push(['Email', contato.email])
+        if (contato.telefone) rows.push(['Telefone', contato.telefone])
+        rows.push([''])
+    }
+
+    // Agent
+    if (agent) {
+        rows.push(['Agente', agent.nome || '-'])
+        if (agent.email) rows.push(['Email Agente', agent.email])
+        rows.push([''])
+    }
+
+    // Travelers
+    const travelers = (cardContext?.participacoes || [])
+        .map(p => p.contatos)
+        .filter(Boolean)
+        .map(c => [c!.nome, c!.sobrenome].filter(Boolean).join(' '))
+        .filter(Boolean)
+    if (travelers.length > 0) {
+        rows.push(['Viajantes', travelers.join(', ')])
+        rows.push([''])
+    }
+
+    // Items table
+    rows.push(['Tipo', 'Título', 'Fornecedor', 'Valor', 'Data Início', 'Data Fim', 'Detalhes'])
+
+    for (const item of sale.items || []) {
         const config = getItemTypeConfig(item.item_type)
         const meta = item.item_metadata || {}
         const travelStart = sale.travel_start_date || sale.sale_date
@@ -360,12 +517,12 @@ function downloadSaleCSV(sale: MondeSaleWithItems) {
         switch (item.item_type) {
             case 'hotel':
             case 'accommodation':
-                dateStart = (meta.check_in as string) || travelStart || ''
-                dateEnd = (meta.check_out as string) || travelEnd || ''
+                dateStart = formatDateBR((meta.check_in as string) || travelStart)
+                dateEnd = formatDateBR((meta.check_out as string) || travelEnd)
                 details = [meta.city, `${(meta.rooms as number) || 1} quarto(s)`].filter(Boolean).join('; ')
                 break
             case 'flight':
-                dateStart = (meta.departure_datetime as string)?.substring(0, 10) || travelStart || ''
+                dateStart = formatDateBR((meta.departure_datetime as string)?.substring(0, 10) || travelStart)
                 details = [
                     `${(meta.origin_airport as string) || (meta.origin as string) || '?'} → ${(meta.destination_airport as string) || (meta.destination as string) || '?'}`,
                     (meta.flight_number as string) || (meta.locator as string) || '',
@@ -373,37 +530,52 @@ function downloadSaleCSV(sale: MondeSaleWithItems) {
                 break
             case 'transfer':
             case 'ground_transportation':
-                dateStart = (meta.date as string) || travelStart || ''
-                details = [meta.origin, meta.destination].filter(Boolean).join(' → ')
+                dateStart = formatDateBR((meta.date as string) || travelStart)
+                details = [(meta.origin as string), (meta.destination as string)].filter(Boolean).join(' → ')
                 break
             case 'insurance':
-                dateStart = (meta.start_date as string) || travelStart || ''
-                dateEnd = (meta.end_date as string) || travelEnd || ''
+                dateStart = formatDateBR((meta.start_date as string) || travelStart)
+                dateEnd = formatDateBR((meta.end_date as string) || travelEnd)
+                break
+            case 'cruise':
+                dateStart = formatDateBR((meta.departure_date as string) || travelStart)
+                dateEnd = formatDateBR((meta.arrival_date as string) || travelEnd)
+                break
+            case 'train_ticket':
+                dateStart = formatDateBR((meta.departure_date as string) || travelStart)
+                details = [(meta.origin as string), (meta.destination as string)].filter(Boolean).join(' → ')
+                break
+            case 'car_rental':
+                dateStart = formatDateBR((meta.pickup_date as string) || travelStart)
+                dateEnd = formatDateBR((meta.return_date as string) || travelEnd)
+                details = [(meta.pickup_location as string), (meta.return_location as string)].filter(Boolean).join(' → ')
+                break
+            case 'travel_package':
+                dateStart = formatDateBR((meta.start_date as string) || travelStart)
+                dateEnd = formatDateBR((meta.end_date as string) || travelEnd)
+                details = (meta.description as string) || item.description || ''
                 break
             default:
                 details = item.description || ''
         }
 
-        return [
+        rows.push([
             config.label,
             item.title,
             item.supplier || '',
-            item.total_price.toFixed(2),
+            formatBRL(item.total_price),
             dateStart,
             dateEnd,
             details,
-        ]
-    })
+        ])
+    }
 
-    // Add summary row
-    rows.push(['', '', '', '', '', '', ''])
-    rows.push(['TOTAL', '', '', sale.total_value.toFixed(2), '', '', ''])
-    rows.push(['Data Venda', sale.sale_date, '', '', '', '', ''])
-    rows.push(['Status', sale.status, '', '', '', '', ''])
-    if (sale.monde_sale_id) rows.push(['Monde ID', sale.monde_sale_id, '', '', '', '', ''])
+    // Total
+    rows.push([''])
+    rows.push(['TOTAL', '', '', formatBRL(sale.total_value), '', '', ''])
 
-    const csvContent = [headers, ...rows]
-        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    const csvContent = rows
+        .map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
         .join('\n')
 
     const BOM = '\uFEFF'
@@ -467,6 +639,7 @@ function SalesSection({
 // ============================================
 interface SaleItemProps {
     sale: MondeSaleWithItems
+    cardContext?: CardContext | null
     onCancel?: () => void
     onRetry?: () => void
     isCancelling?: boolean
@@ -476,6 +649,7 @@ interface SaleItemProps {
 
 function SaleItem({
     sale,
+    cardContext,
     onCancel,
     onRetry,
     isCancelling,
@@ -483,6 +657,7 @@ function SaleItem({
     showError
 }: SaleItemProps) {
     const [showDetail, setShowDetail] = useState(false)
+    const [confirmCancel, setConfirmCancel] = useState(false)
     const statusInfo = getMondeSaleStatusInfo(sale.status as MondeSaleStatus)
     const formattedValue = formatBRL(sale.total_value || 0)
     const formattedDate = formatDateBR(sale.sale_date)
@@ -509,7 +684,7 @@ function SaleItem({
                         {formattedValue}
                     </p>
                     <p className="text-xs text-gray-500">
-                        Data: {formattedDate} • {sale.items?.length || 0} item(s)
+                        Data: {formattedDate} · {sale.items?.length || 0} item(s)
                     </p>
                 </div>
             </div>
@@ -536,7 +711,7 @@ function SaleItem({
                     Ver Detalhes
                 </button>
                 <button
-                    onClick={() => downloadSaleCSV(sale)}
+                    onClick={() => downloadSaleCSV(sale, cardContext)}
                     className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 ml-auto"
                     title="Baixar CSV"
                 >
@@ -547,7 +722,7 @@ function SaleItem({
 
             {/* Expanded Detail View */}
             {showDetail && (
-                <SaleDetailView sale={sale} />
+                <SaleDetailView sale={sale} cardContext={cardContext} />
             )}
 
             {/* Actions */}
@@ -569,20 +744,44 @@ function SaleItem({
                             Tentar Novamente
                         </Button>
                     )}
-                    {onCancel && (
+                    {onCancel && !confirmCancel && (
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={onCancel}
+                            onClick={() => setConfirmCancel(true)}
                             disabled={isCancelling}
                             className="text-xs text-gray-500 hover:text-red-600"
+                            title="Cancelar venda"
                         >
-                            {isCancelling ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                                <Ban className="w-3 h-3" />
-                            )}
+                            <Ban className="w-3 h-3 mr-1" />
+                            Cancelar
                         </Button>
+                    )}
+                    {onCancel && confirmCancel && (
+                        <div className="flex items-center gap-1.5 bg-red-50 rounded-md px-2 py-1.5 border border-red-200">
+                            <span className="text-xs text-red-700">Cancelar esta venda?</span>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { onCancel(); setConfirmCancel(false) }}
+                                disabled={isCancelling}
+                                className="text-xs text-red-700 hover:bg-red-100 h-6 px-2"
+                            >
+                                {isCancelling ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                    'Sim'
+                                )}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setConfirmCancel(false)}
+                                className="text-xs text-gray-600 hover:bg-gray-100 h-6 px-2"
+                            >
+                                Não
+                            </Button>
+                        </div>
                     )}
                 </div>
             )}
@@ -591,47 +790,89 @@ function SaleItem({
 }
 
 // ============================================
-// SaleDetailView — Visual preview of Monde data
+// SaleDetailView — Visual preview with full context
 // ============================================
-function SaleDetailView({ sale }: { sale: MondeSaleWithItems }) {
+function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardContext?: CardContext | null }) {
     const operationId = `WC-${sale.card_id.substring(0, 8)}`
+    const contato = cardContext?.contato
+    const agent = cardContext?.owner || cardContext?.dono
+    const travelers = (cardContext?.participacoes || [])
+        .map(p => p.contatos)
+        .filter(Boolean)
+        .map(c => [c!.nome, c!.sobrenome].filter(Boolean).join(' '))
+        .filter(Boolean)
 
     return (
         <div className="space-y-3 pt-2 border-t border-gray-100">
-            {/* Sale summary */}
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                <div>
-                    <span className="text-gray-400">Data Venda</span>
-                    <p className="text-gray-900 font-medium">{formatDateBR(sale.sale_date)}</p>
-                </div>
-                <div>
-                    <span className="text-gray-400">Operation ID</span>
-                    <p className="text-gray-900 font-mono text-[11px]">{operationId}</p>
-                </div>
+            {/* Sale Info */}
+            <SectionHeader label="Informações da Venda" />
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                <InfoField label="Data Venda" value={formatDateBR(sale.sale_date)} />
+                <InfoField label="Operation ID" value={operationId} mono />
                 {sale.travel_start_date && (
-                    <div>
-                        <span className="text-gray-400">Inicio Viagem</span>
-                        <p className="text-gray-900 font-medium">{formatDateBR(sale.travel_start_date)}</p>
-                    </div>
+                    <InfoField label="Início Viagem" value={formatDateBR(sale.travel_start_date)} />
                 )}
                 {sale.travel_end_date && (
-                    <div>
-                        <span className="text-gray-400">Fim Viagem</span>
-                        <p className="text-gray-900 font-medium">{formatDateBR(sale.travel_end_date)}</p>
-                    </div>
+                    <InfoField label="Fim Viagem" value={formatDateBR(sale.travel_end_date)} />
                 )}
             </div>
 
+            {/* Payer */}
+            {contato && (
+                <>
+                    <SectionHeader label="Pagante (Payer)" />
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 text-xs">
+                        <p className="font-semibold text-slate-900">
+                            {[contato.nome, contato.sobrenome].filter(Boolean).join(' ') || 'Não informado'}
+                        </p>
+                        <div className="grid grid-cols-1 gap-0.5 text-slate-600">
+                            {contato.cpf && (
+                                <p>CPF: <span className="font-medium text-slate-800">{formatCPF(contato.cpf)}</span></p>
+                            )}
+                            {contato.email && (
+                                <p>Email: <span className="font-medium text-slate-800">{contato.email}</span></p>
+                            )}
+                            {contato.telefone && (
+                                <p>Tel: <span className="font-medium text-slate-800">{contato.telefone}</span></p>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Agent */}
+            {agent && (
+                <>
+                    <SectionHeader label="Agente de Viagem" />
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                        <p className="font-semibold text-slate-900">{agent.nome || 'Não informado'}</p>
+                        {agent.email && <p className="text-slate-500 mt-0.5">{agent.email}</p>}
+                    </div>
+                </>
+            )}
+
+            {/* Travelers */}
+            {travelers.length > 0 && (
+                <>
+                    <SectionHeader label={`Viajantes (${travelers.length})`} />
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-0.5">
+                        {travelers.map((name, i) => (
+                            <p key={i} className="text-slate-700">{name}</p>
+                        ))}
+                    </div>
+                </>
+            )}
+
             {/* Items */}
             {sale.items && sale.items.length > 0 && (
-                <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-600">
-                        Itens ({sale.items.length})
-                    </p>
-                    {sale.items.map((item, idx) => (
-                        <SaleItemDetail key={item.id} item={item} sale={sale} index={idx} />
-                    ))}
-                </div>
+                <>
+                    <SectionHeader label={`Produtos (${sale.items.length})`} />
+                    <div className="space-y-2">
+                        {sale.items.map((item, idx) => (
+                            <SaleItemDetail key={item.id} item={item} sale={sale} index={idx} />
+                        ))}
+                    </div>
+                </>
             )}
 
             {/* Total */}
@@ -639,6 +880,22 @@ function SaleDetailView({ sale }: { sale: MondeSaleWithItems }) {
                 <span className="text-xs font-medium text-gray-600">Total Monde</span>
                 <span className="text-sm font-semibold text-indigo-700">{formatBRL(sale.total_value)}</span>
             </div>
+        </div>
+    )
+}
+
+// ============================================
+// Detail sub-components
+// ============================================
+function SectionHeader({ label }: { label: string }) {
+    return <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
+}
+
+function InfoField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+    return (
+        <div>
+            <span className="text-gray-400">{label}</span>
+            <p className={cn('text-gray-900 font-medium', mono && 'font-mono text-[11px]')}>{value}</p>
         </div>
     )
 }
