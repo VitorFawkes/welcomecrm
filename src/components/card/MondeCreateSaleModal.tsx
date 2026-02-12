@@ -54,16 +54,34 @@ export default function MondeCreateSaleModal({
     const { data: sentItems, isLoading: isLoadingSent } = useSentProposalItems(cardId)
     const { mutate: createSale, isPending: isCreating } = useCreateMondeSale()
 
-    // Fetch card dates for sale_date default and travel dates
-    const { data: cardDates } = useQuery({
-        queryKey: ['card-dates', cardId],
+    // Fetch card data: dates + owner/contato for payload preview
+    const { data: cardData } = useQuery({
+        queryKey: ['card-monde-data', cardId],
         queryFn: async () => {
             const { data } = await supabase
                 .from('cards')
-                .select('data_fechamento, data_viagem_inicio, data_viagem_fim, ganho_planner_at')
+                .select(`
+                    data_fechamento, data_viagem_inicio, data_viagem_fim, ganho_planner_at,
+                    contato:contatos!cards_pessoa_principal_id_fkey(id, nome, sobrenome, email, telefone, cpf),
+                    owner:profiles!cards_vendas_owner_id_profiles_fkey(id, nome),
+                    dono:profiles!cards_dono_atual_id_profiles_fkey(id, nome)
+                `)
                 .eq('id', cardId)
                 .single()
             return data
+        },
+    })
+
+    // Fetch CNPJ for payload preview
+    const { data: mondeCnpj } = useQuery({
+        queryKey: ['monde-cnpj'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('integration_settings')
+                .select('value')
+                .eq('key', 'MONDE_CNPJ')
+                .single()
+            return data?.value || null
         },
     })
 
@@ -86,12 +104,12 @@ export default function MondeCreateSaleModal({
     // Derived sale_date: manual override > ganho_planner_at > data_fechamento > today
     const saleDate = useMemo(() => {
         if (saleDateManual !== null) return saleDateManual
-        if (cardDates) {
-            const d = cardDates.ganho_planner_at || cardDates.data_fechamento || ''
+        if (cardData) {
+            const d = cardData.ganho_planner_at || cardData.data_fechamento || ''
             return d ? d.split('T')[0] : new Date().toISOString().split('T')[0]
         }
         return new Date().toISOString().split('T')[0]
-    }, [saleDateManual, cardDates])
+    }, [saleDateManual, cardData])
 
     // Build selectable items from proposal OR card_financial_items
     const selectableItems = useMemo(() => {
@@ -234,8 +252,8 @@ export default function MondeCreateSaleModal({
             card_id: cardId,
             proposal_id: proposalId || null,
             sale_date: saleDate || new Date().toISOString().split('T')[0],
-            travel_start_date: cardDates?.data_viagem_inicio?.split('T')[0] || null,
-            travel_end_date: cardDates?.data_viagem_fim?.split('T')[0] || null,
+            travel_start_date: cardData?.data_viagem_inicio?.split('T')[0] || null,
+            travel_end_date: cardData?.data_viagem_fim?.split('T')[0] || null,
             items
         }, {
             onSuccess: () => {
@@ -261,83 +279,139 @@ export default function MondeCreateSaleModal({
     // Estado para mostrar/esconder o preview do payload
     const [showPayloadPreview, setShowPayloadPreview] = useState(false)
 
-    // Gerar preview do payload que seria enviado para o Monde
+    // Gerar preview do payload espelhando buildMondePayload do dispatch
     const mondePayloadPreview = useMemo(() => {
         const selectedItemsList = selectableItems.filter(item => selectedItems[item.id]?.selected)
+        if (selectedItemsList.length === 0) return null
 
-        // Agrupar por tipo
+        const travelStart = cardData?.data_viagem_inicio?.split('T')[0] || saleDate
+        const travelEnd = cardData?.data_viagem_fim?.split('T')[0] || travelStart
+
+        // travel_agent (REQUIRED) — card owner
+        const agent = (cardData?.owner || cardData?.dono) as { id?: string; nome?: string } | null
+        const travelAgent: Record<string, unknown> = {
+            external_id: agent?.id,
+            name: agent?.nome || 'Agente não informado',
+        }
+
+        // payer (REQUIRED) — card contato
+        const contato = cardData?.contato as { id?: string; nome?: string; sobrenome?: string; email?: string; telefone?: string; cpf?: string } | null
+        const payerName = contato
+            ? [contato.nome, contato.sobrenome].filter(Boolean).join(' ')
+            : 'Pagante não informado'
+        const payer: Record<string, unknown> = {
+            person_kind: 'individual',
+            external_id: contato?.id,
+            name: payerName,
+            ...(contato?.cpf && { cpf_cnpj: contato.cpf.replace(/\D/g, '') }),
+            ...(contato?.email && { email: contato.email }),
+            ...(contato?.telefone && { mobile_number: contato.telefone.replace(/\D/g, '') }),
+        }
+
+        // Products — mesma lógica do dispatch (8 tipos)
         const hotels: Array<Record<string, unknown>> = []
         const airlineTickets: Array<Record<string, unknown>> = []
-        const insurances: Array<Record<string, unknown>> = []
         const transfers: Array<Record<string, unknown>> = []
-        const others: Array<Record<string, unknown>> = []
+        const insurances: Array<Record<string, unknown>> = []
+        const cruises: Array<Record<string, unknown>> = []
+        const trainTickets: Array<Record<string, unknown>> = []
+        const carRentals: Array<Record<string, unknown>> = []
+        const travelPackages: Array<Record<string, unknown>> = []
 
         for (const item of selectedItemsList) {
             const supplier = selectedItems[item.id]?.supplier || item.supplier || 'Não informado'
 
             switch (item.itemType) {
                 case 'hotel':
+                case 'accommodation':
                     hotels.push({
-                        check_in: "Data do serviço",
-                        check_out: "Data fim",
+                        check_in: travelStart,
+                        check_out: travelEnd,
                         supplier_name: supplier,
-                        city: item.description?.split(' - ')[0] || "Cidade",
-                        value: item.price
+                        value: item.price,
                     })
                     break
                 case 'flight':
                     airlineTickets.push({
-                        departure_date: "Data partida",
-                        origin: item.title.split(' → ')[0] || "Origem",
-                        destination: item.title.split(' → ')[1] || "Destino",
+                        departure_date: travelStart,
+                        origin: item.title.split(' → ')[0] || 'N/A',
+                        destination: item.title.split(' → ')[1] || 'N/A',
                         supplier_name: supplier,
-                        value: item.price
+                        value: item.price,
+                    })
+                    break
+                case 'transfer':
+                case 'ground_transportation':
+                    transfers.push({
+                        date: travelStart,
+                        supplier_name: supplier,
+                        value: item.price,
                     })
                     break
                 case 'insurance':
                     insurances.push({
-                        start_date: "Data início",
-                        end_date: "Data fim",
+                        start_date: travelStart,
+                        end_date: travelEnd,
                         supplier_name: supplier,
-                        value: item.price
+                        value: item.price,
                     })
                     break
-                case 'transfer':
-                    transfers.push({
-                        date: "Data do serviço",
-                        origin: "Origem",
-                        destination: "Destino",
+                case 'cruise':
+                    cruises.push({
+                        departure_date: travelStart,
+                        arrival_date: travelEnd,
                         supplier_name: supplier,
-                        value: item.price
+                        value: item.price,
+                    })
+                    break
+                case 'train_ticket':
+                    trainTickets.push({
+                        departure_date: travelStart,
+                        origin: 'N/A',
+                        destination: 'N/A',
+                        supplier_name: supplier,
+                        value: item.price,
+                    })
+                    break
+                case 'car_rental':
+                    carRentals.push({
+                        pickup_date: travelStart,
+                        return_date: travelEnd,
+                        supplier_name: supplier,
+                        value: item.price,
                     })
                     break
                 default:
-                    others.push({
-                        description: item.title,
+                    // Fallback: travel_package (mesmo do dispatch)
+                    travelPackages.push({
+                        start_date: travelStart,
+                        end_date: travelEnd,
                         supplier_name: supplier,
-                        value: item.price
+                        description: item.title,
+                        value: item.price,
                     })
             }
         }
 
         const payload: Record<string, unknown> = {
-            company_identifier: "SEU_CNPJ_AQUI",
+            company_identifier: mondeCnpj || 'CNPJ_NAO_CONFIGURADO',
             sale_date: saleDate,
             operation_id: `WC-${cardId.substring(0, 8)}`,
-            travel_agent: {
-                name: "Nome do consultor",
-                email: "email@agencia.com"
-            }
+            travel_agent: travelAgent,
+            payer: payer,
         }
 
         if (hotels.length > 0) payload.hotels = hotels
         if (airlineTickets.length > 0) payload.airline_tickets = airlineTickets
-        if (insurances.length > 0) payload.insurances = insurances
         if (transfers.length > 0) payload.ground_transportations = transfers
-        if (others.length > 0) payload.other_products = others
+        if (insurances.length > 0) payload.insurances = insurances
+        if (cruises.length > 0) payload.cruises = cruises
+        if (trainTickets.length > 0) payload.train_tickets = trainTickets
+        if (carRentals.length > 0) payload.car_rentals = carRentals
+        if (travelPackages.length > 0) payload.travel_packages = travelPackages
 
         return payload
-    }, [selectableItems, selectedItems, saleDate, cardId])
+    }, [selectableItems, selectedItems, saleDate, cardId, cardData, mondeCnpj])
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
