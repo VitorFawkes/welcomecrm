@@ -68,7 +68,7 @@ interface CardContext {
         nome: string | null
         email: string | null
     } | null
-    participacoes: Array<{
+    cards_contatos: Array<{
         contatos: {
             nome: string | null
             sobrenome: string | null
@@ -97,7 +97,7 @@ export default function MondeWidget({
                     contato:contatos!cards_pessoa_principal_id_fkey(nome, sobrenome, email, telefone, cpf),
                     owner:profiles!cards_vendas_owner_id_fkey(nome, email),
                     dono:profiles!cards_dono_atual_id_fkey(nome, email),
-                    participacoes(contatos(nome, sobrenome))
+                    cards_contatos(contatos(nome, sobrenome))
                 `)
                 .eq('id', cardId)
                 .single()
@@ -491,7 +491,7 @@ function downloadSaleCSV(sale: MondeSaleWithItems, cardContext?: CardContext | n
     }
 
     // Travelers
-    const travelers = (cardContext?.participacoes || [])
+    const travelers = (cardContext?.cards_contatos || [])
         .map(p => p.contatos)
         .filter(Boolean)
         .map(c => [c!.nome, c!.sobrenome].filter(Boolean).join(' '))
@@ -796,7 +796,7 @@ function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardC
     const operationId = `WC-${sale.card_id.substring(0, 8)}`
     const contato = cardContext?.contato
     const agent = cardContext?.owner || cardContext?.dono
-    const travelers = (cardContext?.participacoes || [])
+    const travelers = (cardContext?.cards_contatos || [])
         .map(p => p.contatos)
         .filter(Boolean)
         .map(c => [c!.nome, c!.sobrenome].filter(Boolean).join(' '))
