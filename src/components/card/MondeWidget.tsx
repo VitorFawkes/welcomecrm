@@ -3,13 +3,20 @@ import {
     Building2,
     Plus,
     ChevronRight,
+    ChevronDown,
     Clock,
     CheckCircle2,
     AlertCircle,
     Loader2,
     RefreshCw,
     Ban,
-    Eye
+    Eye,
+    Download,
+    Building,
+    Plane,
+    Car,
+    Shield,
+    Package
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -22,6 +29,7 @@ import {
     useRetryMondeSale,
     getMondeSaleStatusInfo,
     type MondeSaleWithItems,
+    type MondeSaleItem,
     type MondeSaleStatus
 } from '@/hooks/useMondeSales'
 import MondeCreateSaleModal from './MondeCreateSaleModal'
@@ -151,7 +159,7 @@ export default function MondeWidget({
                             {sentSales.length} venda(s) enviada(s)
                         </p>
                         <p className="text-xs text-green-700">
-                            Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSent)}
+                            Total: {formatBRL(totalSent)}
                         </p>
                     </div>
                 </div>
@@ -257,6 +265,158 @@ export default function MondeWidget({
 }
 
 // ============================================
+// Helpers
+// ============================================
+function formatBRL(value: number) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+}
+
+function formatDateBR(dateStr: string | null | undefined): string {
+    if (!dateStr) return '-'
+    try {
+        const d = new Date(dateStr)
+        return d.toLocaleDateString('pt-BR')
+    } catch {
+        return dateStr
+    }
+}
+
+const ITEM_TYPE_CONFIG: Record<string, { label: string; icon: typeof Building; color: string; bgColor: string }> = {
+    hotel: { label: 'Hotel', icon: Building, color: 'text-blue-700', bgColor: 'bg-blue-50 border-blue-200' },
+    accommodation: { label: 'Hotel', icon: Building, color: 'text-blue-700', bgColor: 'bg-blue-50 border-blue-200' },
+    flight: { label: 'Voo', icon: Plane, color: 'text-indigo-700', bgColor: 'bg-indigo-50 border-indigo-200' },
+    transfer: { label: 'Transfer', icon: Car, color: 'text-orange-700', bgColor: 'bg-orange-50 border-orange-200' },
+    ground_transportation: { label: 'Transfer', icon: Car, color: 'text-orange-700', bgColor: 'bg-orange-50 border-orange-200' },
+    insurance: { label: 'Seguro', icon: Shield, color: 'text-green-700', bgColor: 'bg-green-50 border-green-200' },
+    custom: { label: 'Outros', icon: Package, color: 'text-gray-700', bgColor: 'bg-gray-50 border-gray-200' },
+}
+
+function getItemTypeConfig(type: string) {
+    return ITEM_TYPE_CONFIG[type] || ITEM_TYPE_CONFIG.custom
+}
+
+function getItemMondeFields(item: MondeSaleItem, sale: MondeSaleWithItems): Array<{ label: string; value: string }> {
+    const meta = item.item_metadata || {}
+    const travelStart = sale.travel_start_date || sale.sale_date
+    const travelEnd = sale.travel_end_date || travelStart
+
+    switch (item.item_type) {
+        case 'hotel':
+        case 'accommodation':
+            return [
+                { label: 'Fornecedor', value: item.supplier || 'Nao informado' },
+                { label: 'Check-in', value: formatDateBR((meta.check_in as string) || travelStart) },
+                { label: 'Check-out', value: formatDateBR((meta.check_out as string) || travelEnd) },
+                ...(meta.city ? [{ label: 'Cidade', value: meta.city as string }] : []),
+                { label: 'Quartos', value: String((meta.rooms as number) || 1) },
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        case 'flight':
+            return [
+                { label: 'Cia Aerea', value: item.supplier || 'Nao informado' },
+                { label: 'Data Partida', value: formatDateBR((meta.departure_datetime as string)?.substring(0, 10) || travelStart) },
+                { label: 'Origem', value: (meta.origin_airport as string) || (meta.origin as string) || 'N/A' },
+                { label: 'Destino', value: (meta.destination_airport as string) || (meta.destination as string) || 'N/A' },
+                ...((meta.flight_number || meta.locator) ? [{ label: 'Localizador', value: (meta.flight_number as string) || (meta.locator as string) || '' }] : []),
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        case 'transfer':
+        case 'ground_transportation':
+            return [
+                ...(item.supplier ? [{ label: 'Fornecedor', value: item.supplier }] : []),
+                { label: 'Data', value: formatDateBR((meta.date as string) || travelStart) },
+                ...(meta.origin ? [{ label: 'Origem', value: meta.origin as string }] : []),
+                ...(meta.destination ? [{ label: 'Destino', value: meta.destination as string }] : []),
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        case 'insurance':
+            return [
+                ...(item.supplier ? [{ label: 'Fornecedor', value: item.supplier }] : []),
+                { label: 'Inicio', value: formatDateBR((meta.start_date as string) || travelStart) },
+                { label: 'Fim', value: formatDateBR((meta.end_date as string) || travelEnd) },
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+        default:
+            return [
+                ...(item.supplier ? [{ label: 'Fornecedor', value: item.supplier }] : []),
+                ...(item.description ? [{ label: 'Descricao', value: item.description }] : []),
+                { label: 'Valor', value: formatBRL(item.total_price) },
+            ]
+    }
+}
+
+function downloadSaleCSV(sale: MondeSaleWithItems) {
+    const headers = ['Tipo Monde', 'Titulo', 'Fornecedor', 'Valor', 'Data Inicio', 'Data Fim', 'Detalhes']
+    const rows = (sale.items || []).map(item => {
+        const config = getItemTypeConfig(item.item_type)
+        const meta = item.item_metadata || {}
+        const travelStart = sale.travel_start_date || sale.sale_date
+        const travelEnd = sale.travel_end_date || travelStart
+
+        let dateStart = ''
+        let dateEnd = ''
+        let details = ''
+
+        switch (item.item_type) {
+            case 'hotel':
+            case 'accommodation':
+                dateStart = (meta.check_in as string) || travelStart || ''
+                dateEnd = (meta.check_out as string) || travelEnd || ''
+                details = [meta.city, `${(meta.rooms as number) || 1} quarto(s)`].filter(Boolean).join('; ')
+                break
+            case 'flight':
+                dateStart = (meta.departure_datetime as string)?.substring(0, 10) || travelStart || ''
+                details = [
+                    `${(meta.origin_airport as string) || (meta.origin as string) || '?'} → ${(meta.destination_airport as string) || (meta.destination as string) || '?'}`,
+                    (meta.flight_number as string) || (meta.locator as string) || '',
+                ].filter(Boolean).join('; ')
+                break
+            case 'transfer':
+            case 'ground_transportation':
+                dateStart = (meta.date as string) || travelStart || ''
+                details = [meta.origin, meta.destination].filter(Boolean).join(' → ')
+                break
+            case 'insurance':
+                dateStart = (meta.start_date as string) || travelStart || ''
+                dateEnd = (meta.end_date as string) || travelEnd || ''
+                break
+            default:
+                details = item.description || ''
+        }
+
+        return [
+            config.label,
+            item.title,
+            item.supplier || '',
+            item.total_price.toFixed(2),
+            dateStart,
+            dateEnd,
+            details,
+        ]
+    })
+
+    // Add summary row
+    rows.push(['', '', '', '', '', '', ''])
+    rows.push(['TOTAL', '', '', sale.total_value.toFixed(2), '', '', ''])
+    rows.push(['Data Venda', sale.sale_date, '', '', '', '', ''])
+    rows.push(['Status', sale.status, '', '', '', '', ''])
+    if (sale.monde_sale_id) rows.push(['Monde ID', sale.monde_sale_id, '', '', '', '', ''])
+
+    const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n')
+
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `monde-venda-${sale.sale_date}-${sale.id.substring(0, 8)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+}
+
+// ============================================
 // SalesSection Component
 // ============================================
 interface SalesSectionProps {
@@ -322,13 +482,10 @@ function SaleItem({
     isRetrying,
     showError
 }: SaleItemProps) {
+    const [showDetail, setShowDetail] = useState(false)
     const statusInfo = getMondeSaleStatusInfo(sale.status as MondeSaleStatus)
-    const formattedValue = new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: sale.currency || 'BRL'
-    }).format(sale.total_value || 0)
-
-    const formattedDate = new Date(sale.sale_date).toLocaleDateString('pt-BR')
+    const formattedValue = formatBRL(sale.total_value || 0)
+    const formattedDate = formatDateBR(sale.sale_date)
 
     return (
         <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2">
@@ -365,24 +522,32 @@ function SaleItem({
                 </div>
             )}
 
-            {/* Items preview */}
-            {sale.items && sale.items.length > 0 && (
-                <div className="text-xs text-gray-500 space-y-0.5">
-                    {sale.items.slice(0, 3).map(item => (
-                        <div key={item.id} className="flex items-center gap-1">
-                            <span className="w-1 h-1 rounded-full bg-gray-300" />
-                            <span className="truncate">{item.title}</span>
-                            {item.supplier && (
-                                <span className="text-gray-400">({item.supplier})</span>
-                            )}
-                        </div>
-                    ))}
-                    {sale.items.length > 3 && (
-                        <span className="text-gray-400">
-                            +{sale.items.length - 3} mais...
-                        </span>
+            {/* Detail toggle + CSV download */}
+            <div className="flex items-center gap-2 pt-1">
+                <button
+                    onClick={() => setShowDetail(!showDetail)}
+                    className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                    {showDetail ? (
+                        <ChevronDown className="w-3 h-3" />
+                    ) : (
+                        <ChevronRight className="w-3 h-3" />
                     )}
-                </div>
+                    Ver Detalhes
+                </button>
+                <button
+                    onClick={() => downloadSaleCSV(sale)}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 ml-auto"
+                    title="Baixar CSV"
+                >
+                    <Download className="w-3 h-3" />
+                    CSV
+                </button>
+            </div>
+
+            {/* Expanded Detail View */}
+            {showDetail && (
+                <SaleDetailView sale={sale} />
             )}
 
             {/* Actions */}
@@ -421,6 +586,98 @@ function SaleItem({
                     )}
                 </div>
             )}
+        </div>
+    )
+}
+
+// ============================================
+// SaleDetailView — Visual preview of Monde data
+// ============================================
+function SaleDetailView({ sale }: { sale: MondeSaleWithItems }) {
+    const operationId = `WC-${sale.card_id.substring(0, 8)}`
+
+    return (
+        <div className="space-y-3 pt-2 border-t border-gray-100">
+            {/* Sale summary */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                <div>
+                    <span className="text-gray-400">Data Venda</span>
+                    <p className="text-gray-900 font-medium">{formatDateBR(sale.sale_date)}</p>
+                </div>
+                <div>
+                    <span className="text-gray-400">Operation ID</span>
+                    <p className="text-gray-900 font-mono text-[11px]">{operationId}</p>
+                </div>
+                {sale.travel_start_date && (
+                    <div>
+                        <span className="text-gray-400">Inicio Viagem</span>
+                        <p className="text-gray-900 font-medium">{formatDateBR(sale.travel_start_date)}</p>
+                    </div>
+                )}
+                {sale.travel_end_date && (
+                    <div>
+                        <span className="text-gray-400">Fim Viagem</span>
+                        <p className="text-gray-900 font-medium">{formatDateBR(sale.travel_end_date)}</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Items */}
+            {sale.items && sale.items.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600">
+                        Itens ({sale.items.length})
+                    </p>
+                    {sale.items.map((item, idx) => (
+                        <SaleItemDetail key={item.id} item={item} sale={sale} index={idx} />
+                    ))}
+                </div>
+            )}
+
+            {/* Total */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span className="text-xs font-medium text-gray-600">Total Monde</span>
+                <span className="text-sm font-semibold text-indigo-700">{formatBRL(sale.total_value)}</span>
+            </div>
+        </div>
+    )
+}
+
+// ============================================
+// SaleItemDetail — Single item visual card
+// ============================================
+function SaleItemDetail({ item, sale, index }: { item: MondeSaleItem; sale: MondeSaleWithItems; index: number }) {
+    const config = getItemTypeConfig(item.item_type)
+    const Icon = config.icon
+    const fields = getItemMondeFields(item, sale)
+
+    return (
+        <div className={cn('rounded-lg border p-2.5 space-y-1.5', config.bgColor)}>
+            {/* Item header */}
+            <div className="flex items-center gap-1.5">
+                <Icon className={cn('w-3.5 h-3.5', config.color)} />
+                <span className={cn('text-xs font-semibold', config.color)}>
+                    {config.label}
+                </span>
+                <span className="text-[10px] text-gray-400 ml-auto">#{index + 1}</span>
+            </div>
+
+            {/* Item title */}
+            <p className="text-xs text-gray-800 font-medium leading-tight truncate" title={item.title}>
+                {item.title}
+            </p>
+
+            {/* Monde fields */}
+            <div className="space-y-0.5">
+                {fields.map((field, i) => (
+                    <div key={i} className="flex items-baseline justify-between gap-2">
+                        <span className="text-[10px] text-gray-500 shrink-0">{field.label}</span>
+                        <span className="text-[11px] text-gray-800 font-medium text-right truncate" title={field.value}>
+                            {field.value}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
     )
 }
