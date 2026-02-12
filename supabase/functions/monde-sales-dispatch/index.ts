@@ -533,13 +533,14 @@ function buildMondePayload(
             case 'flight':
             case 'aereo':
                 // airline_tickets is SILENTLY IGNORED by Monde API → map as travel_package
+                // destination is REQUIRED enum: "national" | "international" (validated Feb 2026)
                 travelPackages.push({
                     ...base,
                     begin_date: (meta.departure_datetime as string)?.substring(0, 10) || travelStart,
                     end_date: (meta.arrival_datetime as string)?.substring(0, 10) || null,
                     booking_number: (meta.flight_number as string) || (meta.locator as string) || `WC-${item.id.substring(0, 8)}`,
                     package_name: item.title || 'Passagem Aérea',
-                    destination: (meta.destination_airport as string) || (meta.destination as string) || null,
+                    destination: (meta.destination as string) === 'national' ? 'national' : 'international',
                 });
                 console.log(`[monde-sales-dispatch] Flight mapped to travel_package (airline_tickets ignored by API)`);
                 break;
@@ -604,13 +605,14 @@ function buildMondePayload(
             case 'experiencia':
             default:
                 // Fallback: everything maps to travel_package (most flexible Monde type)
+                // destination is REQUIRED enum: "national" | "international" (validated Feb 2026)
                 travelPackages.push({
                     ...base,
                     begin_date: (meta.start_date as string) || (meta.begin_date as string) || travelStart,
                     end_date: (meta.end_date as string) || travelEnd,
                     booking_number: (meta.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
                     package_name: item.title || item.description || 'Serviço',
-                    destination: (meta.destination as string) || null,
+                    destination: (meta.destination as string) === 'national' ? 'national' : 'international',
                 });
                 if (item.item_type !== 'travel_package') {
                     console.log(`[monde-sales-dispatch] Item type '${item.item_type}' mapped to travel_package`);
@@ -622,7 +624,7 @@ function buildMondePayload(
     const payload: MondeSalePayload = {
         company_identifier: cnpj.replace(/\D/g, ''),
         sale_date: sale.sale_date,
-        operation_id: `WC-${sale.card_id.substring(0, 8)}`,
+        // operation_id removed — Monde rejects unregistered operation IDs with 422
         travel_agent: travelAgent,
         payer,
     };

@@ -43,7 +43,7 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
 |-------|------|----------|-----------|
 | `company_identifier` | string (14 chars) | **SIM** | CNPJ da agência (só dígitos). Ex: `"46598887000162"` |
 | `sale_date` | string (date) | **SIM** | Data da venda. Ex: `"2026-02-12"` |
-| `operation_id` | string | não | ID da operação própria |
+| `operation_id` | string | não | ID de operação própria cadastrada no Monde. **NÃO USAR** se não houver operação registrada — causa 422. |
 | `travel_agent` | object | **SIM** | Agente de viagem responsável pela venda |
 | `payer` | object | **SIM** | Contratante/pagante do produto |
 | `intermediary` | object | não | Intermediário (operadora/consolidadora) |
@@ -188,7 +188,17 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
 | `begin_date` | string (date) | **SIM** | Data início cobertura — **NÃO é `start_date`!** |
 | `end_date` | string (date) | não | Data fim cobertura |
 | `voucher_code` | string | não | Código do voucher |
-| `destination` | string | não | Destino |
+| `destination` | string (enum) | não | Enum: `"national"`, `"international"`, `"cruise"` |
+
+### destination — Valores válidos por tipo de produto
+
+| Tipo | Valores aceitos | Required |
+|------|----------------|----------|
+| `travel_packages` | `"national"`, `"international"` | **SIM** |
+| `hotels` | `"national"`, `"international"` | não |
+| `insurances` | `"national"`, `"international"`, `"cruise"` | não |
+
+> Testado em Feb 2026: valores freetext (cidades, países, ISO codes) causam 422 para travel_packages.
 
 ### cruises — Cruzeiro
 
@@ -231,7 +241,10 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
 | `end_date` | string (date) | não | Data fim |
 | `booking_number` | string | **SIM** | Número da reserva |
 | `package_name` | string | não | Nome do pacote — **NÃO é `description`!** |
-| `destination` | string | não | Destino |
+| `destination` | string (enum) | **SIM** | **OBRIGATÓRIO!** Enum: `"national"` ou `"international"`. Valores freetext causam 422. |
+
+> **AVISO `destination`:** Testado em Feb 2026 — enviar `null`, cidades, países ou códigos ISO causa 422.
+> Apenas `"national"` e `"international"` são aceitos para travel_packages.
 
 ### payments — Pagamentos
 
@@ -331,7 +344,7 @@ Query param `kind`: `insurance`, `cruise`, `hotel`, `airline_ticket`, `train_tic
 | `monde_sales.sale_date` | `sale_date` | Monde sale |
 | `cards.vendas_owner_id` → profiles | `travel_agent.name` | Card owner |
 | `cards.pessoa_principal_id` → contatos | `payer.name/cpf/email` | Card contato |
-| `WC-{card_id[0:8]}` | `operation_id` | Generated |
+| ~~`WC-{card_id[0:8]}`~~ | ~~`operation_id`~~ | **REMOVIDO** — Monde rejeita IDs não cadastrados |
 | `monde_sale_items.id` | `external_id` (produto) | UUID do item |
 | `monde_sale_items.supplier` | `supplier.name` | Item supplier |
 | `cards.receita` | `commission_amount` | Distribuído proporcional |

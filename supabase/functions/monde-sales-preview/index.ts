@@ -41,7 +41,7 @@ interface PreviewItem {
 interface MondeSalePayload {
     company_identifier: string;
     sale_date: string;
-    operation_id: string;
+    operation_id?: string;
     travel_agent: {
         external_id: string;
         name: string;
@@ -271,13 +271,14 @@ Deno.serve(async (req) => {
                 case 'flight':
                 case 'aereo': {
                     // airline_tickets is SILENTLY IGNORED by Monde API → map as travel_package
+                    // destination is REQUIRED enum: "national" | "international" (validated Feb 2026)
                     const mondeObj = {
                         ...base,
                         begin_date: (rc.departure_datetime as string)?.substring(0, 10) || saleDate,
                         end_date: (rc.arrival_datetime as string)?.substring(0, 10) || null,
                         booking_number: (rc.flight_number as string) || `WC-${item.id.substring(0, 8)}`,
                         package_name: item.title || 'Passagem Aerea',
-                        destination: (rc.destination_airport as string) || (rc.destination_city as string) || null,
+                        destination: (rc.destination as string) === 'national' ? 'national' : 'international',
                     };
                     travelPackages.push(mondeObj);
                     previewItems.push({
@@ -430,13 +431,14 @@ Deno.serve(async (req) => {
                 }
 
                 case 'travel_package': {
+                    // destination is REQUIRED enum: "national" | "international" (validated Feb 2026)
                     const mondeObj = {
                         ...base,
                         begin_date: (rc.start_date as string) || (rc.begin_date as string) || saleDate,
                         end_date: (rc.end_date as string) || null,
                         booking_number: (rc.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
                         package_name: item.description || item.title,
-                        destination: (rc.destination as string) || null,
+                        destination: (rc.destination as string) === 'national' ? 'national' : 'international',
                     };
                     travelPackages.push(mondeObj);
                     previewItems.push({
@@ -459,13 +461,14 @@ Deno.serve(async (req) => {
                 case 'experiencia':
                 default: {
                     // Fallback: map unmapped types as travel_package (most flexible Monde type)
+                    // destination is REQUIRED enum: "national" | "international" (validated Feb 2026)
                     const mondeObj = {
                         ...base,
                         begin_date: saleDate,
                         end_date: null,
                         booking_number: `WC-${item.id.substring(0, 8)}`,
                         package_name: item.title || item.description || 'Servico',
-                        destination: null,
+                        destination: 'international',
                     };
                     travelPackages.push(mondeObj);
                     previewItems.push({
@@ -504,7 +507,7 @@ Deno.serve(async (req) => {
         const payload: MondeSalePayload = {
             company_identifier: (config['MONDE_CNPJ'] || 'CNPJ_NAO_CONFIGURADO').replace(/\D/g, ''),
             sale_date: saleDate,
-            operation_id: `WC-${cardId.substring(0, 8)}`,
+            // operation_id removed — Monde rejects unregistered operation IDs with 422
             travel_agent: travelAgent,
             payer: payer,
         };

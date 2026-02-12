@@ -362,12 +362,13 @@ export default function MondeCreateSaleModal({
                 case 'flight':
                 case 'aereo':
                     // airline_tickets is IGNORED by API → map as travel_package
+                    // destination is REQUIRED enum: "national" | "international"
                     travelPackages.push({
                         ...base,
                         begin_date: travelStart,
                         booking_number: `WC-${item.id.substring(0, 8)}`,
                         package_name: item.title || 'Passagem Aérea',
-                        destination: item.title.split(' → ')[1] || null,
+                        destination: 'international',
                     })
                     break
                 case 'transfer':
@@ -412,12 +413,14 @@ export default function MondeCreateSaleModal({
                 case 'experiencia':
                 default:
                     // Fallback: travel_package (most flexible Monde type)
+                    // destination is REQUIRED enum: "national" | "international"
                     travelPackages.push({
                         ...base,
                         begin_date: travelStart,
                         end_date: travelEnd,
                         booking_number: `WC-${item.id.substring(0, 8)}`,
                         package_name: item.title,
+                        destination: 'international',
                     })
             }
         }
@@ -425,7 +428,7 @@ export default function MondeCreateSaleModal({
         const payload: Record<string, unknown> = {
             company_identifier: mondeCnpj || 'CNPJ_NAO_CONFIGURADO',
             sale_date: saleDate,
-            operation_id: `WC-${cardId.substring(0, 8)}`,
+            // operation_id removed — Monde rejects unregistered operation IDs with 422
             travel_agent: travelAgent,
             payer: payer,
         }
