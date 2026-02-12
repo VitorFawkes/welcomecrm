@@ -78,8 +78,7 @@ function OrigemBadgeEditable({ cardId, origem, origemLead }: { cardId: string, o
         mutationFn: async ({ newOrigem, newDetalhe }: { newOrigem: string, newDetalhe: string | null }) => {
             const { error } = await supabase
                 .from('cards')
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- campo origem_lead pré-regeneração de types
-                .update({ origem: newOrigem, origem_lead: newDetalhe } as any)
+                .update({ origem: newOrigem, origem_lead: newDetalhe })
                 .eq('id', cardId)
             if (error) throw error
         },

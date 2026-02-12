@@ -1871,6 +1871,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cards_dono_atual_id_profiles_fkey"
+            columns: ["dono_atual_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_dono_atual_id_profiles_fkey"
+            columns: ["dono_atual_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "cards_dono_atual_id_profiles_fkey"
+            columns: ["dono_atual_id"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cards_etapa_funil_id_fkey"
             columns: ["pipeline_stage_id"]
             isOneToOne: false
@@ -1966,6 +1987,27 @@ export type Database = {
             columns: ["pipeline_id"]
             isOneToOne: false
             referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_vendas_owner_id_profiles_fkey"
+            columns: ["vendas_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_vendas_owner_id_profiles_fkey"
+            columns: ["vendas_owner_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "cards_vendas_owner_id_profiles_fkey"
+            columns: ["vendas_owner_id"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
             referencedColumns: ["id"]
           },
         ]
@@ -2201,6 +2243,8 @@ export type Database = {
           last_whatsapp_sync: string | null
           nome: string
           observacoes: string | null
+          origem: string | null
+          origem_detalhe: string | null
           passaporte: string | null
           responsavel_id: string | null
           sobrenome: string | null
@@ -2224,6 +2268,8 @@ export type Database = {
           last_whatsapp_sync?: string | null
           nome: string
           observacoes?: string | null
+          origem?: string | null
+          origem_detalhe?: string | null
           passaporte?: string | null
           responsavel_id?: string | null
           sobrenome?: string | null
@@ -2247,6 +2293,8 @@ export type Database = {
           last_whatsapp_sync?: string | null
           nome?: string
           observacoes?: string | null
+          origem?: string | null
+          origem_detalhe?: string | null
           passaporte?: string | null
           responsavel_id?: string | null
           sobrenome?: string | null
@@ -7975,6 +8023,7 @@ export type Database = {
           moeda: string | null
           orcamento: string | null
           origem: string | null
+          origem_lead: string | null
           parent_card_id: string | null
           parent_titulo: string | null
           pessoa_email: string | null
@@ -8031,6 +8080,27 @@ export type Database = {
           {
             foreignKeyName: "cards_archived_by_fkey"
             columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_dono_atual_id_profiles_fkey"
+            columns: ["dono_atual_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_dono_atual_id_profiles_fkey"
+            columns: ["dono_atual_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "cards_dono_atual_id_profiles_fkey"
+            columns: ["dono_atual_id"]
             isOneToOne: false
             referencedRelation: "view_profiles_complete"
             referencedColumns: ["id"]
@@ -8103,6 +8173,27 @@ export type Database = {
             columns: ["pipeline_id"]
             isOneToOne: false
             referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_vendas_owner_id_profiles_fkey"
+            columns: ["vendas_owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_vendas_owner_id_profiles_fkey"
+            columns: ["vendas_owner_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "cards_vendas_owner_id_profiles_fkey"
+            columns: ["vendas_owner_id"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
             referencedColumns: ["id"]
           },
         ]

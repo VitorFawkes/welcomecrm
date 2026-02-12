@@ -7,8 +7,6 @@ import { getTipoPessoa } from '../../lib/contactUtils'
 import { Loader2, X, Link } from 'lucide-react'
 import { ORIGEM_OPTIONS, needsOrigemDetalhe } from '../../lib/constants/origem'
 
-// Campos adicionados pela migration origem_simplificada (pré-regeneração de types)
-type ContatoForm = Partial<Contato> & { origem?: string | null; origem_detalhe?: string | null }
 
 interface ContactFormProps {
     contact?: Contato
@@ -22,7 +20,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
     const [saving, setSaving] = useState(false)
     const [potentialGuardians, setPotentialGuardians] = useState<Contato[]>([])
 
-    const [formData, setFormData] = useState<ContatoForm>({
+    const [formData, setFormData] = useState<Partial<Contato>>({
         nome: contact?.nome || initialName,
         sobrenome: contact?.sobrenome || '',
         tipo_pessoa: contact?.tipo_pessoa || 'adulto',

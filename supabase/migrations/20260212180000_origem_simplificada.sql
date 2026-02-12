@@ -16,6 +16,21 @@ BEGIN;
 UPDATE cards SET origem = 'carteira' WHERE origem = 'recorrencia';
 UPDATE cards SET origem = 'manual' WHERE origem = 'sdr';
 
+-- Reprocess: AC cards with UTM data should be 'mkt', not 'active_campaign'
+UPDATE cards
+SET origem = 'mkt',
+    origem_lead = COALESCE(
+        NULLIF(marketing_data->>'utm_source', ''),
+        NULLIF(marketing_data->>'utm_medium', ''),
+        NULLIF(marketing_data->>'utm_campaign', '')
+    )
+WHERE origem = 'active_campaign'
+  AND (
+    COALESCE(marketing_data->>'utm_source', '') != ''
+    OR COALESCE(marketing_data->>'utm_medium', '') != ''
+    OR COALESCE(marketing_data->>'utm_campaign', '') != ''
+  );
+
 -- ============================================================================
 -- 2. UPDATE CHECK CONSTRAINT (simplified taxonomy)
 -- ============================================================================
