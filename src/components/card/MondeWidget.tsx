@@ -836,6 +836,12 @@ function SaleDetailView({ sale, cardContext }: { sale: MondeSaleWithItems; cardC
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                 <InfoField label="Data Venda" value={formatDateBR(sale.sale_date)} />
                 <InfoField label="Operation ID" value={operationId} mono />
+                {sale.monde_sale_number && (
+                    <InfoField label="Viagem N°" value={sale.monde_sale_number} mono />
+                )}
+                {sale.monde_sale_id && (
+                    <InfoField label="Monde ID" value={sale.monde_sale_id.substring(0, 8)} mono />
+                )}
                 {sale.travel_start_date && (
                     <InfoField label="Início Viagem" value={formatDateBR(sale.travel_start_date)} />
                 )}

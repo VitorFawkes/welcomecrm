@@ -247,6 +247,21 @@ Deno.serve(async (req) => {
 
             const saleItems = (items || []) as MondeSaleItem[];
 
+            // Validate: API requires at least 1 product
+            if (saleItems.length === 0) {
+                await supabase
+                    .from('monde_sales')
+                    .update({
+                        status: 'failed',
+                        error_message: 'Nenhum item de venda encontrado. A API Monde exige pelo menos 1 produto.',
+                        attempts: sale.attempts + 1,
+                    })
+                    .eq('id', sale.id);
+                results.push({ id: sale.id, status: 'failed', error: 'No sale items' });
+                console.error(`[monde-sales-dispatch] ✗ Sale ${sale.id} has no items — skipping`);
+                continue;
+            }
+
             // Build Monde payload
             const payload = buildMondePayload(sale, saleItems, mondeCnpj || '00000000000000');
 
@@ -320,7 +335,7 @@ Deno.serve(async (req) => {
             } else {
                 // Handle error
                 const newAttempts = sale.attempts + 1;
-                const isRetryable = [408, 429, 500, 502, 503, 504].includes(response.status);
+                const isRetryable = [408, 409, 429, 500, 502, 503, 504].includes(response.status);
                 const shouldRetry = isRetryable && newAttempts < sale.max_attempts;
 
                 if (shouldRetry) {
