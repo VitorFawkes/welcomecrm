@@ -1,7 +1,7 @@
 # Monde API V3 — Referência Completa
 
 > **IMPORTANTE:** Esta documentação deve ser consultada ANTES de modificar qualquer código de integração Monde.
-> Fonte: Documentação oficial Monde (suporte@monde.com.br)
+> Fonte: Documentação oficial Monde + testes reais POST /sales (vendas 69160/69161)
 > Última atualização: 2026-02-12
 
 ## Informações Gerais
@@ -50,7 +50,7 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
 | `insurances` | array | não | Seguro viagem |
 | `cruises` | array | não | Cruzeiro |
 | `hotels` | array | não | Diárias de hospedagem |
-| `airline_tickets` | array | não | Passagem aérea |
+| `airline_tickets` | array | **IGNORADO** | **Silenciosamente ignorado pela API** — voos devem ir como `travel_packages` |
 | `train_tickets` | array | não | Bilhete de trem |
 | `ground_transportations` | array | não | Transporte terrestre |
 | `car_rentals` | array | não | Locação de veículos |
@@ -69,7 +69,7 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
-| `external_id` | string (uuid) | não | ID externo do agente |
+| `external_id` | string (uuid) | **SIM** | ID externo do agente |
 | `name` | string | **SIM** | Nome do agente |
 | `cpf` | string (11 chars) | não | CPF do agente (só dígitos) |
 
@@ -80,31 +80,21 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
   "person_kind": "individual",
   "external_id": "cce45f2c-30e3-43a6-bbf1-af340188a04c",
   "name": "Márcio da Veiga",
-  "legal_name": null,
-  "gender": "male",
-  "birthdate": "1990-02-12",
   "cpf_cnpj": "50957153848",
-  "rg_ie": "202571476",
-  "passport_number": "BC826174",
-  "passport_expiration_date": "2030-07-15",
-  "foreigner": false,
-  "foreign_identity_document": null,
   "email": "contato@marcio.com",
-  "phone_number": "11999990001",
-  "mobile_number": "11999990002",
-  "address": {}
+  "mobile_number": "11999990002"
 }
 ```
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
 | `person_kind` | string | **SIM** | `"individual"` ou `"company"` |
-| `external_id` | string (uuid) | não | ID externo |
+| `external_id` | string (uuid) | **SIM** | ID externo |
 | `name` | string | **SIM** | Nome (PF) ou Razão Social (PJ) |
 | `legal_name` | string | não | Nome fantasia (PJ) |
 | `gender` | string | não | `"male"`, `"female"` |
 | `birthdate` | string (date) | não | Data de nascimento |
-| `cpf_cnpj` | string | não | CPF (11 dígitos) ou CNPJ (14 dígitos) |
+| `cpf_cnpj` | string | não | CPF (11 dígitos) ou CNPJ (14 dígitos) — **auto-popula** dados do contato se existir no Monde |
 | `rg_ie` | string | não | RG ou Inscrição Estadual |
 | `passport_number` | string | não | Número do passaporte |
 | `passport_expiration_date` | string (date) | não | Validade do passaporte |
@@ -136,92 +126,112 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
 
 ---
 
+## Campos Comuns a TODOS os Produtos (REQUIRED)
+
+> **Validado via testes reais.** Cada produto DEVE ter estes campos além dos específicos.
+
+| Campo | Tipo | Required | Descrição |
+|-------|------|----------|-----------|
+| `external_id` | string (uuid) | **SIM** | ID único do produto |
+| `currency` | string | **SIM** | Moeda. Ex: `"BRL"` |
+| `value` | float | **SIM** | Valor total do produto |
+| `supplier` | **object** | **SIM** | Fornecedor — **NÃO é string!** |
+| `supplier.external_id` | string (uuid) | **SIM** | ID do fornecedor |
+| `supplier.name` | string | **SIM** | Nome do fornecedor |
+| `passengers` | **array** | **SIM** | Lista de passageiros (mín. 1) |
+| `passengers[].person.external_id` | string (uuid) | **SIM** | ID do passageiro |
+| `passengers[].person.name` | string | **SIM** | Nome do passageiro |
+| `passengers[].amount` | float | não | Valor pago pelo passageiro |
+| `passengers[].agency_fee` | float | não | Taxa de agenciamento |
+| `commission_amount` | float | não | Comissão/receita da agência |
+
+---
+
 ## Tipos de Produto (no payload de venda)
 
 ### hotels — Diárias de hospedagem
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
+| *(campos comuns acima)* | | **SIM** | |
 | `check_in` | string (date) | **SIM** | Data check-in |
 | `check_out` | string (date) | **SIM** | Data check-out |
-| `supplier_name` | string | **SIM** | Nome do hotel/fornecedor |
-| `city` | string | não | Cidade |
-| `rooms` | integer | não | Número de quartos |
-| `daily_quantity` | integer | não | Número de diárias |
-| `value` | float | **SIM** | Valor total |
+| `booking_number` | string | **SIM** | Número da reserva |
+| `destination` | string | não | Cidade/destino |
+| `accommodation_kind` | string | não | Tipo de acomodação |
+| `room_category` | string | não | Categoria do quarto |
+| `meal_plan` | string | não | Regime de alimentação |
+| `exchange_rate` | float | não | Taxa de câmbio |
 
-### airline_tickets — Passagem aérea
+### airline_tickets — SILENCIOSAMENTE IGNORADO
 
-| Campo | Tipo | Required | Descrição |
-|-------|------|----------|-----------|
-| `departure_date` | string (date) | **SIM** | Data de partida |
-| `arrival_date` | string (date) | não | Data de chegada |
-| `origin` | string | **SIM** | Código aeroporto origem |
-| `destination` | string | **SIM** | Código aeroporto destino |
-| `locator` | string | não | Localizador/número voo |
-| `supplier_name` | string | **SIM** | Companhia aérea |
-| `value` | float | **SIM** | Valor total |
-
-> Bilhetes com mesmo `locator` e `sale_date` são agrupados automaticamente.
+> **AVISO:** O campo `airline_tickets` é aceito no POST mas **silenciosamente ignorado**.
+> Passagens aéreas retornam como `airline_tickets: []` na resposta.
+> **Use `travel_packages` como fallback para enviar voos ao Monde.**
 
 ### ground_transportations — Transporte terrestre
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
-| `date` | string (date) | **SIM** | Data do serviço |
-| `origin` | string | não | Local de origem |
-| `destination` | string | não | Local de destino |
-| `supplier_name` | string | não | Fornecedor |
-| `value` | float | **SIM** | Valor total |
+| *(campos comuns acima)* | | **SIM** | |
+| `locator` | string | **SIM** | Localizador |
+| `segments` | array | não | Segmentos da viagem |
+| `segments[].date` | string (date) | **SIM** | Data do segmento |
+| `segments[].origin` | string | não | Local de origem |
+| `segments[].destination` | string | não | Local de destino |
 
 ### insurances — Seguro viagem
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
-| `start_date` | string (date) | **SIM** | Data início cobertura |
+| *(campos comuns acima)* | | **SIM** | |
+| `begin_date` | string (date) | **SIM** | Data início cobertura — **NÃO é `start_date`!** |
 | `end_date` | string (date) | não | Data fim cobertura |
-| `supplier_name` | string | não | Seguradora |
-| `value` | float | **SIM** | Valor total |
+| `voucher_code` | string | não | Código do voucher |
+| `destination` | string | não | Destino |
 
 ### cruises — Cruzeiro
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
+| *(campos comuns acima)* | | **SIM** | |
 | `departure_date` | string (date) | **SIM** | Data de partida |
-| `arrival_date` | string (date) | não | Data de chegada |
-| `supplier_name` | string | **SIM** | Companhia de cruzeiro |
-| `value` | float | **SIM** | Valor total |
+| `arrival_date` | string (date) | **SIM** | Data de chegada |
+| `booking_number` | string | **SIM** | Número da reserva |
+| `ship_name` | string | não | Nome do navio |
 
 ### train_tickets — Bilhete de trem
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
-| `departure_date` | string (date) | **SIM** | Data de partida |
-| `origin` | string | **SIM** | Estação/cidade origem |
-| `destination` | string | **SIM** | Estação/cidade destino |
-| `supplier_name` | string | não | Companhia ferroviária |
-| `value` | float | **SIM** | Valor total |
+| *(campos comuns acima)* | | **SIM** | |
+| `locator` | string | **SIM** | Localizador |
+| `segments` | array | não | Segmentos da viagem |
+| `segments[].departure_date` | string (date) | **SIM** | Data de partida |
+| `segments[].origin` | string | não | Estação/cidade origem |
+| `segments[].destination` | string | não | Estação/cidade destino |
 
 ### car_rentals — Locação de veículos
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
+| *(campos comuns acima)* | | **SIM** | |
 | `pickup_date` | string (date) | **SIM** | Data retirada |
-| `return_date` | string (date) | não | Data devolução |
+| `dropoff_date` | string (date) | não | Data devolução — **NÃO é `return_date`!** |
+| `booking_number` | string | **SIM** | Número da reserva |
 | `pickup_location` | string | não | Local de retirada |
-| `return_location` | string | não | Local de devolução |
-| `supplier_name` | string | **SIM** | Locadora |
-| `value` | float | **SIM** | Valor total |
+| `dropoff_location` | string | não | Local de devolução — **NÃO é `return_location`!** |
 
 ### travel_packages — Pacotes turísticos
 
 | Campo | Tipo | Required | Descrição |
 |-------|------|----------|-----------|
-| `start_date` | string (date) | **SIM** | Data início |
+| *(campos comuns acima)* | | **SIM** | |
+| `begin_date` | string (date) | **SIM** | Data início — **NÃO é `start_date`!** |
 | `end_date` | string (date) | não | Data fim |
-| `supplier_name` | string | **SIM** | Fornecedor/operadora |
-| `description` | string | não | Descrição do pacote |
-| `value` | float | **SIM** | Valor total |
+| `booking_number` | string | **SIM** | Número da reserva |
+| `package_name` | string | não | Nome do pacote — **NÃO é `description`!** |
+| `destination` | string | não | Destino |
 
 ### payments — Pagamentos
 
@@ -237,7 +247,11 @@ Credenciais fornecidas pela agência. Não expiram, podem ser revogadas.
 
 Query params: `period_start`, `period_end`, `page`, `size`
 
+> **Nota:** Nossa conta API retorna 404 neste endpoint (write-only).
+
 ## GET /sales/{sale_id} — Obter venda por ID
+
+> **Nota:** Nossa conta API retorna 404 neste endpoint (write-only).
 
 ## POST /attachments — Enviar anexo
 
@@ -250,74 +264,62 @@ Query params: `period_start`, `period_end`, `page`, `size`
 
 Query param `kind`: `insurance`, `cruise`, `hotel`, `airline_ticket`, `train_ticket`, `ground_transportation`, `car_rental`, `travel_package`, `operation`, `others`
 
+> **Nota:** Nossa conta API retorna 403 neste endpoint (sem permissão de leitura).
+
 ---
 
-## Exemplo Completo — Venda com todos os produtos
+## Exemplo Completo — Venda com hotel (validado)
 
 ```json
 {
-  "company_identifier": "46598887000162",
-  "sale_date": "2026-02-12",
+  "company_identifier": "07454238000136",
+  "sale_date": "2026-02-11",
   "travel_agent": {
     "external_id": "a8a41bec-e2a2-4d6a-b2f9-8fbc29169e46",
-    "name": "João da Silva",
-    "cpf": "83115137168"
+    "name": "João da Silva"
   },
   "payer": {
     "person_kind": "individual",
     "external_id": "cce45f2c-30e3-43a6-bbf1-af340188a04c",
     "name": "Márcio da Veiga",
-    "gender": "male",
-    "birthdate": "1990-02-12",
-    "cpf_cnpj": "50957153848",
-    "email": "contato@marcio.com",
-    "mobile_number": "11999990002"
+    "cpf_cnpj": "50957153848"
   },
   "hotels": [{
+    "external_id": "d1e2f3a4-b5c6-7890-abcd-ef1234567890",
     "check_in": "2026-03-01",
     "check_out": "2026-03-05",
-    "supplier_name": "Hotel Copacabana Palace",
-    "city": "Rio de Janeiro",
-    "rooms": 1,
-    "value": 5000.00
-  }],
-  "airline_tickets": [{
-    "departure_date": "2026-03-01",
-    "origin": "GRU",
-    "destination": "GIG",
-    "locator": "AA1234",
-    "supplier_name": "LATAM",
-    "value": 1200.00
-  }],
-  "ground_transportations": [{
-    "date": "2026-03-01",
-    "origin": "Aeroporto GIG",
-    "destination": "Hotel Copacabana Palace",
-    "supplier_name": "Transfer Service",
-    "value": 150.00
-  }],
-  "insurances": [{
-    "start_date": "2026-03-01",
-    "end_date": "2026-03-05",
-    "supplier_name": "Assist Card",
-    "value": 250.00
-  }],
-  "travel_packages": [{
-    "start_date": "2026-03-01",
-    "end_date": "2026-03-05",
-    "supplier_name": "CVC",
-    "description": "Pacote Rio de Janeiro 5 dias",
-    "value": 8000.00
-  }],
-  "car_rentals": [{
-    "pickup_date": "2026-03-01",
-    "return_date": "2026-03-05",
-    "pickup_location": "Aeroporto GIG",
-    "supplier_name": "Localiza",
-    "value": 600.00
+    "supplier": {
+      "external_id": "f1e2d3c4-b5a6-7890-cdef-123456789abc",
+      "name": "Hotel Copacabana Palace"
+    },
+    "currency": "BRL",
+    "value": 5000.00,
+    "commission_amount": 750.00,
+    "passengers": [{
+      "person": {
+        "external_id": "cce45f2c-30e3-43a6-bbf1-af340188a04c",
+        "name": "Márcio da Veiga"
+      },
+      "amount": 5000.00,
+      "agency_fee": 50.00
+    }],
+    "booking_number": "WC-abc12345",
+    "destination": "Rio de Janeiro"
   }]
 }
 ```
+
+---
+
+## Campos Financeiros (Receita/Comissão)
+
+| Campo | Nível | Descrição |
+|-------|-------|-----------|
+| `commission_amount` | Produto | Comissão/receita da agência naquele produto |
+| `agency_fee` | Passageiro | Taxa de agenciamento cobrada do passageiro |
+| `amount` | Passageiro | Valor pago pelo passageiro naquele produto |
+
+> Monde **auto-popula** dados do contato a partir do CPF. Ao enviar um CPF existente no Monde, ele preenche nome, endereço, telefone e email automaticamente.
 
 ---
 
@@ -326,9 +328,13 @@ Query param `kind`: `insurance`, `cruise`, `hotel`, `airline_ticket`, `train_tic
 | Campo WelcomeCRM | Campo Monde | Fonte |
 |------------------|-------------|-------|
 | `MONDE_CNPJ` (integration_settings) | `company_identifier` | Config |
-| `monde_sales.sale_date` | `sale_date` | Mondo sale |
+| `monde_sales.sale_date` | `sale_date` | Monde sale |
 | `cards.vendas_owner_id` → profiles | `travel_agent.name` | Card owner |
 | `cards.pessoa_principal_id` → contatos | `payer.name/cpf/email` | Card contato |
 | `WC-{card_id[0:8]}` | `operation_id` | Generated |
+| `monde_sale_items.id` | `external_id` (produto) | UUID do item |
+| `monde_sale_items.supplier` | `supplier.name` | Item supplier |
+| `cards.receita` | `commission_amount` | Distribuído proporcional |
 | `proposal_items.item_type` | Tipo do produto | Proposal |
 | `card_financial_items.product_type` | Tipo do produto | Financial item |
+| `flight` (item_type) | `travel_packages` | airline_tickets ignorado |

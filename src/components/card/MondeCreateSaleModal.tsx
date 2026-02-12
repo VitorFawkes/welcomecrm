@@ -61,7 +61,7 @@ export default function MondeCreateSaleModal({
             const { data } = await supabase
                 .from('cards')
                 .select(`
-                    data_fechamento, data_viagem_inicio, data_viagem_fim, ganho_planner_at,
+                    data_fechamento, data_viagem_inicio, data_viagem_fim, ganho_planner_at, receita, valor_final,
                     contato:contatos!cards_pessoa_principal_id_fkey(id, nome, sobrenome, email, telefone, cpf),
                     owner:profiles!cards_vendas_owner_id_profiles_fkey(id, nome),
                     dono:profiles!cards_dono_atual_id_profiles_fkey(id, nome)
@@ -280,6 +280,7 @@ export default function MondeCreateSaleModal({
     const [showPayloadPreview, setShowPayloadPreview] = useState(false)
 
     // Gerar preview do payload espelhando buildMondePayload do dispatch
+    // Structure validated via real POST tests (Feb 2026)
     const mondePayloadPreview = useMemo(() => {
         const selectedItemsList = selectableItems.filter(item => selectedItems[item.id]?.selected)
         if (selectedItemsList.length === 0) return null
@@ -289,8 +290,8 @@ export default function MondeCreateSaleModal({
 
         // travel_agent (REQUIRED) — card owner
         const agent = (cardData?.owner || cardData?.dono) as { id?: string; nome?: string } | null
-        const travelAgent: Record<string, unknown> = {
-            external_id: agent?.id,
+        const travelAgent = {
+            external_id: agent?.id || '(auto-generated)',
             name: agent?.nome || 'Agente não informado',
         }
 
@@ -299,18 +300,37 @@ export default function MondeCreateSaleModal({
         const payerName = contato
             ? [contato.nome, contato.sobrenome].filter(Boolean).join(' ')
             : 'Pagante não informado'
-        const payer: Record<string, unknown> = {
+        const payer = {
             person_kind: 'individual',
-            external_id: contato?.id,
+            external_id: contato?.id || '(auto-generated)',
             name: payerName,
             ...(contato?.cpf && { cpf_cnpj: contato.cpf.replace(/\D/g, '') }),
             ...(contato?.email && { email: contato.email }),
             ...(contato?.telefone && { mobile_number: contato.telefone.replace(/\D/g, '') }),
         }
 
-        // Products — mesma lógica do dispatch (8 tipos)
+        // Default passenger (payer = main traveler)
+        const defaultPassenger = {
+            person: {
+                external_id: contato?.id || '(auto-generated)',
+                name: payerName,
+            },
+        }
+
+        // Helper: build product base fields
+        const makeBase = (item: SelectableItem) => {
+            const supplierName = selectedItems[item.id]?.supplier || item.supplier || 'Não informado'
+            return {
+                external_id: item.id,
+                currency: 'BRL',
+                value: item.price,
+                supplier: { external_id: '(auto-generated)', name: supplierName },
+                passengers: [defaultPassenger],
+            }
+        }
+
+        // Products — same logic as dispatch (7 types, no airline_tickets)
         const hotels: Array<Record<string, unknown>> = []
-        const airlineTickets: Array<Record<string, unknown>> = []
         const transfers: Array<Record<string, unknown>> = []
         const insurances: Array<Record<string, unknown>> = []
         const cruises: Array<Record<string, unknown>> = []
@@ -319,76 +339,77 @@ export default function MondeCreateSaleModal({
         const travelPackages: Array<Record<string, unknown>> = []
 
         for (const item of selectedItemsList) {
-            const supplier = selectedItems[item.id]?.supplier || item.supplier || 'Não informado'
+            const base = makeBase(item)
 
             switch (item.itemType) {
                 case 'hotel':
                 case 'accommodation':
                     hotels.push({
+                        ...base,
                         check_in: travelStart,
                         check_out: travelEnd,
-                        supplier_name: supplier,
-                        value: item.price,
+                        booking_number: `WC-${item.id.substring(0, 8)}`,
                     })
                     break
                 case 'flight':
-                    airlineTickets.push({
-                        departure_date: travelStart,
-                        origin: item.title.split(' → ')[0] || 'N/A',
-                        destination: item.title.split(' → ')[1] || 'N/A',
-                        supplier_name: supplier,
-                        value: item.price,
+                case 'aereo':
+                    // airline_tickets is IGNORED by API → map as travel_package
+                    travelPackages.push({
+                        ...base,
+                        begin_date: travelStart,
+                        booking_number: `WC-${item.id.substring(0, 8)}`,
+                        package_name: item.title || 'Passagem Aérea',
+                        destination: item.title.split(' → ')[1] || null,
                     })
                     break
                 case 'transfer':
                 case 'ground_transportation':
                     transfers.push({
-                        date: travelStart,
-                        supplier_name: supplier,
-                        value: item.price,
+                        ...base,
+                        locator: `WC-${item.id.substring(0, 8)}`,
+                        segments: [{ date: travelStart }],
                     })
                     break
                 case 'insurance':
+                case 'seguro':
                     insurances.push({
-                        start_date: travelStart,
+                        ...base,
+                        begin_date: travelStart,
                         end_date: travelEnd,
-                        supplier_name: supplier,
-                        value: item.price,
                     })
                     break
                 case 'cruise':
                     cruises.push({
+                        ...base,
                         departure_date: travelStart,
                         arrival_date: travelEnd,
-                        supplier_name: supplier,
-                        value: item.price,
+                        booking_number: `WC-${item.id.substring(0, 8)}`,
                     })
                     break
                 case 'train_ticket':
                     trainTickets.push({
-                        departure_date: travelStart,
-                        origin: 'N/A',
-                        destination: 'N/A',
-                        supplier_name: supplier,
-                        value: item.price,
+                        ...base,
+                        locator: `WC-${item.id.substring(0, 8)}`,
+                        segments: [{ departure_date: travelStart }],
                     })
                     break
                 case 'car_rental':
                     carRentals.push({
+                        ...base,
                         pickup_date: travelStart,
-                        return_date: travelEnd,
-                        supplier_name: supplier,
-                        value: item.price,
+                        dropoff_date: travelEnd,
+                        booking_number: `WC-${item.id.substring(0, 8)}`,
                     })
                     break
+                case 'experiencia':
                 default:
-                    // Fallback: travel_package (mesmo do dispatch)
+                    // Fallback: travel_package (most flexible Monde type)
                     travelPackages.push({
-                        start_date: travelStart,
+                        ...base,
+                        begin_date: travelStart,
                         end_date: travelEnd,
-                        supplier_name: supplier,
-                        description: item.title,
-                        value: item.price,
+                        booking_number: `WC-${item.id.substring(0, 8)}`,
+                        package_name: item.title,
                     })
             }
         }
@@ -402,13 +423,13 @@ export default function MondeCreateSaleModal({
         }
 
         if (hotels.length > 0) payload.hotels = hotels
-        if (airlineTickets.length > 0) payload.airline_tickets = airlineTickets
         if (transfers.length > 0) payload.ground_transportations = transfers
         if (insurances.length > 0) payload.insurances = insurances
         if (cruises.length > 0) payload.cruises = cruises
         if (trainTickets.length > 0) payload.train_tickets = trainTickets
         if (carRentals.length > 0) payload.car_rentals = carRentals
         if (travelPackages.length > 0) payload.travel_packages = travelPackages
+        // NOTE: airline_tickets intentionally excluded — silently ignored by Monde API
 
         return payload
     }, [selectableItems, selectedItems, saleDate, cardId, cardData, mondeCnpj])
@@ -566,6 +587,17 @@ export default function MondeCreateSaleModal({
                                             }).format(selectedTotal)}
                                         </span>
                                     </div>
+                                    {cardData?.receita != null && (
+                                        <div className="flex justify-between pt-2 border-t border-gray-200 text-sm">
+                                            <span className="text-gray-600">Receita (Margem)</span>
+                                            <span className="font-medium text-emerald-600">
+                                                {new Intl.NumberFormat('pt-BR', {
+                                                    style: 'currency',
+                                                    currency: 'BRL'
+                                                }).format(cardData.receita)}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -593,6 +625,14 @@ export default function MondeCreateSaleModal({
                                                 currency: 'BRL'
                                             }).format(selectedTotal)}
                                         </p>
+                                        {cardData?.receita != null && (
+                                            <p className="text-sm text-emerald-600 mt-1">
+                                                Receita (Margem): {new Intl.NumberFormat('pt-BR', {
+                                                    style: 'currency',
+                                                    currency: 'BRL'
+                                                }).format(cardData.receita)}
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Toggle Preview */}

@@ -36,32 +36,33 @@ interface PreviewItem {
     field_mappings: MondeFieldMapping[];
 }
 
-// Monde API V3 payload types (see docs/MONDE_API.md)
+// Monde API V3 payload types (validated via POST tests Feb 2026)
+// NOTE: airline_tickets is silently IGNORED by the API — flights go as travel_packages
 interface MondeSalePayload {
     company_identifier: string;
     sale_date: string;
     operation_id: string;
     travel_agent: {
-        external_id?: string;
+        external_id: string;
         name: string;
         cpf?: string;
     };
     payer: {
         person_kind: 'individual' | 'company';
-        external_id?: string;
+        external_id: string;
         name: string;
         cpf_cnpj?: string;
         email?: string;
         mobile_number?: string;
     };
     hotels?: Array<Record<string, unknown>>;
-    airline_tickets?: Array<Record<string, unknown>>;
     ground_transportations?: Array<Record<string, unknown>>;
     insurances?: Array<Record<string, unknown>>;
     cruises?: Array<Record<string, unknown>>;
     train_tickets?: Array<Record<string, unknown>>;
     car_rentals?: Array<Record<string, unknown>>;
     travel_packages?: Array<Record<string, unknown>>;
+    // NOTE: airline_tickets intentionally excluded — silently ignored by Monde API
 }
 
 // ============================================
@@ -201,8 +202,8 @@ Deno.serve(async (req) => {
         }
 
         // 7. Transform each item to Monde format with field mappings
+        // Structure validated via real POST tests (Feb 2026)
         const hotels: Array<Record<string, unknown>> = [];
-        const airlineTickets: Array<Record<string, unknown>> = [];
         const transfers: Array<Record<string, unknown>> = [];
         const insurances: Array<Record<string, unknown>> = [];
         const cruises: Array<Record<string, unknown>> = [];
@@ -211,20 +212,44 @@ Deno.serve(async (req) => {
         const travelPackages: Array<Record<string, unknown>> = [];
 
         const saleDate = new Date().toISOString().split('T')[0];
+        const contato = (card as any).contato;
+
+        // Build passenger from contato (payer = main traveler)
+        const payerName = contato
+            ? [contato.nome, contato.sobrenome].filter(Boolean).join(' ')
+            : 'Pagante nao informado';
+        const defaultPassenger = {
+            person: {
+                external_id: contato?.id || crypto.randomUUID(),
+                name: payerName,
+            },
+        };
+
+        // Helper: build product base fields (shared by all product types)
+        const makeBase = (item: CrmItemData) => ({
+            external_id: item.id,
+            currency: 'BRL',
+            value: item.price,
+            supplier: {
+                external_id: crypto.randomUUID(),
+                name: item.supplier || 'Nao informado',
+            },
+            passengers: [defaultPassenger],
+        });
 
         for (const item of allItems) {
             const rc = item.rich_content;
+            const base = makeBase(item);
 
             switch (item.item_type) {
                 case 'hotel':
                 case 'accommodation': {
                     const mondeObj = {
+                        ...base,
                         check_in: (rc.check_in as string) || saleDate,
                         check_out: (rc.check_out as string) || saleDate,
-                        supplier_name: item.supplier || 'Nao informado',
-                        city: (rc.city as string) || (rc.destination as string) || null,
-                        rooms: (rc.rooms as number) || 1,
-                        value: item.price,
+                        booking_number: (rc.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
+                        destination: (rc.city as string) || (rc.destination as string) || null,
                     };
                     hotels.push(mondeObj);
                     previewItems.push({
@@ -232,42 +257,42 @@ Deno.serve(async (req) => {
                         monde_type: 'hotels',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
                             { crm_field: 'Check-in', crm_value: rc.check_in as string, monde_field: 'check_in', monde_value: mondeObj.check_in },
                             { crm_field: 'Check-out', crm_value: rc.check_out as string, monde_field: 'check_out', monde_value: mondeObj.check_out },
-                            { crm_field: 'Cidade', crm_value: (rc.city as string) || null, monde_field: 'city', monde_value: mondeObj.city },
-                            { crm_field: 'Quartos', crm_value: (rc.rooms as number) || null, monde_field: 'rooms', monde_value: mondeObj.rooms },
+                            { crm_field: 'Destino', crm_value: (rc.city as string) || null, monde_field: 'destination', monde_value: mondeObj.destination },
+                            { crm_field: 'Reserva', crm_value: (rc.booking_number as string) || null, monde_field: 'booking_number', monde_value: mondeObj.booking_number },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
                     break;
                 }
 
-                case 'flight': {
+                case 'flight':
+                case 'aereo': {
+                    // airline_tickets is SILENTLY IGNORED by Monde API → map as travel_package
                     const mondeObj = {
-                        departure_date: (rc.departure_datetime as string)?.substring(0, 10) || saleDate,
-                        arrival_date: (rc.arrival_datetime as string)?.substring(0, 10) || null,
-                        origin: (rc.origin_airport as string) || 'N/A',
-                        destination: (rc.destination_airport as string) || 'N/A',
-                        locator: (rc.flight_number as string) || null,
-                        supplier_name: item.supplier || 'Nao informado',
-                        value: item.price,
+                        ...base,
+                        begin_date: (rc.departure_datetime as string)?.substring(0, 10) || saleDate,
+                        end_date: (rc.arrival_datetime as string)?.substring(0, 10) || null,
+                        booking_number: (rc.flight_number as string) || `WC-${item.id.substring(0, 8)}`,
+                        package_name: item.title || 'Passagem Aerea',
+                        destination: (rc.destination_airport as string) || (rc.destination_city as string) || null,
                     };
-                    airlineTickets.push(mondeObj);
+                    travelPackages.push(mondeObj);
                     previewItems.push({
                         crm: item,
-                        monde_type: 'airline_tickets',
+                        monde_type: 'travel_packages (voo)',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
-                            { crm_field: 'Origem', crm_value: (rc.origin_city as string) || (rc.origin_airport as string), monde_field: 'origin', monde_value: mondeObj.origin },
-                            { crm_field: 'Destino', crm_value: (rc.destination_city as string) || (rc.destination_airport as string), monde_field: 'destination', monde_value: mondeObj.destination },
-                            { crm_field: 'Partida', crm_value: rc.departure_datetime as string, monde_field: 'departure_date', monde_value: mondeObj.departure_date },
-                            { crm_field: 'Chegada', crm_value: rc.arrival_datetime as string, monde_field: 'arrival_date', monde_value: mondeObj.arrival_date },
-                            { crm_field: 'Numero Voo', crm_value: rc.flight_number as string, monde_field: 'locator', monde_value: mondeObj.locator },
+                            { crm_field: 'Titulo', crm_value: item.title, monde_field: 'package_name', monde_value: mondeObj.package_name },
+                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
+                            { crm_field: 'Partida', crm_value: rc.departure_datetime as string, monde_field: 'begin_date', monde_value: mondeObj.begin_date },
+                            { crm_field: 'Chegada', crm_value: rc.arrival_datetime as string, monde_field: 'end_date', monde_value: mondeObj.end_date },
+                            { crm_field: 'Numero Voo', crm_value: rc.flight_number as string, monde_field: 'booking_number', monde_value: mondeObj.booking_number },
+                            { crm_field: 'Destino', crm_value: (rc.destination_airport as string) || (rc.destination_city as string), monde_field: 'destination', monde_value: mondeObj.destination },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
+                            { crm_field: '(Nota)', crm_value: 'Voo', monde_field: 'airline_tickets', monde_value: 'Ignorado pela API - mapeado como travel_package' },
                         ],
                     });
                     break;
@@ -276,11 +301,13 @@ Deno.serve(async (req) => {
                 case 'transfer':
                 case 'ground_transportation': {
                     const mondeObj = {
-                        date: (rc.date as string) || saleDate,
-                        origin: (rc.origin as string) || null,
-                        destination: (rc.destination as string) || null,
-                        supplier_name: item.supplier || null,
-                        value: item.price,
+                        ...base,
+                        locator: (rc.locator as string) || `WC-${item.id.substring(0, 8)}`,
+                        segments: [{
+                            date: (rc.date as string) || saleDate,
+                            origin: (rc.origin as string) || undefined,
+                            destination: (rc.destination as string) || undefined,
+                        }],
                     };
                     transfers.push(mondeObj);
                     previewItems.push({
@@ -288,23 +315,24 @@ Deno.serve(async (req) => {
                         monde_type: 'ground_transportations',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
-                            { crm_field: 'Data', crm_value: rc.date as string, monde_field: 'date', monde_value: mondeObj.date },
-                            { crm_field: 'Origem', crm_value: rc.origin as string, monde_field: 'origin', monde_value: mondeObj.origin },
-                            { crm_field: 'Destino', crm_value: rc.destination as string, monde_field: 'destination', monde_value: mondeObj.destination },
+                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
+                            { crm_field: 'Data', crm_value: rc.date as string, monde_field: 'segments[0].date', monde_value: mondeObj.segments[0].date },
+                            { crm_field: 'Origem', crm_value: rc.origin as string, monde_field: 'segments[0].origin', monde_value: mondeObj.segments[0].origin || null },
+                            { crm_field: 'Destino', crm_value: rc.destination as string, monde_field: 'segments[0].destination', monde_value: mondeObj.segments[0].destination || null },
+                            { crm_field: 'Localizador', crm_value: (rc.locator as string) || null, monde_field: 'locator', monde_value: mondeObj.locator },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
                     break;
                 }
 
-                case 'insurance': {
+                case 'insurance':
+                case 'seguro': {
                     const mondeObj = {
-                        start_date: (rc.start_date as string) || saleDate,
+                        ...base,
+                        begin_date: (rc.start_date as string) || (rc.begin_date as string) || saleDate,
                         end_date: (rc.end_date as string) || null,
-                        supplier_name: item.supplier || null,
-                        value: item.price,
+                        destination: (rc.destination as string) || null,
                     };
                     insurances.push(mondeObj);
                     previewItems.push({
@@ -312,10 +340,10 @@ Deno.serve(async (req) => {
                         monde_type: 'insurances',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
-                            { crm_field: 'Inicio', crm_value: rc.start_date as string, monde_field: 'start_date', monde_value: mondeObj.start_date },
+                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
+                            { crm_field: 'Inicio', crm_value: (rc.start_date as string) || (rc.begin_date as string), monde_field: 'begin_date', monde_value: mondeObj.begin_date },
                             { crm_field: 'Fim', crm_value: rc.end_date as string, monde_field: 'end_date', monde_value: mondeObj.end_date },
+                            { crm_field: 'Destino', crm_value: (rc.destination as string) || null, monde_field: 'destination', monde_value: mondeObj.destination },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
@@ -324,10 +352,11 @@ Deno.serve(async (req) => {
 
                 case 'cruise': {
                     const mondeObj = {
+                        ...base,
                         departure_date: (rc.departure_date as string) || saleDate,
-                        arrival_date: (rc.arrival_date as string) || null,
-                        supplier_name: item.supplier || 'Nao informado',
-                        value: item.price,
+                        arrival_date: (rc.arrival_date as string) || saleDate,
+                        booking_number: (rc.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
+                        ship_name: (rc.ship_name as string) || null,
                     };
                     cruises.push(mondeObj);
                     previewItems.push({
@@ -335,10 +364,11 @@ Deno.serve(async (req) => {
                         monde_type: 'cruises',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
                             { crm_field: 'Partida', crm_value: rc.departure_date as string, monde_field: 'departure_date', monde_value: mondeObj.departure_date },
                             { crm_field: 'Chegada', crm_value: rc.arrival_date as string, monde_field: 'arrival_date', monde_value: mondeObj.arrival_date },
+                            { crm_field: 'Reserva', crm_value: (rc.booking_number as string) || null, monde_field: 'booking_number', monde_value: mondeObj.booking_number },
+                            { crm_field: 'Navio', crm_value: (rc.ship_name as string) || null, monde_field: 'ship_name', monde_value: mondeObj.ship_name },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
@@ -347,11 +377,13 @@ Deno.serve(async (req) => {
 
                 case 'train_ticket': {
                     const mondeObj = {
-                        departure_date: (rc.departure_date as string) || saleDate,
-                        origin: (rc.origin as string) || 'N/A',
-                        destination: (rc.destination as string) || 'N/A',
-                        supplier_name: item.supplier || null,
-                        value: item.price,
+                        ...base,
+                        locator: (rc.locator as string) || `WC-${item.id.substring(0, 8)}`,
+                        segments: [{
+                            departure_date: (rc.departure_date as string) || saleDate,
+                            origin: (rc.origin as string) || undefined,
+                            destination: (rc.destination as string) || undefined,
+                        }],
                     };
                     trainTickets.push(mondeObj);
                     previewItems.push({
@@ -359,11 +391,11 @@ Deno.serve(async (req) => {
                         monde_type: 'train_tickets',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
-                            { crm_field: 'Partida', crm_value: rc.departure_date as string, monde_field: 'departure_date', monde_value: mondeObj.departure_date },
-                            { crm_field: 'Origem', crm_value: rc.origin as string, monde_field: 'origin', monde_value: mondeObj.origin },
-                            { crm_field: 'Destino', crm_value: rc.destination as string, monde_field: 'destination', monde_value: mondeObj.destination },
+                            { crm_field: 'Companhia', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
+                            { crm_field: 'Partida', crm_value: rc.departure_date as string, monde_field: 'segments[0].departure_date', monde_value: mondeObj.segments[0].departure_date },
+                            { crm_field: 'Origem', crm_value: rc.origin as string, monde_field: 'segments[0].origin', monde_value: mondeObj.segments[0].origin || null },
+                            { crm_field: 'Destino', crm_value: rc.destination as string, monde_field: 'segments[0].destination', monde_value: mondeObj.segments[0].destination || null },
+                            { crm_field: 'Localizador', crm_value: (rc.locator as string) || null, monde_field: 'locator', monde_value: mondeObj.locator },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
@@ -372,12 +404,12 @@ Deno.serve(async (req) => {
 
                 case 'car_rental': {
                     const mondeObj = {
+                        ...base,
                         pickup_date: (rc.pickup_date as string) || saleDate,
-                        return_date: (rc.return_date as string) || null,
+                        dropoff_date: (rc.return_date as string) || (rc.dropoff_date as string) || null,
+                        booking_number: (rc.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
                         pickup_location: (rc.pickup_location as string) || null,
-                        return_location: (rc.return_location as string) || null,
-                        supplier_name: item.supplier || 'Nao informado',
-                        value: item.price,
+                        dropoff_location: (rc.return_location as string) || (rc.dropoff_location as string) || null,
                     };
                     carRentals.push(mondeObj);
                     previewItems.push({
@@ -385,12 +417,12 @@ Deno.serve(async (req) => {
                         monde_type: 'car_rentals',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Locadora', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Locadora', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
                             { crm_field: 'Retirada', crm_value: rc.pickup_date as string, monde_field: 'pickup_date', monde_value: mondeObj.pickup_date },
-                            { crm_field: 'Devoluçao', crm_value: rc.return_date as string, monde_field: 'return_date', monde_value: mondeObj.return_date },
+                            { crm_field: 'Devolucao', crm_value: (rc.return_date as string) || (rc.dropoff_date as string), monde_field: 'dropoff_date', monde_value: mondeObj.dropoff_date },
+                            { crm_field: 'Reserva', crm_value: (rc.booking_number as string) || null, monde_field: 'booking_number', monde_value: mondeObj.booking_number },
                             { crm_field: 'Local Retirada', crm_value: rc.pickup_location as string, monde_field: 'pickup_location', monde_value: mondeObj.pickup_location },
-                            { crm_field: 'Local Devoluçao', crm_value: rc.return_location as string, monde_field: 'return_location', monde_value: mondeObj.return_location },
+                            { crm_field: 'Local Devolucao', crm_value: (rc.return_location as string) || (rc.dropoff_location as string), monde_field: 'dropoff_location', monde_value: mondeObj.dropoff_location },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
@@ -399,11 +431,12 @@ Deno.serve(async (req) => {
 
                 case 'travel_package': {
                     const mondeObj = {
-                        start_date: (rc.start_date as string) || saleDate,
+                        ...base,
+                        begin_date: (rc.start_date as string) || (rc.begin_date as string) || saleDate,
                         end_date: (rc.end_date as string) || null,
-                        supplier_name: item.supplier || 'Nao informado',
-                        description: item.description || item.title,
-                        value: item.price,
+                        booking_number: (rc.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
+                        package_name: item.description || item.title,
+                        destination: (rc.destination as string) || null,
                     };
                     travelPackages.push(mondeObj);
                     previewItems.push({
@@ -411,25 +444,28 @@ Deno.serve(async (req) => {
                         monde_type: 'travel_packages',
                         monde_object: mondeObj,
                         field_mappings: [
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: '(titulo nao enviado)', monde_value: null },
-                            { crm_field: 'Operadora', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
-                            { crm_field: 'Inicio', crm_value: rc.start_date as string, monde_field: 'start_date', monde_value: mondeObj.start_date },
+                            { crm_field: 'Operadora', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
+                            { crm_field: 'Inicio', crm_value: (rc.start_date as string) || (rc.begin_date as string), monde_field: 'begin_date', monde_value: mondeObj.begin_date },
                             { crm_field: 'Fim', crm_value: rc.end_date as string, monde_field: 'end_date', monde_value: mondeObj.end_date },
-                            { crm_field: 'Descricao', crm_value: item.description, monde_field: 'description', monde_value: mondeObj.description },
+                            { crm_field: 'Pacote', crm_value: item.description || item.title, monde_field: 'package_name', monde_value: mondeObj.package_name },
+                            { crm_field: 'Destino', crm_value: (rc.destination as string) || null, monde_field: 'destination', monde_value: mondeObj.destination },
+                            { crm_field: 'Reserva', crm_value: (rc.booking_number as string) || null, monde_field: 'booking_number', monde_value: mondeObj.booking_number },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
                     break;
                 }
 
+                case 'experiencia':
                 default: {
                     // Fallback: map unmapped types as travel_package (most flexible Monde type)
                     const mondeObj = {
-                        start_date: saleDate,
+                        ...base,
+                        begin_date: saleDate,
                         end_date: null,
-                        supplier_name: item.supplier || 'Nao informado',
-                        description: item.title || item.description || 'Servico',
-                        value: item.price,
+                        booking_number: `WC-${item.id.substring(0, 8)}`,
+                        package_name: item.title || item.description || 'Servico',
+                        destination: null,
                     };
                     travelPackages.push(mondeObj);
                     previewItems.push({
@@ -438,8 +474,8 @@ Deno.serve(async (req) => {
                         monde_object: mondeObj,
                         field_mappings: [
                             { crm_field: 'Tipo Original', crm_value: item.item_type, monde_field: 'travel_packages', monde_value: 'Mapeado como pacote' },
-                            { crm_field: 'Titulo', crm_value: item.title, monde_field: 'description', monde_value: mondeObj.description },
-                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier_name', monde_value: mondeObj.supplier_name },
+                            { crm_field: 'Titulo', crm_value: item.title, monde_field: 'package_name', monde_value: mondeObj.package_name },
+                            { crm_field: 'Fornecedor', crm_value: item.supplier, monde_field: 'supplier.name', monde_value: mondeObj.supplier.name },
                             { crm_field: 'Valor', crm_value: item.price, monde_field: 'value', monde_value: mondeObj.value },
                         ],
                     });
@@ -449,19 +485,15 @@ Deno.serve(async (req) => {
 
         // 8. Build travel_agent and payer from card context
         const agent = (card as any).owner || (card as any).dono;
-        const contato = (card as any).contato;
 
         const travelAgent = {
-            external_id: agent?.id,
+            external_id: agent?.id || crypto.randomUUID(),
             name: agent?.nome || 'Agente nao informado',
         };
 
-        const payerName = contato
-            ? [contato.nome, contato.sobrenome].filter(Boolean).join(' ')
-            : 'Pagante nao informado';
         const payer = {
             person_kind: 'individual' as const,
-            external_id: contato?.id,
+            external_id: contato?.id || crypto.randomUUID(),
             name: payerName,
             cpf_cnpj: contato?.cpf?.replace(/\D/g, '') || undefined,
             email: contato?.email || undefined,
@@ -478,13 +510,13 @@ Deno.serve(async (req) => {
         };
 
         if (hotels.length > 0) payload.hotels = hotels;
-        if (airlineTickets.length > 0) payload.airline_tickets = airlineTickets;
         if (transfers.length > 0) payload.ground_transportations = transfers;
         if (insurances.length > 0) payload.insurances = insurances;
         if (cruises.length > 0) payload.cruises = cruises;
         if (trainTickets.length > 0) payload.train_tickets = trainTickets;
         if (carRentals.length > 0) payload.car_rentals = carRentals;
         if (travelPackages.length > 0) payload.travel_packages = travelPackages;
+        // NOTE: airline_tickets intentionally excluded — silently ignored by Monde API
 
         // 10. Return preview
         const totalValue = allItems.reduce((sum, i) => sum + i.price, 0);

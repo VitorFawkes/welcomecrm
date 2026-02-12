@@ -7,7 +7,7 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// --- Types matching Monde API V3 (see docs/MONDE_API.md) ---
+// --- Types matching Monde API V3 (validated via POST tests Feb 2026) ---
 
 interface MondeSale {
     id: string;
@@ -26,6 +26,7 @@ interface MondeSale {
         titulo: string;
         produto_data: Record<string, unknown> | null;
         pessoa_principal_id?: string;
+        receita?: number | null;
         contato?: { id: string; nome: string; sobrenome: string; email: string; telefone: string; cpf: string } | null;
         owner?: { id: string; nome: string; email: string } | null;
         dono?: { id: string; nome: string; email: string } | null;
@@ -47,92 +48,108 @@ interface MondeSaleItem {
     item_metadata: Record<string, unknown>;
 }
 
-// Monde API V3 payload types (see docs/MONDE_API.md for full spec)
-interface MondeHotel {
+// Monde API V3 — Real structure (validated via POST tests Feb 2026)
+// IMPORTANT: airline_tickets is SILENTLY IGNORED by the API — flights go as travel_packages
+
+interface MondeSupplier {
+    external_id: string;
+    name: string;
+}
+
+interface MondePassenger {
+    person: {
+        external_id: string;
+        name: string;
+    };
+    amount?: number;
+    agency_fee?: number;
+}
+
+interface MondeProductBase {
+    external_id: string;
+    currency: string;
+    value: number;
+    supplier: MondeSupplier;
+    passengers: MondePassenger[];
+    commission_amount?: number;
+}
+
+interface MondeHotel extends MondeProductBase {
     check_in: string;
     check_out: string;
-    supplier_name: string;
-    city?: string;
-    rooms?: number;
-    daily_quantity?: number;
-    value: number;
+    booking_number: string;
+    destination?: string | null;
+    accommodation_kind?: string | null;
+    room_category?: string | null;
+    meal_plan?: string | null;
+    exchange_rate?: number;
 }
 
-interface MondeAirlineTicket {
+interface MondeInsurance extends MondeProductBase {
+    begin_date: string;
+    end_date?: string | null;
+    voucher_code?: string | null;
+    destination?: string | null;
+}
+
+interface MondeCruise extends MondeProductBase {
     departure_date: string;
-    arrival_date?: string;
-    origin: string;
-    destination: string;
-    locator?: string;
-    supplier_name: string;
-    value: number;
+    arrival_date: string;
+    booking_number: string;
+    ship_name?: string | null;
 }
 
-interface MondeTravelAgent {
-    external_id?: string;
-    name: string;
-    cpf?: string;
+interface MondeGroundTransportation extends MondeProductBase {
+    locator: string;
+    segments?: Array<{ date: string; origin?: string; destination?: string }>;
 }
 
-interface MondePayer {
-    person_kind: 'individual' | 'company';
-    external_id?: string;
-    name: string;
-    cpf_cnpj?: string;
-    email?: string;
-    phone_number?: string;
-    mobile_number?: string;
+interface MondeTrainTicket extends MondeProductBase {
+    locator: string;
+    segments?: Array<{ departure_date: string; origin?: string; destination?: string }>;
+}
+
+interface MondeCarRental extends MondeProductBase {
+    pickup_date: string;
+    dropoff_date?: string;
+    booking_number: string;
+    pickup_location?: string | null;
+    dropoff_location?: string | null;
+}
+
+interface MondeTravelPackage extends MondeProductBase {
+    begin_date: string;
+    end_date?: string | null;
+    booking_number: string;
+    package_name?: string;
+    destination?: string | null;
 }
 
 interface MondeSalePayload {
     company_identifier: string;
     sale_date: string;
     operation_id?: string;
-    travel_agent: MondeTravelAgent;
-    payer: MondePayer;
-    insurances?: Array<{
-        start_date: string;
-        end_date?: string;
-        supplier_name?: string;
-        value: number;
-    }>;
-    cruises?: Array<{
-        departure_date: string;
-        arrival_date?: string;
-        supplier_name: string;
-        value: number;
-    }>;
+    travel_agent: {
+        external_id: string;
+        name: string;
+        cpf?: string;
+    };
+    payer: {
+        person_kind: 'individual' | 'company';
+        external_id: string;
+        name: string;
+        cpf_cnpj?: string;
+        email?: string;
+        mobile_number?: string;
+    };
     hotels?: MondeHotel[];
-    airline_tickets?: MondeAirlineTicket[];
-    train_tickets?: Array<{
-        departure_date: string;
-        origin: string;
-        destination: string;
-        supplier_name?: string;
-        value: number;
-    }>;
-    ground_transportations?: Array<{
-        date: string;
-        origin?: string;
-        destination?: string;
-        supplier_name?: string;
-        value: number;
-    }>;
-    car_rentals?: Array<{
-        pickup_date: string;
-        return_date?: string;
-        pickup_location?: string;
-        return_location?: string;
-        supplier_name: string;
-        value: number;
-    }>;
-    travel_packages?: Array<{
-        start_date: string;
-        end_date?: string;
-        supplier_name: string;
-        description?: string;
-        value: number;
-    }>;
+    insurances?: MondeInsurance[];
+    cruises?: MondeCruise[];
+    ground_transportations?: MondeGroundTransportation[];
+    train_tickets?: MondeTrainTicket[];
+    car_rentals?: MondeCarRental[];
+    travel_packages?: MondeTravelPackage[];
+    // NOTE: airline_tickets intentionally excluded — silently ignored by Monde API
 }
 
 Deno.serve(async (req) => {
@@ -196,7 +213,7 @@ Deno.serve(async (req) => {
             id, card_id, proposal_id, sale_date, travel_start_date, travel_end_date,
             total_value, idempotency_key, status, attempts, max_attempts,
             cards:cards(
-                id, titulo, produto_data, pessoa_principal_id,
+                id, titulo, produto_data, pessoa_principal_id, receita,
                 contato:contatos!cards_pessoa_principal_id_fkey(id, nome, sobrenome, email, telefone, cpf),
                 owner:profiles!cards_vendas_owner_id_profiles_fkey(id, nome, email),
                 dono:profiles!cards_dono_atual_id_profiles_fkey(id, nome, email)
@@ -416,7 +433,13 @@ Deno.serve(async (req) => {
 
 /**
  * Build Monde API V3 payload from sale and items.
- * Reference: docs/MONDE_API.md
+ * Structure validated via real POST tests (Feb 2026, sales 69160/69161).
+ * Key differences from original docs:
+ *   - supplier is an OBJECT { external_id, name }, not a string
+ *   - passengers[] is REQUIRED on every product
+ *   - external_id, currency, booking_number are REQUIRED
+ *   - airline_tickets is silently IGNORED — flights go as travel_packages
+ *   - commission_amount sends receita to Monde
  */
 function buildMondePayload(
     sale: MondeSale,
@@ -424,165 +447,194 @@ function buildMondePayload(
     cnpj: string
 ): MondeSalePayload {
     const card = sale.cards;
-
-    // --- travel_agent (REQUIRED) from card owner ---
     const agent = card?.owner || card?.dono;
-    const travelAgent: MondeTravelAgent = {
-        external_id: agent?.id,
+    const contato = card?.contato;
+
+    // travel_agent (REQUIRED)
+    const travelAgent = {
+        external_id: agent?.id || crypto.randomUUID(),
         name: agent?.nome || 'Agente não informado',
     };
 
-    // --- payer (REQUIRED) from card's main contact ---
-    const contato = card?.contato;
+    // payer (REQUIRED)
     const payerName = contato
         ? [contato.nome, contato.sobrenome].filter(Boolean).join(' ')
         : 'Pagante não informado';
-    const payer: MondePayer = {
-        person_kind: 'individual',
-        external_id: contato?.id,
+    const payer = {
+        person_kind: 'individual' as const,
+        external_id: contato?.id || crypto.randomUUID(),
         name: payerName,
         cpf_cnpj: contato?.cpf?.replace(/\D/g, '') || undefined,
         email: contato?.email || undefined,
         mobile_number: contato?.telefone?.replace(/\D/g, '') || undefined,
     };
 
-    const payload: MondeSalePayload = {
-        company_identifier: cnpj.replace(/\D/g, ''),
-        sale_date: sale.sale_date,
-        operation_id: `WC-${sale.card_id.substring(0, 8)}`,
-        travel_agent: travelAgent,
-        payer: payer,
+    // Default passenger (payer = main traveler)
+    const defaultPassenger: MondePassenger = {
+        person: {
+            external_id: contato?.id || crypto.randomUUID(),
+            name: payerName,
+        },
     };
 
-    // Group items by Monde product type
-    const hotels: MondeHotel[] = [];
-    const airlineTickets: MondeAirlineTicket[] = [];
-    const transfers: NonNullable<MondeSalePayload['ground_transportations']> = [];
-    const insurances: NonNullable<MondeSalePayload['insurances']> = [];
-    const cruises: NonNullable<MondeSalePayload['cruises']> = [];
-    const trainTickets: NonNullable<MondeSalePayload['train_tickets']> = [];
-    const carRentals: NonNullable<MondeSalePayload['car_rentals']> = [];
-    const travelPackages: NonNullable<MondeSalePayload['travel_packages']> = [];
+    // Receita: distribute commission_amount proportionally across items
+    const cardReceita = card?.receita as number | null | undefined;
+    const totalValue = items.reduce((sum, i) => sum + i.total_price, 0);
 
-    // Travel dates fallback chain: metadata → travel_start/end_date → sale_date
+    // Helper: build product base fields (shared by all product types)
+    const makeBase = (item: MondeSaleItem): MondeProductBase => {
+        const supplierName = item.supplier || 'Não informado';
+        const commission = cardReceita && totalValue > 0
+            ? Math.round((item.total_price / totalValue) * cardReceita * 100) / 100
+            : undefined;
+
+        return {
+            external_id: item.id,
+            currency: 'BRL',
+            value: item.total_price,
+            supplier: {
+                external_id: crypto.randomUUID(),
+                name: supplierName,
+            },
+            passengers: [defaultPassenger],
+            ...(commission ? { commission_amount: commission } : {}),
+        };
+    };
+
+    // Travel dates fallback: travel_start/end_date → sale_date
     const travelStart = sale.travel_start_date || sale.sale_date;
     const travelEnd = sale.travel_end_date || travelStart;
 
+    // Product arrays
+    const hotels: MondeHotel[] = [];
+    const insurances: MondeInsurance[] = [];
+    const cruises: MondeCruise[] = [];
+    const groundTransportations: MondeGroundTransportation[] = [];
+    const trainTickets: MondeTrainTicket[] = [];
+    const carRentals: MondeCarRental[] = [];
+    const travelPackages: MondeTravelPackage[] = [];
+
     for (const item of items) {
-        const metadata = item.item_metadata || {};
+        const meta = item.item_metadata || {};
+        const base = makeBase(item);
 
         switch (item.item_type) {
             case 'hotel':
             case 'accommodation':
                 hotels.push({
-                    check_in: (metadata.check_in as string) || travelStart,
-                    check_out: (metadata.check_out as string) || travelEnd,
-                    supplier_name: item.supplier || 'Não informado',
-                    city: (metadata.city as string) || (metadata.destination as string),
-                    rooms: (metadata.rooms as number) || 1,
-                    value: item.total_price
+                    ...base,
+                    check_in: (meta.check_in as string) || travelStart,
+                    check_out: (meta.check_out as string) || travelEnd,
+                    booking_number: (meta.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
+                    destination: (meta.city as string) || (meta.destination as string) || null,
                 });
                 break;
 
             case 'flight':
-                airlineTickets.push({
-                    departure_date: (metadata.departure_datetime as string)?.substring(0, 10) || travelStart,
-                    arrival_date: (metadata.arrival_datetime as string)?.substring(0, 10),
-                    origin: (metadata.origin_airport as string) || (metadata.origin as string) || 'N/A',
-                    destination: (metadata.destination_airport as string) || (metadata.destination as string) || 'N/A',
-                    locator: (metadata.flight_number as string) || (metadata.locator as string),
-                    supplier_name: item.supplier || 'Não informado',
-                    value: item.total_price
+            case 'aereo':
+                // airline_tickets is SILENTLY IGNORED by Monde API → map as travel_package
+                travelPackages.push({
+                    ...base,
+                    begin_date: (meta.departure_datetime as string)?.substring(0, 10) || travelStart,
+                    end_date: (meta.arrival_datetime as string)?.substring(0, 10) || null,
+                    booking_number: (meta.flight_number as string) || (meta.locator as string) || `WC-${item.id.substring(0, 8)}`,
+                    package_name: item.title || 'Passagem Aérea',
+                    destination: (meta.destination_airport as string) || (meta.destination as string) || null,
                 });
-                break;
-
-            case 'transfer':
-            case 'ground_transportation':
-                transfers.push({
-                    date: (metadata.date as string) || travelStart,
-                    origin: metadata.origin as string,
-                    destination: metadata.destination as string,
-                    supplier_name: item.supplier,
-                    value: item.total_price
-                });
+                console.log(`[monde-sales-dispatch] Flight mapped to travel_package (airline_tickets ignored by API)`);
                 break;
 
             case 'insurance':
+            case 'seguro':
                 insurances.push({
-                    start_date: (metadata.start_date as string) || travelStart,
-                    end_date: (metadata.end_date as string) || travelEnd,
-                    supplier_name: item.supplier,
-                    value: item.total_price
+                    ...base,
+                    begin_date: (meta.start_date as string) || (meta.begin_date as string) || travelStart,
+                    end_date: (meta.end_date as string) || travelEnd,
+                    destination: (meta.destination as string) || null,
                 });
                 break;
 
             case 'cruise':
                 cruises.push({
-                    departure_date: (metadata.departure_date as string) || travelStart,
-                    arrival_date: (metadata.arrival_date as string) || travelEnd,
-                    supplier_name: item.supplier || 'Não informado',
-                    value: item.total_price
+                    ...base,
+                    departure_date: (meta.departure_date as string) || travelStart,
+                    arrival_date: (meta.arrival_date as string) || travelEnd,
+                    booking_number: (meta.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
+                    ship_name: (meta.ship_name as string) || null,
+                });
+                break;
+
+            case 'transfer':
+            case 'ground_transportation':
+                groundTransportations.push({
+                    ...base,
+                    locator: (meta.locator as string) || `WC-${item.id.substring(0, 8)}`,
+                    segments: [{
+                        date: (meta.date as string) || travelStart,
+                        origin: (meta.origin as string) || undefined,
+                        destination: (meta.destination as string) || undefined,
+                    }],
                 });
                 break;
 
             case 'train_ticket':
                 trainTickets.push({
-                    departure_date: (metadata.departure_date as string) || travelStart,
-                    origin: (metadata.origin as string) || 'N/A',
-                    destination: (metadata.destination as string) || 'N/A',
-                    supplier_name: item.supplier,
-                    value: item.total_price
+                    ...base,
+                    locator: (meta.locator as string) || `WC-${item.id.substring(0, 8)}`,
+                    segments: [{
+                        departure_date: (meta.departure_date as string) || travelStart,
+                        origin: (meta.origin as string) || undefined,
+                        destination: (meta.destination as string) || undefined,
+                    }],
                 });
                 break;
 
             case 'car_rental':
                 carRentals.push({
-                    pickup_date: (metadata.pickup_date as string) || travelStart,
-                    return_date: (metadata.return_date as string) || travelEnd,
-                    pickup_location: metadata.pickup_location as string,
-                    return_location: metadata.return_location as string,
-                    supplier_name: item.supplier || 'Não informado',
-                    value: item.total_price
+                    ...base,
+                    pickup_date: (meta.pickup_date as string) || travelStart,
+                    dropoff_date: (meta.return_date as string) || (meta.dropoff_date as string) || travelEnd,
+                    booking_number: (meta.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
+                    pickup_location: (meta.pickup_location as string) || null,
+                    dropoff_location: (meta.return_location as string) || (meta.dropoff_location as string) || null,
                 });
                 break;
 
             case 'travel_package':
-                travelPackages.push({
-                    start_date: (metadata.start_date as string) || travelStart,
-                    end_date: (metadata.end_date as string) || travelEnd,
-                    supplier_name: item.supplier || 'Não informado',
-                    description: item.description || item.title,
-                    value: item.total_price
-                });
-                break;
-
-            case 'custom':
             case 'experiencia':
-            case 'aereo':
-            case 'seguro':
             default:
-                // Fallback: send as travel_package (most flexible Monde type)
+                // Fallback: everything maps to travel_package (most flexible Monde type)
                 travelPackages.push({
-                    start_date: travelStart,
-                    end_date: travelEnd,
-                    supplier_name: item.supplier || 'Não informado',
-                    description: item.title || item.description || 'Serviço',
-                    value: item.total_price
+                    ...base,
+                    begin_date: (meta.start_date as string) || (meta.begin_date as string) || travelStart,
+                    end_date: (meta.end_date as string) || travelEnd,
+                    booking_number: (meta.booking_number as string) || `WC-${item.id.substring(0, 8)}`,
+                    package_name: item.title || item.description || 'Serviço',
+                    destination: (meta.destination as string) || null,
                 });
-                console.log(`[monde-sales-dispatch] Item type '${item.item_type}' mapped to travel_package`);
+                if (item.item_type !== 'travel_package') {
+                    console.log(`[monde-sales-dispatch] Item type '${item.item_type}' mapped to travel_package`);
+                }
                 break;
         }
     }
 
-    // Add non-empty arrays to payload
+    const payload: MondeSalePayload = {
+        company_identifier: cnpj.replace(/\D/g, ''),
+        sale_date: sale.sale_date,
+        operation_id: `WC-${sale.card_id.substring(0, 8)}`,
+        travel_agent: travelAgent,
+        payer,
+    };
+
     if (hotels.length > 0) payload.hotels = hotels;
-    if (airlineTickets.length > 0) payload.airline_tickets = airlineTickets;
-    if (transfers.length > 0) payload.ground_transportations = transfers;
     if (insurances.length > 0) payload.insurances = insurances;
     if (cruises.length > 0) payload.cruises = cruises;
+    if (groundTransportations.length > 0) payload.ground_transportations = groundTransportations;
     if (trainTickets.length > 0) payload.train_tickets = trainTickets;
     if (carRentals.length > 0) payload.car_rentals = carRentals;
     if (travelPackages.length > 0) payload.travel_packages = travelPackages;
+    // NOTE: airline_tickets intentionally excluded — silently ignored by Monde API
 
     return payload;
 }
