@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock, Pencil, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock, Pencil, TrendingUp, Link } from 'lucide-react'
+import { getOrigemLabel, getOrigemColor, ORIGEM_OPTIONS, needsOrigemDetalhe } from '../../lib/constants/origem'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import type { Database } from '../../database.types'
@@ -60,6 +61,118 @@ type Card = CardBase & {
 
 interface CardHeaderProps {
     card: Card
+}
+
+/** Inline-editable origin badge with popover */
+function OrigemBadgeEditable({ cardId, origem, origemLead }: { cardId: string, origem: string | null, origemLead: string | null }) {
+    const queryClient = useQueryClient()
+    const [isOpen, setIsOpen] = useState(false)
+    const [localOrigem, setLocalOrigem] = useState(origem)
+    const [localDetalhe, setLocalDetalhe] = useState(origemLead || '')
+
+    // Sync local state when props change (popover closed = source of truth is server)
+    if (!isOpen && localOrigem !== origem) setLocalOrigem(origem)
+    if (!isOpen && localDetalhe !== (origemLead || '')) setLocalDetalhe(origemLead || '')
+
+    const mutation = useMutation({
+        mutationFn: async ({ newOrigem, newDetalhe }: { newOrigem: string, newDetalhe: string | null }) => {
+            const { error } = await supabase
+                .from('cards')
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- campo origem_lead pré-regeneração de types
+                .update({ origem: newOrigem, origem_lead: newDetalhe } as any)
+                .eq('id', cardId)
+            if (error) throw error
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['card-detail', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['card', cardId] })
+            queryClient.invalidateQueries({ queryKey: ['cards'] })
+            setIsOpen(false)
+        }
+    })
+
+    const handleSelect = (value: string) => {
+        setLocalOrigem(value)
+        if (!needsOrigemDetalhe(value)) {
+            mutation.mutate({ newOrigem: value, newDetalhe: null })
+        } else {
+            setLocalDetalhe('')
+        }
+    }
+
+    const handleSaveDetalhe = () => {
+        if (localOrigem) {
+            mutation.mutate({ newOrigem: localOrigem, newDetalhe: localDetalhe || null })
+        }
+    }
+
+    const colorClass = getOrigemColor(origem)
+
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-medium border cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-500 transition-all",
+                    colorClass
+                )}
+                title={origemLead ? `Origem: ${getOrigemLabel(origem)} — ${origemLead}` : `Origem: ${getOrigemLabel(origem)}`}
+            >
+                <Link className="inline h-2.5 w-2.5 mr-0.5" />
+                {getOrigemLabel(origem)}
+                {origemLead && <span className="ml-1 opacity-70">· {origemLead}</span>}
+            </button>
+
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                    <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-64 space-y-3">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Origem do Lead</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {ORIGEM_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => handleSelect(opt.value)}
+                                    className={cn(
+                                        "px-2.5 py-1 text-xs font-medium rounded-lg border transition-all",
+                                        localOrigem === opt.value
+                                            ? opt.color + " ring-1 ring-indigo-500"
+                                            : "border-slate-200 text-slate-600 hover:border-slate-300 bg-white"
+                                    )}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                        {needsOrigemDetalhe(localOrigem) && (
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-slate-600">
+                                    {needsOrigemDetalhe(localOrigem) === 'indicacao' ? 'Quem indicou?' : 'Campanha / Fonte'}
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={localDetalhe}
+                                        onChange={(e) => setLocalDetalhe(e.target.value)}
+                                        placeholder={needsOrigemDetalhe(localOrigem) === 'indicacao' ? 'Nome de quem indicou...' : 'Ex: Google Ads...'}
+                                        className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveDetalhe()}
+                                    />
+                                    <button
+                                        onClick={handleSaveDetalhe}
+                                        disabled={mutation.isPending}
+                                        className="px-2 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                                    >
+                                        {mutation.isPending ? '...' : 'OK'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    )
 }
 
 export default function CardHeader({ card }: CardHeaderProps) {
@@ -698,6 +811,13 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                     )}
                                 </div>
                             )}
+
+                            {/* Origin Badge (editable) */}
+                            <OrigemBadgeEditable
+                                cardId={card.id}
+                                origem={card.origem}
+                                origemLead={card.origem_lead}
+                            />
 
                             {/* Mark as Lost Button OR Loss Reason Display */}
                             {card.status_comercial !== 'perdido' && lostStage && (

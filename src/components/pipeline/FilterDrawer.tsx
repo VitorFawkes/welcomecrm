@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { X, Filter, Calendar, User, Users, Search, Clock, Target } from 'lucide-react'
+import { X, Filter, Calendar, User, Users, Search, Clock, Target, Link } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { usePipelineFilters } from '../../hooks/usePipelineFilters'
 import { cn } from '../../lib/utils'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
+import { ALL_ORIGEM_OPTIONS } from '../../lib/constants/origem'
 
 
 interface FilterDrawerProps {
@@ -37,10 +38,9 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
     const [searchPos, setSearchPos] = useState('')
     const [searchTeam, setSearchTeam] = useState('')
 
-    // Update local state when global filters change
-    useEffect(() => {
-        setLocalFilters(filters || {})
-    }, [filters])
+    // Sync local state when global filters change (controlled component pattern)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync externo (zustand store → local state)
+    useEffect(() => { setLocalFilters(filters || {}) }, [filters])
 
     if (!isOpen) return null
 
@@ -58,7 +58,7 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
         setFilters({})
     }
 
-    const toggleSelection = (field: 'ownerIds' | 'sdrIds' | 'plannerIds' | 'posIds' | 'teamIds' | 'departmentIds' | 'statusComercial', value: string) => {
+    const toggleSelection = (field: 'ownerIds' | 'sdrIds' | 'plannerIds' | 'posIds' | 'teamIds' | 'departmentIds' | 'statusComercial' | 'origem', value: string) => {
         setLocalFilters(prev => {
             const current = (prev[field] as string[]) || []
             const updated = current.includes(value)
@@ -142,6 +142,35 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
                                                     : opt.value === 'pausado' ? "bg-gray-500 text-white border-gray-500 shadow-sm"
                                                     : "bg-primary text-white border-primary shadow-sm"
                                                     : "border-gray-200 text-gray-600 hover:border-primary/50 hover:text-primary bg-white"
+                                            )}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section: Origem */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                            <Link className="h-3 w-3" /> Origem do Lead
+                        </h3>
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Origem</label>
+                            <div className="flex flex-wrap gap-2">
+                                {ALL_ORIGEM_OPTIONS.map(opt => {
+                                    const isSelected = (localFilters.origem || []).includes(opt.value)
+                                    return (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => toggleSelection('origem', opt.value)}
+                                            className={cn(
+                                                "px-3 py-1.5 text-sm font-medium rounded-lg border transition-all",
+                                                isSelected
+                                                    ? opt.color + " border-transparent shadow-sm"
+                                                    : "border-gray-200 text-gray-600 hover:border-gray-300 bg-white"
                                             )}
                                         >
                                             {opt.label}

@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ArrowUpDown, User as UserIcon, ExternalLink, AlertCircle, Clock, MapPin } from 'lucide-react'
+import { getOrigemLabel, getOrigemColor } from '../../lib/constants/origem'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table'
 import { Badge } from '../ui/Badge'
 import { Avatar, AvatarFallback } from '../ui/avatar'
@@ -237,9 +238,9 @@ const columnRenderers: Record<string, (lead: LeadCard) => React.ReactNode> = {
     ),
 
     origem: (lead) => (
-        <span className="text-gray-600 text-sm truncate max-w-[100px]">
-            {lead.origem || '-'}
-        </span>
+        <Badge className={cn("text-xs font-medium", getOrigemColor(lead.origem))}>
+            {getOrigemLabel(lead.origem)}
+        </Badge>
     ),
 }
 
@@ -320,7 +321,7 @@ export default function LeadsTable({
                             <Checkbox
                                 checked={allSelected}
                                 ref={(el) => {
-                                    if (el) (el as any).indeterminate = someSelected
+                                    if (el) (el as unknown as HTMLInputElement).indeterminate = someSelected
                                 }}
                                 onCheckedChange={(checked) => onSelectAll(checked as boolean)}
                             />

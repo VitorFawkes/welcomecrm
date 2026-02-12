@@ -1299,8 +1299,51 @@ Deno.serve(async (req) => {
 
                         cardPayload.external_id = dealId;
                         cardPayload.external_source = 'active_campaign';
-                        cardPayload.origem = 'active_campaign';
                         cardPayload.pessoa_principal_id = contactId;
+
+                        // ═══════════════════════════════════════════════════════════════════
+                        // SMART ORIGIN: Resolve origin from AC data
+                        // Priority: AC "Origem do lead" field (#29) → UTM data → fallback 'active_campaign'
+                        //
+                        // Rules:
+                        //  1. If AC "Origem do lead" matches our taxonomy → use it (indicacao, carteira, mkt, etc.)
+                        //  2. If AC "Origem do lead" is marketing-related text → 'mkt'
+                        //  3. If no AC origin but UTM/marketing data exists → 'mkt'
+                        //  4. Otherwise → 'active_campaign'
+                        // ═══════════════════════════════════════════════════════════════════
+                        const acOrigem = String(topLevelUpdates.origem || finalMarketingData.origem || '').toLowerCase().trim();
+                        const acUtmSource = topLevelUpdates.utm_source || finalMarketingData.utm_source;
+                        const acUtmMedium = topLevelUpdates.utm_medium || finalMarketingData.utm_medium;
+                        const acUtmCampaign = topLevelUpdates.utm_campaign || finalMarketingData.utm_campaign;
+
+                        // Normalize AC "Origem do lead" to our taxonomy
+                        const ORIGEM_MAP: Record<string, string> = {
+                            'mkt': 'mkt', 'marketing': 'mkt',
+                            'indicacao': 'indicacao', 'indicação': 'indicacao', 'referral': 'indicacao',
+                            'carteira': 'carteira', 'recorrente': 'carteira', 'recorrencia': 'carteira',
+                            'site': 'site', 'manual': 'manual', 'outro': 'outro',
+                        };
+                        const resolvedOrigem = acOrigem ? ORIGEM_MAP[acOrigem] : null;
+                        const hasUtmData = !!(acUtmSource || acUtmMedium || acUtmCampaign);
+
+                        if (resolvedOrigem) {
+                            // AC sent a recognizable origin → use it directly
+                            cardPayload.origem = resolvedOrigem;
+                            cardPayload.origem_lead = acUtmSource || null;
+                        } else if (acOrigem) {
+                            // AC sent an origin value we don't recognize → treat as marketing
+                            cardPayload.origem = 'mkt';
+                            cardPayload.origem_lead = topLevelUpdates.origem || finalMarketingData.origem || null;
+                        } else if (hasUtmData) {
+                            // No origin field, but UTM data present → marketing
+                            cardPayload.origem = 'mkt';
+                            cardPayload.origem_lead = acUtmSource || null;
+                        } else {
+                            // No marketing/origin info at all → fallback
+                            cardPayload.origem = 'active_campaign';
+                        }
+                        // Don't let the mapped 'origem' field overwrite our resolved value
+                        delete topLevelUpdates.origem;
 
                         // Use AC deal creation date instead of current time
                         const acCreateDate = payload['deal[create_date]'] || payload.cdate || payload.date_time;

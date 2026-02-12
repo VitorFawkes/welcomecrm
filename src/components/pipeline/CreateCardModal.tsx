@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
-import { Plus, User, X, Loader2, ChevronDown, Check } from 'lucide-react'
+import { Plus, User, X, Loader2, ChevronDown, Check, Megaphone, Users, Wallet, PenTool, MoreHorizontal, Search } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useAllowedStages } from '../../hooks/useCardCreationRules'
 import { useToast } from '../../contexts/ToastContext'
 import type { Database } from '../../database.types'
+import { ORIGEM_OPTIONS, needsOrigemDetalhe } from '../../lib/constants/origem'
 
 type Product = Database['public']['Enums']['app_product']
 
@@ -236,7 +237,34 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
         vendas_owner_nome: null as string | null,
         pos_owner_id: null as string | null,
         pos_owner_nome: null as string | null,
-        selectedStageId: null as string | null
+        selectedStageId: null as string | null,
+        origem: 'manual' as string,
+        origem_lead: null as string | null
+    })
+
+    // Indicação autocomplete state
+    const [indicacaoSearch, setIndicacaoSearch] = useState('')
+    const [debouncedIndicacao, setDebouncedIndicacao] = useState('')
+    const [showIndicacaoResults, setShowIndicacaoResults] = useState(false)
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedIndicacao(indicacaoSearch), 300)
+        return () => clearTimeout(timer)
+    }, [indicacaoSearch])
+
+    const { data: indicacaoContacts } = useQuery({
+        queryKey: ['indicacao-search', debouncedIndicacao],
+        queryFn: async () => {
+            if (!debouncedIndicacao) return []
+            const { data, error } = await supabase
+                .from('contatos')
+                .select('id, nome, telefone, email')
+                .or(`nome.ilike.%${debouncedIndicacao}%,email.ilike.%${debouncedIndicacao}%`)
+                .limit(5)
+            if (error) throw error
+            return data
+        },
+        enabled: debouncedIndicacao.length > 2
     })
 
     // Dynamic fields stored in briefing_inicial (for future use)
@@ -262,8 +290,11 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                 pessoa_principal_id: null,
                 pessoa_principal_nome: null,
                 ...initialOwners,
-                selectedStageId: null
+                selectedStageId: null,
+                origem: 'manual',
+                origem_lead: null
             })
+            setIndicacaoSearch('')
         }
         wasOpenRef.current = isOpen
     }, [isOpen, initialOwners])
@@ -315,7 +346,8 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                     vendas_owner_id: formData.vendas_owner_id,
                     pos_owner_id: formData.pos_owner_id,
                     dono_atual_id: currentOwnerId,
-                    origem: 'manual',
+                    origem: formData.origem,
+                    origem_lead: formData.origem_lead,
                     status_comercial: 'em_andamento',
                     moeda: 'BRL',
                     briefing_inicial: dynamicFields
@@ -342,8 +374,11 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                 pessoa_principal_id: null,
                 pessoa_principal_nome: null,
                 ...initialOwners,
-                selectedStageId: null
+                selectedStageId: null,
+                origem: 'manual',
+                origem_lead: null
             })
+            setIndicacaoSearch('')
         },
         onError: (error) => {
             console.error('Erro ao criar card:', error)
@@ -450,6 +485,109 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                                     <option value="CORP">Corp</option>
                                 </select>
                             </div>
+                        </section>
+
+                        {/* Section: Lead Origin */}
+                        <section className="space-y-4">
+                            <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                                Origem do Lead
+                            </h3>
+
+                            <div className="flex flex-wrap gap-2">
+                                {ORIGEM_OPTIONS.map(option => {
+                                    const isSelected = formData.origem === option.value
+                                    const IconMap: Record<string, React.ElementType> = {
+                                        Megaphone, Users, Wallet, PenTool, MoreHorizontal
+                                    }
+                                    const Icon = IconMap[option.icon]
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, origem: option.value, origem_lead: null })
+                                                setIndicacaoSearch('')
+                                                setShowIndicacaoResults(false)
+                                            }}
+                                            className={cn(
+                                                'flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200',
+                                                'hover:shadow-sm active:scale-[0.98]',
+                                                isSelected
+                                                    ? `${option.color} ring-2 ring-offset-1 ring-indigo-500`
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                                            )}
+                                        >
+                                            {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600" />}
+                                            {Icon && <Icon className="h-3.5 w-3.5" />}
+                                            <span className="text-sm font-medium">{option.label}</span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+
+                            {/* Sub-field: Quem indicou? (indicacao) */}
+                            {needsOrigemDetalhe(formData.origem) === 'indicacao' && (
+                                <div className="relative">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                        Quem indicou?
+                                    </label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                        <Input
+                                            value={indicacaoSearch || formData.origem_lead || ''}
+                                            onChange={(e) => {
+                                                setIndicacaoSearch(e.target.value)
+                                                setFormData({ ...formData, origem_lead: e.target.value })
+                                                setShowIndicacaoResults(true)
+                                            }}
+                                            onFocus={() => setShowIndicacaoResults(true)}
+                                            onBlur={() => setTimeout(() => setShowIndicacaoResults(false), 200)}
+                                            placeholder="Digite o nome ou busque um contato..."
+                                            className="pl-10"
+                                        />
+                                    </div>
+                                    {showIndicacaoResults && indicacaoContacts && indicacaoContacts.length > 0 && (
+                                        <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                            {indicacaoContacts.map(c => (
+                                                <button
+                                                    key={c.id}
+                                                    type="button"
+                                                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 text-left"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault()
+                                                        setFormData({ ...formData, origem_lead: c.nome })
+                                                        setIndicacaoSearch(c.nome || '')
+                                                        setShowIndicacaoResults(false)
+                                                    }}
+                                                >
+                                                    <div className="h-7 w-7 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 text-xs font-medium">
+                                                        {(c.nome || '?').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium text-slate-900 truncate">{c.nome}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{c.telefone || c.email || ''}</p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Sub-field: Campanha / Fonte (mkt) */}
+                            {needsOrigemDetalhe(formData.origem) === 'mkt' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                                        Campanha / Fonte
+                                    </label>
+                                    <Input
+                                        value={formData.origem_lead || ''}
+                                        onChange={(e) => setFormData({ ...formData, origem_lead: e.target.value })}
+                                        placeholder="Ex: Google Ads, Instagram Stories..."
+                                    />
+                                </div>
+                            )}
                         </section>
 
                         {/* Section: Assignment */}

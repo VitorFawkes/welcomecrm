@@ -23,6 +23,7 @@ export interface FilterState {
     sortDirection?: SortDirection
     showArchived?: boolean // Mostrar cards arquivados
     statusComercial?: string[] // Multi-select: em_aberto, em_andamento, pausado, ganho, perdido
+    origem?: string[] // Multi-select: mkt, indicacao, carteira, manual, outro, site, active_campaign, whatsapp
 }
 
 export interface GroupFilters {

@@ -29,7 +29,7 @@ const DEFAULT_COLUMNS: LeadsColumnConfig[] = [
     { id: 'pipeline_nome', label: 'Pipeline', isVisible: false },
     { id: 'pessoa_email', label: 'Email', isVisible: false },
     { id: 'pessoa_telefone', label: 'Telefone', isVisible: false },
-    { id: 'origem', label: 'Origem', isVisible: false },
+    { id: 'origem', label: 'Origem', isVisible: true },
 ]
 
 interface LeadsColumnsStore {

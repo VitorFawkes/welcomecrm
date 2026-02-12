@@ -151,6 +151,11 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 query = query.in('status_comercial', filters.statusComercial)
             }
 
+            // Origem Filter
+            if ((filters.origem?.length ?? 0) > 0) {
+                query = query.in('origem', filters.origem)
+            }
+
             // Archived Filter — esconder cards arquivados do pipeline
             query = query.is('archived_at', null)
 

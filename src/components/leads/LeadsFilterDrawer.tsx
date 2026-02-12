@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { X, Filter, Calendar, User, DollarSign, Clock, Layers, MapPin } from 'lucide-react'
+import { X, Filter, Calendar, User, DollarSign, Clock, Layers, MapPin, Link } from 'lucide-react'
 import { Button } from '../ui/Button'
 import type { LeadsFilterState } from '../../hooks/useLeadsFilters'
 import { cn } from '../../lib/utils'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { usePipelines } from '../../hooks/usePipelines'
+import { ALL_ORIGEM_OPTIONS } from '../../lib/constants/origem'
 
 interface LeadsFilterDrawerProps {
     isOpen: boolean
@@ -56,12 +57,13 @@ export function LeadsFilterDrawer({ isOpen, onClose, filters, setFilters }: Lead
             valorMax: undefined,
             diasSemContatoMin: undefined,
             diasSemContatoMax: undefined,
+            origem: undefined,
         }
         setLocalFilters(clearedFilters)
         setFilters(clearedFilters)
     }
 
-    const toggleSelection = (field: 'ownerIds' | 'stageIds' | 'statusComercial' | 'prioridade' | 'pipelineIds', value: string) => {
+    const toggleSelection = (field: 'ownerIds' | 'stageIds' | 'statusComercial' | 'prioridade' | 'pipelineIds' | 'origem', value: string) => {
         setLocalFilters(prev => {
             const current = (prev[field] as string[]) || []
             const updated = current.includes(value)
@@ -412,6 +414,35 @@ export function LeadsFilterDrawer({ isOpen, onClose, filters, setFilters }: Lead
                                             )}
                                         >
                                             {prio.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section: Origem */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                            <Link className="h-3 w-3" /> Origem do Lead
+                        </h3>
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <label className="text-sm font-semibold text-gray-700 block">Origem</label>
+                            <div className="flex flex-wrap gap-2">
+                                {ALL_ORIGEM_OPTIONS.map(opt => {
+                                    const isSelected = (localFilters.origem || []).includes(opt.value)
+                                    return (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => toggleSelection('origem', opt.value)}
+                                            className={cn(
+                                                "px-3 py-1.5 text-sm font-medium rounded-lg border transition-all",
+                                                isSelected
+                                                    ? opt.color + " border-transparent shadow-sm"
+                                                    : "border-gray-200 text-gray-600 hover:border-gray-300 bg-white"
+                                            )}
+                                        >
+                                            {opt.label}
                                         </button>
                                     )
                                 })}

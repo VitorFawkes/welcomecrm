@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ArrowUpDown, Calendar, Clock, AlertCircle, User as UserIcon, Trash2, Edit, Phone, Mail, MoreHorizontal, CheckCircle2, Plane, AlertTriangle } from 'lucide-react'
+import { getOrigemLabel, getOrigemColor } from '../../lib/constants/origem'
 import { usePipelineCards } from '../../hooks/usePipelineCards'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
@@ -27,6 +28,14 @@ import { Button } from '../ui/Button'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 
+interface ProximaTarefa {
+    id: string
+    titulo: string
+    tipo: string | null
+    data_vencimento: string
+}
+const asProximaTarefa = (t: Card['proxima_tarefa']): ProximaTarefa => t as unknown as ProximaTarefa
+
 interface PipelineListViewProps {
     productFilter: Product
     viewMode: ViewMode
@@ -37,7 +46,7 @@ interface PipelineListViewProps {
 
 export default function PipelineListView({ productFilter, viewMode, subView, filters }: PipelineListViewProps) {
     const queryClient = useQueryClient()
-    const { groupFilters, setFilters: _setFilters } = usePipelineFilters()
+    const { groupFilters } = usePipelineFilters()
 
     const { data: cards, isLoading } = usePipelineCards({
         productFilter,
@@ -195,9 +204,9 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
         queryClient.invalidateQueries({ queryKey: ['cards'] })
     }
 
-    const handleBulkEdit = async (fieldId: string, value: any) => {
+    const handleBulkEdit = async (fieldId: string, value: string | number | null) => {
         try {
-            const updates: Record<string, any> = {}
+            const updates: Record<string, string | number | null> = {}
 
             if (fieldId === 'data_viagem_inicio') {
                 updates.data_viagem_inicio = value
@@ -250,13 +259,13 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
     })
 
     const sortedCards = [...filteredCards].sort((a, b) => {
-        let aValue: any = a[sortField as keyof Card]
-        let bValue: any = b[sortField as keyof Card]
+        let aValue: string | number | boolean | null | undefined = a[sortField as keyof Card] as string | number | boolean | null | undefined
+        let bValue: string | number | boolean | null | undefined = b[sortField as keyof Card] as string | number | boolean | null | undefined
 
         // Special handling for nested/complex fields
         if (sortField === 'proxima_tarefa') {
-            aValue = (a.proxima_tarefa as any)?.data_vencimento || ''
-            bValue = (b.proxima_tarefa as any)?.data_vencimento || ''
+            aValue = asProximaTarefa(a.proxima_tarefa)?.data_vencimento || ''
+            bValue = asProximaTarefa(b.proxima_tarefa)?.data_vencimento || ''
         }
 
         if (!aValue && !bValue) return 0
@@ -419,7 +428,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                     onClick={(e) => {
                                         e.preventDefault()
                                         e.stopPropagation()
-                                        completeTaskMutation.mutate((card.proxima_tarefa as any).id)
+                                        completeTaskMutation.mutate(asProximaTarefa(card.proxima_tarefa).id)
                                     }}
                                     disabled={completeTaskMutation.isPending}
                                     className="opacity-0 group-hover/task:opacity-100 transition-opacity p-1 rounded hover:bg-green-100"
@@ -430,29 +439,29 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                 <div className="flex flex-col text-sm">
                                     <span className={cn(
                                         "font-medium flex items-center gap-1.5",
-                                        new Date((card.proxima_tarefa as any).data_vencimento) < new Date() ? "text-red-600" : "text-gray-700"
+                                        new Date(asProximaTarefa(card.proxima_tarefa).data_vencimento) < new Date() ? "text-red-600" : "text-gray-700"
                                     )}>
-                                        {(card.proxima_tarefa as any).tipo === 'ligacao' && <Phone className="h-3.5 w-3.5" />}
-                                        {(card.proxima_tarefa as any).tipo === 'email' && <Mail className="h-3.5 w-3.5" />}
-                                        {(card.proxima_tarefa as any).tipo === 'reuniao' && <Calendar className="h-3.5 w-3.5" />}
-                                        {!(card.proxima_tarefa as any).tipo && (
-                                            new Date((card.proxima_tarefa as any).data_vencimento) < new Date()
+                                        {asProximaTarefa(card.proxima_tarefa).tipo === 'ligacao' && <Phone className="h-3.5 w-3.5" />}
+                                        {asProximaTarefa(card.proxima_tarefa).tipo === 'email' && <Mail className="h-3.5 w-3.5" />}
+                                        {asProximaTarefa(card.proxima_tarefa).tipo === 'reuniao' && <Calendar className="h-3.5 w-3.5" />}
+                                        {!asProximaTarefa(card.proxima_tarefa).tipo && (
+                                            new Date(asProximaTarefa(card.proxima_tarefa).data_vencimento) < new Date()
                                                 ? <AlertCircle className="h-3.5 w-3.5" />
                                                 : <Clock className="h-3.5 w-3.5" />
                                         )}
-                                        {format(new Date((card.proxima_tarefa as any).data_vencimento), "dd/MM HH:mm", { locale: ptBR })}
+                                        {format(new Date(asProximaTarefa(card.proxima_tarefa).data_vencimento), "dd/MM HH:mm", { locale: ptBR })}
                                     </span>
                                     <span className="text-xs text-gray-500 truncate max-w-[150px]">
-                                        {(card.proxima_tarefa as any).titulo}
+                                        {asProximaTarefa(card.proxima_tarefa).titulo}
                                     </span>
                                 </div>
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
                             <div className="text-xs space-y-1">
-                                <p className="font-medium">{(card.proxima_tarefa as any).titulo}</p>
-                                <p className="text-gray-400">Tipo: {(card.proxima_tarefa as any).tipo || 'Tarefa'}</p>
-                                <p className="text-gray-400">Vencimento: {format(new Date((card.proxima_tarefa as any).data_vencimento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                                <p className="font-medium">{asProximaTarefa(card.proxima_tarefa).titulo}</p>
+                                <p className="text-gray-400">Tipo: {asProximaTarefa(card.proxima_tarefa).tipo || 'Tarefa'}</p>
+                                <p className="text-gray-400">Vencimento: {format(new Date(asProximaTarefa(card.proxima_tarefa).data_vencimento), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
                             </div>
                         </TooltipContent>
                     </Tooltip>
@@ -537,7 +546,9 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                 </div>
             ),
             renderCell: (card) => (
-                <span className="text-gray-600 text-sm capitalize">{card.origem || '-'}</span>
+                <Badge className={cn("text-xs font-medium", getOrigemColor(card.origem))}>
+                    {getOrigemLabel(card.origem)}
+                </Badge>
             )
         },
         produto: {

@@ -90,6 +90,11 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
                 query = query.in('pipeline_id', filters.pipelineIds)
             }
 
+            // Origem filter
+            if ((filters.origem?.length ?? 0) > 0) {
+                query = query.in('origem', filters.origem)
+            }
+
             // Creation date filter
             if (filters.creationStartDate) {
                 query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
