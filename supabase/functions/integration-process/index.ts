@@ -237,15 +237,35 @@ Deno.serve(async (req) => {
             .select('*')
             .eq('is_active', true);
 
-        // Helper: Parse flattened AC fields (deal[fields][109][value] -> { 109: "value" })
+        // Helper: Parse flattened AC fields
+        // AC webhook sends deal[fields] as a sequential array where:
+        //   deal[fields][INDEX][key]   = field name
+        //   deal[fields][INDEX][value] = field value
+        //   deal[fields][INDEX][id]    = actual AC field ID (only for fields with set values)
+        // We prefer [id] (real AC field ID) when available, fallback to INDEX for backward compat.
         const parseCustomFields = (payload: Record<string, any>) => {
             const fields: Record<string, any> = {};
 
+            // Collect all unique field indices
+            const indices = new Set<string>();
             Object.keys(payload).forEach(key => {
-                const match = key.match(/^deal\[fields\]\[(\d+)\]\[value\]$/);
-                if (match) {
-                    const fieldId = match[1];
-                    fields[fieldId] = payload[key];
+                const match = key.match(/^deal\[fields\]\[(\d+)\]/);
+                if (match) indices.add(match[1]);
+            });
+
+            indices.forEach(idx => {
+                const value = payload[`deal[fields][${idx}][value]`];
+                const acFieldId = payload[`deal[fields][${idx}][id]`];
+
+                if (value !== undefined) {
+                    // Use real AC field ID when available, fall back to sequential index
+                    const effectiveId = acFieldId || idx;
+                    fields[effectiveId] = value;
+
+                    // ALSO store by index for backward compat (if acFieldId differs from index)
+                    if (acFieldId && acFieldId !== idx) {
+                        fields[idx] = value;
+                    }
                 }
             });
             return fields;
@@ -521,7 +541,10 @@ Deno.serve(async (req) => {
 
                             // Populate contato_meios for WhatsApp matching
                             if (phone && newContact?.id) {
-                                const normalizedPhone = phone.replace(/\D/g, '');
+                                let normalizedPhone = phone.replace(/\D/g, '');
+                                if (/^55\d{10,11}$/.test(normalizedPhone)) {
+                                    normalizedPhone = normalizedPhone.slice(2);
+                                }
                                 await supabase.from('contato_meios').upsert({
                                     contato_id: newContact.id,
                                     tipo: 'whatsapp',
@@ -764,8 +787,19 @@ Deno.serve(async (req) => {
                 const potentialUpdates: Record<string, any> = {};
                 const protectedFields: string[] = []; // List of local keys that should NOT be updated if they exist
 
+                // Normalize AC pipeline ID for field mapping lookup
+                const acPipelineStr = acPipelineId ? String(acPipelineId) : '';
+
                 Object.entries(acFields).forEach(([fieldId, value]) => {
-                    const fieldMap = fieldMappings?.find(m => m.external_field_id === fieldId && m.integration_id === event.integration_id && m.entity_type === 'deal');
+                    // Match deal field mappings respecting external_pipeline_id:
+                    // - Pipeline-specific mappings only match events from that pipeline
+                    // - Global mappings (external_pipeline_id = '' or null) match all events
+                    const fieldMap = fieldMappings?.find(m =>
+                        m.external_field_id === fieldId &&
+                        m.integration_id === event.integration_id &&
+                        m.entity_type === 'deal' &&
+                        (!m.external_pipeline_id || m.external_pipeline_id === '' || m.external_pipeline_id === acPipelineStr)
+                    );
 
                     if (fieldMap) {
                         // Store in potential updates
@@ -903,7 +937,10 @@ Deno.serve(async (req) => {
 
                         // Populate contato_meios for WhatsApp matching
                         if (contactPhone) {
-                            const normalizedPhone = contactPhone.replace(/\D/g, '');
+                            let normalizedPhone = contactPhone.replace(/\D/g, '');
+                            if (/^55\d{10,11}$/.test(normalizedPhone)) {
+                                normalizedPhone = normalizedPhone.slice(2);
+                            }
                             await supabase.from('contato_meios').upsert({
                                 contato_id: contactId,
                                 tipo: 'whatsapp',
@@ -925,7 +962,13 @@ Deno.serve(async (req) => {
                         .single();
 
                     // Apply Field Updates with Protection Logic
-                    const finalMarketingData = { ...marketingData };
+                    // MERGE: Start with existing marketing_data to preserve contact-sourced fields
+                    // (deal_update webhooks from AC don't include contact[fields], so without merge
+                    //  any data populated by the deal_add's contact[fields] would be wiped out)
+                    const finalMarketingData = {
+                        ...(existingCard?.marketing_data || {}),
+                        ...marketingData
+                    };
                     const topLevelUpdates: Record<string, any> = {};
 
                     // Initialize JSON field containers for enterprise storage
@@ -982,36 +1025,52 @@ Deno.serve(async (req) => {
                                 cleanKey = key.replace('card.', '');
                             }
 
+                            // GUARD: Don't overwrite existing JSON values with empty strings
+                            // This prevents deal_update events (which have mostly empty deal[fields])
+                            // from wiping out data previously populated by contact[fields] in deal_add
+                            const isEmpty = value === '' || value === null || value === undefined;
+
                             // Route based on storage_location from database configuration
                             if (storageLocation === 'column' && dbColumnName) {
-                                // Direct column in cards table - convert empty strings to null for DB compatibility
-                                topLevelUpdates[dbColumnName] = value === '' ? null : value;
+                                // Direct column in cards table - skip empty values to avoid wiping existing data
+                                if (!isEmpty) {
+                                    topLevelUpdates[dbColumnName] = value;
+                                }
                             } else if (storageLocation === 'produto_data') {
-                                // Store in produto_data JSON
-                                if (!cardPayload_produtoData) cardPayload_produtoData = {};
-                                const jsonKey = cleanKey.replace('__produto_data__.', '');
-                                cardPayload_produtoData[jsonKey] = value;
+                                if (!isEmpty) {
+                                    if (!cardPayload_produtoData) cardPayload_produtoData = {};
+                                    const jsonKey = cleanKey.replace('__produto_data__.', '');
+                                    cardPayload_produtoData[jsonKey] = value;
+                                }
                             } else if (storageLocation === 'briefing_inicial') {
-                                // Store in briefing_inicial JSON
-                                if (!cardPayload_briefingInicial) cardPayload_briefingInicial = {};
-                                const jsonKey = cleanKey.replace('__briefing_inicial__.', '');
-                                cardPayload_briefingInicial[jsonKey] = value;
+                                if (!isEmpty) {
+                                    if (!cardPayload_briefingInicial) cardPayload_briefingInicial = {};
+                                    const jsonKey = cleanKey.replace('__briefing_inicial__.', '');
+                                    cardPayload_briefingInicial[jsonKey] = value;
+                                }
                             } else if (storageLocation === 'marketing_data') {
-                                // Store in marketing_data JSON
-                                finalMarketingData[cleanKey] = value;
+                                if (!isEmpty) {
+                                    finalMarketingData[cleanKey] = value;
+                                }
                             } else {
                                 // FALLBACK: Legacy prefix-based routing (for backward compatibility)
                                 if (key.startsWith('__briefing_inicial__.')) {
-                                    if (!cardPayload_briefingInicial) cardPayload_briefingInicial = {};
-                                    const jsonKey = key.replace('__briefing_inicial__.', '');
-                                    cardPayload_briefingInicial[jsonKey] = value;
+                                    if (!isEmpty) {
+                                        if (!cardPayload_briefingInicial) cardPayload_briefingInicial = {};
+                                        const jsonKey = key.replace('__briefing_inicial__.', '');
+                                        cardPayload_briefingInicial[jsonKey] = value;
+                                    }
                                 } else if (key.startsWith('__produto_data__.')) {
-                                    if (!cardPayload_produtoData) cardPayload_produtoData = {};
-                                    const jsonKey = key.replace('__produto_data__.', '');
-                                    cardPayload_produtoData[jsonKey] = value;
+                                    if (!isEmpty) {
+                                        if (!cardPayload_produtoData) cardPayload_produtoData = {};
+                                        const jsonKey = key.replace('__produto_data__.', '');
+                                        cardPayload_produtoData[jsonKey] = value;
+                                    }
                                 } else {
                                     // Default: marketing_data (safe fallback)
-                                    finalMarketingData[cleanKey] = value;
+                                    if (!isEmpty) {
+                                        finalMarketingData[cleanKey] = value;
+                                    }
                                 }
                             }
                         }
