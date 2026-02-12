@@ -317,15 +317,23 @@ export default function MondeCreateSaleModal({
             },
         }
 
+        // Receita: distribute commission_amount proportionally (mirrors dispatch logic)
+        const cardReceita = cardData?.receita as number | null | undefined
+        const totalValue = selectedItemsList.reduce((sum, i) => sum + i.price, 0)
+
         // Helper: build product base fields
         const makeBase = (item: SelectableItem) => {
             const supplierName = selectedItems[item.id]?.supplier || item.supplier || 'Não informado'
+            const commission = cardReceita && totalValue > 0
+                ? Math.round((item.price / totalValue) * cardReceita * 100) / 100
+                : undefined
             return {
                 external_id: item.id,
                 currency: 'BRL',
                 value: item.price,
                 supplier: { external_id: '(auto-generated)', name: supplierName },
                 passengers: [defaultPassenger],
+                ...(commission ? { commission_amount: commission } : {}),
             }
         }
 
