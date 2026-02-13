@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import type { Database } from '../database.types'
+import type { Database, Json } from '../database.types'
 
 type SystemField = Database['public']['Tables']['system_fields']['Row']
 type StageFieldConfig = Database['public']['Tables']['stage_field_config']['Row']
@@ -15,7 +15,7 @@ export interface FieldConfigResult {
     isRequired: boolean
     isHeader: boolean
     customLabel?: string | null
-    options?: any
+    options?: Json
 }
 
 export function useFieldConfig() {
@@ -28,6 +28,7 @@ export function useFieldConfig() {
                 .select('*')
                 .eq('active', true)
                 .order('section')
+                .order('order_index')
                 .order('label')
             return data as SystemField[]
         },

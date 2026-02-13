@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
-import { Loader2, Plus, Trash2, Eye, EyeOff, CheckSquare, Square, LayoutTemplate, Shield, Edit2, Layers, Grid } from 'lucide-react'
+import { Loader2, Plus, Trash2, Eye, EyeOff, CheckSquare, Square, LayoutTemplate, Shield, Edit2, Layers, Grid, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import FieldInspectorDrawer from './FieldInspectorDrawer'
 import type { Database } from '../../../database.types'
@@ -70,12 +70,12 @@ export default function StudioUnified() {
     })
 
     const { data: phasesData } = usePipelinePhases()
-    const phases = phasesData || []
+    const phases = useMemo(() => phasesData || [], [phasesData])
 
     const { data: fields, isLoading: loadingFields } = useQuery({
         queryKey: ['system-fields-unified'],
         queryFn: async () => {
-            const { data } = await supabase.from('system_fields').select('*').order('section').order('label')
+            const { data } = await supabase.from('system_fields').select('*').order('section').order('order_index').order('label')
             return data as SystemField[]
         }
     })
@@ -125,6 +125,7 @@ export default function StudioUnified() {
                 options: field.options
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error } = await supabase.from('system_fields').insert(payload as any)
             if (error) throw error
         },
@@ -173,6 +174,7 @@ export default function StudioUnified() {
         mutationFn: async (newConfigs: Partial<StageFieldConfig>[]) => {
             const { error } = await supabase
                 .from('stage_field_config')
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .upsert(newConfigs as any, { onConflict: 'stage_id, field_key' })
             if (error) throw error
         },
@@ -190,13 +192,13 @@ export default function StudioUnified() {
         onMutate: async (newPhase) => {
             await queryClient.cancelQueries({ queryKey: ['pipeline-phases'] })
             const previousPhases = queryClient.getQueryData(['pipeline-phases'])
-            queryClient.setQueryData(['pipeline-phases'], (old: any[] | undefined) => {
+            queryClient.setQueryData<Array<{ id: string; color: string }>>(['pipeline-phases'], (old) => {
                 if (!old) return []
-                return old.map((p: any) => p.id === newPhase.id ? { ...p, color: newPhase.color } : p)
+                return old.map((p) => p.id === newPhase.id ? { ...p, color: newPhase.color } : p)
             })
             return { previousPhases }
         },
-        onError: (err, _newPhase, context: any) => {
+        onError: (err, _newPhase, context) => {
             console.error('Error updating phase:', err)
             if (context?.previousPhases) {
                 queryClient.setQueryData(['pipeline-phases'], context.previousPhases)
@@ -206,6 +208,53 @@ export default function StudioUnified() {
             queryClient.invalidateQueries({ queryKey: ['pipeline-phases'] })
         }
     })
+
+    const reorderFieldMutation = useMutation({
+        mutationFn: async (updates: { key: string; order_index: number }[]) => {
+            for (const u of updates) {
+                const { error } = await supabase.from('system_fields').update({ order_index: u.order_index }).eq('key', u.key)
+                if (error) throw error
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['system-fields-unified'] })
+            queryClient.invalidateQueries({ queryKey: ['system-fields-config'] })
+        }
+    })
+
+    const handleMoveField = (sectionKey: string, fieldKey: string, direction: 'up' | 'down') => {
+        const sectionFields = fieldsBySection[sectionKey] || []
+        const idx = sectionFields.findIndex(f => f.key === fieldKey)
+        if (idx < 0) return
+        const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+        if (targetIdx < 0 || targetIdx >= sectionFields.length) return
+
+        const currentField = sectionFields[idx]
+        const targetField = sectionFields[targetIdx]
+        const currentOrder = currentField.order_index ?? idx
+        const targetOrder = targetField.order_index ?? targetIdx
+
+        // Optimistic update
+        queryClient.setQueryData(['system-fields-unified'], (old: SystemField[] | undefined) => {
+            if (!old) return old
+            return old.map(f => {
+                if (f.key === currentField.key) return { ...f, order_index: targetOrder }
+                if (f.key === targetField.key) return { ...f, order_index: currentOrder }
+                return f
+            }).sort((a, b) => {
+                const secCmp = (a.section || '').localeCompare(b.section || '')
+                if (secCmp !== 0) return secCmp
+                const orderCmp = (a.order_index ?? 0) - (b.order_index ?? 0)
+                if (orderCmp !== 0) return orderCmp
+                return a.label.localeCompare(b.label)
+            })
+        })
+
+        reorderFieldMutation.mutate([
+            { key: currentField.key, order_index: targetOrder },
+            { key: targetField.key, order_index: currentOrder }
+        ])
+    }
 
     // --- Helpers ---
     const getConfig = (stageId: string, fieldKey: string) => {
@@ -408,9 +457,9 @@ export default function StudioUnified() {
                 isCreating={isAdding}
                 onSave={(field) => {
                     if (isAdding) {
-                        createFieldMutation.mutate(field as any)
+                        createFieldMutation.mutate(field as Partial<SystemField>)
                     } else {
-                        updateFieldMutation.mutate(field as any)
+                        updateFieldMutation.mutate(field as Partial<SystemField>)
                     }
                 }}
             />
@@ -548,20 +597,48 @@ export default function StudioUnified() {
                                     )}
 
                                     {/* Field Rows */}
-                                    {sectionFields.map(field => (
+                                    {sectionFields.map((field, fieldIdx) => (
                                         <tr key={field.key} className="group hover:bg-muted/50 transition-colors">
                                             {/* Field Name Column (Sticky Left) */}
                                             <td className="sticky left-0 z-10 bg-card group-hover:bg-muted border-r border-border px-4 py-3 transition-colors">
                                                 <div className="flex items-center justify-between group/cell">
-                                                    <div
-                                                        className="cursor-pointer"
-                                                        onClick={() => setEditingField(field)}
-                                                    >
-                                                        <div className="font-medium text-foreground text-sm flex items-center gap-2">
-                                                            {field.label}
-                                                            {field.is_system && <Shield className="w-3 h-3 text-muted-foreground" />}
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Reorder Arrows */}
+                                                        <div className="flex flex-col opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={() => handleMoveField(section.key, field.key, 'up')}
+                                                                disabled={fieldIdx === 0}
+                                                                className={cn(
+                                                                    "p-0.5 rounded transition-colors",
+                                                                    fieldIdx === 0 ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                                )}
+                                                                title="Mover para cima"
+                                                            >
+                                                                <ChevronUp className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleMoveField(section.key, field.key, 'down')}
+                                                                disabled={fieldIdx === sectionFields.length - 1}
+                                                                className={cn(
+                                                                    "p-0.5 rounded transition-colors",
+                                                                    fieldIdx === sectionFields.length - 1 ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                                )}
+                                                                title="Mover para baixo"
+                                                            >
+                                                                <ChevronDown className="w-3.5 h-3.5" />
+                                                            </button>
                                                         </div>
-                                                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{field.key}</div>
+
+                                                        <div
+                                                            className="cursor-pointer"
+                                                            onClick={() => setEditingField(field)}
+                                                        >
+                                                            <div className="font-medium text-foreground text-sm flex items-center gap-2">
+                                                                {field.label}
+                                                                {field.is_system && <Shield className="w-3 h-3 text-muted-foreground" />}
+                                                            </div>
+                                                            <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{field.key}</div>
+                                                        </div>
                                                     </div>
 
                                                     {/* Row Actions (Hover) */}

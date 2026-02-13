@@ -23,18 +23,19 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
     // Local state for stage details
     const [formData, setFormData] = useState<Partial<PipelineStage>>({});
 
+    const stageId = stage?.id;
     useEffect(() => {
         if (stage) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData(stage);
         }
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-    }, [stage]);
+    }, [stageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // --- Data Fetching ---
     const { data: fields } = useQuery({
         queryKey: ['system-fields-inspector'],
         queryFn: async () => {
-            const { data } = await supabase.from('system_fields').select('*').order('label');
+            const { data } = await supabase.from('system_fields').select('*').order('order_index').order('label');
             return data as SystemField[];
         },
         enabled: isOpen
@@ -108,6 +109,7 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
         mutationFn: async (newConfig: Partial<StageFieldConfig>) => {
             const { error } = await supabase
                 .from('stage_field_config')
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .upsert(newConfig as any, { onConflict: 'stage_id, field_key' });
             if (error) throw error;
         },

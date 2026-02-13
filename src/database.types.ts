@@ -6461,6 +6461,7 @@ export type Database = {
           key: string
           label: string
           options: Json | null
+          order_index: number | null
           section: string | null
           section_id: string | null
           type: string
@@ -6472,6 +6473,7 @@ export type Database = {
           key: string
           label: string
           options?: Json | null
+          order_index?: number | null
           section?: string | null
           section_id?: string | null
           type: string
@@ -6483,6 +6485,7 @@ export type Database = {
           key?: string
           label?: string
           options?: Json | null
+          order_index?: number | null
           section?: string | null
           section_id?: string | null
           type?: string
