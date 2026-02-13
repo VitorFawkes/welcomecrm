@@ -1,7 +1,7 @@
 import { CheckCircle2, AlertCircle } from 'lucide-react'
 import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
-import { useStageRequirements, type Requirement } from '../../hooks/useStageRequirements'
+import { useStageRequirements, type Requirement, type TaskRequirement } from '../../hooks/useStageRequirements'
 
 type Card = Database['public']['Tables']['cards']['Row']
 
@@ -91,7 +91,7 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                         isAllBlockingCompleted ? "text-green-900" : "text-red-900"
                     )}>
                         {isAllBlockingCompleted ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                        Obrigações da Etapa Atual
+                        Requisitos para Entrar na Etapa
                     </h3>
                     <span className={cn(
                         "text-xs font-medium px-2 py-1 rounded-full transition-colors duration-300",
@@ -126,10 +126,12 @@ export default function StageRequirements({ card }: StageRequirementsProps) {
                                     {!isCompleted && (
                                         <p className="text-xs text-gray-500 mt-1">
                                             {req.requirement_type === 'task'
-                                                ? 'Complete esta tarefa na agenda para avançar.'
+                                                ? ((req as TaskRequirement).task_require_completed
+                                                    ? 'Conclua esta tarefa para entrar na etapa.'
+                                                    : 'Crie esta tarefa para entrar na etapa.')
                                                 : req.requirement_type === 'proposal'
-                                                    ? 'Mude o status da proposta para avançar.'
-                                                    : 'Preencha este campo para avançar.'}
+                                                    ? 'Atualize o status da proposta para entrar na etapa.'
+                                                    : 'Preencha este campo para entrar na etapa.'}
                                         </p>
                                     )}
                                 </div>

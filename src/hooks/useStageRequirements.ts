@@ -22,12 +22,12 @@ interface FieldRequirement extends BaseRequirement {
     field_key: string
 }
 
-interface ProposalRequirement extends BaseRequirement {
+export interface ProposalRequirement extends BaseRequirement {
     requirement_type: 'proposal'
     proposal_min_status: string
 }
 
-interface TaskRequirement extends BaseRequirement {
+export interface TaskRequirement extends BaseRequirement {
     requirement_type: 'task'
     task_tipo: string
     task_require_completed: boolean
@@ -92,8 +92,8 @@ export function useStageRequirements(card: Card) {
                 .single()
 
             if (stageError) throw stageError
-            const pipelineId = (currentStageData as any).pipeline_id
-            const currentOrder = (currentStageData as any).ordem
+            const pipelineId = (currentStageData as { pipeline_id: string }).pipeline_id
+            const currentOrder = (currentStageData as { ordem: number }).ordem
 
             // Fetch all required configs for this pipeline
             const { data, error } = await supabase
@@ -116,11 +116,13 @@ export function useStageRequirements(card: Card) {
 
             if (error) throw error
 
-            const sortedData = (data || []).sort((a: any, b: any) => {
-                return (a.pipeline_stages?.ordem || 0) - (b.pipeline_stages?.ordem || 0)
+            const sortedData = (data || []).sort((a, b) => {
+                const aOrdem = (a.pipeline_stages as { ordem?: number } | null)?.ordem || 0
+                const bOrdem = (b.pipeline_stages as { ordem?: number } | null)?.ordem || 0
+                return aOrdem - bOrdem
             })
 
-            return sortedData.map((config: any): Requirement => {
+            return sortedData.map((config): Requirement => {
                 const baseReq = {
                     id: config.id,
                     stage_id: config.stage_id,
@@ -146,7 +148,7 @@ export function useStageRequirements(card: Card) {
                         requirement_type: 'task',
                         label: config.requirement_label || `Tarefa: ${config.task_tipo}`,
                         task_tipo: config.task_tipo,
-                        task_require_completed: config.task_require_completed ?? true
+                        task_require_completed: config.task_require_completed ?? false
                     } as TaskRequirement
                 }
 

@@ -13,6 +13,7 @@ import {
     Clock,
     Loader2,
     Copy,
+    AlertCircle,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -23,12 +24,25 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
+import { useStageRequirements, type ProposalRequirement } from '@/hooks/useStageRequirements'
+import type { Database } from '@/database.types'
+
+type Card = Database['public']['Tables']['cards']['Row']
+
+const PROPOSAL_STATUS_LABELS: Record<string, string> = {
+    draft: 'Criada (Rascunho)',
+    sent: 'Enviada',
+    viewed: 'Visualizada',
+    in_progress: 'Em Andamento',
+    accepted: 'Aceita'
+}
 
 interface ProposalsWidgetProps {
     cardId: string
+    card?: Card
 }
 
-export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
+export function ProposalsWidget({ cardId, card }: ProposalsWidgetProps) {
     const navigate = useNavigate()
     const [isCreating, setIsCreating] = useState(false)
 
@@ -36,6 +50,12 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
     const createProposal = useCreateProposal()
     const deleteProposal = useDeleteProposal()
     const cloneProposal = useCloneProposal()
+
+    // Stage requirements - proposal obligations
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { missingBlocking } = useStageRequirements((card || { id: cardId, pipeline_stage_id: null }) as any)
+    const missingProposals = missingBlocking
+        .filter((r): r is ProposalRequirement => r.requirement_type === 'proposal')
 
     const handleCreateProposal = async () => {
         setIsCreating(true)
@@ -124,6 +144,21 @@ export function ProposalsWidget({ cardId }: ProposalsWidgetProps) {
                     )}
                 </Button>
             </div>
+
+            {/* Required proposal indicators */}
+            {missingProposals.length > 0 && (
+                <div className="border-b border-amber-100 bg-amber-50/50">
+                    {missingProposals.map((req, idx) => (
+                        <div key={idx} className="px-4 py-2 flex items-center gap-2">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                            <span className="text-xs text-amber-800 truncate">
+                                <span className="font-medium">Proposta {PROPOSAL_STATUS_LABELS[req.proposal_min_status] || req.proposal_min_status}</span>
+                                {' — obrigatória para esta etapa'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Content */}
             <div className="divide-y divide-slate-100">

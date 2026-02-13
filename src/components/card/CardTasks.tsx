@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle, MessageSquare, Clock } from 'lucide-react'
+import { Plus, CheckCircle2, Circle, Calendar, Phone, Users, FileCheck, MoreHorizontal, User, Trash2, Edit2, Check, RefreshCw, CalendarClock, XCircle, MessageSquare, Clock, AlertCircle } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { SmartTaskModal } from './SmartTaskModal'
@@ -19,9 +19,10 @@ type TaskOutcome = Database['public']['Tables']['task_type_outcomes']['Row']
 
 interface CardTasksProps {
     cardId: string
+    requiredTasks?: { label: string, task_tipo: string, task_require_completed: boolean }[]
 }
 
-export default function CardTasks({ cardId }: CardTasksProps) {
+export default function CardTasks({ cardId, requiredTasks = [] }: CardTasksProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingTask, setEditingTask] = useState<Tarefa | null>(null)
     const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reschedule'>('create')
@@ -314,6 +315,30 @@ export default function CardTasks({ cardId }: CardTasksProps) {
                     Novo Item
                 </button>
             </div>
+
+            {/* Required task indicators */}
+            {requiredTasks.length > 0 && (
+                <div className="border-b border-amber-100 bg-amber-50/50">
+                    {requiredTasks.map((req, idx) => (
+                        <div key={idx} className="px-4 py-2 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                                <span className="text-xs text-amber-800 truncate">
+                                    <span className="font-medium">{req.label}</span>
+                                    {req.task_require_completed ? ' — conclusão obrigatória' : ' — obrigatória para esta etapa'}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => { setEditingTask(null); setModalMode('create'); setIsModalOpen(true); }}
+                                className="text-[11px] font-medium text-amber-700 hover:text-amber-900 bg-amber-100/80 hover:bg-amber-200 px-2.5 py-1 rounded-full transition-colors flex-shrink-0 flex items-center gap-1"
+                            >
+                                <Plus className="w-3 h-3" />
+                                Criar
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
                 {isLoadingTasks ? (

@@ -194,7 +194,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
         targetStageName: string,
         missingFields?: { key: string, label: string }[],
         missingProposals?: { label: string, min_status: string }[],
-        missingTasks?: { label: string, task_tipo: string }[],
+        missingTasks?: { label: string, task_tipo: string, task_require_completed: boolean }[],
         currentOwnerId?: string,
         sdrName?: string
     } | null>(null)

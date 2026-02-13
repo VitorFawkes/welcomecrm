@@ -34,6 +34,7 @@ import { usePipelineCards } from '../../hooks/usePipelineCards'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
+type Stage = Database['public']['Tables']['pipeline_stages']['Row']
 
 interface KanbanBoardProps {
     productFilter: Product
@@ -102,14 +103,14 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const { data: stages } = useQuery({
         queryKey: ['stages', productFilter],
         queryFn: async () => {
-            let query = (supabase.from('pipeline_stages') as any)
+            let query = supabase.from('pipeline_stages')
                 .select('*')
                 .eq('ativo', true)
                 .order('ordem')
 
             // Filtrar stages pelo pipeline do produto
             if (productFilter !== 'ALL') {
-                const { data: pipeline } = await (supabase.from('pipelines') as any)
+                const { data: pipeline } = await supabase.from('pipelines')
                     .select('id')
                     .eq('produto', productFilter)
                     .single()
@@ -121,7 +122,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
             const { data, error } = await query
             if (error) throw error
-            return data as any[]
+            return data as Stage[]
         }
     })
 
@@ -136,11 +137,11 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
     const moveCardMutation = useMutation({
         mutationFn: async ({ cardId, stageId, motivoId, comentario }: { cardId: string, stageId: string, motivoId?: string, comentario?: string }) => {
-            const { error } = await (supabase.rpc as any)('mover_card', {
+            const { error } = await supabase.rpc('mover_card', {
                 p_card_id: cardId,
                 p_nova_etapa_id: stageId,
-                p_motivo_perda_id: motivoId || null,
-                p_motivo_perda_comentario: comentario || null
+                p_motivo_perda_id: motivoId,
+                p_motivo_perda_comentario: comentario
             })
             if (error) throw error
         },
@@ -152,7 +153,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers])
 
             // Find new stage info for complete update
-            const newStage = stages?.find((s: any) => s.id === stageId)
+            const newStage = stages?.find((s) => s.id === stageId)
 
             // Optimistically update to the new value
             if (previousCards) {
@@ -201,7 +202,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         targetStageName: string,
         missingFields?: { key: string, label: string }[],
         missingProposals?: { label: string, min_status: string }[],
-        missingTasks?: { label: string, task_tipo: string }[],
+        missingTasks?: { label: string, task_tipo: string, task_require_completed: boolean }[],
         requiredRole?: string
     } | null>(null)
 
@@ -267,7 +268,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             const cardId = active.id as string
             const stageId = over.id as string
             const currentStageId = active.data.current?.pipeline_stage_id
-            const targetStage = stages?.find((s: any) => s.id === stageId)
+            const targetStage = stages?.find((s) => s.id === stageId)
             const card = active.data.current as Card
 
             if (stageId !== currentStageId) {
@@ -349,7 +350,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const handleConfirmStageChange = (newOwnerId: string) => {
         if (pendingMove) {
             const updateOwner = async () => {
-                const { error } = await (supabase.from('cards') as any)
+                const { error } = await supabase.from('cards')
                     .update({ dono_atual_id: newOwnerId })
                     .eq('id', pendingMove.cardId)
 
@@ -372,13 +373,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const handleConfirmQualityGate = () => {
         if (pendingMove) {
             // After filling fields, we still need to check if we need to change owner
-            const targetStage = stages?.find((s: any) => s.id === pendingMove.stageId)
+            const targetStage = stages?.find((s) => s.id === pendingMove.stageId)
 
             setQualityGateModalOpen(false)
 
             if (targetStage?.target_role) {
                 // Open Owner Change Modal
-                setPendingMove(prev => prev ? { ...prev, requiredRole: targetStage.target_role } : null)
+                setPendingMove(prev => prev ? { ...prev, requiredRole: targetStage.target_role ?? undefined } : null)
                 setStageChangeModalOpen(true)
             } else {
                 // Just move
@@ -459,12 +460,12 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             titulo: c.titulo,
             pipeline_stage_id: c.pipeline_stage_id
         })),
-        allStages: stages.map((s: any) => ({
+        allStages: stages.map((s) => ({
             id: s.id,
             nome: s.nome,
             pipeline_id: s.pipeline_id
         })),
-        matchingTest: stages.map((s: any) => ({
+        matchingTest: stages.map((s) => ({
             stageName: s.nome,
             cardsInStage: cards.filter(c => c.pipeline_stage_id === s.id).length
         }))
@@ -508,7 +509,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                 ) : displayPhases.map((phase) => {
                                     // Filter stages that belong to this phase
                                     // We support both phase_id (new) and fase name match (legacy migration)
-                                    const phaseStages = stages.filter((s: any) =>
+                                    const phaseStages = stages.filter((s) =>
                                         s.phase_id === phase.id ||
                                         (!s.phase_id && s.fase === phase.name)
                                     )
@@ -516,7 +517,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                     // If no stages for this phase, skip rendering it (optional, but cleaner)
                                     if (phaseStages.length === 0) return null
 
-                                    const phaseCards = cards.filter(c => phaseStages.some((s: any) => s.id === c.pipeline_stage_id))
+                                    const phaseCards = cards.filter(c => phaseStages.some((s) => s.id === c.pipeline_stage_id))
                                     const totalCount = phaseCards.length
                                     const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
 
@@ -532,7 +533,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                             stages={phaseStages}
                                             cards={phaseCards}
                                         >
-                                            {phaseStages.map((stage: any) => (
+                                            {phaseStages.map((stage) => (
                                                 <KanbanColumn
                                                     key={stage.id}
                                                     stage={stage}
@@ -586,7 +587,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                         missingFields={pendingMove.missingFields || []}
                                         missingProposals={pendingMove.missingProposals || []}
                                         missingTasks={pendingMove.missingTasks || []}
-                                        initialData={cards?.find(c => c.id === pendingMove.cardId) as any}
+                                        initialData={cards?.find(c => c.id === pendingMove.cardId) as Record<string, unknown> | undefined}
                                     />
 
                                     <LossReasonModal
@@ -649,13 +650,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 <div className="flex items-center gap-6">
                     {/* Phase Summaries (Mini) */}
                     {displayPhases.map(phase => {
-                        const phaseStages = stages.filter((s: any) =>
+                        const phaseStages = stages.filter((s) =>
                             s.phase_id === phase.id ||
                             (!s.phase_id && s.fase === phase.name)
                         )
                         if (phaseStages.length === 0) return null
 
-                        const phaseCards = cards.filter(c => phaseStages.some((s: any) => s.id === c.pipeline_stage_id))
+                        const phaseCards = cards.filter(c => phaseStages.some((s) => s.id === c.pipeline_stage_id))
                         const val = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
                         const count = phaseCards.length
 

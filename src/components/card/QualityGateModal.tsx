@@ -11,8 +11,8 @@ interface QualityGateModalProps {
     targetStageName: string
     missingFields: { key: string, label: string }[]
     missingProposals?: { label: string, min_status: string }[]
-    missingTasks?: { label: string, task_tipo: string }[]
-    initialData?: Record<string, any>  // Keep for API compatibility
+    missingTasks?: { label: string, task_tipo: string, task_require_completed: boolean }[]
+    initialData?: Record<string, unknown>  // Keep for API compatibility
 }
 
 const PROPOSAL_STATUS_LABELS: Record<string, string> = {
@@ -114,7 +114,7 @@ export default function QualityGateModal({
                                         className="flex items-center gap-2 text-sm text-purple-800"
                                     >
                                         <span className="w-1.5 h-1.5 bg-purple-500 rounded-full flex-shrink-0" />
-                                        {task.label} (concluída)
+                                        {task.label} {task.task_require_completed ? '(concluída)' : '(criada)'}
                                     </li>
                                 ))}
                             </ul>

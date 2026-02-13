@@ -182,6 +182,22 @@ export default function GovernanceConsole() {
         onError: (err: Error) => toast.error(`Erro ao remover: ${err.message}`)
     })
 
+    const updateMutation = useMutation({
+        mutationFn: async ({ id, updates }: { id: string, updates: Partial<ActionRequirement> }) => {
+            const { error } = await supabase
+                .from('stage_field_config')
+                .update(updates)
+                .eq('id', id)
+            if (error) throw error
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['action-requirements-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-field-config-all'] })
+            queryClient.invalidateQueries({ queryKey: ['stage-requirements'] })
+        },
+        onError: (err: Error) => toast.error(`Erro ao atualizar: ${err.message}`)
+    })
+
     const replicateMutation = useMutation({
         mutationFn: async ({ sourceRules, targetStageIds }: { sourceRules: ActionRequirement[], targetStageIds: string[] }) => {
             const newRules: ActionRequirement[] = []
@@ -302,7 +318,7 @@ export default function GovernanceConsole() {
             is_required: true,
             is_blocking: true,
             ...(type === 'proposal' && { proposal_min_status: value }),
-            ...(type === 'task' && { task_tipo: value, task_require_completed: true }),
+            ...(type === 'task' && { task_tipo: value, task_require_completed: false }),
             ...(type === 'field' && { field_key: value }),
             ...(type === 'rule' && { field_key: value }) // We store rule key in field_key for simplicity
         }
@@ -428,7 +444,7 @@ export default function GovernanceConsole() {
                                 <p className="text-gray-500">
                                     {selectedStageId === 'all'
                                         ? "Gerencie regras de todas as etapas em um único lugar."
-                                        : "Defina o que é obrigatório para um card sair desta etapa."}
+                                        : "Defina o que é obrigatório para um card entrar nesta etapa."}
                                 </p>
                             </div>
 
@@ -549,6 +565,10 @@ export default function GovernanceConsole() {
                                                 selected={rule.id ? selectedRuleIds.has(rule.id) : false}
                                                 onToggle={() => rule.id && toggleRuleSelection(rule.id)}
                                                 onDelete={() => rule.id && deleteMutation.mutate([rule.id])}
+                                                onToggleCompleted={rule.id ? (newVal) => updateMutation.mutate({
+                                                    id: rule.id!,
+                                                    updates: { task_require_completed: newVal }
+                                                }) : undefined}
                                             />
                                         ))}
                                     </div>
@@ -595,7 +615,7 @@ export default function GovernanceConsole() {
                                 <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50/50">
                                     <ShieldAlert className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                                     <p className="text-gray-500 font-medium">Nenhuma regra ativa</p>
-                                    <p className="text-sm text-gray-400">O card pode sair desta etapa livremente.</p>
+                                    <p className="text-sm text-gray-400">O card pode entrar nesta etapa livremente.</p>
                                 </div>
                             )}
                         </div>
@@ -684,7 +704,7 @@ export default function GovernanceConsole() {
 }
 
 
-function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: ActionRequirement & { _label: string; _isInvalid: boolean }, stageName?: string, selected: boolean, onToggle: () => void, onDelete: () => void }) {
+function RuleItem({ rule, stageName, selected, onToggle, onDelete, onToggleCompleted }: { rule: ActionRequirement & { _label: string; _isInvalid: boolean }, stageName?: string, selected: boolean, onToggle: () => void, onDelete: () => void, onToggleCompleted?: (newValue: boolean) => void }) {
     return (
         <div className={cn(
             "group flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm transition-all cursor-pointer",
@@ -734,6 +754,22 @@ function RuleItem({ rule, stageName, selected, onToggle, onDelete }: { rule: Act
                             </span>
                         )}
                     </p>
+                    {rule.requirement_type === 'task' && onToggleCompleted && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onToggleCompleted(!rule.task_require_completed)
+                            }}
+                            className={cn(
+                                "mt-1.5 text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors border",
+                                rule.task_require_completed
+                                    ? "bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200"
+                                    : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                            )}
+                        >
+                            {rule.task_require_completed ? 'Exige conclusão' : 'Apenas existir'}
+                        </button>
+                    )}
                 </div>
             </div>
             <Button

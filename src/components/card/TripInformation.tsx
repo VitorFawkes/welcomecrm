@@ -396,7 +396,6 @@ export default function TripInformation({ card }: TripInformationProps) {
 
 
     const getFieldStatus = (dataKey: string) => {
-        if (viewMode !== SystemPhase.SDR && viewMode !== SystemPhase.PLANNER) return 'ok' // Only validate in early stages
         if (correctionMode) return 'ok'
 
         // Only show visual indicator for BLOCKING requirements (current stage)

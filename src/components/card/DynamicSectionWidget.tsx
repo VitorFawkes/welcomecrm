@@ -15,6 +15,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { useSections } from '../../hooks/useSections'
+import { useStageRequirements } from '../../hooks/useStageRequirements'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
 import { cn } from '../../lib/utils'
 import type { Database, Json } from '../../database.types'
@@ -96,6 +97,15 @@ export default function DynamicSectionWidget({
 
     // Fetch field configuration
     const { getVisibleFields, isLoading: loadingFields } = useFieldConfig()
+
+    // Stage requirements for field blocking indicators
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { missingBlocking } = useStageRequirements(card as any)
+    const isFieldBlocking = useCallback((fieldKey: string) => {
+        return missingBlocking.some(req =>
+            req.requirement_type === 'field' && 'field_key' in req && req.field_key === fieldKey
+        )
+    }, [missingBlocking])
 
     // Get visible fields for this section at the current stage
     const fields = useMemo(() => {
@@ -255,11 +265,24 @@ export default function DynamicSectionWidget({
             {/* Content - fields always in edit mode, matches ObservacoesEstruturadas */}
             <div className="p-4" onKeyDown={handleKeyDown}>
                 <div className="space-y-4">
-                    {fields.map((field) => (
+                    {fields.map((field) => {
+                        const blocking = isFieldBlocking(field.key)
+                        return (
                         <div key={field.key}>
-                            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                            <label className={cn(
+                                "flex items-center gap-1.5 text-xs font-medium mb-2",
+                                blocking ? "text-red-700" : "text-gray-700"
+                            )}>
+                                <div className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    blocking ? "bg-red-500" : "bg-gray-400"
+                                )} />
                                 {field.label}
+                                {blocking && (
+                                    <span className="text-[10px] text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded-full">
+                                        Obrigatório
+                                    </span>
+                                )}
                             </label>
                             <UniversalFieldRenderer
                                 field={{
@@ -273,7 +296,8 @@ export default function DynamicSectionWidget({
                                 onChange={(val) => handleChange(field.key, val)}
                             />
                         </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         </div>

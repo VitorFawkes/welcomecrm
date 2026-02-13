@@ -29,6 +29,7 @@ interface MissingProposal {
 interface MissingTask {
     label: string
     task_tipo: string
+    task_require_completed: boolean
 }
 
 interface MissingRule {
@@ -64,21 +65,21 @@ export function useQualityGate() {
 
             if (error) throw error
 
-            return data?.map((item: any): RequirementRule => ({
-                stage_id: item.stage_id,
-                requirement_type: item.requirement_type || 'field',
+            return data?.map((item): RequirementRule => ({
+                stage_id: item.stage_id as string,
+                requirement_type: (item.requirement_type || 'field') as RequirementType,
                 field_key: item.field_key,
                 label: item.system_fields?.label || item.requirement_label || item.field_key || 'Requisito',
                 is_blocking: item.is_blocking ?? true,
                 proposal_min_status: item.proposal_min_status,
                 task_tipo: item.task_tipo,
-                task_require_completed: item.task_require_completed ?? true
+                task_require_completed: item.task_require_completed ?? false
             })) || []
         },
         staleTime: 1000 * 60 * 5 // 5 minutes
     })
 
-    const validateMove = async (card: any, targetStageId: string): Promise<ValidationResult> => {
+    const validateMove = async (card: Record<string, unknown>, targetStageId: string): Promise<ValidationResult> => {
         if (!rules) return { valid: true, missingFields: [], missingProposals: [], missingTasks: [], missingRules: [] }
 
         const stageRules = rules.filter(r => r.stage_id === targetStageId && r.is_blocking)
@@ -146,7 +147,7 @@ export function useQualityGate() {
             const { data: proposals } = await supabase
                 .from('proposals')
                 .select('id, status')
-                .eq('card_id', card.id)
+                .eq('card_id', card.id as string)
 
             for (const rule of proposalRules) {
                 if (!rule.proposal_min_status) continue
@@ -173,7 +174,7 @@ export function useQualityGate() {
             const { data: tasks } = await supabase
                 .from('tarefas')
                 .select('id, tipo, concluida')
-                .eq('card_id', card.id)
+                .eq('card_id', card.id as string)
 
             for (const rule of taskRules) {
                 if (!rule.task_tipo) continue
@@ -187,7 +188,8 @@ export function useQualityGate() {
                 if (!hasValidTask) {
                     missingTasks.push({
                         label: rule.label,
-                        task_tipo: rule.task_tipo
+                        task_tipo: rule.task_tipo,
+                        task_require_completed: rule.task_require_completed
                     })
                 }
             }
@@ -203,7 +205,7 @@ export function useQualityGate() {
             if (rule.field_key === 'lost_reason_required') {
                 // Check if lost reason is present
                 const hasId = !!card.motivo_perda_id
-                const hasComment = !!card.motivo_perda_comentario && card.motivo_perda_comentario.trim().length > 0
+                const hasComment = !!card.motivo_perda_comentario && (card.motivo_perda_comentario as string).trim().length > 0
                 isValid = hasId || hasComment
             }
 
@@ -225,7 +227,7 @@ export function useQualityGate() {
     }
 
     // Synchronous version for backward compatibility (fields only + rules sync check)
-    const validateMoveSync = (card: any, targetStageId: string): { valid: boolean, missingFields: { key: string, label: string }[], missingRules: { key: string, label: string }[] } => {
+    const validateMoveSync = (card: Record<string, unknown>, targetStageId: string): { valid: boolean, missingFields: { key: string, label: string }[], missingRules: { key: string, label: string }[] } => {
         if (!rules) return { valid: true, missingFields: [], missingRules: [] }
 
         const stageRules = rules.filter(r =>
@@ -290,7 +292,7 @@ export function useQualityGate() {
 
                 if (rule.field_key === 'lost_reason_required') {
                     const hasId = !!card.motivo_perda_id
-                    const hasComment = !!card.motivo_perda_comentario && card.motivo_perda_comentario.trim().length > 0
+                    const hasComment = !!card.motivo_perda_comentario && (card.motivo_perda_comentario as string).trim().length > 0
                     isValid = hasId || hasComment
                 }
 

@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import CardHeader from '../components/card/CardHeader'
-import StageRequirements from '../components/card/StageRequirements'
+import { useStageRequirements, type TaskRequirement } from '../hooks/useStageRequirements'
 import CardTasks from '../components/card/CardTasks'
 import { DynamicSectionsList } from '../components/card/DynamicSectionWidget'
 
@@ -64,6 +64,12 @@ export default function CardDetail() {
         },
         enabled: !!card?.pipeline_stage_id,
     })
+
+    // Compute missing task requirements for contextual indicators in CardTasks
+    const { missingBlocking } = useStageRequirements((card || { id: '', pipeline_stage_id: null }) as Card)
+    const requiredTasks = missingBlocking
+        .filter((r): r is TaskRequirement => r.requirement_type === 'task')
+        .map(r => ({ label: r.label, task_tipo: r.task_tipo, task_require_completed: r.task_require_completed }))
 
     // Determine if we can show sub-cards functionality
     const showSubCards = stageInfo?.fase === 'Pós-venda' &&
@@ -139,11 +145,8 @@ export default function CardDetail() {
                         <ParentLinkBanner parentId={card.parent_card_id} />
                     )}
 
-                    {/* Stage Requirements (Checklist) */}
-                    <StageRequirements card={card} />
-
                     {/* Tasks & Meetings (Unified) — hardcoded */}
-                    <CardTasks cardId={card.id!} />
+                    <CardTasks cardId={card.id!} requiredTasks={requiredTasks} />
 
                     {/* Dynamic Sections (left_column) — includes Informações Importantes via widget */}
                     <DynamicSectionsList
