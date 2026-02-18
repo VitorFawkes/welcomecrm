@@ -35,7 +35,14 @@ interface WhatsAppMessage {
     status: string | null;
     created_at: string | null;
     sent_by_user_name: string | null;
+    fase_label: string | null;
 }
+
+const FASE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+    'SDR': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    'Planner': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+    'Pós-Venda': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+};
 
 interface WhatsAppHistoryProps {
     contactId: string | null;
@@ -119,7 +126,7 @@ function getStatusIcon(message: WhatsAppMessage) {
 
 // Render media content
 function MessageMedia({ message }: { message: WhatsAppMessage }) {
-    const { media_url, message_type, body: _body } = message;
+    const { media_url, message_type } = message;
 
     if (!media_url) return null;
 
@@ -314,15 +321,16 @@ export function WhatsAppHistory({ contactId, className }: WhatsAppHistoryProps) 
         queryFn: async () => {
             if (!contactId) return [];
 
-            const { data, error } = await supabase
-                .from('whatsapp_messages')
-                .select('id, contact_id, card_id, body, direction, is_from_me, sender_name, message_type, media_url, status, created_at, sent_by_user_name')
+            const { data, error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .from('whatsapp_messages') as any)
+                .select('id, contact_id, card_id, body, direction, is_from_me, sender_name, message_type, media_url, status, created_at, sent_by_user_name, fase_label')
                 .eq('contact_id', contactId)
                 .order('created_at', { ascending: true })
                 .limit(200);
 
             if (error) throw error;
-            return data as WhatsAppMessage[];
+            return (data || []) as WhatsAppMessage[];
         },
         enabled: !!contactId
     });
@@ -352,7 +360,7 @@ export function WhatsAppHistory({ contactId, className }: WhatsAppHistoryProps) 
                     table: 'whatsapp_messages',
                     filter: `contact_id=eq.${contactId}`
                 },
-                (_payload) => {
+                () => {
                     // Invalidate query to refetch with new message
                     queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', contactId] });
                 }
@@ -365,6 +373,20 @@ export function WhatsAppHistory({ contactId, className }: WhatsAppHistoryProps) 
     }, [contactId, queryClient]);
 
     const groupedMessages = messages ? groupMessagesByDate(messages) : [];
+
+    // Pre-compute which messages should show a fase change badge
+    const faseChangeIds = new Set<string>();
+    if (groupedMessages.length > 0) {
+        let prevFase: string | null = null;
+        for (const group of groupedMessages) {
+            for (const msg of group.messages) {
+                if (msg.fase_label && msg.fase_label !== prevFase) {
+                    faseChangeIds.add(msg.id);
+                }
+                if (msg.fase_label) prevFase = msg.fase_label;
+            }
+        }
+    }
 
     // Filter out messages with no content
     const hasMessages = messages && messages.some(m => m.body || m.media_url);
@@ -443,9 +465,25 @@ export function WhatsAppHistory({ contactId, className }: WhatsAppHistoryProps) 
                             </div>
 
                             {/* Messages in group */}
-                            {group.messages.map((message) => (
-                                <MessageBubble key={message.id} message={message} />
-                            ))}
+                            {group.messages.map((message) => {
+                                const showFaseBadge = message.fase_label && faseChangeIds.has(message.id);
+                                const colors = message.fase_label ? FASE_COLORS[message.fase_label] : null;
+                                return (
+                                    <div key={message.id}>
+                                        {showFaseBadge && colors && (
+                                            <div className="flex items-center justify-center my-1">
+                                                <span className={cn(
+                                                    "px-2.5 py-0.5 rounded-full text-[10px] font-medium border",
+                                                    colors.bg, colors.text, colors.border
+                                                )}>
+                                                    {message.fase_label}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <MessageBubble message={message} />
+                                    </div>
+                                );
+                            })}
                         </div>
                     ))}
                 </div>

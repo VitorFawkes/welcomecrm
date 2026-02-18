@@ -14,6 +14,7 @@ interface ActionButtonsProps {
         id: string
         pessoa_principal_id?: string | null
         titulo?: string | null
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         [key: string]: any
     }
 }
@@ -37,7 +38,8 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
     })
 
     const logActivityMutation = useMutation({
-        mutationFn: async (activity: { tipo: string; descricao: string; metadata?: any }) => {
+        mutationFn: async (activity: { tipo: string; descricao: string; metadata?: Record<string, unknown> }) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error } = await (supabase.from('activities') as any)
                 .insert({
                     card_id: card.id,
@@ -98,23 +100,41 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         let platformName = 'WhatsApp'
 
         try {
-            // PRIORITY 1: Check if contact has an existing conversation with URL
+            const currentPhaseId = card.pipeline_stage?.phase_id
+
+            // Resolve expected phone line for current phase
+            let expectedPhoneLabel: string | null = null
+            if (currentPhaseId) {
+                const { data: lineConfig } = await (supabase
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    .from('whatsapp_linha_config') as any)
+                    .select('phone_number_label')
+                    .eq('phase_id', currentPhaseId)
+                    .eq('ativo', true)
+                    .limit(1)
+                    .single()
+                expectedPhoneLabel = lineConfig?.phone_number_label || null
+            }
+
+            // PRIORITY 1: Check conversation — only use if it matches current phase's line
             if (card.pessoa_principal_id) {
                 const { data: conversation } = await (supabase
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     .from('whatsapp_conversations') as any)
-                    .select('external_conversation_id, external_conversation_url, platform_id')
+                    .select('external_conversation_id, external_conversation_url, platform_id, phone_number_label')
                     .eq('contact_id', card.pessoa_principal_id)
                     .order('last_message_at', { ascending: false })
                     .limit(1)
                     .single()
 
-                if (conversation?.external_conversation_url) {
-                    // Direct URL available - use it!
+                // Use conversation URL only if it belongs to the current phase's line (or no phase mapping exists)
+                const conversationMatchesPhase = !expectedPhoneLabel || conversation?.phone_number_label === expectedPhoneLabel
+
+                if (conversation?.external_conversation_url && conversationMatchesPhase) {
                     targetUrl = conversation.external_conversation_url
                     fallbackUsed = 'deep_link'
                     platformName = 'Echo'
-                } else if (conversation?.external_conversation_id) {
-                    // Build URL from template if we have conversation ID
+                } else if (conversation?.external_conversation_id && conversationMatchesPhase) {
                     const { data: platform } = await supabase
                         .from('whatsapp_platforms')
                         .select('name, dashboard_url_template')
@@ -129,33 +149,30 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                 }
             }
 
-            // PRIORITY 2: If no conversation found, try phase mapping fallback
-            if (!targetUrl) {
-                const currentPhaseId = card.pipeline_stage?.phase_id
-                if (currentPhaseId) {
-                    const { data: mapping } = await (supabase
-                        .from('whatsapp_phase_instance_map' as never)
-                        .select('platform_id') as any)
-                        .eq('phase_id', currentPhaseId)
+            // PRIORITY 2: Phase mapping fallback (opens Echo dashboard)
+            if (!targetUrl && currentPhaseId) {
+                const { data: mapping } = await (supabase
+                    .from('whatsapp_phase_instance_map' as never)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    .select('platform_id') as any)
+                    .eq('phase_id', currentPhaseId)
+                    .eq('is_active', true)
+                    .order('priority')
+                    .limit(1)
+                    .single()
+
+                if (mapping?.platform_id) {
+                    const { data: platform } = await supabase
+                        .from('whatsapp_platforms')
+                        .select('name, dashboard_url_template')
+                        .eq('id', mapping.platform_id)
                         .eq('is_active', true)
-                        .order('priority')
-                        .limit(1)
                         .single()
 
-                    if (mapping?.platform_id) {
-                        const { data: platform } = await supabase
-                            .from('whatsapp_platforms')
-                            .select('name, dashboard_url_template')
-                            .eq('id', mapping.platform_id)
-                            .eq('is_active', true)
-                            .single()
-
-                        if (platform?.dashboard_url_template && !platform.dashboard_url_template.includes('{')) {
-                            // Static dashboard URL
-                            targetUrl = platform.dashboard_url_template
-                            fallbackUsed = 'dashboard'
-                            platformName = platform.name || 'Echo'
-                        }
+                    if (platform?.dashboard_url_template && !platform.dashboard_url_template.includes('{')) {
+                        targetUrl = platform.dashboard_url_template
+                        fallbackUsed = 'dashboard'
+                        platformName = platform.name || 'Echo'
                     }
                 }
             }
@@ -277,7 +294,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                                 });
                                 if (error) throw error;
                                 toast.success('Sincronização solicitada!', { id: toastId });
-                            } catch (err: any) {
+                            } catch (err: unknown) {
                                 console.error('Erro detalhado sync:', err);
                                 toast.error('Erro ao sincronizar', { id: toastId });
                             }

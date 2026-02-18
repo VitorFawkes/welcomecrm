@@ -23,6 +23,7 @@ import {
     TooltipTrigger,
     TooltipProvider,
 } from '@/components/ui/tooltip';
+import { usePipelinePhases } from '@/hooks/usePipelinePhases';
 
 // Line config from whatsapp_linha_config
 interface LinhaConfig {
@@ -31,6 +32,8 @@ interface LinhaConfig {
     phone_number_id: string | null;
     ativo: boolean;
     produto: string | null;
+    fase_label: string | null;
+    phase_id: string | null;
 }
 
 const TOGGLE_DEFINITIONS = [
@@ -68,11 +71,20 @@ const PRODUTOS = [
     { value: 'MARKETING', label: 'Marketing' },
 ];
 
+const FASE_LABELS = [
+    { value: 'SDR', label: 'SDR' },
+    { value: 'Planner', label: 'Planner' },
+    { value: 'Pós-Venda', label: 'Pós-Venda' },
+];
+
 export function WhatsAppGovernanceTab() {
     const queryClient = useQueryClient();
     const [toggleOverrides, setToggleOverrides] = useState<Record<string, boolean> | null>(null);
     const [linhaOverrides, setLinhaOverrides] = useState<LinhaConfig[] | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
+
+    // Fetch pipeline phases for the fase dropdown
+    const { data: phasesData } = usePipelinePhases();
 
     // Fetch Toggles from integration_settings
     const { data: togglesData, isLoading: isLoadingToggles } = useQuery({
@@ -92,9 +104,10 @@ export function WhatsAppGovernanceTab() {
     const { data: linhasData, isLoading: isLoadingLinhas } = useQuery({
         queryKey: ['whatsapp_linhas'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('whatsapp_linha_config')
-                .select('*')
+            const { data, error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .from('whatsapp_linha_config') as any)
+                .select('id, phone_number_label, phone_number_id, ativo, produto, fase_label, phase_id')
                 .order('phone_number_label');
 
             if (error) throw error;
@@ -139,14 +152,22 @@ export function WhatsAppGovernanceTab() {
         }
     });
 
+    // Build phase options from fetched data
+    const phaseOptions = useMemo(() => {
+        return (phasesData || []).map(p => ({ value: p.id, label: p.label || p.name }));
+    }, [phasesData]);
+
     // Save linha mutation
     const saveLinhaMutation = useMutation({
         mutationFn: async (linha: LinhaConfig) => {
-            const { error } = await supabase
-                .from('whatsapp_linha_config')
+            const { error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .from('whatsapp_linha_config') as any)
                 .update({
                     ativo: linha.ativo,
                     produto: linha.produto,
+                    fase_label: linha.fase_label,
+                    phase_id: linha.phase_id,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', linha.id);
@@ -324,18 +345,68 @@ export function WhatsAppGovernanceTab() {
 
                                 {linha.ativo && (
                                     <div className="pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200">
-                                        <div className="space-y-2 max-w-xs">
-                                            <label className="text-xs font-medium text-muted-foreground">
-                                                Produto (filtra qual card vincular)
-                                            </label>
-                                            <Select
-                                                value={linha.produto || ''}
-                                                onChange={(val) =>
-                                                    handleLinhaChange(linha.id, 'produto', val || null)
-                                                }
-                                                options={PRODUTOS}
-                                                placeholder="Todos os produtos"
-                                            />
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium text-muted-foreground">
+                                                    Produto (filtra qual card vincular)
+                                                </label>
+                                                <Select
+                                                    value={linha.produto || ''}
+                                                    onChange={(val) =>
+                                                        handleLinhaChange(linha.id, 'produto', val || null)
+                                                    }
+                                                    options={PRODUTOS}
+                                                    placeholder="Todos os produtos"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <label className="text-xs font-medium text-muted-foreground">
+                                                        Fase de Atendimento
+                                                    </label>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                <Info className="w-3 h-3 text-muted-foreground" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p className="max-w-xs">Define qual fase do pipeline esta linha atende (SDR, Planner, Pós-Venda). Usado para direcionar o botão WhatsApp na fase correta.</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </div>
+                                                <Select
+                                                    value={linha.fase_label || ''}
+                                                    onChange={(val) => {
+                                                        handleLinhaChange(linha.id, 'fase_label', val || null);
+                                                        // Auto-select phase_id based on name match
+                                                        const FASE_TO_SLUG: Record<string, string> = { 'SDR': 'sdr', 'Planner': 'planner', 'Pós-Venda': 'pos_venda' };
+                                                        const slug = val ? FASE_TO_SLUG[val] : null;
+                                                        const matchedPhase = slug ? phasesData?.find(p => p.slug === slug) : null;
+                                                        handleLinhaChange(linha.id, 'phase_id', matchedPhase?.id || null);
+                                                    }}
+                                                    options={FASE_LABELS}
+                                                    placeholder="Nenhuma fase"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium text-muted-foreground">
+                                                    Fase do Pipeline (vínculo direto)
+                                                </label>
+                                                <Select
+                                                    value={linha.phase_id || ''}
+                                                    onChange={(val) => {
+                                                        handleLinhaChange(linha.id, 'phase_id', val || null);
+                                                        // Auto-set fase_label from selected phase
+                                                        const SLUG_TO_FASE: Record<string, string> = { 'sdr': 'SDR', 'planner': 'Planner', 'pos_venda': 'Pós-Venda' };
+                                                        const phase = phasesData?.find(p => p.id === val);
+                                                        const faseLabel = phase?.slug ? SLUG_TO_FASE[phase.slug] : null;
+                                                        handleLinhaChange(linha.id, 'fase_label', faseLabel || null);
+                                                    }}
+                                                    options={phaseOptions}
+                                                    placeholder="Selecionar fase"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 )}
