@@ -196,7 +196,9 @@ export default function CardHeader({ card }: CardHeaderProps) {
         missingProposals?: { label: string, min_status: string }[],
         missingTasks?: { label: string, task_tipo: string, task_require_completed: boolean }[],
         currentOwnerId?: string,
-        sdrName?: string
+        sdrName?: string,
+        targetPhaseId?: string,
+        targetPhaseName?: string
     } | null>(null)
 
     const [lossReasonModalOpen, setLossReasonModalOpen] = useState(false)
@@ -412,7 +414,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
         }
     })
 
-    const handleStageSelect = async (stageId: string, stageName: string, stageFase: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- stageFase mantido na assinatura pois caller passa 3 args
+    const handleStageSelect = async (stageId: string, stageName: string, _stageFase: string) => {
         if (isValidatingStage) return
         setIsValidatingStage(true)
 
@@ -441,19 +444,19 @@ export default function CardHeader({ card }: CardHeaderProps) {
             return
         }
 
-        // 2. Check Owner Change (SDR -> Planner)
-        const currentPhase = phasesData?.find(p => p.name === currentFase)
-        const targetPhase = phasesData?.find(p => p.name === stageFase)
-
-        const isSdrPhase = currentPhase?.slug === SystemPhase.SDR
-        const isTargetSdr = targetPhase?.slug === SystemPhase.SDR
-
-        if (isSdrPhase && stageFase && !isTargetSdr) {
+        // 2. Check Owner Change (qualquer stage com target_phase_id)
+        const targetStageData = stages?.find(s => s.id === stageId)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types
+        const targetPhaseId = (targetStageData as any)?.target_phase_id as string | null
+        if (targetPhaseId) {
+            const targetPhase = phasesData?.find(p => p.id === targetPhaseId)
             setPendingStageChange({
                 stageId,
                 targetStageName: stageName,
                 currentOwnerId: card.dono_atual_id || undefined,
-                sdrName: card.sdr_owner_id ? 'SDR Atual' : undefined
+                sdrName: card.sdr_owner_id ? 'SDR Atual' : undefined,
+                targetPhaseId,
+                targetPhaseName: targetPhase?.name || 'Nova Fase'
             })
             setStageChangeModalOpen(true)
             setShowStageDropdown(false)
@@ -570,13 +573,16 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
             // Check owner change after quality gate
             const targetStage = stages?.find(s => s.id === pendingStageChange.stageId)
-            const currentPhase = phasesData?.find(p => p.name === currentFase)
-            const targetPhase = phasesData?.find(p => p.name === targetStage?.fase)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types
+            const phaseId = (targetStage as any)?.target_phase_id as string | null
 
-            const isSdrPhase = currentPhase?.slug === SystemPhase.SDR
-            const isTargetSdr = targetPhase?.slug === SystemPhase.SDR
-
-            if (isSdrPhase && targetStage?.fase && !isTargetSdr) {
+            if (phaseId) {
+                const targetPhase = phasesData?.find(p => p.id === phaseId)
+                setPendingStageChange(prev => prev ? {
+                    ...prev,
+                    targetPhaseId: phaseId,
+                    targetPhaseName: targetPhase?.name || 'Nova Fase'
+                } : null)
                 setStageChangeModalOpen(true)
             } else {
                 updateStageMutation.mutate(pendingStageChange.stageId)
@@ -1121,6 +1127,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 targetStageName={pendingStageChange?.targetStageName || ''}
                 currentOwnerId={pendingStageChange?.currentOwnerId || null}
                 sdrName={pendingStageChange?.sdrName}
+                targetPhaseId={pendingStageChange?.targetPhaseId}
+                targetPhaseName={pendingStageChange?.targetPhaseName}
             />
 
             <LossReasonModal

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import KanbanBoard from '../components/pipeline/KanbanBoard'
 import PipelineListView from '../components/pipeline/PipelineListView'
 import { cn } from '../lib/utils'
@@ -6,6 +6,8 @@ import CreateCardModal from '../components/pipeline/CreateCardModal'
 
 import { usePipelineFilters } from '../hooks/usePipelineFilters'
 import { useProductContext } from '../hooks/useProductContext'
+import { useMyTeamPhase } from '../hooks/useMyTeamPhase'
+import { useAuth } from '../contexts/AuthContext'
 
 import { FilterDrawer } from '../components/pipeline/FilterDrawer'
 import { ActiveFilters } from '../components/pipeline/ActiveFilters'
@@ -23,13 +25,23 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 
 export default function Pipeline() {
     const {
-        viewMode, subView, groupFilters, filters,
-        setViewMode, setSubView, setGroupFilters, setFilters
+        viewMode, subView, groupFilters, filters, _phaseAutoApplied,
+        setViewMode, setSubView, setGroupFilters, setFilters, setAll
     } = usePipelineFilters()
     const { currentProduct } = useProductContext()
+    const { profile } = useAuth()
+    const { data: myTeamPhase } = useMyTeamPhase()
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
     const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+
+    // Auto-filter: agentes (não-admin) veem inicialmente apenas a fase do seu time
+    // Flag _phaseAutoApplied persiste no Zustand entre navegações, evitando re-aplicação
+    const isAdmin = profile?.is_admin === true
+    useEffect(() => {
+        if (_phaseAutoApplied || isAdmin || !myTeamPhase) return
+        setAll({ filters: { ...filters, phaseFilter: myTeamPhase.id }, _phaseAutoApplied: true })
+    }, [myTeamPhase, isAdmin, _phaseAutoApplied]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
     const [viewType, setViewType] = useState<'kanban' | 'list'>(() => {

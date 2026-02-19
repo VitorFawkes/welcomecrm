@@ -376,7 +376,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         missingFields?: { key: string, label: string }[],
         missingProposals?: { label: string, min_status: string }[],
         missingTasks?: { label: string, task_tipo: string, task_require_completed: boolean }[],
-        requiredRole?: string
+        targetPhaseId?: string,
+        targetPhaseName?: string
     } | null>(null)
 
     // Edge Scrolling Logic
@@ -491,15 +492,19 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     return
                 }
 
-                // 2. Check Governance Rules (Target Role)
-                if (targetStage?.target_role) {
+                // 2. Check Governance Rules (Target Phase)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types
+                const targetPhaseId = (targetStage as any)?.target_phase_id as string | null
+                if (targetPhaseId) {
+                    const targetPhase = phasesData?.find(p => p.id === targetPhaseId)
                     setPendingMove({
                         cardId,
                         stageId,
                         currentOwnerId: active.data.current?.dono_atual_id,
                         sdrName: active.data.current?.sdr_owner_id ? 'SDR Atual' : undefined,
                         targetStageName: targetStage?.nome || 'Nova Etapa',
-                        requiredRole: targetStage.target_role
+                        targetPhaseId,
+                        targetPhaseName: targetPhase?.name || 'Nova Fase'
                     })
                     setStageChangeModalOpen(true)
                     setActiveCard(null)
@@ -550,9 +555,12 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
 
             setQualityGateModalOpen(false)
 
-            if (targetStage?.target_role) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types
+            const phaseId = (targetStage as any)?.target_phase_id as string | null
+            if (phaseId) {
                 // Open Owner Change Modal
-                setPendingMove(prev => prev ? { ...prev, requiredRole: targetStage.target_role ?? undefined } : null)
+                const targetPhase = phasesData?.find(p => p.id === phaseId)
+                setPendingMove(prev => prev ? { ...prev, targetPhaseId: phaseId, targetPhaseName: targetPhase?.name || 'Nova Fase' } : null)
                 setStageChangeModalOpen(true)
             } else {
                 // Just move
@@ -614,7 +622,9 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     // If phasesData is not loaded yet, we might want to show a loader or fallback
     // We map over the phasesData to ensure order and color
     const phases = phasesData || []
-    const displayPhases = [...phases]
+    const displayPhases = filters.phaseFilter
+        ? phases.filter(p => p.id === filters.phaseFilter)
+        : [...phases]
 
     // Calculate Totals for Sticky Footer (usar allCards para incluir terminal)
     const totalPipelineValue = allCards.reduce((acc, c) => acc + (c.valor_display || c.valor_estimado || 0), 0)
@@ -729,7 +739,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                         currentOwnerId={pendingMove.currentOwnerId || ''}
                                         sdrName={pendingMove.sdrName}
                                         targetStageName={pendingMove.targetStageName}
-                                        requiredRole={pendingMove.requiredRole}
+                                        targetPhaseId={pendingMove.targetPhaseId}
+                                        targetPhaseName={pendingMove.targetPhaseName}
                                     />
 
                                     <QualityGateModal

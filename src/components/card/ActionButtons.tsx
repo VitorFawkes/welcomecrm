@@ -280,7 +280,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                     {isCreatingProposal ? 'Criando...' : 'Proposta'}
                 </button>
 
-                {(profile?.role === 'admin' || profile?.is_admin) && (
+                {profile?.is_admin === true && (
                     <button
                         onClick={async () => {
                             if (!card.external_id) return;

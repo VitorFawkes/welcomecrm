@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { type ViewMode, type SubView, type FilterState, type GroupFilters } from './usePipelineFilters'
 import type { Database } from '../database.types'
 import { prepareSearchTerms } from '../lib/utils'
+import { useTeamFilterMembers } from './useTeamFilterMembers'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 export type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -16,6 +17,7 @@ interface UsePipelineListCardsProps {
     groupFilters: GroupFilters
     includeTerminalStages?: boolean
     terminalStageIds?: string[]
+    phaseStageIds?: string[] // Stage IDs filtrados por phaseFilter
     page?: number
     pageSize?: number
 }
@@ -36,6 +38,7 @@ export function usePipelineListCards({
     groupFilters,
     includeTerminalStages = false,
     terminalStageIds,
+    phaseStageIds,
     page = 1,
     pageSize = 50
 }: UsePipelineListCardsProps) {
@@ -57,15 +60,20 @@ export function usePipelineListCards({
         }
     })
 
+    // Fetch members for Team Filter (FilterDrawer teamIds)
+    const { data: filteredTeamMembers } = useTeamFilterMembers(filters.teamIds)
+
     const needsAuth = (viewMode === 'AGENT' && subView === 'MY_QUEUE') ||
         (viewMode === 'MANAGER' && subView === 'TEAM_VIEW')
     const isAuthReady = !!session?.user?.id
     const isTeamReady = subView !== 'TEAM_VIEW' || (myTeamMembers && myTeamMembers.length > 0)
+    // Aguardar RPC retornar (undefined = loading, [] = sem membros, [ids] = com membros)
+    const isTeamFilterReady = !(filters.teamIds?.length) || filteredTeamMembers !== undefined
 
     return useQuery({
-        queryKey: ['pipeline-list', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, includeTerminalStages, terminalStageIds, page, pageSize],
+        queryKey: ['pipeline-list', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, filteredTeamMembers, includeTerminalStages, terminalStageIds, phaseStageIds, page, pageSize],
         placeholderData: keepPreviousData,
-        enabled: !needsAuth || (isAuthReady && isTeamReady),
+        enabled: (!needsAuth || (isAuthReady && isTeamReady)) && isTeamFilterReady,
         queryFn: async (): Promise<PipelineListResult> => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- query builder perde tipo com encadeamento dinâmico
             let query = (supabase.from('view_cards_acoes') as any)
@@ -137,6 +145,16 @@ export function usePipelineListCards({
                 query = query.in('pos_owner_id', filters.posIds)
             }
 
+            // Team Filter — resolve teamIds para member IDs via RPC server-side
+            if ((filters.teamIds?.length ?? 0) > 0 && filteredTeamMembers !== undefined) {
+                if (filteredTeamMembers.length > 0) {
+                    query = query.in('dono_atual_id', filteredTeamMembers)
+                } else {
+                    // Time sem membros ativos — forçar zero resultados
+                    query = query.in('dono_atual_id', ['00000000-0000-0000-0000-000000000000'])
+                }
+            }
+
             if (filters.startDate) {
                 query = query.gte('data_viagem_inicio', filters.startDate)
             }
@@ -167,6 +185,14 @@ export function usePipelineListCards({
             // Terminal Stages Filter — default: excluir concluídos/perdidos
             if (!includeTerminalStages && terminalStageIds && terminalStageIds.length > 0) {
                 query = query.not('pipeline_stage_id', 'in', `(${terminalStageIds.join(',')})`)
+            }
+
+            // Phase Filter — filtrar por stages da fase selecionada
+            if (phaseStageIds && phaseStageIds.length > 0) {
+                query = query.in('pipeline_stage_id', phaseStageIds)
+            } else if (phaseStageIds !== undefined && phaseStageIds.length === 0) {
+                // Fase sem stages — forçar zero resultados
+                query = query.in('pipeline_stage_id', ['00000000-0000-0000-0000-000000000000'])
             }
 
             // Exclude group parents

@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { usePipelineFilters } from '../../hooks/usePipelineFilters'
 import { cn } from '../../lib/utils'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
+import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -17,6 +18,7 @@ export function ActiveFilters() {
     const { filters: rawFilters, setFilters } = usePipelineFilters()
     const filters = rawFilters || {}
     const { data: options } = useFilterOptions()
+    const { data: phasesData } = usePipelinePhases()
 
     const hasFilters = Object.keys(filters).length > 0 && (
         filters.search ||
@@ -26,6 +28,7 @@ export function ActiveFilters() {
         filters.posIds?.length ||
         filters.teamIds?.length ||
         filters.departmentIds?.length ||
+        filters.phaseFilter ||
         filters.statusComercial?.length ||
         filters.startDate ||
         filters.endDate ||
@@ -33,11 +36,13 @@ export function ActiveFilters() {
         filters.creationEndDate
     )
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic filter removal needs flexible typing
     const removeFilter = (key: keyof typeof filters, value?: any) => {
         const newFilters = { ...filters }
 
         if (Array.isArray(newFilters[key])) {
-            (newFilters as any)[key] = (newFilters[key] as any[]).filter(item => item !== value)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (newFilters as any)[key] = (newFilters[key] as string[]).filter(item => item !== value)
         } else {
             delete newFilters[key]
         }
@@ -95,6 +100,14 @@ export function ActiveFilters() {
                     const name = options?.departments.find(d => d.id === id)?.name || 'Depto'
                     return <Chip key={id} label={`Depto: ${name}`} onRemove={() => removeFilter('departmentIds', id)} />
                 })}
+
+                {/* Phase Filter */}
+                {filters.phaseFilter && (
+                    <Chip
+                        label={`Fase: ${phasesData?.find(p => p.id === filters.phaseFilter)?.name || 'Fase'}`}
+                        onRemove={() => removeFilter('phaseFilter')}
+                    />
+                )}
 
                 {/* Status Comercial */}
                 {filters.statusComercial?.map(status => (

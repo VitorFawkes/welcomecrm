@@ -51,7 +51,6 @@ export default function UserManagement() {
 
     useEffect(() => {
         fetchTeams();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fetchTeams = async () => {
@@ -91,6 +90,7 @@ export default function UserManagement() {
     );
 
     // Helper to get role display name
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user shape varies between fetched profiles
     const getRoleDisplay = (user: any) => {
         // First try new role_id
         if (user.role_id) {
@@ -104,7 +104,7 @@ export default function UserManagement() {
         return { name: '-', color: 'bg-gray-100 text-gray-800' };
     };
 
-    if (!profile?.is_admin && profile?.role !== 'admin') {
+    if (profile?.is_admin !== true) {
         return (
             <div className="flex items-center justify-center h-[50vh]">
                 <div className="text-center">

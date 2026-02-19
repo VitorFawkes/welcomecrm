@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Button } from '../ui/Button'
 import UserSelector from '../card/UserSelector'
 import { AlertTriangle } from 'lucide-react'
+import { useTeams } from '../../hooks/useTeams'
 
 interface StageChangeModalProps {
     isOpen: boolean
@@ -11,7 +12,8 @@ interface StageChangeModalProps {
     currentOwnerId: string | null
     sdrName?: string
     targetStageName: string
-    requiredRole?: string
+    targetPhaseId?: string    // UUID direto da pipeline_phases
+    targetPhaseName?: string  // Label para exibicao no modal
 }
 
 export default function StageChangeModal({
@@ -21,14 +23,21 @@ export default function StageChangeModal({
     currentOwnerId,
     sdrName,
     targetStageName,
-    requiredRole
+    targetPhaseId,
+    targetPhaseName
 }: StageChangeModalProps) {
-    const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(currentOwnerId)
+    const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null)
+    const [showAllUsers, setShowAllUsers] = useState(false)
+    const { teams } = useTeams()
 
-    useEffect(() => {
+    // Reset state when modal opens with new data
+    const [prevKey, setPrevKey] = useState('')
+    const resetKey = `${currentOwnerId}-${isOpen}`
+    if (resetKey !== prevKey) {
+        setPrevKey(resetKey)
         setSelectedOwnerId(currentOwnerId)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-    }, [currentOwnerId, isOpen])
+        setShowAllUsers(false)
+    }
 
     const handleConfirm = () => {
         if (selectedOwnerId) {
@@ -36,16 +45,17 @@ export default function StageChangeModal({
         }
     }
 
-    const getRoleLabel = (role?: string) => {
-        switch (role) {
-            case 'vendas': return 'Planner / Vendedor'
-            case 'concierge': return 'Concierge'
-            case 'sdr': return 'SDR'
-            default: return 'Responsável'
-        }
-    }
+    const phaseLabel = targetPhaseName || 'Responsável'
 
-    const roleLabel = getRoleLabel(requiredRole)
+    // Encontrar times que pertencem a fase alvo — direto por phase_id, sem mapeamento
+    const phaseTeamIds = useMemo(() => {
+        if (!targetPhaseId || showAllUsers) return undefined
+        const matchingTeams = teams.filter(t => t.phase_id === targetPhaseId)
+        if (matchingTeams.length === 0) return undefined // Nenhum time configurado — fail-open
+        return matchingTeams.map(t => t.id)
+    }, [targetPhaseId, showAllUsers, teams])
+
+    const isFiltered = phaseTeamIds !== undefined
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -60,8 +70,8 @@ export default function StageChangeModal({
                 <div className="py-4 space-y-4">
                     <p className="text-sm text-gray-600">
                         O card está entrando na etapa <strong>{targetStageName}</strong>.
-                        {requiredRole ? (
-                            <> Esta etapa exige um perfil de <strong>{roleLabel}</strong>.</>
+                        {targetPhaseId ? (
+                            <> Esta etapa exige um responsável da fase <strong>{phaseLabel}</strong>.</>
                         ) : (
                             <> Verifique o responsável pelo card.</>
                         )}
@@ -74,13 +84,28 @@ export default function StageChangeModal({
                     )}
 
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Selecionar {roleLabel}</label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-gray-700">Selecionar {phaseLabel}</label>
+                            {isFiltered && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAllUsers(true)}
+                                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                                >
+                                    Mostrar todos
+                                </button>
+                            )}
+                        </div>
                         <UserSelector
                             currentUserId={selectedOwnerId}
                             onSelect={setSelectedOwnerId}
+                            teamIds={phaseTeamIds}
                         />
                         <p className="text-xs text-gray-500">
-                            Se o responsável atual já for adequado, apenas confirme.
+                            {isFiltered
+                                ? `Mostrando membros dos times de ${phaseLabel}.`
+                                : 'Se o responsável atual já for adequado, apenas confirme.'
+                            }
                         </p>
                     </div>
                 </div>

@@ -15,7 +15,8 @@ export default function Header() {
                         {profile?.nome || user?.email}
                     </span>
                     <span className="text-xs text-gray-500 capitalize">
-                        {profile?.role || 'Usuário'}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- role_info join pendente de types regeneration */}
+                        {(profile as unknown as Record<string, any>)?.role_info?.display_name || 'Membro'}
                     </span>
                 </div>
                 <button

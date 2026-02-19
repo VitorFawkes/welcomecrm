@@ -174,6 +174,41 @@ Deno.serve(async (req) => {
             }
         }
 
+        // 6.6 Forward to n8n Wedding agent
+        if (provider === "echo" && insertedIds.length > 0) {
+            const weddingN8nUrl = Deno.env.get("N8N_WEDDING_WEBHOOK_URL");
+            if (weddingN8nUrl) {
+                const { data: weddingLabelSetting } = await supabaseClient
+                    .from("integration_settings")
+                    .select("value")
+                    .eq("key", "WEDDING_PHONE_LABELS")
+                    .single();
+                const weddingLabels = (weddingLabelSetting?.value || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+                if (weddingLabels.length > 0) {
+                    for (const singlePayload of payloads) {
+                        const phoneLabel = singlePayload?.phone_number || singlePayload?.data?.phone_number;
+                        if (phoneLabel && weddingLabels.includes(phoneLabel)) {
+                            try {
+                                const fwdPayload = { ...singlePayload };
+                                if (fwdPayload.ts_iso) {
+                                    const d = new Date(fwdPayload.ts_iso);
+                                    fwdPayload.ts_iso = d.toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).replace(' ', 'T') + '-03:00';
+                                }
+                                const fwdRes = await fetch(weddingN8nUrl, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify(fwdPayload),
+                                });
+                                console.log("n8n wedding forward:", fwdRes.status);
+                            } catch (err) {
+                                console.error("n8n wedding forward error:", err);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 7. Return response
         if (errors.length > 0 && insertedIds.length === 0) {
             return new Response(

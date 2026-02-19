@@ -19,6 +19,7 @@ export interface FilterState {
     posIds?: string[] // Multi-select Pós-Venda (pos_owner_id)
     teamIds?: string[]
     departmentIds?: string[]
+    phaseFilter?: string // phase_id — filtra pipeline para mostrar apenas uma fase
     sortBy?: SortBy
     sortDirection?: SortDirection
     showArchived?: boolean // Mostrar cards arquivados
@@ -37,6 +38,7 @@ interface PipelineFiltersState {
     filters: FilterState
     groupFilters: GroupFilters
     collapsedPhases: string[]
+    _phaseAutoApplied: boolean // Flag interna: phaseFilter já foi auto-aplicado para o usuário atual
     setViewMode: (mode: ViewMode) => void
     setSubView: (view: SubView) => void
     setFilters: (filters: FilterState) => void
@@ -59,7 +61,8 @@ export const initialState: Omit<PipelineFiltersState, 'setViewMode' | 'setSubVie
         showLinked: true,
         showSolo: true
     },
-    collapsedPhases: []
+    collapsedPhases: [],
+    _phaseAutoApplied: false
 }
 
 export const usePipelineFilters = create<PipelineFiltersState>()((set) => ({

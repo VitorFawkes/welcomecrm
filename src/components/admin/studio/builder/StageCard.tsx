@@ -10,9 +10,10 @@ interface StageCardProps {
     stage: PipelineStage
     onEdit: () => void
     onDelete: () => void
+    targetPhaseName?: string | null
 }
 
-export default function StageCard({ stage, onEdit, onDelete }: StageCardProps) {
+export default function StageCard({ stage, onEdit, onDelete, targetPhaseName }: StageCardProps) {
     const {
         attributes,
         listeners,
@@ -89,12 +90,11 @@ export default function StageCard({ stage, onEdit, onDelete }: StageCardProps) {
                         Inativo
                     </span>
                 )}
-                {stage.target_role && (
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types */}
+                {((stage as any).target_phase_id || stage.target_role) && (
                     <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
-                        {stage.target_role === 'sdr' ? 'SDR' :
-                            stage.target_role === 'vendas' ? 'Vendas' :
-                                stage.target_role === 'concierge' ? 'Concierge' : stage.target_role}
+                        {targetPhaseName || stage.target_role || 'Handoff'}
                     </span>
                 )}
             </div>

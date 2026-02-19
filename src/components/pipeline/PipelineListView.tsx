@@ -81,6 +81,12 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
         [fullStages]
     )
 
+    // Computar IDs de stages da fase filtrada (para phaseFilter)
+    const phaseStageIds = useMemo(() => {
+        if (!filters.phaseFilter || !stages) return undefined
+        return stages.filter(s => s.phase_id === filters.phaseFilter).map(s => s.id)
+    }, [filters.phaseFilter, stages])
+
     const { data: queryResult, isLoading } = usePipelineListCards({
         productFilter,
         viewMode,
@@ -89,6 +95,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
         groupFilters,
         includeTerminalStages: includeTerminal,
         terminalStageIds,
+        phaseStageIds,
         page: currentPage,
         pageSize: 50
     })

@@ -22,6 +22,7 @@ type PipelinePhase = Database['public']['Tables']['pipeline_phases']['Row']
 interface PhaseColumnProps {
     phase: PipelinePhase
     stages: PipelineStage[]
+    allPhases?: PipelinePhase[]
     onAddStage: () => void
     onEditPhase: () => void
     onDeletePhase: () => void
@@ -46,6 +47,7 @@ const COLORS = [
 export default function PhaseColumn({
     phase,
     stages,
+    allPhases,
     onAddStage,
     onEditPhase,
     onDeletePhase,
@@ -206,14 +208,20 @@ export default function PhaseColumn({
             <div className="flex-1 p-2 overflow-y-auto min-h-[100px]">
                 <SortableContext items={stages.map(s => String(s.id))} strategy={verticalListSortingStrategy}>
                     <div className="flex flex-col gap-2">
-                        {stages.map(stage => (
-                            <StageCard
-                                key={stage.id}
-                                stage={stage}
-                                onEdit={() => onEditStage(stage)}
-                                onDelete={() => onDeleteStage(stage)}
-                            />
-                        ))}
+                        {stages.map(stage => {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types
+                            const tpId = (stage as any).target_phase_id as string | null
+                            const tpName = tpId ? allPhases?.find(p => p.id === tpId)?.name : null
+                            return (
+                                <StageCard
+                                    key={stage.id}
+                                    stage={stage}
+                                    onEdit={() => onEditStage(stage)}
+                                    onDelete={() => onDeleteStage(stage)}
+                                    targetPhaseName={tpName}
+                                />
+                            )
+                        })}
                     </div>
                 </SortableContext>
             </div>

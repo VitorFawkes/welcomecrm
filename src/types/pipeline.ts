@@ -27,7 +27,8 @@ export interface PipelineStage {
     nome: string
     ordem: number
     cor: string
-    fase: string // Legacy column, will be deprecated
+    /** @deprecated Use phase_id FK. Mantido apenas por sync trigger. */
+    fase: string
     created_at: string
     updated_at: string
 }

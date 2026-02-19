@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { type ViewMode, type SubView, type FilterState, type GroupFilters } from './usePipelineFilters'
 import type { Database } from '../database.types'
 import { prepareSearchTerms } from '../lib/utils'
+import { useTeamFilterMembers } from './useTeamFilterMembers'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 export type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -37,16 +38,21 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
         }
     })
 
+    // Fetch members for Team Filter (FilterDrawer teamIds)
+    const { data: filteredTeamMembers } = useTeamFilterMembers(filters.teamIds)
+
     // Aguardar auth antes de disparar query para evitar busca sem filtro de dono (timeout)
     const needsAuth = (viewMode === 'AGENT' && subView === 'MY_QUEUE') ||
         (viewMode === 'MANAGER' && subView === 'TEAM_VIEW')
     const isAuthReady = !!session?.user?.id
     const isTeamReady = subView !== 'TEAM_VIEW' || (myTeamMembers && myTeamMembers.length > 0)
+    // Aguardar RPC retornar (undefined = loading, [] = sem membros, [ids] = com membros)
+    const isTeamFilterReady = !(filters.teamIds?.length) || filteredTeamMembers !== undefined
 
     const query = useQuery({
-        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, terminalStageIds],
+        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, filteredTeamMembers, terminalStageIds],
         placeholderData: keepPreviousData,
-        enabled: !needsAuth || (isAuthReady && isTeamReady),
+        enabled: (!needsAuth || (isAuthReady && isTeamReady)) && isTeamFilterReady,
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- query builder perde tipo com encadeamento dinâmico
             let query = (supabase.from('view_cards_acoes') as any)
@@ -129,6 +135,16 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
             // NEW: Pós-Venda Filter (pos_owner_id)
             if ((filters.posIds?.length ?? 0) > 0) {
                 query = query.in('pos_owner_id', filters.posIds)
+            }
+
+            // Team Filter — resolve teamIds para member IDs via RPC server-side
+            if ((filters.teamIds?.length ?? 0) > 0 && filteredTeamMembers !== undefined) {
+                if (filteredTeamMembers.length > 0) {
+                    query = query.in('dono_atual_id', filteredTeamMembers)
+                } else {
+                    // Time sem membros ativos — forçar zero resultados
+                    query = query.in('dono_atual_id', ['00000000-0000-0000-0000-000000000000'])
+                }
             }
 
             if (filters.startDate) {

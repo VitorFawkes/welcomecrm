@@ -209,21 +209,24 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
 
     const { profile } = useAuth()
 
-    // Helper to get initial owner values based on user's role
+    // Helper to get initial owner values based on user's team phase (not role)
+    // A fase do time determina qual coluna de owner e preenchida automaticamente
     const initialOwners = useMemo(() => {
-        const role = profile?.role
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- team join pendente de types regeneration
+        const phaseSlug = (profile as any)?.team?.phase?.slug as string | undefined
         const userId = profile?.id || null
         const userName = profile?.nome || null
 
         return {
-            sdr_owner_id: role === 'sdr' ? userId : null,
-            sdr_owner_nome: role === 'sdr' ? userName : null,
-            vendas_owner_id: role === 'vendas' ? userId : null,
-            vendas_owner_nome: role === 'vendas' ? userName : null,
-            pos_owner_id: role === 'pos_venda' ? userId : null,
-            pos_owner_nome: role === 'pos_venda' ? userName : null,
+            sdr_owner_id: phaseSlug === 'sdr' ? userId : null,
+            sdr_owner_nome: phaseSlug === 'sdr' ? userName : null,
+            vendas_owner_id: phaseSlug === 'planner' ? userId : null,
+            vendas_owner_nome: phaseSlug === 'planner' ? userName : null,
+            pos_owner_id: phaseSlug === 'pos_venda' ? userId : null,
+            pos_owner_nome: phaseSlug === 'pos_venda' ? userName : null,
         }
-    }, [profile?.role, profile?.id, profile?.nome])
+        // eslint-disable-next-line react-hooks/exhaustive-deps, @typescript-eslint/no-explicit-any
+    }, [(profile as any)?.team?.phase?.slug, profile?.id, profile?.nome])
 
     // Core form data
     const [formData, setFormData] = useState({
@@ -283,7 +286,6 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
     useEffect(() => {
         if (isOpen && !wasOpenRef.current) {
             // Modal just opened - reset with initial owners based on user's role
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData({
                 titulo: '',
                 produto: 'TRIPS',

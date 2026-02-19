@@ -75,6 +75,7 @@ export function TeamManagement() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nome</TableHead>
+                            <TableHead>Fase Pipeline</TableHead>
                             <TableHead>Descrição</TableHead>
                             <TableHead>Membros</TableHead>
                             <TableHead>Status</TableHead>
@@ -84,13 +85,13 @@ export function TeamManagement() {
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8">
+                                <TableCell colSpan={6} className="text-center py-8">
                                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                                 </TableCell>
                             </TableRow>
                         ) : filteredTeams?.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                     Nenhum time encontrado.
                                 </TableCell>
                             </TableRow>
@@ -104,6 +105,15 @@ export function TeamManagement() {
                                             </div>
                                             <span className="font-medium text-foreground">{team.name}</span>
                                         </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {team.phase ? (
+                                            <Badge className={`${team.phase.color} text-white text-xs`}>
+                                                {team.phase.name}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-muted-foreground text-sm">—</span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">
                                         {team.description || '-'}

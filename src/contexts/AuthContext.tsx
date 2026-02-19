@@ -3,7 +3,23 @@ import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Database } from '../database.types'
 
-type Profile = Database['public']['Tables']['profiles']['Row']
+type ProfileRow = Database['public']['Tables']['profiles']['Row']
+
+// Enriquecido com joins de team+phase e role_info para evitar queries extras
+type Profile = ProfileRow & {
+    team?: {
+        id: string
+        name: string
+        phase_id: string | null
+        phase: { id: string; name: string; slug: string; color: string; order_index: number } | null
+    } | null
+    role_info?: {
+        id: string
+        name: string
+        display_name: string
+        color: string | null
+    } | null
+}
 
 interface AuthContextType {
     user: User | null
@@ -80,7 +96,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select(`
+                    *,
+                    team:teams(id, name, phase_id,
+                        phase:pipeline_phases(id, name, slug, color, order_index)
+                    ),
+                    role_info:roles(id, name, display_name, color)
+                `)
                 .eq('id', userId)
                 .single()
 

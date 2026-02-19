@@ -15,28 +15,41 @@ interface UserSelectorProps {
     label?: string
     disabled?: boolean
     roleFilter?: string | string[]
+    teamIds?: string[] // Filtra por membros desses times
 }
 
-export default function UserSelector({ currentUserId, onSelect, label, disabled = false, roleFilter }: UserSelectorProps) {
+export default function UserSelector({ currentUserId, onSelect, label, disabled = false, roleFilter, teamIds }: UserSelectorProps) {
     const [profiles, setProfiles] = useState<Profile[]>([])
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
         const fetchProfiles = async () => {
+            // teamIds=[] significa "filtro ativo mas sem times" — zero resultados
+            if (teamIds !== undefined && teamIds.length === 0) {
+                setProfiles([])
+                setLoading(false)
+                return
+            }
+
             setLoading(true)
             try {
-                // Busca todos os usuários ativos
-                const { data, error } = await supabase
+                let query = supabase
                     .from('profiles')
-                    .select('id, nome, email, role')
+                    .select('id, nome, email, role, team_id')
                     .eq('active', true)
                     .order('nome')
 
+                // Filtro server-side por time quando possível
+                if (teamIds && teamIds.length > 0) {
+                    query = query.in('team_id', teamIds)
+                }
+
+                const { data, error } = await query
                 if (error) throw error
 
                 let filteredProfiles = data || []
 
-                // Filtra por role se especificado (usando o campo 'role' diretamente)
+                // Filtra por role se especificado (legado, usando o campo 'role')
                 if (roleFilter) {
                     const roleArray = Array.isArray(roleFilter) ? roleFilter : [roleFilter]
                     filteredProfiles = filteredProfiles.filter(p =>
@@ -53,7 +66,7 @@ export default function UserSelector({ currentUserId, onSelect, label, disabled 
         }
 
         fetchProfiles()
-    }, [roleFilter])
+    }, [roleFilter, teamIds?.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <div>

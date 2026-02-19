@@ -6,6 +6,7 @@ export interface Team {
     name: string;
     description: string | null;
     department_id: string | null;
+    phase_id: string | null;
     is_active: boolean;
     color: string;
     leader_id: string | null;
@@ -20,6 +21,13 @@ export interface Team {
         nome: string;
         email: string;
     } | null;
+    phase?: {
+        id: string;
+        name: string;
+        slug: string | null;
+        color: string;
+        order_index: number;
+    } | null;
     member_count?: number;
 }
 
@@ -27,6 +35,7 @@ export interface CreateTeamData {
     name: string;
     description?: string;
     department_id?: string;
+    phase_id?: string;
     color?: string;
     leader_id?: string;
 }
@@ -50,7 +59,8 @@ export function useTeams() {
                 .select(`
                     *,
                     department:departments(id, name),
-                    leader:profiles!teams_leader_id_fkey(id, nome, email)
+                    leader:profiles!teams_leader_id_fkey(id, nome, email),
+                    phase:pipeline_phases(id, name, slug, color, order_index)
                 `)
                 .order('name');
 
@@ -69,7 +79,8 @@ export function useTeams() {
                 .select(`
                     *,
                     department:departments(id, name),
-                    leader:profiles!teams_leader_id_fkey(id, nome, email)
+                    leader:profiles!teams_leader_id_fkey(id, nome, email),
+                    phase:pipeline_phases(id, name, slug, color, order_index)
                 `)
                 .order('name');
 
@@ -108,6 +119,7 @@ export function useTeams() {
                     name: data.name,
                     description: data.description || null,
                     department_id: data.department_id || null,
+                    phase_id: data.phase_id || null,
                     color: data.color || 'bg-blue-100 text-blue-800',
                     leader_id: data.leader_id || null,
                     is_active: true,
@@ -129,6 +141,7 @@ export function useTeams() {
             if (data.name !== undefined) updates.name = data.name;
             if (data.description !== undefined) updates.description = data.description;
             if (data.department_id !== undefined) updates.department_id = data.department_id || null;
+            if (data.phase_id !== undefined) updates.phase_id = data.phase_id || null;
             if (data.color !== undefined) updates.color = data.color;
             if (data.leader_id !== undefined) updates.leader_id = data.leader_id || null;
             if (data.is_active !== undefined) updates.is_active = data.is_active;

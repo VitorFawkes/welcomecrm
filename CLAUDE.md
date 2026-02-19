@@ -141,7 +141,22 @@ proposals → cards (card_id)
 cadence_instances → cards (card_id)
 profiles → teams (team_id)
 pipeline_stages → pipeline_phases (phase_id)
+pipeline_stages → pipeline_phases (target_phase_id) — handoff entre fases
 ```
+
+### Arquitetura de Identidade (Fonte da Verdade)
+| Conceito | Fonte | Caminho |
+|----------|-------|---------|
+| **Seção do pipeline** (onde trabalha) | `teams.phase_id` | `profiles.team_id → teams.phase_id → pipeline_phases.slug` |
+| **Nível de acesso** (o que pode fazer) | `profiles.is_admin` | `true` = admin/gestor, `false` = membro regular |
+| **Handoff de fase** (quem deve receber) | `pipeline_stages.target_phase_id` | UUID FK → pipeline_phases |
+| **Role legacy** (backward compat) | `profiles.role` | **CONGELADO** — sync automático via trigger `trg_sync_role_from_team` |
+
+**Regras:**
+- `profiles.role` (enum) NÃO deve ser lido para lógica de seção do pipeline — usar `team.phase.slug`
+- `isAdmin` deve usar APENAS `profile?.is_admin === true` — nunca checar `role === 'admin'`
+- Handoff entre fases usa `target_phase_id` (UUID FK) — nunca `target_role` (string legacy)
+- AuthContext já traz joins: `profile.team.phase` e `profile.role_info`
 
 ---
 

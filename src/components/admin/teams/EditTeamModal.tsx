@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useTeams, type UpdateTeamData, type Team } from '../../../hooks/useTeams';
+import { usePipelinePhases } from '../../../hooks/usePipelinePhases';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Textarea } from '../../ui/textarea';
+import { Select } from '../../ui/Select';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
@@ -14,23 +16,39 @@ interface EditTeamModalProps {
     team: Team | null;
 }
 
-// TEAM_COLORS array is removed as the color selection mechanism changes to a color input.
+const TEAM_COLOR_OPTIONS = [
+    { value: 'bg-blue-100 text-blue-800', label: 'Azul' },
+    { value: 'bg-green-100 text-green-800', label: 'Verde' },
+    { value: 'bg-purple-100 text-purple-800', label: 'Roxo' },
+    { value: 'bg-yellow-100 text-yellow-800', label: 'Amarelo' },
+    { value: 'bg-red-100 text-red-800', label: 'Vermelho' },
+    { value: 'bg-pink-100 text-pink-800', label: 'Rosa' },
+    { value: 'bg-indigo-100 text-indigo-800', label: 'Índigo' },
+    { value: 'bg-slate-100 text-slate-800', label: 'Cinza' },
+];
 
 export function EditTeamModal({ isOpen, onClose, team }: EditTeamModalProps) {
-    const { updateTeam } = useTeams(); // Assuming updateTeam is an object with mutateAsync and isPending
-    const { toast } = useToast(); // Re-adding useToast hook
-    const { register, handleSubmit, reset, formState: { errors } } = useForm<UpdateTeamData>();
+    const { updateTeam } = useTeams();
+    const { data: phases } = usePipelinePhases();
+    const { toast } = useToast();
+    const { register, handleSubmit, reset, control, formState: { errors } } = useForm<UpdateTeamData>();
+
+    const phaseOptions = [
+        { value: '', label: 'Nenhuma (time genérico)' },
+        ...(phases?.map(p => ({ value: p.id, label: p.label || p.name })) || [])
+    ];
 
     useEffect(() => {
-        if (team && isOpen) { // Added isOpen check for reset logic
+        if (team && isOpen) {
             reset({
                 name: team.name,
                 description: team.description || '',
-                color: team.color || '#000000', // Default color if not set
+                phase_id: team.phase_id || '',
+                color: team.color || 'bg-blue-100 text-blue-800',
                 is_active: team.is_active
             });
         }
-    }, [team, isOpen, reset]); // Added isOpen to dependency array
+    }, [team, isOpen, reset]);
 
     const onSubmit = async (data: UpdateTeamData) => {
         if (!team) return;
@@ -74,20 +92,43 @@ export function EditTeamModal({ isOpen, onClose, team }: EditTeamModalProps) {
                         />
                     </div>
 
-                    <div className="space-y-2"> {/* New color selection div */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Fase do Pipeline</label>
+                        <Controller
+                            name="phase_id"
+                            control={control}
+                            render={({ field }) => (
+                                <Select
+                                    value={field.value || ''}
+                                    onChange={field.onChange}
+                                    options={phaseOptions}
+                                    placeholder="Selecione a fase..."
+                                />
+                            )}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Define em qual seção do pipeline este time opera
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
                         <label className="text-sm font-medium">Cor</label>
-                        <div className="flex gap-2">
-                            <Input
-                                type="color"
-                                {...register('color')}
-                                className="w-12 h-10 p-1 cursor-pointer"
-                            />
-                            <Input
-                                {...register('color')}
-                                placeholder="#000000"
-                                className="flex-1"
-                            />
-                        </div>
+                        <Controller
+                            name="color"
+                            control={control}
+                            render={({ field }) => (
+                                <div className="flex items-center gap-2">
+                                    <span className={`w-8 h-8 rounded-md border border-slate-200 shrink-0 ${(field.value || 'bg-blue-100').split(' ')[0]}`} />
+                                    <Select
+                                        value={field.value || 'bg-blue-100 text-blue-800'}
+                                        onChange={field.onChange}
+                                        options={TEAM_COLOR_OPTIONS}
+                                        placeholder="Selecione a cor..."
+                                        className="flex-1"
+                                    />
+                                </div>
+                            )}
+                        />
                     </div>
 
                     <div className="flex items-center gap-2">

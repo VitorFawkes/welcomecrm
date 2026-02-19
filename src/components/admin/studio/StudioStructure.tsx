@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { Loader2, Plus, Layout } from 'lucide-react'
@@ -91,17 +91,18 @@ export default function StudioStructure() {
         }
     })
 
-    // Sync state
-    // Sync state
-    useEffect(() => {
+    // Sync server data → local state (render-time sync, avoids cascading useEffect)
+    const [prevPhases, setPrevPhases] = useState(phasesData)
+    if (phasesData !== prevPhases) {
+        setPrevPhases(phasesData)
         if (phasesData) setLocalPhases(phasesData)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-    }, [phasesData])
+    }
 
-    useEffect(() => {
+    const [prevStages, setPrevStages] = useState(stagesData)
+    if (stagesData !== prevStages) {
+        setPrevStages(stagesData)
         if (stagesData) setLocalStages(stagesData)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-    }, [stagesData])
+    }
 
     // --- Mutations ---
     const updatePhaseMutation = useMutation({
@@ -112,12 +113,14 @@ export default function StudioStructure() {
         onMutate: async (newPhase) => {
             await queryClient.cancelQueries({ queryKey: ['pipeline-phases'] })
             const previousPhases = queryClient.getQueryData(['pipeline-phases'])
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             queryClient.setQueryData(['pipeline-phases'], (old: any[] | undefined) => {
                 if (!old) return []
-                return old.map((p: any) => p.id === newPhase.id ? { ...p, ...newPhase } : p)
+                return old.map((p: { id: string }) => p.id === newPhase.id ? { ...p, ...newPhase } : p)
             })
             return { previousPhases }
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (err, _newPhase, context: any) => {
             console.error('Error updating phase:', err)
             if (context?.previousPhases) {
@@ -178,27 +181,16 @@ export default function StudioStructure() {
                 throw new Error('Não foi possível determinar o pipeline. Recarregue a página.')
             }
 
-            // ELITE: Inherit role from parent phase, with smart fallback based on phase name
-            const getDefaultRoleForPhase = (phaseName?: string): string => {
-                if (!phaseName) return 'vendas'
-                const lower = phaseName.toLowerCase()
-                if (lower.includes('sdr') || lower.includes('lead') || lower.includes('prosp')) return 'sdr'
-                if (lower.includes('vend') || lower.includes('clos') || lower.includes('negoc')) return 'vendas'
-                if (lower.includes('pós') || lower.includes('pos') || lower.includes('sucesso')) return 'pos_venda'
-                if (lower.includes('conc')) return 'concierge'
-                if (lower.includes('finan')) return 'financeiro'
-                return 'vendas'
-            }
-            const inheritedRole = (phase as any)?.target_role || getDefaultRoleForPhase(phase?.name)
-
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data, error } = await (supabase.from('pipeline_stages') as any).insert({
                 nome: name,
                 fase: phase?.name || 'SDR',
                 phase_id: phaseId,
+                target_phase_id: phaseId, // Default: mesma fase do stage
                 ordem: maxOrder + 1,
                 pipeline_id: pipelineId,
                 ativo: true,
-                tipo_responsavel: inheritedRole // Inherited from phase or smart default
+                // tipo_responsavel nullable agora — campo deprecated
             }).select()
             if (error) {
                 console.error('Stage creation error:', error)
@@ -237,6 +229,7 @@ export default function StudioStructure() {
 
     const reorderStagesMutation = useMutation({
         mutationFn: async (stages: Partial<PipelineStage>[]) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { error } = await (supabase.from('pipeline_stages') as any).upsert(stages)
             if (error) throw error
         },
@@ -384,7 +377,8 @@ export default function StudioStructure() {
                                 id: s.id,
                                 nome: s.nome,
                                 ordem: idx + 1,
-                                tipo_responsavel: (s as any).tipo_responsavel || 'vendas',
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                tipo_responsavel: (s as any).tipo_responsavel || 'vendas', // DEPRECATED: constraint only
                                 pipeline_id: s.pipeline_id,
                                 ativo: s.ativo ?? true,
                                 fase: phase.name,
@@ -482,6 +476,7 @@ export default function StudioStructure() {
                                     key={phase.id}
                                     phase={phase}
                                     stages={localStages.filter(s => s.phase_id === phase.id)}
+                                    allPhases={localPhases}
                                     onAddStage={() => {
                                         setPromptModal({
                                             isOpen: true,
@@ -535,6 +530,7 @@ export default function StudioStructure() {
                             <PhaseColumn
                                 phase={localPhases.find(p => p.id === activeId)!}
                                 stages={localStages.filter(s => s.phase_id === activeId)}
+                                allPhases={localPhases}
                                 onAddStage={() => { }}
                                 onEditPhase={() => { }}
                                 onDeletePhase={() => { }}

@@ -111,7 +111,7 @@ export function useCardCreationRules() {
 export function useAllowedStages(product: string) {
     const { profile } = useAuth()
     const teamId = profile?.team_id
-    const isAdmin = profile?.is_admin || profile?.role === 'admin' || profile?.role === 'gestor'
+    const isAdmin = profile?.is_admin === true
 
     const { data: allowedStages = [], isLoading } = useQuery({
         queryKey: ['allowed-stages', teamId, isAdmin, product],
@@ -132,13 +132,16 @@ export function useAllowedStages(product: string) {
                         pipelines!inner(produto)
                     `)
                     .eq('ativo', true)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase nested filter typing
                     .eq('pipelines.produto', product as any)
 
                 if (error) throw error
 
                 // Sort by phase order_index, then by stage ordem within phase
                 const sorted = (data || []).sort((a, b) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase join typing
                     const phaseOrderA = (a.pipeline_phases as any)?.order_index ?? 999
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase join typing
                     const phaseOrderB = (b.pipeline_phases as any)?.order_index ?? 999
                     if (phaseOrderA !== phaseOrderB) return phaseOrderA - phaseOrderB
                     return a.ordem - b.ordem
@@ -167,6 +170,7 @@ export function useAllowedStages(product: string) {
                     )
                 `)
                 .eq('team_id', teamId)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase nested filter typing
                 .eq('pipeline_stages.pipelines.produto', product as any)
 
             if (error) throw error
