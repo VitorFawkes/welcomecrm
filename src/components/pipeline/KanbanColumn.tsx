@@ -47,7 +47,7 @@ export default function KanbanColumn({ stage, cards, phaseColor, totalCount, onS
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-base font-bold text-gray-800 tracking-tight">{stage.nome}</h3>
                     <span className="rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-500">
-                        {cards.length}
+                        {totalCount != null ? `${cards.length}/${totalCount}` : cards.length}
                     </span>
                 </div>
                 <div className="flex items-center justify-between">

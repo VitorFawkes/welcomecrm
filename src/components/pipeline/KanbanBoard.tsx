@@ -11,7 +11,7 @@ import {
     type DragEndEvent,
     type DragStartEvent
 } from '@dnd-kit/core'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
@@ -136,19 +136,6 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         [stages]
     )
 
-    // Stats agregadas da view_dashboard_funil (count + valor por stage)
-    const { data: funnelStats } = useQuery({
-        queryKey: ['dashboard-funnel', productFilter],
-        queryFn: async () => {
-            let query = supabase.from('view_dashboard_funil').select('*')
-            if (productFilter !== 'ALL') query = query.eq('produto', productFilter)
-            const { data, error } = await query
-            if (error) throw error
-            return data
-        },
-        staleTime: 1000 * 60 * 2
-    })
-
     // Fetch Cards de stages ativos — exclui stages terminais
     const { data: cards, isError, refetch, myTeamMembers } = usePipelineCards({
         productFilter,
@@ -166,97 +153,114 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const isAuthReady = !!session?.user?.id
     const isTeamReady = subView !== 'TEAM_VIEW' || (myTeamMembers && myTeamMembers.length > 0)
 
-    // Fetch cards de stages terminais separadamente (LIMIT 100) para evitar PGRST_MAX_ROWS
-    const { data: terminalCards } = useQuery({
-        queryKey: ['terminal-cards', terminalStageIds, productFilter, viewMode, subView, filters, groupFilters, myTeamMembers],
-        enabled: terminalStageIds.length > 0 && (!needsAuth || (isAuthReady && isTeamReady)),
-        queryFn: async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let query = (supabase.from('view_cards_acoes') as any)
-                .select('*')
-                .in('pipeline_stage_id', terminalStageIds)
+    // Fetch cards de stages terminais — per-stage com count: 'exact' (LIMIT 50 cada)
+    type TerminalStageResult = { stageId: string, cards: Card[], totalCount: number }
+    const terminalStageQueries = useQueries({
+        queries: terminalStageIds.map(stageId => ({
+            queryKey: ['terminal-cards', stageId, productFilter, viewMode, subView, filters, groupFilters, myTeamMembers],
+            enabled: !needsAuth || (isAuthReady && isTeamReady),
+            staleTime: 1000 * 60 * 2,
+            queryFn: async (): Promise<TerminalStageResult> => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let query = (supabase.from('view_cards_acoes') as any)
+                    .select('*', { count: 'exact' })
+                    .eq('pipeline_stage_id', stageId)
 
-            if (productFilter !== 'ALL') {
-                query = query.eq('produto', productFilter)
-            }
-
-            // Smart View Filters (mesmos do usePipelineCards)
-            if (viewMode === 'AGENT' && subView === 'MY_QUEUE' && session?.user?.id) {
-                query = query.eq('dono_atual_id', session.user.id)
-            } else if (viewMode === 'MANAGER') {
-                if (subView === 'TEAM_VIEW' && myTeamMembers && myTeamMembers.length > 0) {
-                    query = query.in('dono_atual_id', myTeamMembers)
+                if (productFilter !== 'ALL') {
+                    query = query.eq('produto', productFilter)
                 }
-                if (subView === 'FORECAST') {
-                    const startOfMonth = new Date(); startOfMonth.setDate(1);
-                    const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-                    query = query.gte('data_fechamento', startOfMonth.toISOString()).lt('data_fechamento', endOfMonth.toISOString())
-                }
-            }
 
-            // Search (paridade completa com usePipelineCards)
-            if (filters.search) {
-                const { original, normalized, digitsOnly } = prepareSearchTerms(filters.search)
-                if (original) {
-                    const textFields = [
-                        `titulo.ilike.%${original}%`,
-                        `pessoa_nome.ilike.%${original}%`,
-                        `origem.ilike.%${original}%`,
-                        `dono_atual_nome.ilike.%${original}%`,
-                        `sdr_owner_nome.ilike.%${original}%`,
-                        `vendas_nome.ilike.%${original}%`,
-                        `pessoa_email.ilike.%${original}%`,
-                        `external_id.ilike.%${original}%`
-                    ]
-                    if (normalized) {
-                        textFields.push(`pessoa_telefone_normalizado.ilike.%${normalized}%`)
-                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
-                    } else if (digitsOnly) {
-                        textFields.push(`pessoa_telefone_normalizado.ilike.%${digitsOnly}%`)
-                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
-                    } else {
-                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                // Smart View Filters (mesmos do usePipelineCards)
+                if (viewMode === 'AGENT' && subView === 'MY_QUEUE' && session?.user?.id) {
+                    query = query.eq('dono_atual_id', session.user.id)
+                } else if (viewMode === 'MANAGER') {
+                    if (subView === 'TEAM_VIEW' && myTeamMembers && myTeamMembers.length > 0) {
+                        query = query.in('dono_atual_id', myTeamMembers)
                     }
-                    query = query.or(textFields.join(','))
+                    if (subView === 'FORECAST') {
+                        const startOfMonth = new Date(); startOfMonth.setDate(1);
+                        const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+                        query = query.gte('data_fechamento', startOfMonth.toISOString()).lt('data_fechamento', endOfMonth.toISOString())
+                    }
                 }
+
+                // Search (paridade completa com usePipelineCards)
+                if (filters.search) {
+                    const { original, normalized, digitsOnly } = prepareSearchTerms(filters.search)
+                    if (original) {
+                        const textFields = [
+                            `titulo.ilike.%${original}%`,
+                            `pessoa_nome.ilike.%${original}%`,
+                            `origem.ilike.%${original}%`,
+                            `dono_atual_nome.ilike.%${original}%`,
+                            `sdr_owner_nome.ilike.%${original}%`,
+                            `vendas_nome.ilike.%${original}%`,
+                            `pessoa_email.ilike.%${original}%`,
+                            `external_id.ilike.%${original}%`
+                        ]
+                        if (normalized) {
+                            textFields.push(`pessoa_telefone_normalizado.ilike.%${normalized}%`)
+                            textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                        } else if (digitsOnly) {
+                            textFields.push(`pessoa_telefone_normalizado.ilike.%${digitsOnly}%`)
+                            textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                        } else {
+                            textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                        }
+                        query = query.or(textFields.join(','))
+                    }
+                }
+
+                // Owner Filters (paridade completa com usePipelineCards)
+                if ((filters.ownerIds?.length ?? 0) > 0) query = query.in('dono_atual_id', filters.ownerIds)
+                if ((filters.sdrIds?.length ?? 0) > 0) query = query.in('sdr_owner_id', filters.sdrIds)
+                if ((filters.plannerIds?.length ?? 0) > 0) query = query.in('vendas_owner_id', filters.plannerIds)
+                if ((filters.posIds?.length ?? 0) > 0) query = query.in('pos_owner_id', filters.posIds)
+
+                // Date Filters
+                if (filters.startDate) query = query.gte('data_viagem_inicio', filters.startDate)
+                if (filters.endDate) query = query.lte('data_viagem_inicio', filters.endDate)
+                if (filters.creationStartDate) query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
+                if (filters.creationEndDate) query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
+
+                // Status & Origem
+                if ((filters.statusComercial?.length ?? 0) > 0) query = query.in('status_comercial', filters.statusComercial)
+                if ((filters.origem?.length ?? 0) > 0) query = query.in('origem', filters.origem)
+
+                query = query.is('archived_at', null).eq('is_group_parent', false)
+
+                const { showLinked, showSolo } = groupFilters
+                if (showLinked && !showSolo) query = query.not('parent_card_id', 'is', null)
+                else if (showSolo && !showLinked) query = query.is('parent_card_id', null)
+
+                query = query.order('created_at', { ascending: false }).limit(50)
+
+                const { data, count, error } = await query
+                if (error) throw error
+                return { stageId, cards: data as Card[], totalCount: count ?? 0 }
             }
-
-            // Owner Filters (paridade completa com usePipelineCards)
-            if ((filters.ownerIds?.length ?? 0) > 0) query = query.in('dono_atual_id', filters.ownerIds)
-            if ((filters.sdrIds?.length ?? 0) > 0) query = query.in('sdr_owner_id', filters.sdrIds)
-            if ((filters.plannerIds?.length ?? 0) > 0) query = query.in('vendas_owner_id', filters.plannerIds)
-            if ((filters.posIds?.length ?? 0) > 0) query = query.in('pos_owner_id', filters.posIds)
-
-            // Date Filters
-            if (filters.startDate) query = query.gte('data_viagem_inicio', filters.startDate)
-            if (filters.endDate) query = query.lte('data_viagem_inicio', filters.endDate)
-            if (filters.creationStartDate) query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
-            if (filters.creationEndDate) query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
-
-            // Status & Origem
-            if ((filters.statusComercial?.length ?? 0) > 0) query = query.in('status_comercial', filters.statusComercial)
-            if ((filters.origem?.length ?? 0) > 0) query = query.in('origem', filters.origem)
-
-            query = query.is('archived_at', null).eq('is_group_parent', false)
-
-            const { showLinked, showSolo } = groupFilters
-            if (showLinked && !showSolo) query = query.not('parent_card_id', 'is', null)
-            else if (showSolo && !showLinked) query = query.is('parent_card_id', null)
-
-            query = query.order('created_at', { ascending: false }).limit(100)
-
-            const { data, error } = await query
-            if (error) throw error
-            return data as Card[]
-        },
-        staleTime: 1000 * 60 * 2
+        }))
     })
 
-    // Merge: cards ativos + cards terminais (limitados)
+    // Derivar terminal cards e counts per-stage
+    const terminalCards = useMemo(() =>
+        terminalStageQueries.flatMap(q => q.data?.cards || []),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [terminalStageQueries.map(q => q.dataUpdatedAt).join()]
+    )
+    const terminalCountByStage = useMemo(() => {
+        const map: Record<string, number> = {}
+        for (const q of terminalStageQueries) {
+            if (q.data) map[q.data.stageId] = q.data.totalCount
+        }
+        return map
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [terminalStageQueries.map(q => q.dataUpdatedAt).join()])
+
+    // Merge: cards ativos + cards terminais (limitados a 50 por stage)
     const allCards = useMemo(() => {
         const active = cards || []
-        const terminal = terminalCards || []
-        return [...active, ...terminal]
+        return [...active, ...terminalCards]
     }, [cards, terminalCards])
 
     const moveCardMutation = useMutation({
@@ -302,16 +306,16 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     })
                 })
 
-                // Se movendo para terminal, adicionar no cache de terminal-cards
+                // Se movendo para terminal, adicionar no cache de terminal-cards (per-stage)
                 if (isTerminalStage) {
                     const movedCard = previousCards.find(c => c.id === cardId)
                     if (movedCard) {
-                        queryClient.setQueriesData<Card[]>(
-                            { queryKey: ['terminal-cards'] },
+                        queryClient.setQueriesData<TerminalStageResult>(
+                            { queryKey: ['terminal-cards', stageId] },
                             (old) => {
+                                if (!old) return old
                                 const updated = { ...movedCard, pipeline_stage_id: stageId, etapa_nome: newStage?.nome || movedCard.etapa_nome }
-                                if (!old) return [updated]
-                                return [updated, ...old].slice(0, 100)
+                                return { ...old, cards: [updated, ...old.cards].slice(0, 50), totalCount: old.totalCount + 1 }
                             }
                         )
                     }
@@ -322,9 +326,14 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     const currentCard = allCards.find(c => c.id === cardId)
                     const isFromTerminal = currentCard && terminalStageIds.includes(currentCard.pipeline_stage_id as string)
                     if (isFromTerminal && currentCard) {
-                        queryClient.setQueriesData<Card[]>(
+                        queryClient.setQueriesData<TerminalStageResult>(
                             { queryKey: ['terminal-cards'] },
-                            (old) => (old || []).filter(c => c.id !== cardId)
+                            (old) => {
+                                if (!old) return old
+                                const hasCard = old.cards.some(c => c.id === cardId)
+                                if (!hasCard) return old
+                                return { ...old, cards: old.cards.filter(c => c.id !== cardId), totalCount: Math.max(0, old.totalCount - 1) }
+                            }
                         )
                         queryClient.setQueryData<Card[]>(qk, (old) => {
                             const updated = { ...currentCard, pipeline_stage_id: stageId, fase: newStage?.fase || currentCard.fase, etapa_nome: newStage?.nome || currentCard.etapa_nome }
@@ -612,13 +621,6 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const totalPipelineReceita = allCards.reduce((acc, c) => acc + (c.receita || 0), 0)
     const totalCards = allCards.length
 
-    // Helper: obter total real de um stage via view_dashboard_funil
-    const getStageTotal = (stageNome: string) => {
-        const stat = funnelStats?.find(f => f.stage_nome === stageNome)
-        return stat ? { totalCards: Number(stat.total_cards), totalValue: Number(stat.valor_total) } : null
-    }
-
-
     return (
         <div className={cn("flex flex-col h-full", className)}>
             {/* Scroll Area with Arrows */}
@@ -681,7 +683,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                             {phaseStages.map((stage) => {
                                                 const isTerminal = terminalStageIds.includes(stage.id)
                                                 const stageCards = allCards.filter(c => c.pipeline_stage_id === stage.id)
-                                                const stageTotal = isTerminal ? getStageTotal(stage.nome) : null
+                                                const stageTotalCount = isTerminal ? terminalCountByStage[stage.id] : undefined
 
                                                 return (
                                                     <KanbanColumn
@@ -689,9 +691,10 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                                         stage={stage}
                                                         cards={stageCards}
                                                         phaseColor={phase.color}
-                                                        totalCount={stageTotal?.totalCards}
-                                                        onShowMore={isTerminal && stageTotal && stageTotal.totalCards > stageCards.length ? () => {
-                                                            setTerminalDrawer({ stage, totalCards: stageTotal.totalCards, totalValue: stageTotal.totalValue })
+                                                        totalCount={stageTotalCount}
+                                                        onShowMore={isTerminal && stageTotalCount != null && stageTotalCount > stageCards.length ? () => {
+                                                            const stageValue = stageCards.reduce((acc, c) => acc + (c.valor_display || c.valor_estimado || 0), 0)
+                                                            setTerminalDrawer({ stage, totalCards: stageTotalCount, totalValue: stageValue })
                                                         } : undefined}
                                                     />
                                                 )
