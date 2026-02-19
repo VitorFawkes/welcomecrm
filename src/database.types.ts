@@ -1287,6 +1287,13 @@ export type Database = {
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "card_auto_creation_rules_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
         ]
       }
       card_creation_rules: {
@@ -1339,6 +1346,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_creation_rules_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "card_creation_rules_team_id_fkey"
@@ -1883,6 +1897,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_etapa_funil_id_fkey"
+            columns: ["pipeline_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "cards_merged_by_fkey"
@@ -2734,11 +2755,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "historico_fases_etapa_anterior_id_fkey"
+            columns: ["etapa_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
+          {
             foreignKeyName: "historico_fases_etapa_nova_id_fkey"
             columns: ["etapa_nova_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_fases_etapa_nova_id_fkey"
+            columns: ["etapa_nova_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -2844,6 +2879,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "integration_conflict_log_actual_stage_id_fkey"
+            columns: ["actual_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
+          {
             foreignKeyName: "integration_conflict_log_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
@@ -2905,6 +2947,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "integration_conflict_log_trigger_id_fkey"
@@ -3328,6 +3377,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "integration_inbound_triggers_quarantine_stage_id_fkey"
+            columns: ["quarantine_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
+          {
             foreignKeyName: "integration_inbound_triggers_target_pipeline_id_fkey"
             columns: ["target_pipeline_id"]
             isOneToOne: false
@@ -3340,6 +3396,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_inbound_triggers_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -3554,6 +3617,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_outbound_stage_map_internal_stage_id_fkey"
+            columns: ["internal_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -3866,6 +3936,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_stage_map_internal_stage_id_fkey"
+            columns: ["internal_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -4657,6 +4734,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pipeline_config_from_stage_id_fkey"
+            columns: ["from_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
+          {
             foreignKeyName: "pipeline_config_pipeline_id_fkey"
             columns: ["pipeline_id"]
             isOneToOne: false
@@ -4669,6 +4753,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_config_to_stage_id_fkey"
+            columns: ["to_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -6130,6 +6221,13 @@ export type Database = {
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "stage_field_config_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
         ]
       }
       stage_fields_settings: {
@@ -6170,6 +6268,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_fields_settings_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "stage_fields_settings_updated_by_fkey"
@@ -6228,11 +6333,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stage_transitions_source_stage_id_fkey"
+            columns: ["source_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
+          {
             foreignKeyName: "stage_transitions_target_stage_id_fkey"
             columns: ["target_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_transitions_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -7131,6 +7250,13 @@ export type Database = {
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "whatsapp_linha_config_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
         ]
       }
       whatsapp_messages: {
@@ -7589,6 +7715,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "integration_conflict_log_actual_stage_id_fkey"
+            columns: ["actual_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
+          },
+          {
             foreignKeyName: "integration_conflict_log_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
@@ -7636,6 +7769,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_conflict_log_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -7907,15 +8047,18 @@ export type Database = {
       }
       view_cards_acoes: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           briefing_inicial: Json | null
           campaign_id: string | null
+          card_type: string | null
           cliente_recorrente: boolean | null
           concierge_owner_id: string | null
           condicoes_pagamento: string | null
           created_at: string | null
           data_fechamento: string | null
           data_viagem_inicio: string | null
-          destinos: Json | null
+          destinos: string | null
           dias_ate_viagem: number | null
           dono_atual_email: string | null
           dono_atual_id: string | null
@@ -7936,13 +8079,15 @@ export type Database = {
           is_group_parent: boolean | null
           marketing_data: Json | null
           moeda: string | null
-          orcamento: Json | null
+          orcamento: string | null
           origem: string | null
           parent_card_id: string | null
+          parent_titulo: string | null
           pessoa_email: string | null
           pessoa_nome: string | null
           pessoa_principal_id: string | null
           pessoa_telefone: string | null
+          pessoa_telefone_normalizado: string | null
           pipeline_id: string | null
           pipeline_nome: string | null
           pipeline_stage_id: string | null
@@ -7951,12 +8096,16 @@ export type Database = {
           produto: Database["public"]["Enums"]["app_product"] | null
           produto_data: Json | null
           proxima_tarefa: Json | null
+          receita: number | null
+          receita_source: string | null
           sdr_nome: string | null
           sdr_owner_email: string | null
           sdr_owner_id: string | null
           sdr_owner_nome: string | null
           status_comercial: string | null
           status_taxa: string | null
+          sub_card_mode: string | null
+          sub_card_status: string | null
           tarefas_atrasadas: number | null
           tarefas_pendentes: number | null
           tempo_etapa_dias: number | null
@@ -7964,14 +8113,36 @@ export type Database = {
           titulo: string | null
           ultima_interacao: Json | null
           updated_at: string | null
-          urgencia_tempo_etapa: number | null
-          urgencia_viagem: number | null
+          urgencia_tempo_etapa: string | null
+          urgencia_viagem: string | null
+          valor_display: number | null
           valor_estimado: number | null
           valor_final: number | null
           vendas_nome: string | null
           vendas_owner_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cards_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "cards_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cards_dono_atual_id_profiles_fkey"
             columns: ["dono_atual_id"]
@@ -7999,6 +8170,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_etapa_funil_id_fkey"
+            columns: ["pipeline_stage_id"]
+            isOneToOne: false
+            referencedRelation: "view_dashboard_funil"
+            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "cards_parent_card_id_fkey"
@@ -8091,12 +8269,14 @@ export type Database = {
       }
       view_dashboard_funil: {
         Row: {
-          etapa_nome: string | null
-          etapa_ordem: number | null
+          fase: string | null
+          ordem: number | null
           produto: Database["public"]["Enums"]["app_product"] | null
+          receita_total: number | null
+          stage_id: string | null
+          stage_nome: string | null
           total_cards: number | null
-          total_valor_estimado: number | null
-          total_valor_final: number | null
+          valor_total: number | null
         }
         Relationships: []
       }
