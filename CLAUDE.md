@@ -57,6 +57,9 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | useQualityGate | 4+ | Validação de mudança de stage |
 | useIntegrationHealth | 3+ | Alertas, regras e pulse de saúde das integrações |
 | useStageRequirements | 4+ | Campos obrigatórios por stage |
+| usePipelineListCards | 1 | Cards paginados para PipelineListView (exclui terminais) |
+| useMyTeamPhase | 1 | Fase do pipeline associada ao time do usuário logado |
+| useTeamFilterMembers | 2 | Resolve teamIds para member IDs via RPC server-side |
 
 ### Componentes Principais (src/components/)
 | Área | Componentes-chave |
@@ -67,7 +70,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Propostas | ProposalBuilder, SectionEditor, AddItemMenu, VersionHistory |
 | Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings, JuliaIAConfig |
 | Health | IntegrationHealthTab, PulseGrid, ActiveAlertsList, HealthRulesConfig |
-| Pessoas | PeopleGrid, PersonDetailDrawer, ContactForm |
+| Pessoas | PeopleGrid, PersonDetailDrawer, ContactForm, ContactImportModal |
 | Leads | LeadsTable, LeadsFilters, LeadsBulkActions |
 | Trips | TripsTaxBadge, group/* (GroupDashboard, GroupTravelersList) |
 | Monde | MondeWidget |
@@ -77,7 +80,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Tabela | Papel | FK principais |
 |--------|-------|---------------|
 | **cards** | Central — deals/viagens | → pipeline_stages, contatos, cards (parent) |
-| **contatos** | Central — pessoas | — |
+| **contatos** | Central — pessoas (cpf_normalizado UNIQUE, rg, passaporte_validade) | — |
 | **profiles** | Central — usuários | → teams |
 | proposals | Propostas comerciais | → cards |
 | pipeline_stages | Stages do funil | → pipeline_phases, pipelines |

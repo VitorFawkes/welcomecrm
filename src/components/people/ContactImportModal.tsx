@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
-import { Download, Upload, Check, AlertCircle, Loader2, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Download, Upload, Check, AlertCircle, Loader2, ChevronRight, ArrowLeft, X, AlertTriangle, Eye } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface ContactImportModalProps {
     isOpen: boolean
@@ -16,40 +17,162 @@ interface Mapping {
     [key: string]: string
 }
 
+type RowData = Record<string, unknown>
+
 const CRM_FIELDS = [
-    { key: 'nome', label: 'Nome', required: true },
-    { key: 'sobrenome', label: 'Sobrenome', required: false },
-    { key: 'email', label: 'Email', required: false },
-    { key: 'telefone', label: 'Telefone', required: false },
+    { key: 'nome', label: 'Nome Completo', required: true },
     { key: 'cpf', label: 'CPF', required: false },
     { key: 'data_nascimento', label: 'Data de Nascimento', required: false },
-    { key: 'passaporte', label: 'Passaporte', required: false },
-    { key: 'tipo_pessoa', label: 'Tipo (adulto/crianca)', required: false },
+    { key: 'rg', label: 'RG', required: false },
+    { key: 'email', label: 'E-mail', required: false },
+    { key: 'telefone', label: 'Celular/Telefone', required: false },
+    { key: 'cep', label: 'CEP', required: false },
+    { key: 'endereco', label: 'Endereço (rua)', required: false },
+    { key: 'numero', label: 'Número', required: false },
+    { key: 'complemento', label: 'Complemento', required: false },
+    { key: 'bairro', label: 'Bairro', required: false },
+    { key: 'cidade', label: 'Cidade', required: false },
+    { key: 'uf', label: 'UF / Estado', required: false },
+    { key: 'pais', label: 'País', required: false },
+    { key: 'sexo', label: 'Sexo', required: false },
+    { key: 'passaporte', label: 'Número Passaporte', required: false },
+    { key: 'passaporte_validade', label: 'Validade Passaporte', required: false },
+    { key: 'observacoes', label: 'Observações', required: false },
     { key: 'tags', label: 'Tags (separadas por vírgula)', required: false },
-    { key: 'observacoes', label: 'Observações', required: false }
+    { key: 'primeira_venda', label: 'Primeira Venda', required: false },
+    { key: 'ultima_venda', label: 'Última Venda', required: false },
+    { key: 'ultimo_retorno', label: 'Último Retorno', required: false },
 ]
 
+const fieldAliases: Record<string, string[]> = {
+    nome: ['nome', 'name', 'nome completo', 'full name'],
+    cpf: ['cpf', 'documento', 'cpf/cnpj', 'cnpj'],
+    data_nascimento: ['nascimento', 'data nascimento', 'data de nascimento', 'fundacao', 'fundação', 'birthday', 'aniversario', 'aniversário'],
+    rg: ['rg', 'identidade', 'registro geral'],
+    email: ['email', 'e-mail', 'mail', 'correio'],
+    telefone: ['celular', 'telefone', 'phone', 'tel', 'whatsapp', 'fone', 'mobile'],
+    cep: ['cep', 'zip', 'codigo postal', 'código postal'],
+    endereco: ['endereco', 'endereço', 'rua', 'logradouro', 'address'],
+    numero: ['numero', 'número', 'nro', 'num'],
+    complemento: ['complemento', 'compl'],
+    bairro: ['bairro', 'neighborhood'],
+    cidade: ['cidade', 'city', 'municipio', 'município'],
+    uf: ['uf', 'estado', 'state'],
+    pais: ['pais', 'país', 'country'],
+    sexo: ['sexo', 'genero', 'gênero', 'gender'],
+    passaporte: ['passaporte', 'passport', 'numero passaporte', 'número passaporte'],
+    passaporte_validade: ['validade passaporte', 'passport expiry', 'vencimento passaporte', 'validade do passaporte'],
+    observacoes: ['observacoes', 'observações', 'obs', 'notas', 'notes'],
+    tags: ['tags', 'categorias'],
+    primeira_venda: ['primeira venda', 'first sale'],
+    ultima_venda: ['ultima venda', 'última venda', 'last sale'],
+    ultimo_retorno: ['ultimo retorno', 'último retorno', 'last return'],
+}
+
+/** Fix UTF-8 double-encoding (mojibake): "Ã¡" → "á", "Ã§" → "ç" */
+function fixMojibake(str: string): string {
+    try {
+        const bytes = new Uint8Array([...str].map(c => c.charCodeAt(0)))
+        if ([...str].some(c => c.charCodeAt(0) > 255)) return str
+        const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+        return decoded !== str ? decoded : str
+    } catch {
+        return str
+    }
+}
+
+function excelDateToISO(serial: unknown): string | null {
+    if (!serial) return null
+    if (typeof serial === 'string') {
+        const brMatch = serial.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+        if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`
+        if (/^\d{4}-\d{2}-\d{2}/.test(serial)) return serial.slice(0, 10)
+        return null
+    }
+    const serialNum = Number(serial)
+    if (!isNaN(serialNum) && serialNum > 1000) {
+        const date = new Date((serialNum - 25569) * 86400 * 1000)
+        return date.toISOString().split('T')[0]
+    }
+    return null
+}
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+function splitName(fullName: string): { nome: string; sobrenome: string | null } {
+    const parts = fullName.trim().split(/\s+/)
+    if (parts.length <= 1) return { nome: parts[0] || '', sobrenome: null }
+    return { nome: parts[0], sobrenome: parts.slice(1).join(' ') }
+}
+
+interface ParsedContact {
+    nome: string
+    sobrenome: string | null
+    cpf: string | null
+    _normalizedCpf: string | null
+    rg: string | null
+    email: string | null
+    telefone: string | null
+    data_nascimento: string | null
+    passaporte: string | null
+    passaporte_validade: string | null
+    endereco: Record<string, string> | null
+    observacoes: string | null
+    tags: string[] | null
+}
+
+interface PreviewStats {
+    toImport: number
+    dupCpf: number
+    dupEmail: number
+    noName: number
+    dupInFile: number
+    total: number
+}
+
 export default function ContactImportModal({ isOpen, onClose, onSuccess }: ContactImportModalProps) {
-    const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'importing'>('upload')
-    const [fileData, setFileData] = useState<any[]>([])
+    const { session } = useAuth()
+    const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'importing' | 'results'>('upload')
+    const [fileData, setFileData] = useState<RowData[]>([])
     const [headers, setHeaders] = useState<string[]>([])
     const [mapping, setMapping] = useState<Mapping>({})
     const [isImporting, setIsImporting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    // Preview & import state
+    const [previewStats, setPreviewStats] = useState<PreviewStats | null>(null)
+    const [contactsToInsert, setContactsToInsert] = useState<ParsedContact[]>([])
+    const [batchId, setBatchId] = useState('')
+    const [importResults, setImportResults] = useState<{
+        success: number; dupCpf: number; dupEmail: number; errors: string[]
+    }>({ success: 0, dupCpf: 0, dupEmail: 0, errors: [] })
+    const [progress, setProgress] = useState({ current: 0, total: 0, startTime: 0 })
+    const abortRef = useRef(false)
+
+    const currentUserId = session?.user?.id
+
     const handleDownloadTemplate = () => {
         const template = [
             {
-                Nome: 'João',
-                Sobrenome: 'Silva',
-                Email: 'joao@exemplo.com',
-                Telefone: '11999999999',
+                Nome: 'João Silva',
                 CPF: '123.456.789-00',
-                'Data de Nascimento': '1990-01-01',
+                'Data de Nascimento': '01/01/1990',
+                RG: '12.345.678-9',
+                'E-mail': 'joao@exemplo.com',
+                Celular: '11999999999',
+                CEP: '01310-100',
+                'Endereço': 'Av Paulista',
+                'Número': '1000',
+                Complemento: 'Sala 1',
+                Bairro: 'Bela Vista',
+                Cidade: 'São Paulo',
+                UF: 'SP',
+                'País': 'Brasil',
+                Sexo: 'Masculino',
                 Passaporte: 'AA123456',
-                Tipo: 'adulto',
+                'Validade Passaporte': '2030-12-31',
+                'Observações': 'Cliente VIP',
                 Tags: 'VIP, Luxo',
-                Observações: 'Cliente VIP'
             }
         ]
         const ws = XLSX.utils.json_to_sheet(template)
@@ -64,40 +187,132 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
 
         const reader = new FileReader()
         reader.onload = (evt) => {
-            const bstr = evt.target?.result
-            const wb = XLSX.read(bstr, { type: 'binary' })
+            const data = new Uint8Array(evt.target?.result as ArrayBuffer)
+            const wb = XLSX.read(data, { type: 'array', codepage: 65001 })
             const wsname = wb.SheetNames[0]
             const ws = wb.Sheets[wsname]
 
-            // Get all data including headers reliably
-            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
             if (rows.length === 0) {
                 toast.error('O arquivo está vazio')
                 return
             }
 
-            const sheetHeaders = (rows[0] as any[]).map(h => String(h || '').trim()).filter(h => h !== '')
-            const data = XLSX.utils.sheet_to_json(ws)
+            const sheetHeaders = (rows[0] as unknown[]).map(h => {
+                const raw = String(h || '').trim()
+                return fixMojibake(raw)
+            }).filter(h => h !== '')
+
+            const rawData = XLSX.utils.sheet_to_json(ws) as RowData[]
+            // Fix mojibake in all header keys
+            const fixedData = rawData.map(row => {
+                const fixed: RowData = {}
+                for (const [key, value] of Object.entries(row)) {
+                    fixed[fixMojibake(key)] = value
+                }
+                return fixed
+            })
 
             setHeaders(sheetHeaders)
-            setFileData(data)
+            setFileData(fixedData)
 
-            // Auto-mapping
+            // Auto-mapping com aliases
             const initialMapping: Mapping = {}
             CRM_FIELDS.forEach(field => {
-                const match = sheetHeaders.find(h =>
-                    h.toLowerCase() === field.label.toLowerCase() ||
-                    h.toLowerCase() === field.key.toLowerCase()
-                )
+                const aliases = fieldAliases[field.key] || [field.key, field.label]
+                const match = sheetHeaders.find(h => {
+                    const headerLower = h.toLowerCase().trim()
+                    return aliases.some(alias => headerLower === alias.toLowerCase()) ||
+                        headerLower === field.label.toLowerCase() ||
+                        headerLower === field.key.toLowerCase()
+                })
                 if (match) initialMapping[field.key] = match
             })
             setMapping(initialMapping)
             setStep('mapping')
         }
-        reader.readAsBinaryString(file)
+        reader.readAsArrayBuffer(file)
     }
 
-    const handleImport = async () => {
+    function mapRowToContact(rawRow: RowData): ParsedContact {
+        const get = (key: string): string | null => {
+            const header = mapping[key]
+            if (!header) return null
+            const val = rawRow[header]
+            if (val == null || val === '') return null
+            return String(val).trim()
+        }
+
+        const fullName = get('nome') || ''
+        const { nome, sobrenome } = splitName(fullName)
+
+        const cpfRaw = get('cpf')
+        const normalizedCpf = cpfRaw ? cpfRaw.replace(/\D/g, '') : null
+        const validCpf = normalizedCpf && (normalizedCpf.length === 11 || normalizedCpf.length === 14) ? normalizedCpf : null
+
+        const emailRaw = get('email')
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        const email = emailRaw && emailRegex.test(emailRaw) ? emailRaw.toLowerCase().trim() : null
+
+        const telefoneRaw = get('telefone')
+        const telefone = telefoneRaw ? telefoneRaw.replace(/\D/g, '') : null
+
+        // Endereço JSONB
+        const endereco: Record<string, string> = {}
+        const fields: [string, string][] = [
+            ['cep', 'cep'], ['endereco', 'rua'], ['numero', 'numero'],
+            ['complemento', 'complemento'], ['bairro', 'bairro'],
+            ['cidade', 'cidade'], ['uf', 'estado'], ['pais', 'pais'],
+        ]
+        for (const [mappingKey, jsonKey] of fields) {
+            const val = get(mappingKey)
+            if (val) endereco[jsonKey] = val
+        }
+
+        const dataNascimento = excelDateToISO(get('data_nascimento'))
+        const passaporteValidade = excelDateToISO(get('passaporte_validade'))
+
+        // Tags + sexo
+        const tagsRaw = get('tags')
+        const sexo = get('sexo')
+        const tags: string[] = []
+        if (tagsRaw) tags.push(...tagsRaw.split(',').map(t => t.trim()).filter(Boolean))
+        if (sexo) {
+            const sexoLower = sexo.toLowerCase()
+            if (sexoLower.startsWith('m')) tags.push('Sexo: Masculino')
+            else if (sexoLower.startsWith('f')) tags.push('Sexo: Feminino')
+            else tags.push(`Sexo: ${sexo}`)
+        }
+
+        // Observações + histórico comercial
+        const parts: string[] = []
+        const obs = get('observacoes')
+        if (obs) parts.push(obs)
+        const primeiraVenda = get('primeira_venda')
+        const ultimaVenda = get('ultima_venda')
+        const ultimoRetorno = get('ultimo_retorno')
+        if (primeiraVenda) parts.push(`Primeira venda: ${primeiraVenda}`)
+        if (ultimaVenda) parts.push(`Última venda: ${ultimaVenda}`)
+        if (ultimoRetorno) parts.push(`Último retorno: ${ultimoRetorno}`)
+
+        return {
+            nome,
+            sobrenome,
+            cpf: validCpf,
+            _normalizedCpf: validCpf,
+            rg: get('rg'),
+            email,
+            telefone: telefone && telefone.length >= 8 ? telefone : null,
+            data_nascimento: dataNascimento,
+            passaporte: get('passaporte'),
+            passaporte_validade: passaporteValidade,
+            endereco: Object.keys(endereco).length > 0 ? endereco : null,
+            observacoes: parts.length > 0 ? parts.join(' | ') : null,
+            tags: tags.length > 0 ? tags : null,
+        }
+    }
+
+    const handlePreview = async () => {
         const requiredMissing = CRM_FIELDS.filter(f => f.required && !mapping[f.key])
         if (requiredMissing.length > 0) {
             toast.error(`Mapeamento obrigatório ausente: ${requiredMissing.map(f => f.label).join(', ')}`)
@@ -105,65 +320,215 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         }
 
         setIsImporting(true)
-        setStep('importing')
+        toast.info('Analisando arquivo e verificando duplicados...')
 
         try {
-            const contactsToUpsert = fileData.map((row: any) => {
-                const contact: any = {}
-                CRM_FIELDS.forEach(field => {
-                    if (mapping[field.key]) {
-                        const value = row[mapping[field.key]]
-                        const stringValue = String(value || '').trim()
+            // Fase 1: Parse + dedup intra-arquivo
+            const parsed: ParsedContact[] = []
+            let noNameCount = 0
+            for (const row of fileData) {
+                const contact = mapRowToContact(row)
+                if (!contact.nome) {
+                    noNameCount++
+                    continue
+                }
+                parsed.push(contact)
+            }
 
-                        if (field.key === 'email') {
-                            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-                            contact[field.key] = emailRegex.test(stringValue) ? stringValue : null
-                        } else if (field.key === 'tags' && typeof value === 'string') {
-                            contact[field.key] = value.split(',').map(t => t.trim())
-                        } else {
-                            contact[field.key] = value
-                        }
-                    }
+            const cpfSeen = new Map<string, number>()
+            const emailSeen = new Map<string, number>()
+            const deduped: ParsedContact[] = []
+            let dupInFileCount = 0
+
+            for (let i = 0; i < parsed.length; i++) {
+                const c = parsed[i]
+                if (c._normalizedCpf && cpfSeen.has(c._normalizedCpf)) {
+                    dupInFileCount++
+                    continue
+                }
+                if (c.email && emailSeen.has(c.email)) {
+                    dupInFileCount++
+                    continue
+                }
+                if (c._normalizedCpf) cpfSeen.set(c._normalizedCpf, i)
+                if (c.email) emailSeen.set(c.email, i)
+                deduped.push(c)
+            }
+
+            // Fase 2: Dedup contra banco
+            const existingCpfs = new Set<string>()
+            const PAGE_SIZE = 1000
+            let offset = 0
+            while (true) {
+                const { data } = await supabase
+                    .from('contatos')
+                    .select('cpf_normalizado')
+                    .not('cpf_normalizado', 'is', null)
+                    .range(offset, offset + PAGE_SIZE - 1)
+                if (!data || data.length === 0) break
+                data.forEach((r: { cpf_normalizado: string | null }) => {
+                    if (r.cpf_normalizado) existingCpfs.add(r.cpf_normalizado)
                 })
-                // Default value for tipo_pessoa if not provided
-                if (!contact.tipo_pessoa) contact.tipo_pessoa = 'adulto'
-                return contact
+                if (data.length < PAGE_SIZE) break
+                offset += PAGE_SIZE
+            }
+
+            const existingEmails = new Set<string>()
+            offset = 0
+            while (true) {
+                const { data } = await supabase
+                    .from('contatos')
+                    .select('email')
+                    .not('email', 'is', null)
+                    .range(offset, offset + PAGE_SIZE - 1)
+                if (!data || data.length === 0) break
+                data.forEach((r: { email: string | null }) => {
+                    if (r.email) existingEmails.add(r.email.toLowerCase())
+                })
+                if (data.length < PAGE_SIZE) break
+                offset += PAGE_SIZE
+            }
+
+            let dupCpfCount = 0
+            let dupEmailCount = 0
+            const toInsert: ParsedContact[] = []
+
+            for (const contact of deduped) {
+                if (contact._normalizedCpf && existingCpfs.has(contact._normalizedCpf)) {
+                    dupCpfCount++
+                    continue
+                }
+                if (contact.email && existingEmails.has(contact.email)) {
+                    dupEmailCount++
+                    continue
+                }
+                toInsert.push(contact)
+            }
+
+            const newBatchId = `import-contacts-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}`
+            setBatchId(newBatchId)
+            setContactsToInsert(toInsert)
+            setPreviewStats({
+                toImport: toInsert.length,
+                dupCpf: dupCpfCount,
+                dupEmail: dupEmailCount,
+                noName: noNameCount,
+                dupInFile: dupInFileCount,
+                total: fileData.length,
             })
-
-            // Deduplicate by email to avoid "ON CONFLICT DO UPDATE command cannot affect row a second time"
-            // Postgres doesn't allow updating the same row twice in one batch.
-            const uniqueContacts = Array.from(
-                contactsToUpsert.reduce((map, contact) => {
-                    if (contact.email) {
-                        map.set(contact.email.toLowerCase().trim(), contact)
-                    } else {
-                        // If no email, just keep it (though upsert might fail if it's the conflict target)
-                        // Using unique ID for map key if email is missing to keep them
-                        map.set(Math.random().toString(), contact)
-                    }
-                    return map
-                }, new Map<string, any>()).values()
-            ) as any[] // Force cast to any[] to bypass strict typing issues temporarily, or use Database['public']['Tables']['contatos']['Insert'][] if preferred
-
-            // Supabase upsert based on email (unique constraint)
-            const { error } = await supabase
-                .from('contatos')
-                .upsert(uniqueContacts, {
-                    onConflict: 'email',
-                    ignoreDuplicates: false
-                })
-
-            if (error) throw error
-
-            toast.success(`${contactsToUpsert.length} contatos importados com sucesso!`)
-            onSuccess()
-            onClose()
-            reset()
-        } catch (error: any) {
-            console.error('Import error:', error)
-            toast.error(`Erro na importação: ${error.message}`)
+            setStep('preview')
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Erro desconhecido'
+            toast.error(`Erro na análise: ${message}`)
             setStep('mapping')
         } finally {
+            setIsImporting(false)
+        }
+    }
+
+    const handleImport = async () => {
+        setIsImporting(true)
+        setStep('importing')
+        abortRef.current = false
+
+        let successCount = 0
+        const errors: string[] = []
+        const MAX_ERRORS = 200
+        const CHUNK_SIZE = 100
+        const CHUNK_DELAY = 300
+
+        const startTime = Date.now()
+        setProgress({ current: 0, total: contactsToInsert.length, startTime })
+
+        try {
+            for (let i = 0; i < contactsToInsert.length; i += CHUNK_SIZE) {
+                if (abortRef.current) {
+                    errors.push(`Importação cancelada pelo usuário na linha ${i + 1}`)
+                    break
+                }
+
+                const chunk = contactsToInsert.slice(i, i + CHUNK_SIZE)
+                const insertData = chunk.map(c => {
+                    const { _normalizedCpf, ...rest } = c
+                    void _normalizedCpf
+                    return {
+                        ...rest,
+                        origem: 'importacao' as const,
+                        origem_detalhe: batchId,
+                        created_by: currentUserId || null,
+                    }
+                })
+
+                const { error } = await supabase.from('contatos').insert(insertData)
+
+                if (error) {
+                    // Fallback: insert 1-a-1
+                    for (let j = 0; j < insertData.length; j++) {
+                        const single = insertData[j]
+                        const { error: singleErr } = await supabase.from('contatos').insert(single)
+                        if (singleErr) {
+                            if (errors.length < MAX_ERRORS) {
+                                errors.push(`${single.nome} ${single.sobrenome || ''}: ${singleErr.message}`)
+                            }
+                        } else {
+                            successCount++
+                        }
+                    }
+                } else {
+                    successCount += chunk.length
+                }
+
+                setProgress({ current: Math.min(i + CHUNK_SIZE, contactsToInsert.length), total: contactsToInsert.length, startTime })
+
+                if (i + CHUNK_SIZE < contactsToInsert.length) {
+                    await sleep(CHUNK_DELAY)
+                }
+            }
+
+            // Fase 4: Popular contato_meios com telefones
+            if (successCount > 0 && batchId) {
+                try {
+                    // Buscar contatos recém-importados que têm telefone
+                    let meiosOffset = 0
+                    while (true) {
+                        const { data: recentContacts } = await supabase
+                            .from('contatos')
+                            .select('id, telefone')
+                            .eq('origem_detalhe', batchId)
+                            .not('telefone', 'is', null)
+                            .range(meiosOffset, meiosOffset + 500 - 1)
+
+                        if (!recentContacts || recentContacts.length === 0) break
+
+                        const meiosToInsert = recentContacts.map(c => ({
+                            contato_id: c.id,
+                            tipo: 'telefone',
+                            valor: c.telefone!,
+                            is_principal: true,
+                            origem: 'importacao',
+                        }))
+
+                        // Insert with ON CONFLICT handled by DB constraint
+                        await supabase.from('contato_meios').insert(meiosToInsert)
+
+                        if (recentContacts.length < 500) break
+                        meiosOffset += 500
+                    }
+                } catch {
+                    // Não-crítico: telefones podem ser populados depois
+                }
+            }
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Erro desconhecido'
+            errors.push(`ERRO FATAL: ${message}`)
+        } finally {
+            setImportResults({
+                success: successCount,
+                dupCpf: previewStats?.dupCpf || 0,
+                dupEmail: previewStats?.dupEmail || 0,
+                errors,
+            })
+            setStep('results')
             setIsImporting(false)
         }
     }
@@ -173,22 +538,28 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         setFileData([])
         setHeaders([])
         setMapping({})
+        setPreviewStats(null)
+        setContactsToInsert([])
+        setImportResults({ success: 0, dupCpf: 0, dupEmail: 0, errors: [] })
+        setProgress({ current: 0, total: 0, startTime: 0 })
+        abortRef.current = false
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-2xl bg-white/90 backdrop-blur-md border border-slate-200">
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isImporting) { onClose() } }}>
+            <DialogContent className="max-w-2xl bg-white border border-slate-200 shadow-lg">
                 <DialogHeader>
-                    <DialogTitle className="text-2xl font-semibold text-slate-900">Importar Contatos</DialogTitle>
+                    <DialogTitle className="text-2xl font-semibold tracking-tight text-slate-900">Importar Contatos</DialogTitle>
                     <DialogDescription>
-                        Siga os passos abaixo para importar seus contatos via Excel ou CSV.
+                        Importe contatos via Excel ou CSV com deduplicação automática por CPF.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="mt-4">
+                    {/* STEP: Upload */}
                     {step === 'upload' && (
-                        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 transition-colors hover:bg-slate-50">
+                        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 transition-colors hover:bg-slate-100/50">
                             <Upload className="h-12 w-12 text-slate-400 mb-4" />
                             <h3 className="text-lg font-medium text-slate-900 mb-2">Selecione seu arquivo</h3>
                             <p className="text-sm text-slate-500 mb-6 text-center">
@@ -222,13 +593,15 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                         </div>
                     )}
 
+                    {/* STEP: Mapping */}
                     {step === 'mapping' && (
                         <div className="space-y-6">
                             <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex gap-3">
-                                <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                                <p className="text-sm text-blue-700">
-                                    Relacione as colunas do seu arquivo com os campos do nosso sistema.
-                                </p>
+                                <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-blue-700">
+                                    <p className="font-medium">{fileData.length.toLocaleString('pt-BR')} linhas encontradas</p>
+                                    <p>Relacione as colunas do seu arquivo com os campos do sistema.</p>
+                                </div>
                             </div>
 
                             <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
@@ -242,16 +615,16 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                                     <tbody className="divide-y divide-slate-100">
                                         {CRM_FIELDS.map(field => (
                                             <tr key={field.key}>
-                                                <td className="py-4 font-medium text-slate-900">
+                                                <td className="py-3 font-medium text-slate-900">
                                                     {field.label} {field.required && <span className="text-red-500">*</span>}
                                                 </td>
-                                                <td className="py-4">
+                                                <td className="py-3">
                                                     <select
                                                         value={mapping[field.key] || ''}
                                                         onChange={(e) => setMapping({ ...mapping, [field.key]: e.target.value })}
-                                                        className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                                        className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                                                     >
-                                                        <option value="">Selecione uma coluna...</option>
+                                                        <option value="">— Não mapear —</option>
                                                         {headers.map((h: string) => (
                                                             <option key={h} value={h}>{h}</option>
                                                         ))}
@@ -268,21 +641,170 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Trocar Arquivo
                                 </Button>
-                                <Button onClick={handleImport} className="gap-2" disabled={isImporting}>
-                                    <Check className="h-4 w-4" />
-                                    Importar {fileData.length} Contatos
+                                <Button onClick={handlePreview} className="gap-2" disabled={isImporting}>
+                                    {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                                    Analisar {fileData.length.toLocaleString('pt-BR')} Contatos
                                 </Button>
                             </div>
                         </div>
                     )}
 
+                    {/* STEP: Preview */}
+                    {step === 'preview' && previewStats && (
+                        <div className="space-y-6">
+                            <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg">
+                                <h3 className="font-semibold text-indigo-900 mb-3">Resumo da Análise</h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-3 bg-white rounded-lg border border-slate-200">
+                                        <div className="text-xl font-bold text-slate-900">{previewStats.total.toLocaleString('pt-BR')}</div>
+                                        <div className="text-xs text-slate-500">Linhas no arquivo</div>
+                                    </div>
+                                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                                        <div className="text-xl font-bold text-green-600">{previewStats.toImport.toLocaleString('pt-BR')}</div>
+                                        <div className="text-xs text-green-800">Serão importados</div>
+                                    </div>
+                                    {previewStats.dupCpf > 0 && (
+                                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                            <div className="text-xl font-bold text-blue-600">{previewStats.dupCpf.toLocaleString('pt-BR')}</div>
+                                            <div className="text-xs text-blue-800">CPF já existe (pulados)</div>
+                                        </div>
+                                    )}
+                                    {previewStats.dupEmail > 0 && (
+                                        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                            <div className="text-xl font-bold text-amber-600">{previewStats.dupEmail.toLocaleString('pt-BR')}</div>
+                                            <div className="text-xs text-amber-800">Email já existe (pulados)</div>
+                                        </div>
+                                    )}
+                                    {previewStats.dupInFile > 0 && (
+                                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                            <div className="text-xl font-bold text-slate-600">{previewStats.dupInFile.toLocaleString('pt-BR')}</div>
+                                            <div className="text-xs text-slate-500">Duplicados no arquivo</div>
+                                        </div>
+                                    )}
+                                    {previewStats.noName > 0 && (
+                                        <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                                            <div className="text-xl font-bold text-red-600">{previewStats.noName.toLocaleString('pt-BR')}</div>
+                                            <div className="text-xs text-red-800">Sem nome (ignorados)</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {previewStats.toImport === 0 ? (
+                                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                    <span>Nenhum contato novo para importar. Todos já existem na base.</span>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-slate-500">
+                                    Tempo estimado: ~{Math.ceil(previewStats.toImport / 100 * 0.4)} segundos
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                                <Button variant="ghost" onClick={() => setStep('mapping')}>
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                    Voltar ao Mapeamento
+                                </Button>
+                                <Button
+                                    onClick={handleImport}
+                                    className="gap-2"
+                                    disabled={previewStats.toImport === 0}
+                                >
+                                    <Check className="h-4 w-4" />
+                                    Importar {previewStats.toImport.toLocaleString('pt-BR')} Contatos
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STEP: Importing */}
                     {step === 'importing' && (
-                        <div className="flex flex-col items-center justify-center p-12 text-center">
-                            <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-                            <h3 className="text-lg font-medium text-slate-900 mb-2">Importando seus dados...</h3>
-                            <p className="text-sm text-slate-500">
-                                Isso pode levar alguns segundos dependendo da quantidade de registros.
-                            </p>
+                        <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
+                            <Loader2 className="h-10 w-10 text-indigo-600 animate-spin" />
+
+                            <div>
+                                <p className="text-2xl font-bold text-slate-900">
+                                    {progress.current.toLocaleString('pt-BR')} <span className="text-slate-400 font-normal text-lg">/ {progress.total.toLocaleString('pt-BR')}</span>
+                                </p>
+                                <p className="text-sm text-slate-500 mt-1">Importando contatos...</p>
+                            </div>
+
+                            <div className="w-full max-w-md">
+                                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-300"
+                                        style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between mt-2 text-xs text-slate-400">
+                                    <span>{progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0}%</span>
+                                    <span>
+                                        {(() => {
+                                            if (progress.current < 5 || !progress.startTime) return 'Calculando...'
+                                            const elapsed = (Date.now() - progress.startTime) / 1000
+                                            const perRow = elapsed / progress.current
+                                            const remaining = perRow * (progress.total - progress.current)
+                                            if (remaining < 60) return `~${Math.ceil(remaining)}s restantes`
+                                            return `~${Math.ceil(remaining / 60)}min restantes`
+                                        })()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => { abortRef.current = true }}
+                                className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                                <X className="h-4 w-4" />
+                                Cancelar Importação
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* STEP: Results */}
+                    {step === 'results' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="p-4 bg-green-50 border border-green-100 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-green-600">{importResults.success.toLocaleString('pt-BR')}</div>
+                                    <div className="text-sm text-green-800">Importados</div>
+                                </div>
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-blue-600">{importResults.dupCpf.toLocaleString('pt-BR')}</div>
+                                    <div className="text-sm text-blue-800">CPF duplicado (pulados)</div>
+                                </div>
+                                <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-amber-600">{importResults.dupEmail.toLocaleString('pt-BR')}</div>
+                                    <div className="text-sm text-amber-800">Email duplicado (pulados)</div>
+                                </div>
+                                <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-red-600">{importResults.errors.length}</div>
+                                    <div className="text-sm text-red-800">Erros</div>
+                                </div>
+                            </div>
+
+                            {importResults.errors.some(e => e.includes('ERRO FATAL') || e.includes('cancelada')) && (
+                                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                    <span>Importação interrompida. Os contatos acima foram importados antes da interrupção.</span>
+                                </div>
+                            )}
+
+                            {importResults.errors.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-medium text-red-700 mb-2">Erros ({importResults.errors.length})</h4>
+                                    <div className="max-h-[150px] overflow-y-auto p-3 bg-red-50 border border-red-100 rounded-lg text-xs font-mono text-red-700">
+                                        {importResults.errors.map((err, i) => <div key={i}>{err}</div>)}
+                                    </div>
+                                </div>
+                            )}
+
+                            <Button onClick={() => { onSuccess(); onClose(); reset() }} className="w-full">
+                                Concluir
+                            </Button>
                         </div>
                     )}
                 </div>
