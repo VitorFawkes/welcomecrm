@@ -279,7 +279,12 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         const { nome, sobrenome } = splitName(fullName)
 
         const cpfRaw = get('cpf')
-        const normalizedCpf = cpfRaw ? cpfRaw.replace(/\D/g, '') : null
+        let normalizedCpf = cpfRaw ? cpfRaw.replace(/\D/g, '') : null
+        // Excel remove zeros à esquerda: "05204520970" → "5204520970"
+        if (normalizedCpf) {
+            if (normalizedCpf.length === 10) normalizedCpf = normalizedCpf.padStart(11, '0')
+            else if (normalizedCpf.length === 13) normalizedCpf = normalizedCpf.padStart(14, '0')
+        }
         const validCpf = normalizedCpf && (normalizedCpf.length === 11 || normalizedCpf.length === 14) ? normalizedCpf : null
 
         const emailRaw = get('email')
@@ -298,7 +303,13 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         ]
         for (const [mappingKey, jsonKey] of fields) {
             const val = get(mappingKey)
-            if (val) endereco[jsonKey] = val
+            if (mappingKey === 'cep' && val) {
+                const cepDigits = val.replace(/\D/g, '')
+                // Excel remove zeros à esquerda: "07260270" → "7260270"
+                endereco['cep'] = cepDigits.length === 7 ? '0' + cepDigits : cepDigits
+            } else if (val) {
+                endereco[jsonKey] = val
+            }
         }
 
         const dataNascimento = excelDateToISO(get('data_nascimento'))
