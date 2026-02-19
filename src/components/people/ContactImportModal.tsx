@@ -49,7 +49,7 @@ const CRM_FIELDS = [
 const fieldAliases: Record<string, string[]> = {
     nome: ['nome', 'name', 'nome completo', 'full name'],
     cpf: ['cpf', 'documento', 'cpf/cnpj', 'cnpj'],
-    data_nascimento: ['nascimento', 'data nascimento', 'data de nascimento', 'fundacao', 'fundação', 'birthday', 'aniversario', 'aniversário'],
+    data_nascimento: ['nascimento', 'data nascimento', 'data de nascimento', 'fundacao', 'fundação', 'nascimento (fundação)', 'nascimento (fundacao)', 'birthday', 'aniversario', 'aniversário', 'birth date'],
     rg: ['rg', 'identidade', 'registro geral'],
     email: ['email', 'e-mail', 'mail', 'correio'],
     telefone: ['celular', 'telefone', 'phone', 'tel', 'whatsapp', 'fone', 'mobile'],
@@ -87,16 +87,16 @@ function fixMojibake(str: string): string {
 
 function excelDateToISO(serial: unknown): string | null {
     if (!serial) return null
+    // Tenta numérico primeiro (Excel serial dates — funciona para string e number)
+    const asNum = typeof serial === 'string' ? Number(serial) : (typeof serial === 'number' ? serial : NaN)
+    if (!isNaN(asNum) && asNum > 1000 && asNum < 100000) {
+        const date = new Date((asNum - 25569) * 86400 * 1000)
+        return date.toISOString().split('T')[0]
+    }
     if (typeof serial === 'string') {
         const brMatch = serial.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
         if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`
         if (/^\d{4}-\d{2}-\d{2}/.test(serial)) return serial.slice(0, 10)
-        return null
-    }
-    const serialNum = Number(serial)
-    if (!isNaN(serialNum) && serialNum > 1000) {
-        const date = new Date((serialNum - 25569) * 86400 * 1000)
-        return date.toISOString().split('T')[0]
     }
     return null
 }
@@ -157,6 +157,7 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         success: number; dupCpf: number; dupEmail: number; errors: string[]
     }>({ success: 0, dupCpf: 0, dupEmail: 0, errors: [] })
     const [progress, setProgress] = useState({ current: 0, total: 0, startTime: 0 })
+    const [analysisProgress, setAnalysisProgress] = useState<{ phase: string; current: number; total: number } | null>(null)
     const abortRef = useRef(false)
 
     const currentUserId = session?.user?.id
@@ -179,10 +180,15 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 UF: 'SP',
                 'País': 'Brasil',
                 Sexo: 'Masculino',
+                'Tipo (PF/PJ)': 'PF',
                 Passaporte: 'AA123456',
                 'Validade Passaporte': '2030-12-31',
                 'Observações': 'Cliente VIP',
                 Tags: 'VIP, Luxo',
+                'Cadastrado em': '01/01/2020',
+                'Primeira Venda': '15/03/2020',
+                'Última Venda': '20/12/2025',
+                'Último Retorno': '10/01/2026',
             }
         ]
         const ws = XLSX.utils.json_to_sheet(template)
@@ -226,17 +232,33 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
             setHeaders(sheetHeaders)
             setFileData(fixedData)
 
-            // Auto-mapping com aliases
+            // Auto-mapping com aliases (matching em camadas: exato → contém → parcial)
             const initialMapping: Mapping = {}
+            const usedHeaders = new Set<string>()
             CRM_FIELDS.forEach(field => {
                 const aliases = fieldAliases[field.key] || [field.key, field.label]
-                const match = sheetHeaders.find(h => {
-                    const headerLower = h.toLowerCase().trim()
-                    return aliases.some(alias => headerLower === alias.toLowerCase()) ||
-                        headerLower === field.label.toLowerCase() ||
-                        headerLower === field.key.toLowerCase()
+                const allAliases = [...aliases, field.label, field.key]
+
+                // Camada 1: match exato
+                let match = sheetHeaders.find(h => {
+                    if (usedHeaders.has(h)) return false
+                    const hl = h.toLowerCase().trim()
+                    return allAliases.some(a => hl === a.toLowerCase())
                 })
-                if (match) initialMapping[field.key] = match
+
+                // Camada 2: header contém alias (alias com 4+ chars para evitar falsos positivos)
+                if (!match) {
+                    match = sheetHeaders.find(h => {
+                        if (usedHeaders.has(h)) return false
+                        const hl = h.toLowerCase().trim()
+                        return allAliases.some(a => a.length >= 4 && hl.includes(a.toLowerCase()))
+                    })
+                }
+
+                if (match) {
+                    initialMapping[field.key] = match
+                    usedHeaders.add(match)
+                }
             })
             setMapping(initialMapping)
             setStep('mapping')
@@ -347,20 +369,25 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         }
 
         setIsImporting(true)
-        toast.info('Analisando arquivo e verificando duplicados...')
+        setAnalysisProgress({ phase: 'Parseando contatos...', current: 0, total: fileData.length })
 
         try {
-            // Fase 1: Parse + dedup intra-arquivo
+            // Fase 1: Parse + dedup intra-arquivo (com progresso)
             const parsed: ParsedContact[] = []
             let noNameCount = 0
-            for (const row of fileData) {
-                const contact = mapRowToContact(row)
+            for (let i = 0; i < fileData.length; i++) {
+                const contact = mapRowToContact(fileData[i])
                 if (!contact.nome) {
                     noNameCount++
                     continue
                 }
                 parsed.push(contact)
+                if (i % 1000 === 0) {
+                    setAnalysisProgress({ phase: 'Parseando contatos...', current: i, total: fileData.length })
+                    await sleep(0) // yield para atualizar UI
+                }
             }
+            setAnalysisProgress({ phase: 'Deduplicando arquivo...', current: fileData.length, total: fileData.length })
 
             const cpfSeen = new Map<string, number>()
             const emailSeen = new Map<string, number>()
@@ -382,10 +409,12 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 deduped.push(c)
             }
 
-            // Fase 2: Dedup contra banco
+            // Fase 2: Dedup contra banco (com progresso)
+            setAnalysisProgress({ phase: 'Verificando CPFs no banco...', current: 0, total: 0 })
             const existingCpfs = new Set<string>()
             const PAGE_SIZE = 1000
             let offset = 0
+            let cpfPages = 0
             while (true) {
                 const { data } = await supabase
                     .from('contatos')
@@ -396,10 +425,13 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 data.forEach((r: { cpf_normalizado: string | null }) => {
                     if (r.cpf_normalizado) existingCpfs.add(r.cpf_normalizado)
                 })
+                cpfPages++
+                setAnalysisProgress({ phase: 'Verificando CPFs no banco...', current: existingCpfs.size, total: 0 })
                 if (data.length < PAGE_SIZE) break
                 offset += PAGE_SIZE
             }
 
+            setAnalysisProgress({ phase: 'Verificando emails no banco...', current: 0, total: 0 })
             const existingEmails = new Set<string>()
             offset = 0
             while (true) {
@@ -412,9 +444,11 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 data.forEach((r: { email: string | null }) => {
                     if (r.email) existingEmails.add(r.email.toLowerCase())
                 })
+                setAnalysisProgress({ phase: 'Verificando emails no banco...', current: existingEmails.size, total: 0 })
                 if (data.length < PAGE_SIZE) break
                 offset += PAGE_SIZE
             }
+            setAnalysisProgress({ phase: 'Finalizando análise...', current: 0, total: 0 })
 
             let dupCpfCount = 0
             let dupEmailCount = 0
@@ -450,6 +484,7 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
             setStep('mapping')
         } finally {
             setIsImporting(false)
+            setAnalysisProgress(null)
         }
     }
 
@@ -584,6 +619,7 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         setContactsToInsert([])
         setImportResults({ success: 0, dupCpf: 0, dupEmail: 0, errors: [] })
         setProgress({ current: 0, total: 0, startTime: 0 })
+        setAnalysisProgress(null)
         abortRef.current = false
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
@@ -677,6 +713,34 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Barra de progresso da análise */}
+                            {analysisProgress && (
+                                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-lg space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 text-indigo-600 animate-spin" />
+                                        <span className="text-sm font-medium text-indigo-900">{analysisProgress.phase}</span>
+                                    </div>
+                                    {analysisProgress.total > 0 ? (
+                                        <>
+                                            <div className="h-2 bg-indigo-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-indigo-500 rounded-full transition-all duration-200"
+                                                    style={{ width: `${Math.round((analysisProgress.current / analysisProgress.total) * 100)}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between text-xs text-indigo-600">
+                                                <span>{analysisProgress.current.toLocaleString('pt-BR')} / {analysisProgress.total.toLocaleString('pt-BR')}</span>
+                                                <span>{Math.round((analysisProgress.current / analysisProgress.total) * 100)}%</span>
+                                            </div>
+                                        </>
+                                    ) : analysisProgress.current > 0 ? (
+                                        <div className="text-xs text-indigo-600">
+                                            {analysisProgress.current.toLocaleString('pt-BR')} registros verificados
+                                        </div>
+                                    ) : null}
+                                </div>
+                            )}
 
                             <div className="flex justify-between items-center pt-4 border-t border-slate-100">
                                 <Button variant="ghost" onClick={reset} disabled={isImporting}>
