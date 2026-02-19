@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import { cn } from '../../lib/utils'
 import KanbanCard from './KanbanCard'
+import { ExternalLink } from 'lucide-react'
 import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import type { Database } from '../../database.types'
 
@@ -11,9 +12,11 @@ interface KanbanColumnProps {
     stage: Stage
     cards: Card[]
     phaseColor: string
+    totalCount?: number
+    onShowMore?: () => void
 }
 
-export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnProps) {
+export default function KanbanColumn({ stage, cards, phaseColor, totalCount, onShowMore }: KanbanColumnProps) {
     const { setNodeRef, isOver } = useDroppable({
         id: stage.id,
         data: stage
@@ -78,6 +81,19 @@ export default function KanbanColumn({ stage, cards, phaseColor }: KanbanColumnP
                     ))
                 )}
             </div>
+
+            {/* Ver mais — colunas terminais com muitos cards */}
+            {totalCount != null && totalCount > cards.length && onShowMore && (
+                <div className="flex-shrink-0 border-t border-gray-200 p-2">
+                    <button
+                        onClick={onShowMore}
+                        className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                    >
+                        Ver mais ({totalCount - cards.length} restantes)
+                        <ExternalLink className="h-3 w-3" />
+                    </button>
+                </div>
+            )}
         </div>
     )
 }

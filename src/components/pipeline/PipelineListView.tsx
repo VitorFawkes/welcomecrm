@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowUpDown, Calendar, Clock, AlertCircle, User as UserIcon, Trash2, Edit, Phone, Mail, MoreHorizontal, CheckCircle2, Plane, AlertTriangle } from 'lucide-react'
+import { ArrowUpDown, Calendar, Clock, AlertCircle, User as UserIcon, Trash2, Edit, Phone, Mail, MoreHorizontal, CheckCircle2, Plane, AlertTriangle, ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { getOrigemLabel, getOrigemColor } from '../../lib/constants/origem'
-import { usePipelineCards } from '../../hooks/usePipelineCards'
+import { usePipelineListCards } from '../../hooks/usePipelineListCards'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
@@ -20,7 +20,7 @@ import { useArchiveCard } from '../../hooks/useArchiveCard'
 import DeleteCardModal from '../card/DeleteCardModal'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
-import { useQueryClient, useMutation } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Button } from '../ui/Button'
@@ -48,17 +48,54 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
     const queryClient = useQueryClient()
     const { groupFilters } = usePipelineFilters()
 
-    const { data: cards, isLoading } = usePipelineCards({
+    // Dados para bulk actions
+    const { data: filterOptions } = useFilterOptions()
+    const { data: stages } = usePipelineStages()
+
+    // Paginação e toggle de concluídos/perdidos
+    const [currentPage, setCurrentPage] = useState(1)
+    const [includeTerminal, setIncludeTerminal] = useState(false)
+
+    // Resetar página ao mudar filtros ou toggle
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [filters, includeTerminal])
+
+    // Buscar stages completos (com is_won/is_lost) para identificar stages terminais
+    const { data: fullStages } = useQuery({
+        queryKey: ['stages-full'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('pipeline_stages')
+                .select('id, is_won, is_lost')
+                .eq('ativo', true)
+            if (error) throw error
+            return data
+        },
+        staleTime: 1000 * 60 * 5,
+    })
+
+    // Computar IDs de stages terminais
+    const terminalStageIds = useMemo(() =>
+        (fullStages || []).filter(s => s.is_won || s.is_lost).map(s => s.id),
+        [fullStages]
+    )
+
+    const { data: queryResult, isLoading } = usePipelineListCards({
         productFilter,
         viewMode,
         subView,
         filters,
-        groupFilters
+        groupFilters,
+        includeTerminalStages: includeTerminal,
+        terminalStageIds,
+        page: currentPage,
+        pageSize: 50
     })
 
-    // Dados para bulk actions
-    const { data: filterOptions } = useFilterOptions()
-    const { data: stages } = usePipelineStages()
+    const cards = queryResult?.data
+    const totalCards = queryResult?.total ?? 0
+    const totalPages = queryResult?.totalPages ?? 1
 
     // --- State ---
     const [sortField, setSortField] = useState<keyof Card | 'proxima_tarefa'>('created_at')
@@ -852,9 +889,24 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                     </button>
                 )}
 
+                {/* Toggle Concluídos/Perdidos */}
+                <button
+                    onClick={() => setIncludeTerminal(!includeTerminal)}
+                    className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                        includeTerminal
+                            ? "bg-indigo-100 text-indigo-700 border border-indigo-200"
+                            : "bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
+                    )}
+                >
+                    {includeTerminal ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                    {includeTerminal ? 'Com Concluídos' : 'Sem Concluídos'}
+                </button>
+
                 {/* Results count */}
                 <span className="ml-auto text-xs text-gray-500">
-                    {sortedCards.length} de {cards?.length ?? 0} cards
+                    {sortedCards.length} de {totalCards} cards
+                    {totalPages > 1 && ` · Página ${currentPage} de ${totalPages}`}
                 </span>
             </div>
 
@@ -966,6 +1018,63 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                     </Table>
                 </div>
             </div>
+
+            {/* Paginação */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between px-1">
+                    <span className="text-sm text-gray-500">
+                        Mostrando {((currentPage - 1) * 50) + 1}–{Math.min(currentPage * 50, totalCards)} de {totalCards}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Anterior
+                        </Button>
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                let pageNum: number
+                                if (totalPages <= 5) {
+                                    pageNum = i + 1
+                                } else if (currentPage <= 3) {
+                                    pageNum = i + 1
+                                } else if (currentPage >= totalPages - 2) {
+                                    pageNum = totalPages - 4 + i
+                                } else {
+                                    pageNum = currentPage - 2 + i
+                                }
+                                return (
+                                    <button
+                                        key={pageNum}
+                                        onClick={() => setCurrentPage(pageNum)}
+                                        className={cn(
+                                            "h-8 w-8 rounded text-sm font-medium transition-colors",
+                                            currentPage === pageNum
+                                                ? "bg-indigo-600 text-white"
+                                                : "text-gray-600 hover:bg-gray-100"
+                                        )}
+                                    >
+                                        {pageNum}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                        >
+                            Próxima
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <DeleteCardModal
                 isOpen={showDeleteModal}

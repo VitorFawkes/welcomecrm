@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx'
-import { Download, Upload, Check, Loader2, FileSpreadsheet, ExternalLink } from 'lucide-react'
+import { Download, Upload, Check, Loader2, FileSpreadsheet, ExternalLink, X, AlertTriangle } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { supabase } from '../../lib/supabase'
@@ -61,9 +61,13 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
     const [headers, setHeaders] = useState<string[]>([])
     const [mapping, setMapping] = useState<Mapping>({})
     const [isImporting, setIsImporting] = useState(false)
-    const [importResults, setImportResults] = useState<{ success: number; skipped: number; errors: string[] }>({ success: 0, skipped: 0, errors: [] })
+    const [importResults, setImportResults] = useState<{ success: number; skipped: number; duplicates: number; errors: string[] }>({ success: 0, skipped: 0, duplicates: 0, errors: [] })
     const [importedCards, setImportedCards] = useState<{ id: string; titulo: string; valor: number }[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Progress tracking
+    const [progress, setProgress] = useState({ current: 0, total: 0, startTime: 0 })
+    const abortRef = useRef(false)
 
     // Resolve effective product (default to TRIPS if ALL)
     const effectiveProduct: Product = currentProduct === 'ALL' ? 'TRIPS' : currentProduct
@@ -369,6 +373,37 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         return null
     }
 
+    // Helpers para chunked processing
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+    const excelDateToISO = (serial: unknown): string | null => {
+        if (!serial) return null
+        if (typeof serial === 'string') {
+            const brMatch = serial.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+            if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`
+            if (/^\d{4}-\d{2}-\d{2}/.test(serial)) return serial.slice(0, 10)
+            return serial
+        }
+        const serialNum = Number(serial)
+        if (!isNaN(serialNum)) {
+            const date = new Date((serialNum - 25569) * 86400 * 1000)
+            return date.toISOString().split('T')[0]
+        }
+        return null
+    }
+
+    // Detecção de duplicatas: checa se card já existe com mesma chave composta
+    const checkDuplicate = useCallback(async (titulo: string, pessoaPrincipalId: string, dataFechamento: string | null): Promise<boolean> => {
+        let query = supabase.from('cards').select('id', { count: 'exact', head: true })
+            .eq('titulo', titulo)
+            .eq('pessoa_principal_id', pessoaPrincipalId)
+        if (dataFechamento) {
+            query = query.eq('data_fechamento', dataFechamento)
+        }
+        const { count } = await query
+        return (count ?? 0) > 0
+    }, [])
+
     const handleImport = async () => {
         if (!pipeline) {
             toast.error('Pipeline não encontrado.')
@@ -384,68 +419,99 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         setIsImporting(true)
         setStep('importing')
         setImportedCards([])
+        abortRef.current = false
 
         const batchId = `import-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`
         let successCount = 0
         let skippedCount = 0
+        let duplicateCount = 0
         const errors: string[] = []
-        const createdCards: { id: string; titulo: string; valor: number }[] = []
+        const recentCards: { id: string; titulo: string; valor: number }[] = []
+        const MAX_RECENT_CARDS = 50
+        const MAX_ERRORS = 200
+        const CHUNK_SIZE = 25
+        const CHUNK_DELAY = 500
+        const ROW_DELAY_INTERVAL = 5
+        const ROW_DELAY = 50
+
+        const startTime = Date.now()
+        setProgress({ current: 0, total: fileData.length, startTime })
+
+        // Cache de consultores para evitar queries repetidas
+        const consultorCache = new Map<string, string | null>()
+        const cachedResolveConsultor = async (name: string | null): Promise<string | null> => {
+            if (!name) return null
+            const trimmed = String(name).trim()
+            if (!trimmed) return null
+            if (consultorCache.has(trimmed)) return consultorCache.get(trimmed)!
+            const result = await resolveConsultor(trimmed)
+            consultorCache.set(trimmed, result)
+            return result
+        }
+
+        const showPartialResults = () => {
+            setImportResults({ success: successCount, skipped: skippedCount, duplicates: duplicateCount, errors: errors.slice(0, MAX_ERRORS) })
+            setImportedCards([...recentCards])
+            setStep('results')
+        }
 
         try {
-            // Process sequentially to be safe with async lookups
             for (let i = 0; i < fileData.length; i++) {
+                // Check abort
+                if (abortRef.current) {
+                    errors.push(`Importação cancelada pelo usuário na linha ${i + 2}`)
+                    break
+                }
+
+                // Inter-chunk delay
+                if (i > 0 && i % CHUNK_SIZE === 0) {
+                    await sleep(CHUNK_DELAY)
+                }
+                // Intra-chunk micro-delay
+                if (i > 0 && i % ROW_DELAY_INTERVAL === 0) {
+                    await sleep(ROW_DELAY)
+                }
+
+                setProgress({ current: i + 1, total: fileData.length, startTime })
+
                 const rawRow = fileData[i]
                 const row: RowData = {}
-
-                // Extract mapped values
                 Object.keys(mapping).forEach(key => {
                     row[key] = rawRow[mapping[key]]
                 })
 
                 try {
-                    // 1. Resolve Contact (find or create)
+                    // 1. Resolve Contact
                     const contactId = await findOrCreateContact(row)
 
                     if (!contactId) {
                         skippedCount++
-                        errors.push(`Linha ${i + 2}: Sem dados suficientes para criar contato (Nome: ${row['nome_contato']})`)
+                        if (errors.length < MAX_ERRORS) {
+                            errors.push(`Linha ${i + 2}: Sem dados suficientes para criar contato (Nome: ${row['nome_contato']})`)
+                        }
                         continue
                     }
 
-                    // 2. Resolve Stage
-                    const stageId = viagemConcluidaStage?.id || stages?.[0]?.id || null
+                    // 2. Parse dates and values
+                    const dataFechamento = excelDateToISO(row['data_fechamento'])
+                    const titulo = String(row['titulo'] || '')
 
-                    const excelDateToISO = (serial: unknown): string | null => {
-                        if (!serial) return null
-                        if (typeof serial === 'string') {
-                            // DD/MM/YYYY or D/M/YYYY (Brazilian format) → YYYY-MM-DD
-                            const brMatch = serial.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
-                            if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`
-                            // Already YYYY-MM-DD
-                            if (/^\d{4}-\d{2}-\d{2}/.test(serial)) return serial.slice(0, 10)
-                            return serial
-                        }
-                        const serialNum = Number(serial)
-                        if (!isNaN(serialNum)) {
-                            const date = new Date((serialNum - 25569) * 86400 * 1000)
-                            return date.toISOString().split('T')[0]
-                        }
-                        return null
+                    // 3. Check duplicate — skip silenciosamente se já existe
+                    const isDuplicate = await checkDuplicate(titulo, contactId, dataFechamento)
+                    if (isDuplicate) {
+                        duplicateCount++
+                        continue
                     }
 
-                    // 3. Resolve Consultor
-                    const consultorId = await resolveConsultor(row['consultor'] as string | null)
+                    // 4. Resolve Stage & Consultor
+                    const stageId = viagemConcluidaStage?.id || stages?.[0]?.id || null
+                    const consultorId = await cachedResolveConsultor(row['consultor'] as string | null)
 
                     const valorTotal = parseBRNumber(row['valor'])
                     const receita = parseBRNumber(row['receita'])
-                    console.log(`[Import] Row ${i + 2}: valor raw="${row['valor']}" (${typeof row['valor']}) → ${valorTotal}, receita raw="${row['receita']}" (${typeof row['receita']}) → ${receita}`)
-
-                    // Parse all 3 dates separately
-                    const dataFechamento = excelDateToISO(row['data_fechamento'])
                     const dataInicio = excelDateToISO(row['data_viagem_inicio'])
                     const dataFim = excelDateToISO(row['data_viagem_fim'])
 
-                    // Build epoca_viagem JSON for TripInformation.tsx
                     const epocaViagem = dataInicio ? {
                         tipo: 'data_exata',
                         data_inicio: dataInicio,
@@ -457,30 +523,24 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         flexivel: false
                     } : { tipo: 'indefinido', display: 'A definir' }
 
-                    // 4. Create Card
+                    // 5. Create Card
                     const cardData: Record<string, unknown> = {
-                        titulo: row['titulo'],
+                        titulo,
                         pessoa_principal_id: contactId,
                         pipeline_id: pipeline.id,
                         pipeline_stage_id: stageId,
                         produto: effectiveProduct,
                         valor_estimado: valorTotal,
                         valor_final: valorTotal,
-                        receita: receita,
+                        receita,
                         receita_source: 'manual',
-                        // Datas separadas corretamente
                         data_fechamento: dataFechamento || new Date().toISOString().split('T')[0],
                         data_viagem_inicio: dataInicio,
                         data_viagem_fim: dataFim,
                         epoca_tipo: epocaViagem.tipo,
-                        // ganho_planner_at = data da venda (canônica para Monde)
-                        // Seguro: "Viagem Concluída" tem is_planner_won=false, trigger não sobrescreve
                         ganho_planner: true,
                         ganho_planner_at: dataFechamento || new Date().toISOString(),
-                        // JSON para TripInformation.tsx
-                        produto_data: {
-                            epoca_viagem: epocaViagem
-                        },
+                        produto_data: { epoca_viagem: epocaViagem },
                         origem: 'manual',
                         status_comercial: 'ganho',
                         estado_operacional: 'finalizado',
@@ -499,20 +559,20 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                     const { data: insertedCard, error } = await supabase.from('cards').insert(cardData as any).select('id').single()
 
                     if (error || !insertedCard) {
-                        console.error('Erro detalhado Supabase (Insert Card):', error)
+                        console.error('Erro Supabase (Insert Card):', error)
                         throw error || new Error('Card insert retornou null')
                     }
 
                     const cardId = insertedCard.id
 
-                    // 5. Link pagante as titular in cards_contatos
+                    // 6. Link titular
                     await supabase.from('cards_contatos').insert({
                         card_id: cardId,
                         contato_id: contactId,
                         tipo_viajante: 'titular',
                     })
 
-                    // 6. Link passengers
+                    // 7. Link passengers
                     if (row['passageiros']) {
                         const paganteName = row['nome_contato'] ? String(row['nome_contato']).trim().toLowerCase() : ''
                         const passengers = String(row['passageiros']).split(',').map((p: string) => p.trim()).filter(Boolean)
@@ -530,7 +590,7 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         }
                     }
 
-                    // 7. Create financial item + recalculate (uses existing infra)
+                    // 8. Financial item + recalculate
                     if (valorTotal > 0) {
                         const supplierCost = valorTotal - receita
                         await supabase.from('card_financial_items').insert({
@@ -543,35 +603,36 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                         await supabase.rpc('recalcular_financeiro_manual', { p_card_id: cardId })
                     }
 
-                    createdCards.push({
-                        id: cardId,
-                        titulo: String(row['titulo'] || ''),
-                        valor: valorTotal,
-                    })
+                    // Sliding window de cards recentes (memória)
+                    recentCards.push({ id: cardId, titulo, valor: valorTotal })
+                    if (recentCards.length > MAX_RECENT_CARDS) recentCards.shift()
                     successCount++
 
                 } catch (err: unknown) {
                     skippedCount++
-                    const e = err as Record<string, string>
-                    const errorMsg = e.details || e.message || JSON.stringify(err)
-                    errors.push(`Linha ${i + 2}: Erro ao criar venda - ${errorMsg}`)
+                    if (errors.length < MAX_ERRORS) {
+                        const e = err as Record<string, string>
+                        const errorMsg = e.details || e.message || JSON.stringify(err)
+                        errors.push(`Linha ${i + 2}: Erro ao criar venda - ${errorMsg}`)
+                    }
                 }
             }
 
-            setImportResults({ success: successCount, skipped: skippedCount, errors })
-            setImportedCards(createdCards)
-            setStep('results')
-            if (successCount > 0) {
-                // Do not instantly reload, let user see results
-                // onSuccess() can be called when closing or manually
-            }
+            showPartialResults()
 
         } catch (error: unknown) {
             console.error('Import fatal error:', error)
-            toast.error(`Erro fatal na importação: ${error instanceof Error ? error.message : String(error)}`)
-            setStep('mapping')
+            // Mostrar resultados parciais em vez de perder tudo
+            if (successCount > 0) {
+                errors.push(`ERRO FATAL: ${error instanceof Error ? error.message : String(error)}`)
+                showPartialResults()
+            } else {
+                toast.error(`Erro fatal na importação: ${error instanceof Error ? error.message : String(error)}`)
+                setStep('mapping')
+            }
         } finally {
             setIsImporting(false)
+            abortRef.current = false
         }
     }
 
@@ -581,6 +642,8 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
         setHeaders([])
         setMapping({})
         setImportedCards([])
+        setProgress({ current: 0, total: 0, startTime: 0 })
+        abortRef.current = false
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
@@ -680,24 +743,76 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
                     )}
 
                     {step === 'importing' && (
-                        <div className="flex flex-col items-center justify-center p-12 text-center">
-                            <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-                            <p className="text-slate-600">Processando vendas e buscando contatos...</p>
+                        <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
+                            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+
+                            {/* Counter */}
+                            <div>
+                                <p className="text-2xl font-bold text-slate-900">
+                                    {progress.current} <span className="text-slate-400 font-normal text-lg">/ {progress.total}</span>
+                                </p>
+                                <p className="text-sm text-slate-500 mt-1">Processando vendas e contatos...</p>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="w-full max-w-md">
+                                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-300"
+                                        style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between mt-2 text-xs text-slate-400">
+                                    <span>{progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0}%</span>
+                                    <span>
+                                        {(() => {
+                                            if (progress.current < 5 || !progress.startTime) return 'Calculando...'
+                                            const elapsed = (Date.now() - progress.startTime) / 1000
+                                            const perRow = elapsed / progress.current
+                                            const remaining = perRow * (progress.total - progress.current)
+                                            if (remaining < 60) return `~${Math.ceil(remaining)}s restantes`
+                                            return `~${Math.ceil(remaining / 60)}min restantes`
+                                        })()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Cancel Button */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => { abortRef.current = true }}
+                                className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                                <X className="h-4 w-4" />
+                                Cancelar Importação
+                            </Button>
                         </div>
                     )}
 
                     {step === 'results' && (
                         <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-3">
                                 <div className="p-4 bg-green-50 border border-green-100 rounded-lg text-center">
                                     <div className="text-2xl font-bold text-green-600">{importResults.success}</div>
                                     <div className="text-sm text-green-800">Importados</div>
                                 </div>
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-center">
+                                    <div className="text-2xl font-bold text-blue-600">{importResults.duplicates}</div>
+                                    <div className="text-sm text-blue-800">Duplicatas (pulos)</div>
+                                </div>
                                 <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg text-center">
                                     <div className="text-2xl font-bold text-amber-600">{importResults.skipped}</div>
-                                    <div className="text-sm text-amber-800">Ignorados / Erros</div>
+                                    <div className="text-sm text-amber-800">Erros</div>
                                 </div>
                             </div>
+
+                            {importResults.errors.some(e => e.includes('ERRO FATAL') || e.includes('cancelada')) && (
+                                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                    <span>Importação interrompida. Os cards acima foram importados com sucesso antes da interrupção.</span>
+                                </div>
+                            )}
 
                             {importedCards.length > 0 && (
                                 <div>

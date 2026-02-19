@@ -24,6 +24,7 @@ import SubCardBadge from './SubCardBadge'
 
 export default function KanbanCard({ card }: KanbanCardProps) {
     const navigate = useNavigate()
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: card.id!,
         data: card
@@ -39,7 +40,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         }
     }
 
-    // Delete card functionality
+    // Delete card functionality (only for default)
     const [showMenu, setShowMenu] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const { archive, isArchiving } = useArchiveCard()
@@ -55,7 +56,6 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         setShowDeleteModal(true)
     }
 
-    // Fetch field settings for this phase (try phase_id first, fallback to fase)
     const { data: settings } = useQuery({
         queryKey: ['pipeline-settings', card.pipeline_stage_id, card.fase],
         queryFn: async () => {
@@ -98,7 +98,6 @@ export default function KanbanCard({ card }: KanbanCardProps) {
         staleTime: 1000 * 60 * 5 // 5 minutes - cache for performance
     })
 
-    // Fetch system fields for dynamic rendering
     const { data: systemFields } = useQuery({
         queryKey: ['system-fields'],
         queryFn: async () => {

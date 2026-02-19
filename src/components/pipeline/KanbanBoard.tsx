@@ -1,5 +1,4 @@
-
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { cn } from '../../lib/utils'
 import {
     DndContext,
@@ -31,6 +30,9 @@ import { useHorizontalScroll } from '../../hooks/useHorizontalScroll'
 import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import { ScrollArrows } from '../ui/ScrollArrows'
 import { usePipelineCards } from '../../hooks/usePipelineCards'
+import TerminalStageDrawer from './TerminalStageDrawer'
+import { useAuth } from '../../contexts/AuthContext'
+import { prepareSearchTerms } from '../../lib/utils'
 
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
@@ -50,6 +52,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
     const { validateMove } = useQualityGate()
+    const { session } = useAuth()
+    const [terminalDrawer, setTerminalDrawer] = useState<{ stage: Stage, totalCards: number, totalValue: number } | null>(null)
 
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const { data: phasesData } = usePipelinePhases()
@@ -126,14 +130,134 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         }
     })
 
-    // Fetch Cards using the new shared hook
+    // Computar IDs de stages terminais (Viagem Concluída, Fechado - Perdido) para excluir do Kanban
+    const terminalStageIds = useMemo(() =>
+        (stages || []).filter(s => s.is_won || s.is_lost).map(s => s.id),
+        [stages]
+    )
+
+    // Stats agregadas da view_dashboard_funil (count + valor por stage)
+    const { data: funnelStats } = useQuery({
+        queryKey: ['dashboard-funnel', productFilter],
+        queryFn: async () => {
+            let query = supabase.from('view_dashboard_funil').select('*')
+            if (productFilter !== 'ALL') query = query.eq('produto', productFilter)
+            const { data, error } = await query
+            if (error) throw error
+            return data
+        },
+        staleTime: 1000 * 60 * 2
+    })
+
+    // Fetch Cards de stages ativos — exclui stages terminais
     const { data: cards, isError, refetch, myTeamMembers } = usePipelineCards({
         productFilter,
         viewMode,
         subView,
         filters,
-        groupFilters
+        groupFilters,
+        excludeTerminalStages: true,
+        terminalStageIds
     })
+
+    // Guards de auth (mesma logica de usePipelineCards para evitar query sem filtro de dono)
+    const needsAuth = (viewMode === 'AGENT' && subView === 'MY_QUEUE') ||
+        (viewMode === 'MANAGER' && subView === 'TEAM_VIEW')
+    const isAuthReady = !!session?.user?.id
+    const isTeamReady = subView !== 'TEAM_VIEW' || (myTeamMembers && myTeamMembers.length > 0)
+
+    // Fetch cards de stages terminais separadamente (LIMIT 100) para evitar PGRST_MAX_ROWS
+    const { data: terminalCards } = useQuery({
+        queryKey: ['terminal-cards', terminalStageIds, productFilter, viewMode, subView, filters, groupFilters, myTeamMembers],
+        enabled: terminalStageIds.length > 0 && (!needsAuth || (isAuthReady && isTeamReady)),
+        queryFn: async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let query = (supabase.from('view_cards_acoes') as any)
+                .select('*')
+                .in('pipeline_stage_id', terminalStageIds)
+
+            if (productFilter !== 'ALL') {
+                query = query.eq('produto', productFilter)
+            }
+
+            // Smart View Filters (mesmos do usePipelineCards)
+            if (viewMode === 'AGENT' && subView === 'MY_QUEUE' && session?.user?.id) {
+                query = query.eq('dono_atual_id', session.user.id)
+            } else if (viewMode === 'MANAGER') {
+                if (subView === 'TEAM_VIEW' && myTeamMembers && myTeamMembers.length > 0) {
+                    query = query.in('dono_atual_id', myTeamMembers)
+                }
+                if (subView === 'FORECAST') {
+                    const startOfMonth = new Date(); startOfMonth.setDate(1);
+                    const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+                    query = query.gte('data_fechamento', startOfMonth.toISOString()).lt('data_fechamento', endOfMonth.toISOString())
+                }
+            }
+
+            // Search (paridade completa com usePipelineCards)
+            if (filters.search) {
+                const { original, normalized, digitsOnly } = prepareSearchTerms(filters.search)
+                if (original) {
+                    const textFields = [
+                        `titulo.ilike.%${original}%`,
+                        `pessoa_nome.ilike.%${original}%`,
+                        `origem.ilike.%${original}%`,
+                        `dono_atual_nome.ilike.%${original}%`,
+                        `sdr_owner_nome.ilike.%${original}%`,
+                        `vendas_nome.ilike.%${original}%`,
+                        `pessoa_email.ilike.%${original}%`,
+                        `external_id.ilike.%${original}%`
+                    ]
+                    if (normalized) {
+                        textFields.push(`pessoa_telefone_normalizado.ilike.%${normalized}%`)
+                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                    } else if (digitsOnly) {
+                        textFields.push(`pessoa_telefone_normalizado.ilike.%${digitsOnly}%`)
+                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                    } else {
+                        textFields.push(`pessoa_telefone.ilike.%${original}%`)
+                    }
+                    query = query.or(textFields.join(','))
+                }
+            }
+
+            // Owner Filters (paridade completa com usePipelineCards)
+            if ((filters.ownerIds?.length ?? 0) > 0) query = query.in('dono_atual_id', filters.ownerIds)
+            if ((filters.sdrIds?.length ?? 0) > 0) query = query.in('sdr_owner_id', filters.sdrIds)
+            if ((filters.plannerIds?.length ?? 0) > 0) query = query.in('vendas_owner_id', filters.plannerIds)
+            if ((filters.posIds?.length ?? 0) > 0) query = query.in('pos_owner_id', filters.posIds)
+
+            // Date Filters
+            if (filters.startDate) query = query.gte('data_viagem_inicio', filters.startDate)
+            if (filters.endDate) query = query.lte('data_viagem_inicio', filters.endDate)
+            if (filters.creationStartDate) query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
+            if (filters.creationEndDate) query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
+
+            // Status & Origem
+            if ((filters.statusComercial?.length ?? 0) > 0) query = query.in('status_comercial', filters.statusComercial)
+            if ((filters.origem?.length ?? 0) > 0) query = query.in('origem', filters.origem)
+
+            query = query.is('archived_at', null).eq('is_group_parent', false)
+
+            const { showLinked, showSolo } = groupFilters
+            if (showLinked && !showSolo) query = query.not('parent_card_id', 'is', null)
+            else if (showSolo && !showLinked) query = query.is('parent_card_id', null)
+
+            query = query.order('created_at', { ascending: false }).limit(100)
+
+            const { data, error } = await query
+            if (error) throw error
+            return data as Card[]
+        },
+        staleTime: 1000 * 60 * 2
+    })
+
+    // Merge: cards ativos + cards terminais (limitados)
+    const allCards = useMemo(() => {
+        const active = cards || []
+        const terminal = terminalCards || []
+        return [...active, ...terminal]
+    }, [cards, terminalCards])
 
     const moveCardMutation = useMutation({
         mutationFn: async ({ cardId, stageId, motivoId, comentario }: { cardId: string, stageId: string, motivoId?: string, comentario?: string }) => {
@@ -146,19 +270,25 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             if (error) throw error
         },
         onMutate: ({ cardId, stageId }) => {
+            const qk = ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, terminalStageIds]
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-            queryClient.cancelQueries({ queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers] })
+            queryClient.cancelQueries({ queryKey: qk })
 
             // Snapshot the previous value
-            const previousCards = queryClient.getQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers])
+            const previousCards = queryClient.getQueryData<Card[]>(qk)
 
             // Find new stage info for complete update
             const newStage = stages?.find((s) => s.id === stageId)
+            const isTerminalStage = terminalStageIds.includes(stageId)
 
             // Optimistically update to the new value
             if (previousCards) {
-                queryClient.setQueryData<Card[]>(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], (old) => {
+                queryClient.setQueryData<Card[]>(qk, (old) => {
                     if (!old) return []
+                    // Se movendo para stage terminal, remover do cache do Kanban
+                    if (isTerminalStage) {
+                        return old.filter((card) => card.id !== cardId)
+                    }
                     return old.map((card) => {
                         if (card.id === cardId) {
                             return {
@@ -171,20 +301,54 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                         return card
                     })
                 })
+
+                // Se movendo para terminal, adicionar no cache de terminal-cards
+                if (isTerminalStage) {
+                    const movedCard = previousCards.find(c => c.id === cardId)
+                    if (movedCard) {
+                        queryClient.setQueriesData<Card[]>(
+                            { queryKey: ['terminal-cards'] },
+                            (old) => {
+                                const updated = { ...movedCard, pipeline_stage_id: stageId, etapa_nome: newStage?.nome || movedCard.etapa_nome }
+                                if (!old) return [updated]
+                                return [updated, ...old].slice(0, 100)
+                            }
+                        )
+                    }
+                }
+
+                // Se movendo DE terminal para ativo, remover do terminal e adicionar ao ativo
+                if (!isTerminalStage) {
+                    const currentCard = allCards.find(c => c.id === cardId)
+                    const isFromTerminal = currentCard && terminalStageIds.includes(currentCard.pipeline_stage_id as string)
+                    if (isFromTerminal && currentCard) {
+                        queryClient.setQueriesData<Card[]>(
+                            { queryKey: ['terminal-cards'] },
+                            (old) => (old || []).filter(c => c.id !== cardId)
+                        )
+                        queryClient.setQueryData<Card[]>(qk, (old) => {
+                            const updated = { ...currentCard, pipeline_stage_id: stageId, fase: newStage?.fase || currentCard.fase, etapa_nome: newStage?.nome || currentCard.etapa_nome }
+                            if (!old) return [updated]
+                            return [...old, updated]
+                        })
+                    }
+                }
             }
 
             // Return a context object with the snapshotted value
             return { previousCards }
         },
         onError: (_err, _variables, context) => {
+            const qk = ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, terminalStageIds]
             // If the mutation fails, use the context returned from onMutate to roll back
             if (context?.previousCards) {
-                queryClient.setQueryData(['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers], context.previousCards)
+                queryClient.setQueryData(qk, context.previousCards)
             }
         },
         onSuccess: () => {
             // Only refetch after successful mutation
             queryClient.invalidateQueries({ queryKey: ['cards'] })
+            queryClient.invalidateQueries({ queryKey: ['terminal-cards'] })
             queryClient.invalidateQueries({ queryKey: ['dashboard-funnel'] })
             queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
         }
@@ -443,33 +607,16 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const phases = phasesData || []
     const displayPhases = [...phases]
 
-    // Calculate Totals for Sticky Footer
-    const totalPipelineValue = cards.reduce((acc, c) => acc + (c.valor_display || c.valor_estimado || 0), 0)
-    const totalPipelineReceita = cards.reduce((acc, c) => acc + (c.receita || 0), 0)
-    const totalCards = cards.length
+    // Calculate Totals for Sticky Footer (usar allCards para incluir terminal)
+    const totalPipelineValue = allCards.reduce((acc, c) => acc + (c.valor_display || c.valor_estimado || 0), 0)
+    const totalPipelineReceita = allCards.reduce((acc, c) => acc + (c.receita || 0), 0)
+    const totalCards = allCards.length
 
-    // DEBUG: Log para diagnóstico do problema de colunas vazias
-    console.log('🔍 DEBUG Kanban:', {
-        viewMode,
-        subView,
-        cardsCount: cards.length,
-        stagesCount: stages.length,
-        phasesCount: displayPhases.length,
-        sampleCards: cards.slice(0, 3).map(c => ({
-            id: c.id,
-            titulo: c.titulo,
-            pipeline_stage_id: c.pipeline_stage_id
-        })),
-        allStages: stages.map((s) => ({
-            id: s.id,
-            nome: s.nome,
-            pipeline_id: s.pipeline_id
-        })),
-        matchingTest: stages.map((s) => ({
-            stageName: s.nome,
-            cardsInStage: cards.filter(c => c.pipeline_stage_id === s.id).length
-        }))
-    })
+    // Helper: obter total real de um stage via view_dashboard_funil
+    const getStageTotal = (stageNome: string) => {
+        const stat = funnelStats?.find(f => f.stage_nome === stageNome)
+        return stat ? { totalCards: Number(stat.total_cards), totalValue: Number(stat.valor_total) } : null
+    }
 
 
     return (
@@ -496,7 +643,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                         <div className="flex gap-4 w-max min-w-full px-4 items-stretch pt-2 h-full">
                             <div className="flex gap-6 items-stretch h-full">
-                                {cards.length === 0 ? (
+                                {allCards.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center w-[calc(100vw-20rem)] py-20 bg-white/5 rounded-xl border border-dashed border-gray-300">
                                         <div className="p-4 bg-gray-100 rounded-full mb-4">
                                             <Users className="h-8 w-8 text-gray-400" />
@@ -507,17 +654,15 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                         </p>
                                     </div>
                                 ) : displayPhases.map((phase) => {
-                                    // Filter stages that belong to this phase
-                                    // We support both phase_id (new) and fase name match (legacy migration)
-                                    const phaseStages = stages.filter((s) =>
+                                    // Filter ALL stages (incluindo terminais) por phase
+                                    const phaseStages = (stages || []).filter((s) =>
                                         s.phase_id === phase.id ||
                                         (!s.phase_id && s.fase === phase.name)
                                     )
 
-                                    // If no stages for this phase, skip rendering it (optional, but cleaner)
                                     if (phaseStages.length === 0) return null
 
-                                    const phaseCards = cards.filter(c => phaseStages.some((s) => s.id === c.pipeline_stage_id))
+                                    const phaseCards = allCards.filter(c => phaseStages.some((s) => s.id === c.pipeline_stage_id))
                                     const totalCount = phaseCards.length
                                     const totalValue = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
 
@@ -533,14 +678,24 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                             stages={phaseStages}
                                             cards={phaseCards}
                                         >
-                                            {phaseStages.map((stage) => (
-                                                <KanbanColumn
-                                                    key={stage.id}
-                                                    stage={stage}
-                                                    cards={cards.filter(c => c.pipeline_stage_id === stage.id)}
-                                                    phaseColor={phase.color}
-                                                />
-                                            ))}
+                                            {phaseStages.map((stage) => {
+                                                const isTerminal = terminalStageIds.includes(stage.id)
+                                                const stageCards = allCards.filter(c => c.pipeline_stage_id === stage.id)
+                                                const stageTotal = isTerminal ? getStageTotal(stage.nome) : null
+
+                                                return (
+                                                    <KanbanColumn
+                                                        key={stage.id}
+                                                        stage={stage}
+                                                        cards={stageCards}
+                                                        phaseColor={phase.color}
+                                                        totalCount={stageTotal?.totalCards}
+                                                        onShowMore={isTerminal && stageTotal && stageTotal.totalCards > stageCards.length ? () => {
+                                                            setTerminalDrawer({ stage, totalCards: stageTotal.totalCards, totalValue: stageTotal.totalValue })
+                                                        } : undefined}
+                                                    />
+                                                )
+                                            })}
                                         </KanbanPhaseGroup>
                                     )
                                 })}
@@ -587,7 +742,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                         missingFields={pendingMove.missingFields || []}
                                         missingProposals={pendingMove.missingProposals || []}
                                         missingTasks={pendingMove.missingTasks || []}
-                                        initialData={cards?.find(c => c.id === pendingMove.cardId) as Record<string, unknown> | undefined}
+                                        initialData={allCards?.find(c => c.id === pendingMove.cardId) as Record<string, unknown> | undefined}
                                     />
 
                                     <LossReasonModal
@@ -607,6 +762,23 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     </DndContext>
                 </div>
             </div>
+
+            {/* Terminal Stage Drawer */}
+            {terminalDrawer && (
+                <TerminalStageDrawer
+                    isOpen={!!terminalDrawer}
+                    onClose={() => setTerminalDrawer(null)}
+                    stage={terminalDrawer.stage}
+                    totalCards={terminalDrawer.totalCards}
+                    totalValue={terminalDrawer.totalValue}
+                    productFilter={productFilter}
+                    viewMode={viewMode}
+                    subView={subView}
+                    filters={filters}
+                    groupFilters={groupFilters}
+                    myTeamMembers={myTeamMembers}
+                />
+            )}
 
             {/* Footer - Part of flex layout, not fixed */}
             <div className="flex-shrink-0 h-16 bg-white/95 backdrop-blur-2xl border-t border-primary/10 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] flex items-center justify-between px-6 z-50">
@@ -650,13 +822,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 <div className="flex items-center gap-6">
                     {/* Phase Summaries (Mini) */}
                     {displayPhases.map(phase => {
-                        const phaseStages = stages.filter((s) =>
+                        const phaseStages = (stages || []).filter((s) =>
                             s.phase_id === phase.id ||
                             (!s.phase_id && s.fase === phase.name)
                         )
                         if (phaseStages.length === 0) return null
 
-                        const phaseCards = cards.filter(c => phaseStages.some((s) => s.id === c.pipeline_stage_id))
+                        const phaseCards = allCards.filter(c => phaseStages.some((s) => s.id === c.pipeline_stage_id))
                         const val = phaseCards.reduce((acc, c) => acc + (c.valor_estimado || 0), 0)
                         const count = phaseCards.length
 

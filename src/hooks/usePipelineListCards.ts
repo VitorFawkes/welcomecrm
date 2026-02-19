@@ -8,17 +8,37 @@ import { prepareSearchTerms } from '../lib/utils'
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
 export type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
-interface UsePipelineCardsProps {
+interface UsePipelineListCardsProps {
     productFilter: Product
     viewMode: ViewMode
     subView: SubView
     filters: FilterState
     groupFilters: GroupFilters
-    excludeTerminalStages?: boolean
+    includeTerminalStages?: boolean
     terminalStageIds?: string[]
+    page?: number
+    pageSize?: number
 }
 
-export function usePipelineCards({ productFilter, viewMode, subView, filters, groupFilters, excludeTerminalStages, terminalStageIds }: UsePipelineCardsProps) {
+interface PipelineListResult {
+    data: Card[]
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+}
+
+export function usePipelineListCards({
+    productFilter,
+    viewMode,
+    subView,
+    filters,
+    groupFilters,
+    includeTerminalStages = false,
+    terminalStageIds,
+    page = 1,
+    pageSize = 50
+}: UsePipelineListCardsProps) {
     const { session, profile } = useAuth()
 
     // Fetch Team Members for Team View
@@ -37,55 +57,45 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
         }
     })
 
-    // Aguardar auth antes de disparar query para evitar busca sem filtro de dono (timeout)
     const needsAuth = (viewMode === 'AGENT' && subView === 'MY_QUEUE') ||
         (viewMode === 'MANAGER' && subView === 'TEAM_VIEW')
     const isAuthReady = !!session?.user?.id
     const isTeamReady = subView !== 'TEAM_VIEW' || (myTeamMembers && myTeamMembers.length > 0)
 
-    const query = useQuery({
-        queryKey: ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, terminalStageIds],
+    return useQuery({
+        queryKey: ['pipeline-list', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, includeTerminalStages, terminalStageIds, page, pageSize],
         placeholderData: keepPreviousData,
         enabled: !needsAuth || (isAuthReady && isTeamReady),
-        queryFn: async () => {
+        queryFn: async (): Promise<PipelineListResult> => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- query builder perde tipo com encadeamento dinâmico
             let query = (supabase.from('view_cards_acoes') as any)
-                .select('*')
+                .select('*', { count: 'exact' })
 
             if (productFilter !== 'ALL') {
                 query = query.eq('produto', productFilter)
             }
 
-            // Apply Smart View Filters
+            // Smart View Filters
             if (viewMode === 'AGENT') {
-                if (subView === 'MY_QUEUE') {
-                    // Filter by current user
-                    if (session?.user?.id) {
-                        query = query.eq('dono_atual_id', session.user.id)
-                    }
+                if (subView === 'MY_QUEUE' && session?.user?.id) {
+                    query = query.eq('dono_atual_id', session.user.id)
                 }
-                // 'ATTENTION' logic would go here (e.g. overdue)
             } else if (viewMode === 'MANAGER') {
-                if (subView === 'TEAM_VIEW') {
-                    // Filter by team members if available
-                    if (myTeamMembers && myTeamMembers.length > 0) {
-                        query = query.in('dono_atual_id', myTeamMembers)
-                    }
+                if (subView === 'TEAM_VIEW' && myTeamMembers && myTeamMembers.length > 0) {
+                    query = query.in('dono_atual_id', myTeamMembers)
                 }
                 if (subView === 'FORECAST') {
-                    // Filter by closing_date this month
-                    const startOfMonth = new Date(); startOfMonth.setDate(1);
-                    const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+                    const startOfMonth = new Date(); startOfMonth.setDate(1)
+                    const endOfMonth = new Date(startOfMonth); endOfMonth.setMonth(endOfMonth.getMonth() + 1)
                     query = query.gte('data_fechamento', startOfMonth.toISOString()).lt('data_fechamento', endOfMonth.toISOString())
                 }
             }
 
-            // Apply Advanced Filters (from Drawer) - SMART SEARCH
+            // Search
             if (filters.search) {
                 const { original, normalized, digitsOnly } = prepareSearchTerms(filters.search)
 
                 if (original) {
-                    // Campos de texto padrão
                     const textFields = [
                         `titulo.ilike.%${original}%`,
                         `pessoa_nome.ilike.%${original}%`,
@@ -97,7 +107,6 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                         `external_id.ilike.%${original}%`
                     ]
 
-                    // Busca de telefone — usa coluna normalizada (digits-only) para match cross-formato
                     if (normalized) {
                         textFields.push(`pessoa_telefone_normalizado.ilike.%${normalized}%`)
                         textFields.push(`pessoa_telefone.ilike.%${original}%`)
@@ -116,17 +125,14 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 query = query.in('dono_atual_id', filters.ownerIds)
             }
 
-            // NEW: SDR Filter
             if ((filters.sdrIds?.length ?? 0) > 0) {
                 query = query.in('sdr_owner_id', filters.sdrIds)
             }
 
-            // NEW: Planner Filter (vendas_owner_id)
             if ((filters.plannerIds?.length ?? 0) > 0) {
                 query = query.in('vendas_owner_id', filters.plannerIds)
             }
 
-            // NEW: Pós-Venda Filter (pos_owner_id)
             if ((filters.posIds?.length ?? 0) > 0) {
                 query = query.in('pos_owner_id', filters.posIds)
             }
@@ -139,7 +145,6 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 query = query.lte('data_viagem_inicio', filters.endDate)
             }
 
-            // NEW: Creation Date Filter (TIMESTAMP)
             if (filters.creationStartDate) {
                 query = query.gte('created_at', `${filters.creationStartDate}T00:00:00`)
             }
@@ -148,58 +153,58 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
                 query = query.lte('created_at', `${filters.creationEndDate}T23:59:59`)
             }
 
-            // Status Comercial Filter
             if ((filters.statusComercial?.length ?? 0) > 0) {
                 query = query.in('status_comercial', filters.statusComercial)
             }
 
-            // Origem Filter
             if ((filters.origem?.length ?? 0) > 0) {
                 query = query.in('origem', filters.origem)
             }
 
-            // Archived Filter — esconder cards arquivados do pipeline
+            // Archived Filter
             query = query.is('archived_at', null)
 
-            // Terminal Stages Filter — excluir Viagem Concluída e Perdido do Kanban
-            if (excludeTerminalStages && terminalStageIds && terminalStageIds.length > 0) {
+            // Terminal Stages Filter — default: excluir concluídos/perdidos
+            if (!includeTerminalStages && terminalStageIds && terminalStageIds.length > 0) {
                 query = query.not('pipeline_stage_id', 'in', `(${terminalStageIds.join(',')})`)
             }
 
-            // Apply Sorting
+            // Exclude group parents
+            query = query.eq('is_group_parent', false)
+
+            // Group Filters (server-side para paginação correta)
+            const { showLinked, showSolo } = groupFilters
+            if (showLinked && !showSolo) {
+                query = query.not('parent_card_id', 'is', null)
+            } else if (showSolo && !showLinked) {
+                query = query.is('parent_card_id', null)
+            }
+
+            // Sorting
             if (filters.sortBy && filters.sortBy !== 'data_proxima_tarefa') {
                 query = query.order(filters.sortBy, { ascending: filters.sortDirection === 'asc', nullsFirst: false })
             } else {
                 query = query.order('created_at', { ascending: false })
             }
 
-            const { data, error } = await query
+            // Pagination
+            const from = (page - 1) * pageSize
+            const to = from + pageSize - 1
+            query = query.range(from, to)
+
+            const { data, error, count } = await query
             if (error) throw error
 
-            let filteredData = data as Card[]
+            const total = count || 0
+            const totalPages = Math.ceil(total / pageSize)
 
-            // Apply Group Filters (Client-side for flexibility)
-            const { showLinked, showSolo } = groupFilters
-
-            filteredData = filteredData.filter(card => {
-                // ALWAYS exclude Group Parents from Kanban/List
-                if (card.is_group_parent) return false
-
-                const isLinked = !!card.parent_card_id
-                const isSolo = !isLinked
-
-                if (isLinked && showLinked) return true
-                if (isSolo && showSolo) return true
-
-                return false
-            })
-
-            return filteredData
+            return {
+                data: data as Card[],
+                total,
+                page,
+                pageSize,
+                totalPages
+            }
         }
     })
-
-    return {
-        ...query,
-        myTeamMembers
-    }
 }
