@@ -2213,6 +2213,7 @@ export type Database = {
           cpf_normalizado: string | null
           created_at: string
           created_by: string | null
+          data_cadastro_original: string | null
           data_nascimento: string | null
           email: string | null
           endereco: Json | null
@@ -2227,13 +2228,18 @@ export type Database = {
           origem_detalhe: string | null
           passaporte: string | null
           passaporte_validade: string | null
+          primeira_venda_data: string | null
           responsavel_id: string | null
           rg: string | null
+          sexo: string | null
           sobrenome: string | null
           tags: string[] | null
           telefone: string | null
           telefone_normalizado: string | null
+          tipo_cliente: string | null
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"]
+          ultima_venda_data: string | null
+          ultimo_retorno_data: string | null
           updated_at: string
         }
         Insert: {
@@ -2242,6 +2248,7 @@ export type Database = {
           cpf_normalizado?: string | null
           created_at?: string
           created_by?: string | null
+          data_cadastro_original?: string | null
           data_nascimento?: string | null
           email?: string | null
           endereco?: Json | null
@@ -2256,13 +2263,18 @@ export type Database = {
           origem_detalhe?: string | null
           passaporte?: string | null
           passaporte_validade?: string | null
+          primeira_venda_data?: string | null
           responsavel_id?: string | null
           rg?: string | null
+          sexo?: string | null
           sobrenome?: string | null
           tags?: string[] | null
           telefone?: string | null
           telefone_normalizado?: string | null
+          tipo_cliente?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
+          ultima_venda_data?: string | null
+          ultimo_retorno_data?: string | null
           updated_at?: string
         }
         Update: {
@@ -2271,6 +2283,7 @@ export type Database = {
           cpf_normalizado?: string | null
           created_at?: string
           created_by?: string | null
+          data_cadastro_original?: string | null
           data_nascimento?: string | null
           email?: string | null
           endereco?: Json | null
@@ -2285,13 +2298,18 @@ export type Database = {
           origem_detalhe?: string | null
           passaporte?: string | null
           passaporte_validade?: string | null
+          primeira_venda_data?: string | null
           responsavel_id?: string | null
           rg?: string | null
+          sexo?: string | null
           sobrenome?: string | null
           tags?: string[] | null
           telefone?: string | null
           telefone_normalizado?: string | null
+          tipo_cliente?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
+          ultima_venda_data?: string | null
+          ultimo_retorno_data?: string | null
           updated_at?: string
         }
         Relationships: [

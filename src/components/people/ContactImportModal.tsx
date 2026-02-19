@@ -35,10 +35,12 @@ const CRM_FIELDS = [
     { key: 'uf', label: 'UF / Estado', required: false },
     { key: 'pais', label: 'País', required: false },
     { key: 'sexo', label: 'Sexo', required: false },
+    { key: 'tipo_cliente', label: 'Tipo (PF/PJ)', required: false },
     { key: 'passaporte', label: 'Número Passaporte', required: false },
     { key: 'passaporte_validade', label: 'Validade Passaporte', required: false },
     { key: 'observacoes', label: 'Observações', required: false },
     { key: 'tags', label: 'Tags (separadas por vírgula)', required: false },
+    { key: 'cadastrado_em', label: 'Data Cadastro Original', required: false },
     { key: 'primeira_venda', label: 'Primeira Venda', required: false },
     { key: 'ultima_venda', label: 'Última Venda', required: false },
     { key: 'ultimo_retorno', label: 'Último Retorno', required: false },
@@ -60,10 +62,12 @@ const fieldAliases: Record<string, string[]> = {
     uf: ['uf', 'estado', 'state'],
     pais: ['pais', 'país', 'country'],
     sexo: ['sexo', 'genero', 'gênero', 'gender'],
+    tipo_cliente: ['tipo', 'tipo cliente', 'tipo de cliente', 'pf/pj', 'person type'],
     passaporte: ['passaporte', 'passport', 'numero passaporte', 'número passaporte'],
     passaporte_validade: ['validade passaporte', 'passport expiry', 'vencimento passaporte', 'validade do passaporte'],
     observacoes: ['observacoes', 'observações', 'obs', 'notas', 'notes'],
     tags: ['tags', 'categorias'],
+    cadastrado_em: ['cadastrado em', 'data cadastro', 'registration date', 'data de cadastro', 'created at'],
     primeira_venda: ['primeira venda', 'first sale'],
     ultima_venda: ['ultima venda', 'última venda', 'last sale'],
     ultimo_retorno: ['ultimo retorno', 'último retorno', 'last return'],
@@ -119,6 +123,12 @@ interface ParsedContact {
     endereco: Record<string, string> | null
     observacoes: string | null
     tags: string[] | null
+    sexo: string | null
+    tipo_cliente: string | null
+    data_cadastro_original: string | null
+    primeira_venda_data: string | null
+    ultima_venda_data: string | null
+    ultimo_retorno_data: string | null
 }
 
 interface PreviewStats {
@@ -272,28 +282,39 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
         const dataNascimento = excelDateToISO(get('data_nascimento'))
         const passaporteValidade = excelDateToISO(get('passaporte_validade'))
 
-        // Tags + sexo
+        // Tags (apenas tags reais, sem sexo)
         const tagsRaw = get('tags')
-        const sexo = get('sexo')
         const tags: string[] = []
         if (tagsRaw) tags.push(...tagsRaw.split(',').map(t => t.trim()).filter(Boolean))
-        if (sexo) {
-            const sexoLower = sexo.toLowerCase()
-            if (sexoLower.startsWith('m')) tags.push('Sexo: Masculino')
-            else if (sexoLower.startsWith('f')) tags.push('Sexo: Feminino')
-            else tags.push(`Sexo: ${sexo}`)
+
+        // Sexo → coluna própria (normalizar M/F)
+        const sexoRaw = get('sexo')
+        let sexo: string | null = null
+        if (sexoRaw) {
+            const s = sexoRaw.toLowerCase().trim()
+            if (s.startsWith('m') || s === 'masculino' || s === 'male') sexo = 'Masculino'
+            else if (s.startsWith('f') || s === 'feminino' || s === 'female') sexo = 'Feminino'
+            else sexo = sexoRaw
         }
 
-        // Observações + histórico comercial
-        const parts: string[] = []
+        // Tipo cliente → coluna própria (PF/PJ)
+        const tipoRaw = get('tipo_cliente')
+        let tipoCliente: string | null = null
+        if (tipoRaw) {
+            const t = tipoRaw.toLowerCase().trim()
+            if (t.includes('fis') || t === 'pf' || t === 'pessoa física') tipoCliente = 'PF'
+            else if (t.includes('jur') || t === 'pj' || t === 'pessoa jurídica') tipoCliente = 'PJ'
+            else tipoCliente = tipoRaw
+        }
+
+        // Datas comerciais → colunas date próprias
+        const primeiraVendaData = excelDateToISO(get('primeira_venda'))
+        const ultimaVendaData = excelDateToISO(get('ultima_venda'))
+        const ultimoRetornoData = excelDateToISO(get('ultimo_retorno'))
+        const dataCadastroOriginal = excelDateToISO(get('cadastrado_em'))
+
+        // Observações → SOMENTE o campo real de observações do CSV
         const obs = get('observacoes')
-        if (obs) parts.push(obs)
-        const primeiraVenda = get('primeira_venda')
-        const ultimaVenda = get('ultima_venda')
-        const ultimoRetorno = get('ultimo_retorno')
-        if (primeiraVenda) parts.push(`Primeira venda: ${primeiraVenda}`)
-        if (ultimaVenda) parts.push(`Última venda: ${ultimaVenda}`)
-        if (ultimoRetorno) parts.push(`Último retorno: ${ultimoRetorno}`)
 
         return {
             nome,
@@ -307,8 +328,14 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
             passaporte: get('passaporte'),
             passaporte_validade: passaporteValidade,
             endereco: Object.keys(endereco).length > 0 ? endereco : null,
-            observacoes: parts.length > 0 ? parts.join(' | ') : null,
+            observacoes: obs || null,
             tags: tags.length > 0 ? tags : null,
+            sexo,
+            tipo_cliente: tipoCliente,
+            data_cadastro_original: dataCadastroOriginal,
+            primeira_venda_data: primeiraVendaData,
+            ultima_venda_data: ultimaVendaData,
+            ultimo_retorno_data: ultimoRetornoData,
         }
     }
 
@@ -485,37 +512,52 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 }
             }
 
-            // Fase 4: Popular contato_meios com telefones
+            // Fase 4: Popular contato_meios com telefones E emails
             if (successCount > 0 && batchId) {
                 try {
-                    // Buscar contatos recém-importados que têm telefone
                     let meiosOffset = 0
                     while (true) {
                         const { data: recentContacts } = await supabase
                             .from('contatos')
-                            .select('id, telefone')
+                            .select('id, telefone, email')
                             .eq('origem_detalhe', batchId)
-                            .not('telefone', 'is', null)
                             .range(meiosOffset, meiosOffset + 500 - 1)
 
                         if (!recentContacts || recentContacts.length === 0) break
 
-                        const meiosToInsert = recentContacts.map(c => ({
-                            contato_id: c.id,
-                            tipo: 'telefone',
-                            valor: c.telefone!,
-                            is_principal: true,
-                            origem: 'importacao',
-                        }))
+                        const meiosToInsert: { contato_id: string; tipo: string; valor: string; is_principal: boolean; origem: string }[] = []
 
-                        // Insert with ON CONFLICT handled by DB constraint
-                        await supabase.from('contato_meios').insert(meiosToInsert)
+                        for (const c of recentContacts) {
+                            if (c.telefone) {
+                                meiosToInsert.push({
+                                    contato_id: c.id,
+                                    tipo: 'telefone',
+                                    valor: c.telefone,
+                                    is_principal: true,
+                                    origem: 'importacao',
+                                })
+                            }
+                            if (c.email) {
+                                meiosToInsert.push({
+                                    contato_id: c.id,
+                                    tipo: 'email',
+                                    valor: c.email,
+                                    is_principal: true,
+                                    origem: 'importacao',
+                                })
+                            }
+                        }
+
+                        if (meiosToInsert.length > 0) {
+                            // ON CONFLICT handled by DB unique constraint (tipo, valor_normalizado)
+                            await supabase.from('contato_meios').insert(meiosToInsert)
+                        }
 
                         if (recentContacts.length < 500) break
                         meiosOffset += 500
                     }
                 } catch {
-                    // Não-crítico: telefones podem ser populados depois
+                    // Não-crítico: meios podem ser populados depois
                 }
             }
         } catch (error: unknown) {
