@@ -135,6 +135,7 @@ interface PreviewStats {
     toImport: number
     dupCpf: number
     dupEmail: number
+    dupName: number
     noName: number
     dupInFile: number
     total: number
@@ -402,6 +403,7 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
 
             const cpfSeen = new Map<string, number>()
             const emailSeen = new Map<string, number>()
+            const nameSeen = new Map<string, number>()
             const deduped: ParsedContact[] = []
             let dupInFileCount = 0
 
@@ -414,6 +416,15 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 if (c.email && emailSeen.has(c.email)) {
                     dupInFileCount++
                     continue
+                }
+                // Terceira camada: dedup por nome completo (só quando não tem CPF nem email)
+                if (!c._normalizedCpf && !c.email && c.sobrenome) {
+                    const fullName = (c.nome + ' ' + c.sobrenome).toLowerCase().trim()
+                    if (nameSeen.has(fullName)) {
+                        dupInFileCount++
+                        continue
+                    }
+                    nameSeen.set(fullName, i)
                 }
                 if (c._normalizedCpf) cpfSeen.set(c._normalizedCpf, i)
                 if (c.email) emailSeen.set(c.email, i)
@@ -459,10 +470,32 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 if (data.length < PAGE_SIZE) break
                 offset += PAGE_SIZE
             }
+            // Fase 3: Fetch nomes existentes no banco (para contatos sem CPF/email)
+            setAnalysisProgress({ phase: 'Verificando nomes no banco...', current: 0, total: 0 })
+            const existingNames = new Set<string>()
+            offset = 0
+            while (true) {
+                const { data } = await supabase
+                    .from('contatos')
+                    .select('nome,sobrenome')
+                    .not('sobrenome', 'is', null)
+                    .range(offset, offset + PAGE_SIZE - 1)
+                if (!data || data.length === 0) break
+                data.forEach((r: { nome: string; sobrenome: string | null }) => {
+                    if (r.sobrenome && r.sobrenome.trim()) {
+                        existingNames.add((r.nome + ' ' + r.sobrenome).toLowerCase().trim())
+                    }
+                })
+                setAnalysisProgress({ phase: 'Verificando nomes no banco...', current: existingNames.size, total: 0 })
+                if (data.length < PAGE_SIZE) break
+                offset += PAGE_SIZE
+            }
+
             setAnalysisProgress({ phase: 'Finalizando análise...', current: 0, total: 0 })
 
             let dupCpfCount = 0
             let dupEmailCount = 0
+            let dupNameCount = 0
             const toInsert: ParsedContact[] = []
 
             for (const contact of deduped) {
@@ -474,6 +507,14 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                     dupEmailCount++
                     continue
                 }
+                // Terceira camada: dedup por nome completo contra banco (só sem CPF/email)
+                if (!contact._normalizedCpf && !contact.email && contact.sobrenome) {
+                    const fullName = (contact.nome + ' ' + contact.sobrenome).toLowerCase().trim()
+                    if (existingNames.has(fullName)) {
+                        dupNameCount++
+                        continue
+                    }
+                }
                 toInsert.push(contact)
             }
 
@@ -484,6 +525,7 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                 toImport: toInsert.length,
                 dupCpf: dupCpfCount,
                 dupEmail: dupEmailCount,
+                dupName: dupNameCount,
                 noName: noNameCount,
                 dupInFile: dupInFileCount,
                 total: fileData.length,
@@ -790,6 +832,12 @@ export default function ContactImportModal({ isOpen, onClose, onSuccess }: Conta
                                         <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
                                             <div className="text-xl font-bold text-amber-600">{previewStats.dupEmail.toLocaleString('pt-BR')}</div>
                                             <div className="text-xs text-amber-800">Email já existe (pulados)</div>
+                                        </div>
+                                    )}
+                                    {previewStats.dupName > 0 && (
+                                        <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                            <div className="text-xl font-bold text-purple-600">{previewStats.dupName.toLocaleString('pt-BR')}</div>
+                                            <div className="text-xs text-purple-800">Nome já existe (pulados)</div>
                                         </div>
                                     )}
                                     {previewStats.dupInFile > 0 && (
