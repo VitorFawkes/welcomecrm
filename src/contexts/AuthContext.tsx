@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .from('profiles')
                 .select(`
                     *,
-                    team:teams(id, name, phase_id,
+                    team:teams!profiles_team_id_fkey(id, name, phase_id,
                         phase:pipeline_phases(id, name, slug, color, order_index)
                     ),
                     role_info:roles(id, name, display_name, color)

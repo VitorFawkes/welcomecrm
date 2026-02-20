@@ -187,6 +187,32 @@ export function useAllowedStages(product: string) {
                 }))
                 .sort((a, b) => a.ordem - b.ordem)
 
+            // Fallback: time sem regras configuradas → mostrar todas as etapas
+            if (stages.length === 0) {
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from('pipeline_stages')
+                    .select(`
+                        id, nome, ordem, fase, phase_id,
+                        pipeline_phases!pipeline_stages_phase_id_fkey(id, name, order_index),
+                        pipelines!inner(produto)
+                    `)
+                    .eq('ativo', true)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase nested filter typing
+                    .eq('pipelines.produto', product as any)
+
+                if (fallbackError) throw fallbackError
+
+                return (fallbackData || [])
+                    .sort((a, b) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase join typing
+                        const pa = (a.pipeline_phases as any)?.order_index ?? 999
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase join typing
+                        const pb = (b.pipeline_phases as any)?.order_index ?? 999
+                        return pa !== pb ? pa - pb : a.ordem - b.ordem
+                    })
+                    .map(s => ({ id: s.id, nome: s.nome, ordem: s.ordem, fase: s.fase })) as AllowedStage[]
+            }
+
             return stages as AllowedStage[]
         },
         enabled: !!profile
