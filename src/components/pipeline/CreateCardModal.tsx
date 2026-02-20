@@ -210,23 +210,26 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
     const { profile } = useAuth()
 
     // Helper to get initial owner values based on user's team phase (not role)
-    // A fase do time determina qual coluna de owner e preenchida automaticamente
+    // A fase do time determina qual coluna de owner é preenchida automaticamente
+    // Admin/gestor sem time → default Planner
     const initialOwners = useMemo(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- team join pendente de types regeneration
         const phaseSlug = (profile as any)?.team?.phase?.slug as string | undefined
+        const isAdmin = profile?.is_admin === true
+        const effectivePhase = phaseSlug ?? (isAdmin ? 'planner' : undefined)
         const userId = profile?.id || null
         const userName = profile?.nome || null
 
         return {
-            sdr_owner_id: phaseSlug === 'sdr' ? userId : null,
-            sdr_owner_nome: phaseSlug === 'sdr' ? userName : null,
-            vendas_owner_id: phaseSlug === 'planner' ? userId : null,
-            vendas_owner_nome: phaseSlug === 'planner' ? userName : null,
-            pos_owner_id: phaseSlug === 'pos_venda' ? userId : null,
-            pos_owner_nome: phaseSlug === 'pos_venda' ? userName : null,
+            sdr_owner_id: effectivePhase === 'sdr' ? userId : null,
+            sdr_owner_nome: effectivePhase === 'sdr' ? userName : null,
+            vendas_owner_id: effectivePhase === 'planner' ? userId : null,
+            vendas_owner_nome: effectivePhase === 'planner' ? userName : null,
+            pos_owner_id: effectivePhase === 'pos_venda' ? userId : null,
+            pos_owner_nome: effectivePhase === 'pos_venda' ? userName : null,
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps, @typescript-eslint/no-explicit-any
-    }, [(profile as any)?.team?.phase?.slug, profile?.id, profile?.nome])
+    }, [(profile as any)?.team?.phase?.slug, profile?.is_admin, profile?.id, profile?.nome])
 
     // Core form data
     const [formData, setFormData] = useState({
