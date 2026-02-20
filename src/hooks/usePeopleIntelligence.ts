@@ -65,6 +65,7 @@ export function usePeopleIntelligence() {
             let query = supabase
                 .from('contatos')
                 .select('*, stats:contact_stats(*)', { count: 'exact' })
+                .is('deleted_at', null)
 
             // Apply Filters
             if (filters.search) {
@@ -156,6 +157,7 @@ export function usePeopleIntelligence() {
         const { count: realTotalCount } = await supabase
             .from('contatos')
             .select('*', { count: 'exact', head: true })
+            .is('deleted_at', null)
 
         const { data } = await supabase
             .from('contact_stats')

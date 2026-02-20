@@ -1,4 +1,4 @@
-import { Loader2, AlertTriangle, Info, UserCheck, Plus, ArrowRight } from 'lucide-react'
+import { Loader2, AlertTriangle, Info, UserCheck, Plus, ArrowRight, CheckCircle } from 'lucide-react'
 import type { DuplicateMatch } from '../../hooks/useDuplicateDetection'
 import { cn } from '../../lib/utils'
 
@@ -23,6 +23,7 @@ interface DuplicateWarningPanelProps {
     onSelectExisting: (contactId: string, mergeData?: Record<string, string | null>) => void
     onDismiss?: () => void
     mode?: 'full' | 'compact'
+    noDuplicatesFound?: boolean
 }
 
 function getMergeableFields(
@@ -56,8 +57,9 @@ export default function DuplicateWarningPanel({
     onSelectExisting,
     onDismiss,
     mode = 'full',
+    noDuplicatesFound,
 }: DuplicateWarningPanelProps) {
-    if (!isChecking && duplicates.length === 0) return null
+    if (!isChecking && duplicates.length === 0 && !noDuplicatesFound) return null
 
     const isHighConfidence = duplicates.some(d => d.match_type === 'cpf' || d.match_type === 'email')
 
@@ -66,6 +68,15 @@ export default function DuplicateWarningPanel({
             <div className="flex items-center gap-2 py-2 px-3 text-xs text-slate-500">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Verificando duplicados...
+            </div>
+        )
+    }
+
+    if (noDuplicatesFound && duplicates.length === 0 && !isChecking) {
+        return (
+            <div className="flex items-center gap-2 py-2 px-3 text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Nenhum duplicado encontrado
             </div>
         )
     }

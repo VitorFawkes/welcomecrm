@@ -9,8 +9,13 @@ import { Badge } from '../ui/Badge'
 import ContactForm from '../card/ContactForm'
 import type { Person } from '../../hooks/usePeopleIntelligence'
 import type { Database } from '../../database.types'
-import { Loader2, Plane, Crown, Calendar, DollarSign, MapPin, FileText } from 'lucide-react'
+import { Loader2, Plane, Crown, Calendar, DollarSign, MapPin, FileText, Trash2 } from 'lucide-react'
 import { ContactProposalsWidget } from '../proposals/ContactProposalsWidget'
+import { useDeleteContact } from '../../hooks/useDeleteContact'
+import {
+    AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
+} from '../ui/alert-dialog'
 
 type Card = Database['public']['Tables']['cards']['Row']
 
@@ -22,6 +27,10 @@ interface PersonDetailDrawerProps {
 
 export default function PersonDetailDrawer({ person, onClose, onRefresh }: PersonDetailDrawerProps) {
     const [activeTab, setActiveTab] = useState('info')
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const { softDelete, isDeleting } = useDeleteContact({
+        onSuccess: () => { onRefresh?.(); onClose() }
+    })
 
     // Fetch Trips
     const { data: trips, isLoading: loadingTrips } = useQuery({
@@ -86,7 +95,16 @@ export default function PersonDetailDrawer({ person, onClose, onRefresh }: Perso
                                 </div>
                             </div>
                         </div>
-                        <DrawerClose onClick={onClose} />
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Excluir contato"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                            <DrawerClose onClick={onClose} />
+                        </div>
                     </div>
 
                     {/* Quick Stats */}
@@ -203,6 +221,28 @@ export default function PersonDetailDrawer({ person, onClose, onRefresh }: Perso
                     </Tabs>
                 </DrawerBody>
             </DrawerContent>
+
+            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir contato?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            O contato &quot;{person.nome}{person.sobrenome ? ` ${person.sobrenome}` : ''}&quot; será movido para a lixeira.
+                            Você poderá restaurá-lo depois.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => softDelete(person.id)}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? 'Excluindo...' : 'Excluir'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Drawer >
     )
 }

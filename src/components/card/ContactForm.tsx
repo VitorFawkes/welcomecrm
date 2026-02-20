@@ -35,7 +35,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
     })
 
     // Detecção de duplicados em tempo real
-    const { duplicates, isChecking, hasHighConfidenceDuplicate } = useDuplicateDetection(
+    const { duplicates, isChecking, hasHighConfidenceDuplicate, noDuplicatesFound } = useDuplicateDetection(
         {
             cpf: formData.cpf,
             email: formData.email,
@@ -71,6 +71,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
             const { data } = await (supabase.from('contatos') as any)
                 .select('*')
                 .eq('tipo_pessoa', 'adulto')
+                .is('deleted_at', null)
                 .order('nome')
 
             if (data) {
@@ -323,10 +324,11 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
             </div>
 
             {/* Painel de duplicados */}
-            {showWarning && (
+            {(showWarning || isChecking || noDuplicatesFound) && (
                 <DuplicateWarningPanel
                     duplicates={duplicates}
                     isChecking={isChecking}
+                    noDuplicatesFound={!dismissed && noDuplicatesFound}
                     newData={{
                         email: formData.email || null,
                         telefone: formData.telefone || null,

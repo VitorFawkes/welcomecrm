@@ -265,6 +265,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
             const { data, error } = await supabase
                 .from('contatos')
                 .select('id, nome, telefone, email')
+                .is('deleted_at', null)
                 .or(`nome.ilike.%${debouncedIndicacao}%,email.ilike.%${debouncedIndicacao}%`)
                 .limit(5)
             if (error) throw error

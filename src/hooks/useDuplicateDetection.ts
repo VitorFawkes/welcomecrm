@@ -45,9 +45,10 @@ export function useDuplicateDetection(
     input: DuplicateDetectionInput,
     options: UseDuplicateDetectionOptions = {}
 ) {
-    const { excludeId, debounceMs = 500, enabled = true } = options
+    const { excludeId, debounceMs = 250, enabled = true } = options
     const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([])
     const [isChecking, setIsChecking] = useState(false)
+    const [hasChecked, setHasChecked] = useState(false)
     const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
     const mountedRef = useRef(true)
 
@@ -58,13 +59,13 @@ export function useDuplicateDetection(
 
     const hasSearchableInput = useCallback((): boolean => {
         const cpfDigits = (input.cpf || '').replace(/\D/g, '')
-        if (cpfDigits.length >= 8) return true
+        if (cpfDigits.length >= 5) return true
 
         const email = (input.email || '').trim()
-        if (email.includes('@') && email.length >= 5) return true
+        if (email.includes('@') && email.length >= 3) return true
 
         const phoneDigits = (input.telefone || '').replace(/\D/g, '')
-        if (phoneDigits.length >= 8) return true
+        if (phoneDigits.length >= 6) return true
 
         const nome = (input.nome || '').trim()
         const sobrenome = (input.sobrenome || '').trim()
@@ -80,6 +81,7 @@ export function useDuplicateDetection(
         }
 
         setIsChecking(true)
+        setHasChecked(false)
 
         try {
             // RPC ainda não está nos types gerados — cast para any
@@ -106,7 +108,10 @@ export function useDuplicateDetection(
             console.error('Duplicate check failed:', err)
             if (mountedRef.current) setDuplicates([])
         } finally {
-            if (mountedRef.current) setIsChecking(false)
+            if (mountedRef.current) {
+                setIsChecking(false)
+                setHasChecked(true)
+            }
         }
     }, [input.cpf, input.email, input.telefone, input.nome, input.sobrenome, excludeId, enabled, hasSearchableInput])
 
@@ -116,6 +121,7 @@ export function useDuplicateDetection(
 
         if (!enabled || !hasSearchableInput()) {
             setDuplicates([])
+            setHasChecked(false)
             return
         }
 
@@ -130,6 +136,7 @@ export function useDuplicateDetection(
         d.match_type === 'cpf' || d.match_type === 'email'
     )
     const hasHighConfidenceDuplicate = highConfidenceDuplicates.length > 0
+    const noDuplicatesFound = hasChecked && duplicates.length === 0
 
     const clearDuplicates = useCallback(() => setDuplicates([]), [])
 
@@ -140,5 +147,7 @@ export function useDuplicateDetection(
         hasHighConfidenceDuplicate,
         highConfidenceDuplicates,
         clearDuplicates,
+        hasChecked,
+        noDuplicatesFound,
     }
 }

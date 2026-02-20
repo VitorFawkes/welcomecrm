@@ -33,7 +33,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
     })
 
     // Detecção de duplicados na criação rápida
-    const { duplicates, isChecking: isCheckingDuplicates } = useDuplicateDetection(
+    const { duplicates, isChecking: isCheckingDuplicates, noDuplicatesFound } = useDuplicateDetection(
         {
             nome: newContact.nome,
             email: newContact.email,
@@ -56,6 +56,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
             const { data, error } = await supabase
                 .from('contatos')
                 .select('*')
+                .is('deleted_at', null)
                 .or(`nome.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefone.ilike.%${debouncedSearch}%`)
                 .limit(8)
 
@@ -452,10 +453,11 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                             </div>
 
                             {/* Painel de duplicados */}
-                            {duplicates.length > 0 && (
+                            {(duplicates.length > 0 || isCheckingDuplicates || noDuplicatesFound) && (
                                 <DuplicateWarningPanel
                                     duplicates={duplicates}
                                     isChecking={isCheckingDuplicates}
+                                    noDuplicatesFound={noDuplicatesFound}
                                     onSelectExisting={(contactId) => addContactMutation.mutate(contactId)}
                                     mode="compact"
                                 />

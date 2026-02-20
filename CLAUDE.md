@@ -61,6 +61,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | useMyTeamPhase | 2 | Fase do pipeline associada ao time do usuário logado (auto-filter) |
 | useTeamFilterMembers | 2 | Resolve teamIds → member IDs via RPC server-side (filtro de time) |
 | useDuplicateDetection | 2 | Detecção de duplicados em tempo real (CPF, email, telefone, nome) via RPC |
+| useDeleteContact | 1 | Soft-delete e restauração de contatos (padrão useDeleteCard) |
 
 ### Componentes Principais (src/components/)
 | Área | Componentes-chave |
@@ -81,7 +82,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Tabela | Papel | FK principais |
 |--------|-------|---------------|
 | **cards** | Central — deals/viagens | → pipeline_stages, contatos, cards (parent) |
-| **contatos** | Central — pessoas (cpf_normalizado UNIQUE, rg, passaporte_validade, sexo, tipo_cliente PF/PJ, primeira_venda_data, ultima_venda_data, ultimo_retorno_data, data_cadastro_original) | — |
+| **contatos** | Central — pessoas (cpf_normalizado UNIQUE, rg, passaporte_validade, sexo, tipo_cliente PF/PJ, primeira_venda_data, ultima_venda_data, ultimo_retorno_data, data_cadastro_original, deleted_at, deleted_by) | — |
 | **profiles** | Central — usuários | → teams |
 | proposals | Propostas comerciais | → cards |
 | pipeline_stages | Stages do funil | → pipeline_phases, pipelines |

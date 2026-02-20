@@ -53,6 +53,7 @@ export function GlobalSearchModal() {
             const { data: contacts } = await supabase
                 .from('contatos')
                 .select('id, nome, email, telefone')
+                .is('deleted_at', null)
                 .or(`nome.ilike.${searchTerm},email.ilike.${searchTerm}`)
                 .limit(5)
 
