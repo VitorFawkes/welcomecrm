@@ -94,7 +94,8 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
             }
 
             if (meiosToInsert.length > 0) {
-                await supabase.from('contato_meios').insert(meiosToInsert)
+                // Ignore duplicates — unique index (tipo, valor_normalizado) may reject if phone/email already exists
+                await supabase.from('contato_meios').upsert(meiosToInsert, { onConflict: 'tipo,valor_normalizado', ignoreDuplicates: true })
             }
 
             return data
@@ -131,12 +132,12 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
 
                 onContactAdded(createdContact.id, createdContact)
                 onClose()
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error('Error linking contact:', err)
-                setError('Contato criado, mas houve erro ao vincular: ' + err.message)
+                setError('Contato criado, mas houve erro ao vincular: ' + (err instanceof Error ? err.message : String(err)))
             }
         },
-        onError: (err: any) => {
+        onError: (err: Error) => {
             console.error('Error creating contact:', err)
             setError('Erro ao criar contato: ' + err.message)
         }
@@ -181,7 +182,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
             onContactAdded(contactId, contact ? { nome: contact.nome || 'Sem Nome' } : undefined)
             onClose()
         },
-        onError: (err: any) => {
+        onError: (err: Error) => {
             setError('Erro ao adicionar contato: ' + err.message)
         }
     })
@@ -426,7 +427,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                         </label>
                                         <select
                                             value={newContact.tipo_pessoa}
-                                            onChange={(e) => setNewContact({ ...newContact, tipo_pessoa: e.target.value as any })}
+                                            onChange={(e) => setNewContact({ ...newContact, tipo_pessoa: e.target.value as 'adulto' | 'crianca' })}
                                             className="w-full h-11 px-4 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
                                         >
                                             <option value="adulto">Adulto</option>

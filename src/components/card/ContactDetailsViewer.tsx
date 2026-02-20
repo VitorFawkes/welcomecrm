@@ -20,10 +20,9 @@ export default function ContactDetailsViewer({ contact, card }: ContactDetailsVi
     const [loadingEvents, setLoadingEvents] = useState(false)
 
     // Extract raw fields from card.marketing_data if available
-    const marketingData = card?.marketing_data as Record<string, any> | null
-    const rawFields = marketingData?.raw_fields || {}
-    const unmappedFields = marketingData?.unmapped_fields || {}
-    const hasRawData = Object.keys(rawFields).length > 0 || Object.keys(unmappedFields).length > 0
+    const marketingData = card?.marketing_data as Record<string, unknown> | null
+    const rawFields = (marketingData?.raw_fields || {}) as Record<string, unknown>
+    const unmappedFields = (marketingData?.unmapped_fields || {}) as Record<string, unknown>
 
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return '-'
@@ -36,17 +35,10 @@ export default function ContactDetailsViewer({ contact, card }: ContactDetailsVi
     }
 
     useEffect(() => {
-        // Debugging IDs
-        console.log('[ContactDetailsViewer] Debug:', {
-            contactId: contact.id,
-            contactExternalId: contact.external_id,
-            cardId: card?.id,
-            cardExternalId: card?.external_id
-        })
-
         if (showRawData && events.length === 0) {
             fetchIntegrationEvents()
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- only trigger on showRawData toggle
     }, [showRawData])
 
     const fetchIntegrationEvents = async () => {
@@ -290,15 +282,55 @@ export default function ContactDetailsViewer({ contact, card }: ContactDetailsVi
                             )}
                         </div>
 
-                        {/* 3. Legacy Raw Fields (Fallback) */}
-                        {hasRawData && (
-                            <div className="opacity-75">
-                                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Dados Legados (Card Marketing Data)</h4>
-                                <pre className="p-4 bg-slate-100 text-slate-600 rounded-lg text-xs font-mono overflow-x-auto max-h-[200px]">
-                                    {JSON.stringify({ raw_fields: rawFields, unmapped_fields: unmappedFields }, null, 2)}
-                                </pre>
-                            </div>
-                        )}
+                        {/* 3. Mapped Marketing Fields + Legacy Raw */}
+                        {marketingData && (() => {
+                            // Campos mapeados com valor (exclui metadados internos e objetos)
+                            const internalKeys = new Set(['source', 'active_campaign_id', 'raw_fields', 'unmapped_fields']);
+                            const mappedEntries = Object.entries(marketingData)
+                                .filter(([k, v]) => !internalKeys.has(k) && v !== null && v !== undefined && v !== '' && typeof v !== 'object');
+
+                            // raw_fields e unmapped_fields filtrados (só não-vazios)
+                            const nonEmptyRaw = Object.entries(rawFields).filter(([, v]) => v !== '' && v !== null && v !== undefined);
+                            const nonEmptyUnmapped = Object.entries(unmappedFields).filter(([, v]) => v !== '' && v !== null && v !== undefined);
+
+                            const humanLabel = (key: string) => key
+                                .replace(/^mkt_/, '')
+                                .replace(/_/g, ' ')
+                                .replace(/\b\w/g, l => l.toUpperCase());
+
+                            return (
+                                <div className="space-y-4">
+                                    {mappedEntries.length > 0 && (
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Dados do Active Campaign</h4>
+                                            <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+                                                {mappedEntries.map(([key, value]) => (
+                                                    <div key={key} className="flex items-start gap-3 px-3 py-2">
+                                                        <span className="text-[11px] font-medium text-slate-500 min-w-[140px] shrink-0 pt-0.5">{humanLabel(key)}</span>
+                                                        <span className="text-xs text-slate-800 break-all">{String(value)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(nonEmptyRaw.length > 0 || nonEmptyUnmapped.length > 0) && (
+                                        <div className="opacity-60">
+                                            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Campos Não Mapeados ({nonEmptyRaw.length + nonEmptyUnmapped.length})</h4>
+                                            <pre className="p-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-mono overflow-x-auto max-h-[150px]">
+                                                {JSON.stringify(
+                                                    {
+                                                        ...(nonEmptyRaw.length > 0 ? { raw_fields: Object.fromEntries(nonEmptyRaw) } : {}),
+                                                        ...(nonEmptyUnmapped.length > 0 ? { unmapped_fields: Object.fromEntries(nonEmptyUnmapped) } : {})
+                                                    },
+                                                    null, 2
+                                                )}
+                                            </pre>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>

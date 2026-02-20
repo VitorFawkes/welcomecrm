@@ -103,9 +103,10 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
             }
 
             onSave(result)
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Error saving contact:', error)
-            alert('Erro ao salvar contato')
+            const msg = error instanceof Error ? error.message : (error as Record<string, unknown>)?.message || 'Erro desconhecido'
+            alert(`Erro ao salvar contato:\n${msg}`)
         } finally {
             setSaving(false)
         }

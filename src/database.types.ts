@@ -2266,7 +2266,6 @@ export type Database = {
         Insert: {
           chatpro_session_id?: string | null
           cpf?: string | null
-          cpf_normalizado?: string | null
           created_at?: string
           created_by?: string | null
           data_cadastro_original?: string | null
@@ -2291,7 +2290,6 @@ export type Database = {
           sobrenome?: string | null
           tags?: string[] | null
           telefone?: string | null
-          telefone_normalizado?: string | null
           tipo_cliente?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           ultima_venda_data?: string | null
@@ -2301,7 +2299,6 @@ export type Database = {
         Update: {
           chatpro_session_id?: string | null
           cpf?: string | null
-          cpf_normalizado?: string | null
           created_at?: string
           created_by?: string | null
           data_cadastro_original?: string | null
@@ -2326,7 +2323,6 @@ export type Database = {
           sobrenome?: string | null
           tags?: string[] | null
           telefone?: string | null
-          telefone_normalizado?: string | null
           tipo_cliente?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           ultima_venda_data?: string | null
