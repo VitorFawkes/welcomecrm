@@ -60,6 +60,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | usePipelineListCards | 1 | Cards paginados para PipelineListView (exclui terminais) |
 | useMyTeamPhase | 2 | Fase do pipeline associada ao time do usuário logado (auto-filter) |
 | useTeamFilterMembers | 2 | Resolve teamIds → member IDs via RPC server-side (filtro de time) |
+| useDuplicateDetection | 2 | Detecção de duplicados em tempo real (CPF, email, telefone, nome) via RPC |
 
 ### Componentes Principais (src/components/)
 | Área | Componentes-chave |
@@ -70,7 +71,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Propostas | ProposalBuilder, SectionEditor, AddItemMenu, VersionHistory |
 | Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings, JuliaIAConfig |
 | Health | IntegrationHealthTab, PulseGrid, ActiveAlertsList, HealthRulesConfig |
-| Pessoas | PeopleGrid, PersonDetailDrawer, ContactForm, ContactImportModal |
+| Pessoas | PeopleGrid, PersonDetailDrawer, ContactForm, ContactImportModal, DuplicateWarningPanel |
 | Leads | LeadsTable, LeadsFilters, LeadsBulkActions |
 | Trips | TripsTaxBadge, group/* (GroupDashboard, GroupTravelersList) |
 | Monde | MondeWidget |

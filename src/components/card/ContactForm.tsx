@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import type { Database } from '../../database.types'
 
@@ -6,6 +7,10 @@ type Contato = Database['public']['Tables']['contatos']['Row']
 import { getTipoPessoa } from '../../lib/contactUtils'
 import { Loader2, X, Link } from 'lucide-react'
 import { ORIGEM_OPTIONS, needsOrigemDetalhe } from '../../lib/constants/origem'
+import { useDuplicateDetection } from '../../hooks/useDuplicateDetection'
+import DuplicateWarningPanel from '../contacts/DuplicateWarningPanel'
+import { parseSupabaseContactError } from '../../lib/supabaseErrorParser'
+import { cn } from '../../lib/utils'
 
 
 interface ContactFormProps {
@@ -13,12 +18,14 @@ interface ContactFormProps {
     onSave: (contact: Contato) => void
     onCancel: () => void
     initialName?: string
+    onSelectExisting?: (contactId: string, mergeData?: Record<string, string | null>) => void
 }
 
-export default function ContactForm({ contact, onSave, onCancel, initialName = '' }: ContactFormProps) {
+export default function ContactForm({ contact, onSave, onCancel, initialName = '', onSelectExisting }: ContactFormProps) {
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [potentialGuardians, setPotentialGuardians] = useState<Contato[]>([])
+    const [dismissed, setDismissed] = useState(false)
 
     const [formData, setFormData] = useState<Partial<Contato>>({
         nome: contact?.nome || initialName,
@@ -26,6 +33,23 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
         tipo_pessoa: contact?.tipo_pessoa || 'adulto',
         ...contact
     })
+
+    // Detecção de duplicados em tempo real
+    const { duplicates, isChecking, hasHighConfidenceDuplicate } = useDuplicateDetection(
+        {
+            cpf: formData.cpf,
+            email: formData.email,
+            telefone: formData.telefone,
+            nome: formData.nome,
+            sobrenome: formData.sobrenome,
+        },
+        { excludeId: contact?.id }
+    )
+
+    // Reset dismissed quando duplicados mudam
+    useEffect(() => {
+        setDismissed(false)
+    }, [duplicates])
 
     useEffect(() => {
         if (formData.data_nascimento) {
@@ -105,14 +129,16 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
             onSave(result)
         } catch (error: unknown) {
             console.error('Error saving contact:', error)
-            const msg = error instanceof Error ? error.message : (error as Record<string, unknown>)?.message || 'Erro desconhecido'
-            alert(`Erro ao salvar contato:\n${msg}`)
+            const parsed = parseSupabaseContactError(error)
+            toast.error(parsed.message)
         } finally {
             setSaving(false)
         }
     }
 
     const isChild = formData.tipo_pessoa === 'crianca'
+    const showWarning = !dismissed && duplicates.length > 0
+    const warnSubmit = dismissed && hasHighConfidenceDuplicate
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-gray-50">
@@ -296,6 +322,28 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
                 </div>
             </div>
 
+            {/* Painel de duplicados */}
+            {showWarning && (
+                <DuplicateWarningPanel
+                    duplicates={duplicates}
+                    isChecking={isChecking}
+                    newData={{
+                        email: formData.email || null,
+                        telefone: formData.telefone || null,
+                        cpf: formData.cpf || null,
+                    }}
+                    onSelectExisting={(contactId, mergeData) => {
+                        if (onSelectExisting) {
+                            onSelectExisting(contactId, mergeData)
+                        } else {
+                            toast.info('Contato existente encontrado. Use a página de Pessoas para gerenciá-lo.')
+                        }
+                    }}
+                    onDismiss={() => setDismissed(true)}
+                    mode="full"
+                />
+            )}
+
             <div className="flex justify-end gap-3 pt-4">
                 <button
                     type="button"
@@ -307,10 +355,15 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
                 <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    className={cn(
+                        "inline-flex items-center px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50",
+                        warnSubmit
+                            ? "bg-amber-600 hover:bg-amber-700 focus:ring-amber-500"
+                            : "bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500"
+                    )}
                 >
                     {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Salvar
+                    {warnSubmit ? 'Salvar Mesmo Assim' : 'Salvar'}
                 </button>
             </div>
         </form>

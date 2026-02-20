@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Search, Plus, Filter } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '../components/ui/Button'
 import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { usePeopleIntelligence, type Person } from '../hooks/usePeopleIntelligence'
@@ -11,6 +12,7 @@ import PeopleStatsBar from '../components/people/PeopleStatsBar'
 import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle } from '../components/ui/drawer'
 import ContactForm from '../components/card/ContactForm'
 import ContactImportModal from '../components/people/ContactImportModal'
+import { supabase } from '../lib/supabase'
 
 export default function People() {
     const {
@@ -36,6 +38,67 @@ export default function People() {
         setIsNewPersonDrawerOpen(false)
         refresh()
     }
+
+    const handleSelectExisting = useCallback(async (contactId: string, mergeData?: Record<string, string | null>) => {
+        // 1. Se tem dados novos para mesclar, faz update no contato existente
+        if (mergeData && Object.keys(mergeData).length > 0) {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (supabase.from('contatos') as any)
+                    .update(mergeData)
+                    .eq('id', contactId)
+
+                // Inserir em contato_meios se telefone/email novos
+                const meiosToInsert = []
+                if (mergeData.telefone) {
+                    meiosToInsert.push({
+                        contato_id: contactId,
+                        tipo: 'telefone',
+                        valor: mergeData.telefone,
+                        is_principal: false,
+                        origem: 'manual'
+                    })
+                }
+                if (mergeData.email) {
+                    meiosToInsert.push({
+                        contato_id: contactId,
+                        tipo: 'email',
+                        valor: mergeData.email,
+                        is_principal: false,
+                        origem: 'manual'
+                    })
+                }
+                if (meiosToInsert.length > 0) {
+                    await supabase.from('contato_meios').upsert(meiosToInsert, {
+                        onConflict: 'tipo,valor_normalizado',
+                        ignoreDuplicates: true
+                    })
+                }
+
+                toast.success('Dados mesclados ao contato existente')
+            } catch (err) {
+                console.error('Error merging contact data:', err)
+                toast.error('Erro ao mesclar dados')
+            }
+        }
+
+        // 2. Fechar drawer de criação
+        setIsNewPersonDrawerOpen(false)
+
+        // 3. Buscar contato existente para abrir no drawer
+        const { data: existingContact } = await supabase
+            .from('contatos')
+            .select('*')
+            .eq('id', contactId)
+            .single()
+
+        if (existingContact) {
+            setSelectedPerson(existingContact as unknown as Person)
+        }
+
+        // 4. Refresh lista
+        refresh()
+    }, [refresh])
 
     return (
         <ErrorBoundary>
@@ -175,6 +238,7 @@ export default function People() {
                             <ContactForm
                                 onSave={handleCreateSuccess}
                                 onCancel={() => setIsNewPersonDrawerOpen(false)}
+                                onSelectExisting={handleSelectExisting}
                             />
                         </DrawerBody>
                     </DrawerContent>

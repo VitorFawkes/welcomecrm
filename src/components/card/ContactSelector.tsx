@@ -7,6 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { cn } from '../../lib/utils'
+import { useDuplicateDetection } from '../../hooks/useDuplicateDetection'
+import DuplicateWarningPanel from '../contacts/DuplicateWarningPanel'
+import { parseSupabaseContactError } from '../../lib/supabaseErrorParser'
 
 interface ContactSelectorProps {
     cardId: string
@@ -28,6 +31,16 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         data_nascimento: '',
         tipo_pessoa: 'adulto' as 'adulto' | 'crianca'
     })
+
+    // Detecção de duplicados na criação rápida
+    const { duplicates, isChecking: isCheckingDuplicates } = useDuplicateDetection(
+        {
+            nome: newContact.nome,
+            email: newContact.email,
+            telefone: newContact.telefone,
+        },
+        { enabled: showCreateForm }
+    )
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300)
@@ -137,9 +150,10 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                 setError('Contato criado, mas houve erro ao vincular: ' + (err instanceof Error ? err.message : String(err)))
             }
         },
-        onError: (err: Error) => {
+        onError: (err: unknown) => {
             console.error('Error creating contact:', err)
-            setError('Erro ao criar contato: ' + err.message)
+            const parsed = parseSupabaseContactError(err)
+            setError(parsed.message)
         }
     })
 
@@ -437,13 +451,25 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                 </div>
                             </div>
 
+                            {/* Painel de duplicados */}
+                            {duplicates.length > 0 && (
+                                <DuplicateWarningPanel
+                                    duplicates={duplicates}
+                                    isChecking={isCheckingDuplicates}
+                                    onSelectExisting={(contactId) => addContactMutation.mutate(contactId)}
+                                    mode="compact"
+                                />
+                            )}
+
                             {/* Hint - more compact */}
-                            <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-                                <span className="text-amber-500">💡</span>
-                                <p className="text-xs text-amber-700">
-                                    Após criar, acesse o contato para adicionar endereço, documentos e mais.
-                                </p>
-                            </div>
+                            {duplicates.length === 0 && (
+                                <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <span className="text-amber-500">💡</span>
+                                    <p className="text-xs text-amber-700">
+                                        Após criar, acesse o contato para adicionar endereço, documentos e mais.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Actions */}
                             <div className="flex gap-3 pt-3 border-t border-slate-100">
