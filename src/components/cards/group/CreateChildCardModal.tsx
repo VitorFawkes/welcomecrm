@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import ContactSelector from '@/components/card/ContactSelector'
 import type { Database } from '@/database.types'
+import { formatContactName } from '@/lib/contactUtils'
 
 type Product = Database['public']['Enums']['app_product']
 
@@ -31,6 +32,7 @@ export default function CreateChildCardModal({ isOpen, onClose, parentCardId, pa
     const createCardMutation = useMutation({
         mutationFn: async () => {
             // Get the first stage for the parent's product pipeline
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
             const { data: pipeline } = await (supabase.from('pipelines') as any)
                 .select('id')
                 .eq('produto', parentProduct)
@@ -38,6 +40,7 @@ export default function CreateChildCardModal({ isOpen, onClose, parentCardId, pa
 
             if (!pipeline) throw new Error('Pipeline not found')
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
             const { data: firstStage } = await (supabase.from('pipeline_stages') as any)
                 .select('id')
                 .eq('pipeline_id', pipeline.id)
@@ -48,6 +51,7 @@ export default function CreateChildCardModal({ isOpen, onClose, parentCardId, pa
             if (!firstStage) throw new Error('No stages found')
 
             // Create the card linked to the parent
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
             const { data: card, error } = await (supabase.from('cards') as any)
                 .insert({
                     titulo: formData.titulo,
@@ -193,8 +197,8 @@ export default function CreateChildCardModal({ isOpen, onClose, parentCardId, pa
                                 handleContactSelect(contactId, contact.nome || 'Sem Nome')
                             } else {
                                 // Fallback fetch
-                                supabase.from('contatos').select('nome').eq('id', contactId).single().then(({ data }) => {
-                                    if (data) handleContactSelect(contactId, data.nome || 'Sem Nome')
+                                supabase.from('contatos').select('nome, sobrenome').eq('id', contactId).single().then(({ data }) => {
+                                    if (data) handleContactSelect(contactId, formatContactName(data) || 'Sem Nome')
                                 })
                             }
                         }

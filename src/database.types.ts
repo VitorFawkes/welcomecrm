@@ -1287,13 +1287,6 @@ export type Database = {
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "card_auto_creation_rules_target_stage_id_fkey"
-            columns: ["target_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
         ]
       }
       card_creation_rules: {
@@ -1346,13 +1339,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "card_creation_rules_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "card_creation_rules_team_id_fkey"
@@ -1547,6 +1533,111 @@ export type Database = {
           {
             foreignKeyName: "card_owner_history_transferred_by_fkey"
             columns: ["transferred_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_team_members: {
+        Row: {
+          card_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          profile_id: string
+          role: string
+        }
+        Insert: {
+          card_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          profile_id: string
+          role?: string
+        }
+        Update: {
+          card_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          profile_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_team_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_team_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_archived_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_team_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_team_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_team_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_team_members_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_team_members_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "card_team_members_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_team_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_team_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "card_team_members_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "view_profiles_complete"
             referencedColumns: ["id"]
@@ -1899,13 +1990,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cards_etapa_funil_id_fkey"
-            columns: ["pipeline_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
-          {
             foreignKeyName: "cards_merged_by_fkey"
             columns: ["merged_by"]
             isOneToOne: false
@@ -1981,6 +2065,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "cards_pessoa_principal_id_fkey"
+            columns: ["pessoa_principal_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "cards_pipeline_id_fkey"
@@ -2090,6 +2181,13 @@ export type Database = {
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["contact_id"]
           },
+          {
+            foreignKeyName: "cards_contatos_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       configuracao_taxa_trips: {
@@ -2165,6 +2263,13 @@ export type Database = {
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["contact_id"]
           },
+          {
+            foreignKeyName: "contact_stats_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contato_meios: {
@@ -2225,6 +2330,13 @@ export type Database = {
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["contact_id"]
           },
+          {
+            foreignKeyName: "contato_meios_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contatos: {
@@ -2236,6 +2348,8 @@ export type Database = {
           created_by: string | null
           data_cadastro_original: string | null
           data_nascimento: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           endereco: Json | null
           external_id: string | null
@@ -2266,10 +2380,13 @@ export type Database = {
         Insert: {
           chatpro_session_id?: string | null
           cpf?: string | null
+          cpf_normalizado?: string | null
           created_at?: string
           created_by?: string | null
           data_cadastro_original?: string | null
           data_nascimento?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           endereco?: Json | null
           external_id?: string | null
@@ -2290,6 +2407,7 @@ export type Database = {
           sobrenome?: string | null
           tags?: string[] | null
           telefone?: string | null
+          telefone_normalizado?: string | null
           tipo_cliente?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           ultima_venda_data?: string | null
@@ -2299,10 +2417,13 @@ export type Database = {
         Update: {
           chatpro_session_id?: string | null
           cpf?: string | null
+          cpf_normalizado?: string | null
           created_at?: string
           created_by?: string | null
           data_cadastro_original?: string | null
           data_nascimento?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           endereco?: Json | null
           external_id?: string | null
@@ -2323,6 +2444,7 @@ export type Database = {
           sobrenome?: string | null
           tags?: string[] | null
           telefone?: string | null
+          telefone_normalizado?: string | null
           tipo_cliente?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           ultima_venda_data?: string | null
@@ -2330,6 +2452,27 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contatos_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contatos_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "contatos_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contatos_responsavel_id_fkey"
             columns: ["responsavel_id"]
@@ -2343,6 +2486,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "contatos_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2751,25 +2901,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "historico_fases_etapa_anterior_id_fkey"
-            columns: ["etapa_anterior_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
-          {
             foreignKeyName: "historico_fases_etapa_nova_id_fkey"
             columns: ["etapa_nova_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "historico_fases_etapa_nova_id_fkey"
-            columns: ["etapa_nova_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -2875,13 +3011,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "integration_conflict_log_actual_stage_id_fkey"
-            columns: ["actual_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
-          {
             foreignKeyName: "integration_conflict_log_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
@@ -2943,13 +3072,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_conflict_log_target_stage_id_fkey"
-            columns: ["target_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "integration_conflict_log_trigger_id_fkey"
@@ -3373,13 +3495,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "integration_inbound_triggers_quarantine_stage_id_fkey"
-            columns: ["quarantine_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
-          {
             foreignKeyName: "integration_inbound_triggers_target_pipeline_id_fkey"
             columns: ["target_pipeline_id"]
             isOneToOne: false
@@ -3392,13 +3507,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_inbound_triggers_target_stage_id_fkey"
-            columns: ["target_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -3613,13 +3721,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_outbound_stage_map_internal_stage_id_fkey"
-            columns: ["internal_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -3932,13 +4033,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_stage_map_internal_stage_id_fkey"
-            columns: ["internal_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -4730,13 +4824,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pipeline_config_from_stage_id_fkey"
-            columns: ["from_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
-          {
             foreignKeyName: "pipeline_config_pipeline_id_fkey"
             columns: ["pipeline_id"]
             isOneToOne: false
@@ -4749,13 +4836,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipeline_config_to_stage_id_fkey"
-            columns: ["to_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -6217,13 +6297,6 @@ export type Database = {
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "stage_field_config_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
         ]
       }
       stage_fields_settings: {
@@ -6264,13 +6337,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stage_fields_settings_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "stage_fields_settings_updated_by_fkey"
@@ -6329,25 +6395,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "stage_transitions_source_stage_id_fkey"
-            columns: ["source_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
-          },
-          {
             foreignKeyName: "stage_transitions_target_stage_id_fkey"
             columns: ["target_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stage_transitions_target_stage_id_fkey"
-            columns: ["target_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -7078,6 +7130,13 @@ export type Database = {
             referencedColumns: ["contact_id"]
           },
           {
+            foreignKeyName: "whatsapp_conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "whatsapp_conversations_platform_id_fkey"
             columns: ["platform_id"]
             isOneToOne: false
@@ -7245,13 +7304,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whatsapp_linha_config_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -7440,6 +7492,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_contact_proposals"
             referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "whatsapp_messages_platform_id_fkey"
@@ -7671,6 +7730,13 @@ export type Database = {
             referencedColumns: ["contact_id"]
           },
           {
+            foreignKeyName: "whatsapp_raw_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "whatsapp_raw_events_platform_id_fkey"
             columns: ["platform_id"]
             isOneToOne: false
@@ -7709,13 +7775,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_conflict_log_actual_stage_id_fkey"
-            columns: ["actual_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "integration_conflict_log_card_id_fkey"
@@ -7765,13 +7824,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integration_conflict_log_target_stage_id_fkey"
-            columns: ["target_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -8043,18 +8095,15 @@ export type Database = {
       }
       view_cards_acoes: {
         Row: {
-          archived_at: string | null
-          archived_by: string | null
           briefing_inicial: Json | null
           campaign_id: string | null
-          card_type: string | null
           cliente_recorrente: boolean | null
           concierge_owner_id: string | null
           condicoes_pagamento: string | null
           created_at: string | null
           data_fechamento: string | null
           data_viagem_inicio: string | null
-          destinos: string | null
+          destinos: Json | null
           dias_ate_viagem: number | null
           dono_atual_email: string | null
           dono_atual_id: string | null
@@ -8075,15 +8124,13 @@ export type Database = {
           is_group_parent: boolean | null
           marketing_data: Json | null
           moeda: string | null
-          orcamento: string | null
+          orcamento: Json | null
           origem: string | null
           parent_card_id: string | null
-          parent_titulo: string | null
           pessoa_email: string | null
           pessoa_nome: string | null
           pessoa_principal_id: string | null
           pessoa_telefone: string | null
-          pessoa_telefone_normalizado: string | null
           pipeline_id: string | null
           pipeline_nome: string | null
           pipeline_stage_id: string | null
@@ -8092,16 +8139,12 @@ export type Database = {
           produto: Database["public"]["Enums"]["app_product"] | null
           produto_data: Json | null
           proxima_tarefa: Json | null
-          receita: number | null
-          receita_source: string | null
           sdr_nome: string | null
           sdr_owner_email: string | null
           sdr_owner_id: string | null
           sdr_owner_nome: string | null
           status_comercial: string | null
           status_taxa: string | null
-          sub_card_mode: string | null
-          sub_card_status: string | null
           tarefas_atrasadas: number | null
           tarefas_pendentes: number | null
           tempo_etapa_dias: number | null
@@ -8109,36 +8152,14 @@ export type Database = {
           titulo: string | null
           ultima_interacao: Json | null
           updated_at: string | null
-          urgencia_tempo_etapa: string | null
-          urgencia_viagem: string | null
-          valor_display: number | null
+          urgencia_tempo_etapa: number | null
+          urgencia_viagem: number | null
           valor_estimado: number | null
           valor_final: number | null
           vendas_nome: string | null
           vendas_owner_id: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "cards_archived_by_fkey"
-            columns: ["archived_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cards_archived_by_fkey"
-            columns: ["archived_by"]
-            isOneToOne: false
-            referencedRelation: "v_team_proposal_performance"
-            referencedColumns: ["consultant_id"]
-          },
-          {
-            foreignKeyName: "cards_archived_by_fkey"
-            columns: ["archived_by"]
-            isOneToOne: false
-            referencedRelation: "view_profiles_complete"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "cards_dono_atual_id_profiles_fkey"
             columns: ["dono_atual_id"]
@@ -8166,13 +8187,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cards_etapa_funil_id_fkey"
-            columns: ["pipeline_stage_id"]
-            isOneToOne: false
-            referencedRelation: "view_dashboard_funil"
-            referencedColumns: ["stage_id"]
           },
           {
             foreignKeyName: "cards_parent_card_id_fkey"
@@ -8224,6 +8238,13 @@ export type Database = {
             referencedColumns: ["contact_id"]
           },
           {
+            foreignKeyName: "cards_pessoa_principal_id_fkey"
+            columns: ["pessoa_principal_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cards_pipeline_id_fkey"
             columns: ["pipeline_id"]
             isOneToOne: false
@@ -8265,14 +8286,12 @@ export type Database = {
       }
       view_dashboard_funil: {
         Row: {
-          fase: string | null
-          ordem: number | null
+          etapa_nome: string | null
+          etapa_ordem: number | null
           produto: Database["public"]["Enums"]["app_product"] | null
-          receita_total: number | null
-          stage_id: string | null
-          stage_nome: string | null
           total_cards: number | null
-          valor_total: number | null
+          total_valor_estimado: number | null
+          total_valor_final: number | null
         }
         Relationships: []
       }
@@ -8307,6 +8326,44 @@ export type Database = {
           },
           {
             foreignKeyName: "cards_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      view_deleted_contacts: {
+        Row: {
+          cpf: string | null
+          created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          deleted_by_nome: string | null
+          email: string | null
+          id: string | null
+          nome: string | null
+          sobrenome: string | null
+          telefone: string | null
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contatos_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contatos_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "contatos_deleted_by_fkey"
             columns: ["deleted_by"]
             isOneToOne: false
             referencedRelation: "view_profiles_complete"
@@ -8422,6 +8479,26 @@ export type Database = {
       cancelar_sub_card: {
         Args: { p_motivo?: string; p_sub_card_id: string }
         Returns: Json
+      }
+      check_contact_duplicates: {
+        Args: {
+          p_cpf?: string
+          p_email?: string
+          p_exclude_id?: string
+          p_nome?: string
+          p_sobrenome?: string
+          p_telefone?: string
+        }
+        Returns: {
+          contact_cpf: string
+          contact_email: string
+          contact_id: string
+          contact_nome: string
+          contact_sobrenome: string
+          contact_telefone: string
+          match_strength: string
+          match_type: string
+        }[]
       }
       check_outbound_trigger: {
         Args: {

@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils'
 import { useDuplicateDetection } from '../../hooks/useDuplicateDetection'
 import DuplicateWarningPanel from '../contacts/DuplicateWarningPanel'
 import { parseSupabaseContactError } from '../../lib/supabaseErrorParser'
+import { formatContactName, getContactInitials } from '../../lib/contactUtils'
 
 interface ContactSelectorProps {
     cardId: string
@@ -57,7 +58,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                 .from('contatos')
                 .select('*')
                 .is('deleted_at', null)
-                .or(`nome.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefone.ilike.%${debouncedSearch}%`)
+                .or(`nome.ilike.%${debouncedSearch}%,sobrenome.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefone.ilike.%${debouncedSearch}%`)
                 .limit(8)
 
             if (error) throw error
@@ -194,7 +195,7 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         },
         onSuccess: (contactId) => {
             const contact = contacts?.find(c => c.id === contactId)
-            onContactAdded(contactId, contact ? { nome: contact.nome || 'Sem Nome' } : undefined)
+            onContactAdded(contactId, contact ? { nome: formatContactName(contact) || 'Sem Nome' } : undefined)
             onClose()
         },
         onError: (err: Error) => {
@@ -267,10 +268,10 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-medium group-hover:bg-indigo-100 transition-colors flex-shrink-0">
-                                                    {(contact.nome || 'S').charAt(0).toUpperCase()}
+                                                    {getContactInitials(contact)}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-medium text-slate-900 truncate">{contact.nome || 'Sem Nome'}</p>
+                                                    <p className="font-medium text-slate-900 truncate">{formatContactName(contact) || 'Sem Nome'}</p>
                                                     <div className="flex items-center gap-2 text-xs text-slate-500">
                                                         {contact.telefone && (
                                                             <span className="flex items-center gap-1">

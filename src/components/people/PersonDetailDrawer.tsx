@@ -10,6 +10,7 @@ import ContactForm from '../card/ContactForm'
 import type { Person } from '../../hooks/usePeopleIntelligence'
 import type { Database } from '../../database.types'
 import { Loader2, Plane, Crown, Calendar, DollarSign, MapPin, FileText, Trash2 } from 'lucide-react'
+import { formatContactName, getContactInitials } from '../../lib/contactUtils'
 import { ContactProposalsWidget } from '../proposals/ContactProposalsWidget'
 import { useDeleteContact } from '../../hooks/useDeleteContact'
 import {
@@ -76,11 +77,11 @@ export default function PersonDetailDrawer({ person, onClose, onRefresh }: Perso
                     <div className="flex items-start justify-between">
                         <div className="flex items-center gap-4">
                             <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-2xl font-bold">
-                                {(person.nome || 'S').charAt(0).toUpperCase()}
+                                {getContactInitials(person)}
                             </div>
                             <div>
                                 <DrawerTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                    {person.nome || 'Sem Nome'}
+                                    {formatContactName(person) || 'Sem Nome'}
                                     {person.stats?.is_group_leader && (
                                         <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200">
                                             <Crown className="h-3 w-3 mr-1" />
@@ -199,8 +200,8 @@ export default function PersonDetailDrawer({ person, onClose, onRefresh }: Perso
                                                     <div className="col-span-2 flex items-center gap-2 mt-1">
                                                         <MapPin className="h-3.5 w-3.5 text-gray-400" />
                                                         <span className="truncate">
-                                                            {Array.isArray((trip.produto_data as any).destinos)
-                                                                ? ((trip.produto_data as any).destinos as string[]).join(', ')
+                                                            {Array.isArray((trip.produto_data as Record<string, unknown>).destinos)
+                                                                ? ((trip.produto_data as Record<string, unknown>).destinos as string[]).join(', ')
                                                                 : 'Destino não informado'}
                                                         </span>
                                                     </div>

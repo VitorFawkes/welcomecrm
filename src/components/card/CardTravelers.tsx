@@ -8,13 +8,13 @@ import type { Database } from '../../database.types'
 
 type Contato = Database['public']['Tables']['contatos']['Row']
 import { supabase } from '../../lib/supabase'
-import { calculateAge } from '../../lib/contactUtils'
+import { calculateAge, formatContactName, getContactInitials } from '../../lib/contactUtils'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 interface CardTravelersProps {
     card: {
         id: string
-        produto_data: any
+        produto_data: Record<string, unknown> | null
     }
     embedded?: boolean
     onTravelerClick?: (contact: Contato) => void
@@ -35,11 +35,11 @@ function TravelerRow({
         <div className="border border-transparent hover:border-gray-100 rounded-md transition-all">
             <div className="group flex items-start gap-3 p-2 rounded-md hover:bg-gray-50 transition-colors">
                 <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium shrink-0">
-                    {contact.nome ? contact.nome.charAt(0).toUpperCase() : '?'}
+                    {getContactInitials(contact)}
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900 truncate">{contact.nome || 'Sem nome'}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{formatContactName(contact) || 'Sem nome'}</p>
                         {tipo_viajante === 'titular' && (
                             <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded-full font-medium">
                                 Titular
@@ -81,6 +81,7 @@ export default function CardTravelers({ card, embedded = false }: CardTravelersP
     const { data: contacts, isLoading } = useQuery({
         queryKey: ['card-contacts', card.id],
         queryFn: async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
             const { data, error } = await (supabase.from('cards_contatos') as any)
                 .select(`
                     id,
@@ -101,6 +102,7 @@ export default function CardTravelers({ card, embedded = false }: CardTravelersP
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
             const { error } = await (supabase.from('cards_contatos') as any)
                 .delete()
                 .eq('id', id)

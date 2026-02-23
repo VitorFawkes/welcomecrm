@@ -7,7 +7,7 @@ import type { Database } from '../../../database.types'
 
 type Contato = Database['public']['Tables']['contatos']['Row']
 import ContactSelector from '../../card/ContactSelector'
-import { calculateAge, getContactSummary } from '../../../lib/contactUtils'
+import { calculateAge, getContactSummary, formatContactName, getContactInitials } from '../../../lib/contactUtils'
 
 interface Pessoas {
     adultos: number
@@ -36,6 +36,7 @@ export default function PessoasField({
         if (!cardId) return
 
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
             const { data, error } = await (supabase.from('cards_contatos') as any)
                 .select(`
                     contato:contatos (*)
@@ -45,6 +46,7 @@ export default function PessoasField({
 
             if (error) throw error
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase join type
             const mappedContacts = data?.map((item: any) => item.contato).filter(Boolean) as Contato[] || []
             setContacts(mappedContacts)
 
@@ -67,16 +69,13 @@ export default function PessoasField({
                     onChange(newPessoas)
                 }
             }
-        } catch (error) {
-            console.error('Error fetching contacts:', error)
-        } finally {
-
+        } catch (err) {
+            console.error('Error fetching contacts:', err)
         }
     }
 
-    useEffect(() => {
-        fetchContacts()
-    }, [cardId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch on cardId change only
+    useEffect(() => { fetchContacts() }, [cardId])
 
     const handleRemoveContact = async (contactId: string) => {
         if (!cardId) return
@@ -152,7 +151,7 @@ export default function PessoasField({
                             {contacts.map(contact => (
                                 <div key={contact.id} className="text-xs text-gray-600 flex items-center gap-2">
                                     <User className="h-3 w-3" />
-                                    <span>{contact.nome}</span>
+                                    <span>{formatContactName(contact)}</span>
                                     <span className="text-gray-400">({contact.tipo_pessoa})</span>
                                 </div>
                             ))}
@@ -176,10 +175,10 @@ export default function PessoasField({
                             <div key={contact.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md border text-sm">
                                 <div className="flex items-center gap-2">
                                     <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-medium">
-                                        {(contact.nome || 'S').charAt(0).toUpperCase()}
+                                        {getContactInitials(contact)}
                                     </div>
                                     <div>
-                                        <p className="font-medium text-gray-900">{contact.nome || 'Sem Nome'}</p>
+                                        <p className="font-medium text-gray-900">{formatContactName(contact) || 'Sem Nome'}</p>
                                         <p className="text-xs text-gray-500">
                                             {contact.tipo_pessoa}
                                             {contact.data_nascimento && ` • ${calculateAge(contact.data_nascimento)} anos`}

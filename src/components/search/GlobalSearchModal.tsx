@@ -52,17 +52,18 @@ export function GlobalSearchModal() {
             // Search Contacts
             const { data: contacts } = await supabase
                 .from('contatos')
-                .select('id, nome, email, telefone')
+                .select('id, nome, sobrenome, email, telefone')
                 .is('deleted_at', null)
-                .or(`nome.ilike.${searchTerm},email.ilike.${searchTerm}`)
+                .or(`nome.ilike.${searchTerm},sobrenome.ilike.${searchTerm},email.ilike.${searchTerm}`)
                 .limit(5)
 
             if (contacts) {
                 contacts.forEach(contact => {
+                    const fullName = [contact.nome, contact.sobrenome].filter(Boolean).join(' ')
                     allResults.push({
                         id: contact.id,
                         type: 'contact',
-                        title: contact.nome || 'Sem nome',
+                        title: fullName || 'Sem nome',
                         subtitle: contact.email || contact.telefone || '',
                         href: `/pessoas?search=${encodeURIComponent(contact.nome || '')}`,
                     })
@@ -99,15 +100,18 @@ export function GlobalSearchModal() {
     // Focus input when modal opens
     useEffect(() => {
         if (isOpen) {
-            setTimeout(() => inputRef.current?.focus(), 50)
-            setSelectedIndex(0)
-            setQuery('')
+            setTimeout(() => {
+                inputRef.current?.focus()
+                setSelectedIndex(0)
+                setQuery('')
+            }, 50)
         }
     }, [isOpen])
 
     // Reset selected index when results change
     useEffect(() => {
-        setSelectedIndex(0)
+        const timer = setTimeout(() => setSelectedIndex(0), 0)
+        return () => clearTimeout(timer)
     }, [results])
 
     const navigateTo = (href: string) => {

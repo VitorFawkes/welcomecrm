@@ -2,6 +2,24 @@ import type { Database } from '../database.types'
 
 type Contato = Database['public']['Tables']['contatos']['Row']
 
+// Aceita qualquer objeto com nome/sobrenome (Contato, CardPerson, Person, etc.)
+interface NameFields {
+    nome?: string | null
+    sobrenome?: string | null
+}
+
+export function formatContactName(contact: NameFields): string {
+    return [contact.nome, contact.sobrenome].filter(Boolean).join(' ') || ''
+}
+
+export function getContactInitials(contact: NameFields): string {
+    const n = contact.nome?.trim()
+    const s = contact.sobrenome?.trim()
+    if (n && s) return `${n.charAt(0)}${s.charAt(0)}`.toUpperCase()
+    if (n) return n.charAt(0).toUpperCase()
+    return 'S'
+}
+
 export function calculateAge(birthDate: string | null | undefined): number | null {
     if (!birthDate) return null
 
@@ -24,8 +42,52 @@ export function getTipoPessoa(birthDate: string | null | undefined): 'adulto' | 
     return age < 18 ? 'crianca' : 'adulto'
 }
 
-export function formatContactName(contact: Contato): string {
-    return contact.nome || ''
+// Preposições brasileiras que ficam minúsculas em nomes (exceto primeira palavra)
+const LOWERCASE_WORDS = new Set(['de', 'da', 'do', 'dos', 'das', 'e', 'em', 'com', 'por', 'para'])
+
+/** Title Case brasileiro: capitaliza palavras, preposições ficam minúsculas */
+export function smartTitleCase(name: string | null | undefined): string {
+    if (!name || !name.trim()) return name || ''
+    const words = name.trim().replace(/\s+/g, ' ').split(' ')
+    return words.map((word, i) => {
+        const lower = word.toLowerCase()
+        if (i === 0) return lower.charAt(0).toUpperCase() + lower.slice(1)
+        if (LOWERCASE_WORDS.has(lower)) return lower
+        return lower.charAt(0).toUpperCase() + lower.slice(1)
+    }).join(' ')
+}
+
+/** Corrige nome/sobrenome: split se duplicados, title case */
+export function sanitizeContactNames(
+    nome: string,
+    sobrenome: string | null
+): { nome: string; sobrenome: string | null } {
+    let n: string = (nome || '').trim().replace(/\s+/g, ' ')
+    let s: string | null = (sobrenome || '').trim().replace(/\s+/g, ' ') || null
+
+    // Case 1: nome == sobrenome (duplicado)
+    if (n && s && n.toLowerCase() === s.toLowerCase()) {
+        const parts = n.split(' ')
+        if (parts.length > 1) {
+            n = parts[0]
+            s = parts.slice(1).join(' ')
+        } else {
+            s = null
+        }
+    }
+
+    // Case 2: nome tem full name + sobrenome vazio
+    if (!s && n.includes(' ')) {
+        const parts = n.split(' ')
+        n = parts[0]
+        s = parts.slice(1).join(' ')
+    }
+
+    // Case 3: Aplica title case
+    n = smartTitleCase(n)
+    s = s ? smartTitleCase(s) : null
+
+    return { nome: n, sobrenome: s || null }
 }
 
 export function getContactSummary(contacts: Contato[]): { adults: number, children: number } {

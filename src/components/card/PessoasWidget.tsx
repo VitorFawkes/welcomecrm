@@ -10,6 +10,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerTitle } from '..
 import { useCardPeople } from '../../hooks/useCardPeople'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Database } from '../../database.types'
+import { formatContactName, getContactInitials } from '../../lib/contactUtils'
 
 type Card = Database['public']['Tables']['cards']['Row']
 
@@ -61,7 +62,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
         })
     }
 
-    const displayNome = primary?.nome || ''
+    const displayNome = primary ? formatContactName(primary) : ''
 
     return (
         <div className="rounded-lg border bg-white p-4 shadow-sm">
@@ -74,7 +75,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-full bg-white border border-gray-300 flex items-center justify-center text-indigo-600 font-semibold shadow-sm">
-                                    {displayNome.charAt(0).toUpperCase()}
+                                    {getContactInitials(primary || {})}
                                 </div>
                                 <div>
                                     <p className="text-sm font-semibold text-gray-900">
@@ -154,7 +155,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
 
                             <div className="space-y-2 mb-4">
                                 <CardTravelers
-                                    card={card as any}
+                                    card={{ id: card.id!, produto_data: card.produto_data as Record<string, unknown> | null }}
                                     embedded={true}
                                 />
                             </div>

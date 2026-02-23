@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 interface Contact {
     id: string
     nome: string
+    sobrenome: string | null
     email: string | null
     telefone: string | null
     tipo_pessoa: 'adulto' | 'crianca'
@@ -27,6 +28,7 @@ export function useCardPeople(cardId: string | undefined) {
 
             // 1. Fetch Card (for Primary)
             const { data: card, error: cardError } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
                 .from('cards') as any)
                 .select(`
                     pessoa_principal_id,
@@ -39,6 +41,7 @@ export function useCardPeople(cardId: string | undefined) {
 
             // 2. Fetch Travelers
             const { data: travelersData, error: travelersError } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
                 .from('cards_contatos') as any)
                 .select(`
                     contato:contatos (*)
@@ -53,16 +56,16 @@ export function useCardPeople(cardId: string | undefined) {
             // Add Primary
             if (card.contato) {
                 result.push({
-                    ...(card.contato as any), // Type assertion needed due to complex join types
+                    ...(card.contato as Contact),
                     role: 'primary'
                 })
             }
 
             // Add Travelers
             const travelers = (travelersData || [])
-                .map((item: any) => item.contato)
-                .filter((c: any) => !!c)
-                .map((c: any) => ({ ...c, role: 'traveler' } as CardPerson))
+                .map((item: { contato: Contact }) => item.contato)
+                .filter((c: Contact | null) => !!c)
+                .map((c: Contact) => ({ ...c, role: 'traveler' } as CardPerson))
 
             result.push(...travelers)
 
@@ -132,14 +135,14 @@ export function useCardPeople(cardId: string | undefined) {
             if (!cardId) throw new Error('Card ID required')
 
             if (person.role === 'primary') {
-                const { error } = await (supabase
-                    .from('cards') as any)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
+                const { error } = await (supabase.from('cards') as any)
                     .update({ pessoa_principal_id: null })
                     .eq('id', cardId)
                 if (error) throw error
             } else {
-                const { error } = await (supabase
-                    .from('cards_contatos') as any)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
+                const { error } = await (supabase.from('cards_contatos') as any)
                     .delete()
                     .eq('card_id', cardId)
                     .eq('contato_id', person.id)
@@ -180,8 +183,8 @@ export function useCardPeople(cardId: string | undefined) {
                 return
             }
 
-            const { error } = await (supabase
-                .from('cards_contatos') as any)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- supabase query builder
+            const { error } = await (supabase.from('cards_contatos') as any)
                 .insert({
                     card_id: cardId,
                     contato_id: contact.id,
