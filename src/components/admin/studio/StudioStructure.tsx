@@ -228,8 +228,8 @@ export default function StudioStructure() {
                 // Config WhatsApp
                 supabase.from('whatsapp_linha_config').delete().eq('stage_id', id),
                 // Auditoria: preserva registros mas limpa referência
-                supabase.from('historico_fases').update({ etapa_anterior_id: null }).eq('etapa_anterior_id', id),
-                supabase.from('historico_fases').update({ etapa_nova_id: null }).eq('etapa_nova_id', id),
+                supabase.from('historico_fases').update({ etapa_anterior_id: null as unknown as string }).eq('etapa_anterior_id', id),
+                supabase.from('historico_fases').update({ etapa_nova_id: null as unknown as string }).eq('etapa_nova_id', id),
                 // Triggers de integração: limpa referências
                 supabase.from('integration_inbound_triggers').update({ quarantine_stage_id: null }).eq('quarantine_stage_id', id),
                 supabase.from('integration_inbound_triggers').update({ target_stage_id: null }).eq('target_stage_id', id),
