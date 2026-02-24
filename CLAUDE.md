@@ -29,7 +29,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Grupos | GroupsPage.tsx | Gestão de viagens em grupo |
 | Propostas | ProposalsPage.tsx | Listagem de propostas |
 | Editor Proposta | ProposalBuilderV4.tsx | Editor moderno de propostas |
-| Analytics | Analytics.tsx | Dashboard analítico |
+| Analytics | analytics/AnalyticsPage.tsx | Dashboard analítico — layout sidebar + 8 views (Zustand + React Query + RPCs) |
 | Monde Preview | MondePreviewPage.tsx | Preview integração Monde |
 | Pipeline Studio | admin/PipelineStudio.tsx | Config de pipeline (stages, phases) |
 | Usuários | admin/UserManagement.tsx | Gestão de usuários/roles |
@@ -65,13 +65,24 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | useNetworkStatus | 1 | Detecta online/offline via eventos nativos do browser |
 | useCardTeam | 2 | CRUD membros da equipe do card (assistentes, apoio) + fullTeam unificado. Usado no CardHeader e CardTeamSection |
 | useContactQuality | 1 | Auditoria e correção em lote de qualidade de dados cadastrais |
+| useDocumentTypes | 2 | Lista tipos de documentos reutilizáveis + criação inline |
+| useDocumentCollection | 1 | CRUD de checklist de documentos por card (progress, upload, tarefas) |
+| useAnalyticsFilters | 8+ | Zustand store de filtros globais do Analytics (datas, granularidade, produto) |
+| useOverviewData | 1 | KPIs, funil e timeseries do Overview Analytics |
+| useTeamPerformance | 1 | Performance por consultor (SDR/Planner/Pós) via RPC |
+| useFunnelConversion | 1 | Funil end-to-end + motivos de perda via RPC |
+| useSLAData | 1 | Violações e compliance de SLA via RPC |
+| useWhatsAppAnalytics | 1 | Métricas WhatsApp: volume, aging, response time via RPC |
+| useOperationsData | 1 | Viagens realizadas, sub-cards, qualidade por planner via RPC |
+| useFinancialData | 1 | Receita vs margem, top destinos, receita por produto via RPC |
+| useRetentionData | 1 | Cohort de recompra + KPIs de recorrência via RPC |
 
 ### Componentes Principais (src/components/)
 | Área | Componentes-chave |
 |------|-------------------|
 | Layout | Header, Sidebar, Layout, ProductSwitcher, NotificationCenter |
-| Pipeline | KanbanBoard, PipelineListView, CreateCardModal, FilterDrawer |
-| Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements, FinanceiroWidget, CardTeamSection |
+| Pipeline | KanbanBoard, PipelineListView, CreateCardModal, FilterDrawer, DocumentBadge |
+| Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements, FinanceiroWidget, CardTeamSection, DocumentCollectionWidget |
 | Propostas | ProposalBuilder, SectionEditor, AddItemMenu, VersionHistory |
 | Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings, JuliaIAConfig |
 | Health | IntegrationHealthTab, PulseGrid, ActiveAlertsList, HealthRulesConfig |
@@ -81,6 +92,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Monde | MondeWidget |
 | UI Base | src/components/ui/ — 29 componentes Radix UI (Button, Dialog, Select, etc.) |
 | Resiliência | NetworkStatusBanner (banner offline/online no Layout) |
+| Analytics | AnalyticsSidebar, GlobalControls, KpiCard, ChartCard, views/* (Overview, Team, Funnel, SLA, WhatsApp, Operations, Financial, Retention) |
 
 ### Tabelas do Banco (principais)
 | Tabela | Papel | FK principais |
@@ -104,6 +116,8 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | integration_health_alerts | Alertas gerados | → integration_health_rules, profiles |
 | integration_health_pulse | Cache de ultimo evento por canal | — |
 | card_team_members | Equipe do card (assistentes, apoio) | → cards, profiles |
+| document_types | Tipos de documentos reutilizáveis (passaporte, RG, etc.) | — |
+| card_document_requirements | Checklist de documentos por card/viajante | → cards, contatos, document_types |
 
 ### Campos IA no Cards (Agente WhatsApp)
 | Coluna | Tipo | Propósito |

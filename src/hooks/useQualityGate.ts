@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 
 // Requirement types for validation
-type RequirementType = 'field' | 'proposal' | 'task' | 'rule'
+type RequirementType = 'field' | 'proposal' | 'task' | 'rule' | 'document'
 
 interface RequirementRule {
     stage_id: string
@@ -37,12 +37,19 @@ interface MissingRule {
     label: string
 }
 
+interface MissingDocument {
+    label: string
+    total: number
+    completed: number
+}
+
 interface ValidationResult {
     valid: boolean
     missingFields: MissingField[]
     missingProposals: MissingProposal[]
     missingTasks: MissingTask[]
     missingRules: MissingRule[]
+    missingDocuments: MissingDocument[]
 }
 
 // Proposal status hierarchy
@@ -80,7 +87,7 @@ export function useQualityGate() {
     })
 
     const validateMove = async (card: Record<string, unknown>, targetStageId: string): Promise<ValidationResult> => {
-        if (!rules) return { valid: true, missingFields: [], missingProposals: [], missingTasks: [], missingRules: [] }
+        if (!rules) return { valid: true, missingFields: [], missingProposals: [], missingTasks: [], missingRules: [], missingDocuments: [] }
 
         const stageRules = rules.filter(r => r.stage_id === targetStageId && r.is_blocking)
 
@@ -88,6 +95,7 @@ export function useQualityGate() {
         const missingProposals: MissingProposal[] = []
         const missingTasks: MissingTask[] = []
         const missingRules: MissingRule[] = []
+        const missingDocuments: MissingDocument[] = []
 
         // --- Validate Field Requirements ---
         const fieldRules = stageRules.filter(r => r.requirement_type === 'field')
@@ -217,12 +225,35 @@ export function useQualityGate() {
             }
         }
 
+        // --- Validate Document Requirements ---
+        const documentRules = stageRules.filter(r => r.requirement_type === 'document')
+        if (documentRules.length > 0) {
+            const { data: docReqs } = await supabase
+                .from('card_document_requirements')
+                .select('status')
+                .eq('card_id', card.id as string)
+
+            const total = docReqs?.length || 0
+            const completed = docReqs?.filter(d => d.status === 'recebido').length || 0
+
+            if (total === 0 || completed < total) {
+                for (const rule of documentRules) {
+                    missingDocuments.push({
+                        label: rule.label,
+                        total,
+                        completed
+                    })
+                }
+            }
+        }
+
         return {
-            valid: missingFields.length === 0 && missingProposals.length === 0 && missingTasks.length === 0 && missingRules.length === 0,
+            valid: missingFields.length === 0 && missingProposals.length === 0 && missingTasks.length === 0 && missingRules.length === 0 && missingDocuments.length === 0,
             missingFields,
             missingProposals,
             missingTasks,
-            missingRules
+            missingRules,
+            missingDocuments
         }
     }
 
@@ -314,7 +345,7 @@ export function useQualityGate() {
         return rules.some(r =>
             r.stage_id === targetStageId &&
             r.is_blocking &&
-            (r.requirement_type === 'proposal' || r.requirement_type === 'task')
+            (r.requirement_type === 'proposal' || r.requirement_type === 'task' || r.requirement_type === 'document')
         )
     }
 

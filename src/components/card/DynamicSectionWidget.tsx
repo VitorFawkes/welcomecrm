@@ -25,6 +25,7 @@ import MondeWidget from './MondeWidget'
 import FinanceiroWidget from './FinanceiroWidget'
 import ObservacoesEstruturadas from './ObservacoesEstruturadas'
 import TripInformation from './TripInformation'
+import DocumentCollectionWidget from './documents/DocumentCollectionWidget'
 
 type Card = Database['public']['Tables']['cards']['Row']
 
@@ -40,6 +41,7 @@ const WIDGET_REGISTRY: Record<string, React.ComponentType<any>> = {
     financeiro: FinanceiroWidget,
     observacoes_criticas: ObservacoesEstruturadas,
     trip_info: TripInformation,
+    documentos: DocumentCollectionWidget,
 }
 
 interface DynamicSectionWidgetProps {

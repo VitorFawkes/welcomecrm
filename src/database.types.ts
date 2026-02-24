@@ -1356,6 +1356,143 @@ export type Database = {
           },
         ]
       }
+      card_document_requirements: {
+        Row: {
+          arquivo_id: string | null
+          card_id: string
+          contato_id: string
+          created_at: string
+          data_value: string | null
+          document_type_id: string
+          id: string
+          modo: string
+          notas: string | null
+          recebido_em: string | null
+          recebido_por: string | null
+          status: string
+        }
+        Insert: {
+          arquivo_id?: string | null
+          card_id: string
+          contato_id: string
+          created_at?: string
+          data_value?: string | null
+          document_type_id: string
+          id?: string
+          modo?: string
+          notas?: string | null
+          recebido_em?: string | null
+          recebido_por?: string | null
+          status?: string
+        }
+        Update: {
+          arquivo_id?: string | null
+          card_id?: string
+          contato_id?: string
+          created_at?: string
+          data_value?: string | null
+          document_type_id?: string
+          id?: string
+          modo?: string
+          notas?: string | null
+          recebido_em?: string | null
+          recebido_por?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_document_requirements_arquivo_id_fkey"
+            columns: ["arquivo_id"]
+            isOneToOne: false
+            referencedRelation: "arquivos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_archived_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_acoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_cards_contatos_summary"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "v_contact_proposals"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "view_deleted_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_recebido_por_fkey"
+            columns: ["recebido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_recebido_por_fkey"
+            columns: ["recebido_por"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "card_document_requirements_recebido_por_fkey"
+            columns: ["recebido_por"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_financial_items: {
         Row: {
           card_id: string
@@ -2792,6 +2929,73 @@ export type Database = {
           usage_count?: number | null
         }
         Relationships: []
+      }
+      document_types: {
+        Row: {
+          ativo: boolean
+          campo_contato: string | null
+          created_at: string
+          created_by: string | null
+          data_field_label: string | null
+          descricao: string | null
+          has_data_field: boolean
+          id: string
+          nome: string
+          ordem: number
+          requires_file: boolean
+          slug: string
+        }
+        Insert: {
+          ativo?: boolean
+          campo_contato?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_field_label?: string | null
+          descricao?: string | null
+          has_data_field?: boolean
+          id?: string
+          nome: string
+          ordem?: number
+          requires_file?: boolean
+          slug: string
+        }
+        Update: {
+          ativo?: boolean
+          campo_contato?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_field_label?: string | null
+          descricao?: string | null
+          has_data_field?: boolean
+          id?: string
+          nome?: string
+          ordem?: number
+          requires_file?: boolean
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_types_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_types_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_team_proposal_performance"
+            referencedColumns: ["consultant_id"]
+          },
+          {
+            foreignKeyName: "document_types_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_profiles_complete"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       external_refs: {
         Row: {
@@ -8106,6 +8310,8 @@ export type Database = {
           data_viagem_inicio: string | null
           destinos: Json | null
           dias_ate_viagem: number | null
+          docs_completed: number | null
+          docs_total: number | null
           dono_atual_email: string | null
           dono_atual_id: string | null
           dono_atual_nome: string | null
@@ -8490,6 +8696,13 @@ export type Database = {
           suggested_sobrenome: string
         }[]
       }
+      audit_contact_quality_counts: {
+        Args: never
+        Returns: {
+          issue_count: number
+          issue_type: string
+        }[]
+      }
       auto_expire_proposals: { Args: never; Returns: number }
       calculate_business_due_date: {
         Args: {
@@ -8802,6 +9015,10 @@ export type Database = {
         Returns: Json
       }
       recalcular_receita_card: { Args: { p_card_id: string }; Returns: Json }
+      recalculate_contact_stats_for: {
+        Args: { p_contact_id: string }
+        Returns: undefined
+      }
       reprocess_orphan_whatsapp_for_phone: {
         Args: { p_phone: string }
         Returns: Json

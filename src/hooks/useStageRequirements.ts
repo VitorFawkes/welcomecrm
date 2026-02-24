@@ -5,7 +5,7 @@ import type { Database } from '../database.types'
 type Card = Database['public']['Tables']['cards']['Row']
 
 // Unified requirement types
-type RequirementType = 'field' | 'proposal' | 'task' | 'rule'
+type RequirementType = 'field' | 'proposal' | 'task' | 'rule' | 'document'
 
 interface BaseRequirement {
     id: string
@@ -38,7 +38,11 @@ interface RuleRequirement extends BaseRequirement {
     field_key: string // We use field_key to store the rule key
 }
 
-export type Requirement = FieldRequirement | ProposalRequirement | TaskRequirement | RuleRequirement
+export interface DocumentRequirement extends BaseRequirement {
+    requirement_type: 'document'
+}
+
+export type Requirement = FieldRequirement | ProposalRequirement | TaskRequirement | RuleRequirement | DocumentRequirement
 
 // Legacy interface for backward compatibility
 export interface LegacyRequirement {
@@ -74,6 +78,22 @@ export function useStageRequirements(card: Card) {
                 .select('id, tipo, concluida, status')
                 .eq('card_id', card.id)
             return data || []
+        },
+        enabled: !!card.id,
+        staleTime: 1000 * 60 * 2
+    })
+
+    // Fetch document progress for this card (for document requirement checking)
+    const { data: docProgress } = useQuery({
+        queryKey: ['card-doc-progress', card.id],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('card_document_requirements')
+                .select('status')
+                .eq('card_id', card.id)
+            const total = data?.length || 0
+            const completed = data?.filter(d => d.status === 'recebido').length || 0
+            return { total, completed, allComplete: total > 0 && completed >= total }
         },
         enabled: !!card.id,
         staleTime: 1000 * 60 * 2
@@ -161,6 +181,14 @@ export function useStageRequirements(card: Card) {
                     } as RuleRequirement
                 }
 
+                if (reqType === 'document') {
+                    return {
+                        ...baseReq,
+                        requirement_type: 'document',
+                        label: config.requirement_label || 'Documentos completos',
+                    } as DocumentRequirement
+                }
+
                 // Default: field type
                 return {
                     ...baseReq,
@@ -246,6 +274,8 @@ export function useStageRequirements(card: Card) {
                 return checkProposalRequirement(req.proposal_min_status)
             case 'task':
                 return checkTaskRequirement(req.task_tipo, req.task_require_completed)
+            case 'document':
+                return docProgress?.allComplete ?? true
             case 'rule':
                 if (req.field_key === 'lost_reason_required') {
                     const hasId = !!card.motivo_perda_id
@@ -268,6 +298,7 @@ export function useStageRequirements(card: Card) {
     const proposalRequirements = requirements?.filter((r): r is ProposalRequirement => r.requirement_type === 'proposal') || []
     const taskRequirements = requirements?.filter((r): r is TaskRequirement => r.requirement_type === 'task') || []
     const ruleRequirements = requirements?.filter((r): r is RuleRequirement => r.requirement_type === 'rule') || []
+    const documentRequirements = requirements?.filter((r): r is DocumentRequirement => r.requirement_type === 'document') || []
 
     // Categorize by blocking/future
     const blockingRequirements = requirements?.filter((r: Requirement) => r.isBlocking) || []
@@ -288,6 +319,7 @@ export function useStageRequirements(card: Card) {
         proposalRequirements,
         taskRequirements,
         ruleRequirements,
+        documentRequirements,
         // Categorized by stage
         blockingRequirements,
         futureRequirements,
