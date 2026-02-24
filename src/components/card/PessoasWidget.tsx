@@ -165,6 +165,7 @@ export default function PessoasWidget({ card }: PessoasWidgetProps) {
                         <div className="pt-3 border-t">
                             <TravelHistorySection
                                 travelers={people || []}
+                                currentCardId={card.id || undefined}
                             />
                         </div>
                     </>

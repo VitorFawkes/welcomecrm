@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { MapPin, Calendar, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -10,18 +11,32 @@ interface Traveler {
     nome: string
 }
 
-interface TravelHistorySectionProps {
-    travelers: Traveler[]
+interface TripHistoryRow {
+    card_id: string
+    titulo: string
+    data_viagem: string | null
+    status: string | null
+    role: string
+    valor: number | null
+    moeda: string | null
+    companions: string[]
+    relevant_contacts: string[]
 }
 
-export default function TravelHistorySection({ travelers }: TravelHistorySectionProps) {
+interface TravelHistorySectionProps {
+    travelers: Traveler[]
+    currentCardId?: string
+}
+
+export default function TravelHistorySection({ travelers, currentCardId }: TravelHistorySectionProps) {
     const contactIds = travelers.map(t => t.id).filter(Boolean)
 
-    const { data: history, isLoading } = useQuery({
+    const { data: rawHistory, isLoading } = useQuery({
         queryKey: ['travel-history', contactIds],
         queryFn: async () => {
             if (contactIds.length === 0) return []
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC overload not in generated types
             const { data, error } = await (supabase.rpc as any)('get_travel_history', {
                 contact_ids: contactIds
             })
@@ -33,6 +48,17 @@ export default function TravelHistorySection({ travelers }: TravelHistorySection
         },
         enabled: contactIds.length > 0
     })
+
+    // Dedup by card_id + exclude current card
+    const history = useMemo(() => {
+        if (!rawHistory) return rawHistory
+        const seen = new Map<string, TripHistoryRow>()
+        for (const trip of rawHistory) {
+            if (trip.card_id === currentCardId) continue
+            if (!seen.has(trip.card_id)) seen.set(trip.card_id, trip)
+        }
+        return Array.from(seen.values())
+    }, [rawHistory, currentCardId])
 
     const formatCurrency = (value: number, currency: string) => {
         return new Intl.NumberFormat('pt-BR', {
@@ -82,7 +108,7 @@ export default function TravelHistorySection({ travelers }: TravelHistorySection
             </h4>
 
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {history.map((trip: any) => (
+                {history.map((trip: TripHistoryRow) => (
                     <Link
                         to={`/cards/${trip.card_id}`}
                         key={trip.card_id}
@@ -127,7 +153,7 @@ export default function TravelHistorySection({ travelers }: TravelHistorySection
 
                             {trip.valor && (
                                 <p className="text-[10px] font-semibold text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded">
-                                    {formatCurrency(trip.valor, trip.moeda)}
+                                    {formatCurrency(trip.valor, trip.moeda || 'BRL')}
                                 </p>
                             )}
                         </div>
