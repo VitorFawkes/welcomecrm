@@ -41,9 +41,24 @@ export default function StudioStructure() {
     const [activeId, setActiveId] = useState<string | null>(null)
     const [activeType, setActiveType] = useState<'Phase' | 'Stage' | null>(null)
 
-    // Optimistic State
-    const [localPhases, setLocalPhases] = useState<PipelinePhase[]>([])
-    const [localStages, setLocalStages] = useState<PipelineStage[]>([])
+    // --- Data Fetching (before local state so initializers can use the data) ---
+    const { data: phasesData, isLoading: loadingPhases } = usePipelinePhases()
+
+    const { data: stagesData, isLoading: loadingStages } = useQuery({
+        queryKey: ['pipeline-stages-studio'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('pipeline_stages')
+                .select('*')
+                .order('ordem')
+            if (error) throw error
+            return data as PipelineStage[]
+        }
+    })
+
+    // Optimistic State — initialized from query data to handle cache hits
+    const [localPhases, setLocalPhases] = useState<PipelinePhase[]>(phasesData ?? [])
+    const [localStages, setLocalStages] = useState<PipelineStage[]>(stagesData ?? [])
 
     const [editingStage, setEditingStage] = useState<PipelineStage | null>(null)
     const [editingPhaseSettings, setEditingPhaseSettings] = useState<PipelinePhase | null>(null)
@@ -75,21 +90,6 @@ export default function StudioStructure() {
             coordinateGetter: sortableKeyboardCoordinates,
         })
     )
-
-    // --- Data Fetching ---
-    const { data: phasesData, isLoading: loadingPhases } = usePipelinePhases()
-
-    const { data: stagesData, isLoading: loadingStages } = useQuery({
-        queryKey: ['pipeline-stages-studio'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('pipeline_stages')
-                .select('*')
-                .order('ordem')
-            if (error) throw error
-            return data as PipelineStage[]
-        }
-    })
 
     // Sync server data → local state (render-time sync, avoids cascading useEffect)
     const [prevPhases, setPrevPhases] = useState(phasesData)
@@ -212,6 +212,7 @@ export default function StudioStructure() {
 
     const deleteStageMutation = useMutation({
         mutationFn: async (id: string) => {
+            // 1. Bloqueia se existem cards usando esta etapa
             const { count, error: countError } = await supabase
                 .from('cards')
                 .select('*', { count: 'exact', head: true })
@@ -219,10 +220,35 @@ export default function StudioStructure() {
             if (countError) throw countError
             if (count && count > 0) throw new Error(`Não é possível excluir etapa com ${count} cards ativos.`)
 
+            // 2. Limpa dependências sem ON DELETE CASCADE antes de excluir
+            const cleanupResults = await Promise.all([
+                // Regras de criação que apontam para esta etapa
+                supabase.from('card_creation_rules').delete().eq('stage_id', id),
+                supabase.from('card_auto_creation_rules').delete().eq('target_stage_id', id),
+                // Config legada de campos
+                supabase.from('stage_fields_settings').delete().eq('stage_id', id),
+                // Mapeamentos de integração
+                supabase.from('integration_stage_map').delete().eq('internal_stage_id', id),
+                // Config WhatsApp
+                supabase.from('whatsapp_linha_config').delete().eq('stage_id', id),
+                // Auditoria: preserva registros mas limpa referência
+                supabase.from('historico_fases').update({ etapa_anterior_id: null }).eq('etapa_anterior_id', id),
+                supabase.from('historico_fases').update({ etapa_nova_id: null }).eq('etapa_nova_id', id),
+                // Triggers de integração: limpa referências
+                supabase.from('integration_inbound_triggers').update({ quarantine_stage_id: null }).eq('quarantine_stage_id', id),
+                supabase.from('integration_inbound_triggers').update({ target_stage_id: null }).eq('target_stage_id', id),
+            ])
+            const cleanupError = cleanupResults.find(r => r.error)
+            if (cleanupError?.error) throw new Error(`Erro ao limpar dependências: ${cleanupError.error.message}`)
+
+            // 3. Exclui a etapa (CASCADE cuida de: stage_field_config, stage_transitions, pipeline_config, integration_outbound_stage_map)
             const { error } = await supabase.from('pipeline_stages').delete().eq('id', id)
             if (error) throw error
         },
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pipeline-stages-studio'] })
+            queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] })
+        },
         onError: (err) => alert(err.message)
     })
 
