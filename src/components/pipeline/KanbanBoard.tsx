@@ -51,7 +51,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const queryClient = useQueryClient()
     const [activeCard, setActiveCard] = useState<Card | null>(null)
     const { collapsedPhases, setCollapsedPhases, groupFilters } = usePipelineFilters()
-    const { validateMove } = useQualityGate()
+    const { validateMove, validateMoveSync, hasAsyncRules } = useQualityGate()
     const { session } = useAuth()
     const [terminalDrawer, setTerminalDrawer] = useState<{ stage: Stage, totalCards: number, totalValue: number } | null>(null)
 
@@ -263,6 +263,83 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
         return [...active, ...terminalCards]
     }, [cards, terminalCards])
 
+    // Helper: apply optimistic cache update and return rollback function
+    const applyOptimisticMove = (cardId: string, stageId: string): (() => void) => {
+        const newStage = stages?.find(s => s.id === stageId)
+        const isTargetTerminal = terminalStageIds.includes(stageId)
+
+        queryClient.cancelQueries({ queryKey: ['cards'] })
+        queryClient.cancelQueries({ queryKey: ['terminal-cards'] })
+
+        // Snapshot all card queries for rollback
+        const cardSnapshots: [readonly unknown[], Card[] | undefined][] = []
+        for (const [key, data] of queryClient.getQueriesData<Card[]>({ queryKey: ['cards'] })) {
+            cardSnapshots.push([key, data ? [...data] : undefined])
+        }
+        const termSnapshots: [readonly unknown[], TerminalStageResult | undefined][] = []
+        for (const [key, data] of queryClient.getQueriesData<TerminalStageResult>({ queryKey: ['terminal-cards'] })) {
+            termSnapshots.push([key, data ? { ...data, cards: [...data.cards] } : undefined])
+        }
+
+        // Move card in all matching card queries
+        queryClient.setQueriesData<Card[]>({ queryKey: ['cards'] }, (old) => {
+            if (!old) return old
+            if (isTargetTerminal) return old.filter(c => c.id !== cardId)
+            return old.map(c => c.id !== cardId ? c : {
+                ...c,
+                pipeline_stage_id: stageId,
+                fase: newStage?.fase || c.fase,
+                etapa_nome: newStage?.nome || c.etapa_nome
+            })
+        })
+
+        // Handle move TO terminal
+        if (isTargetTerminal) {
+            const movedCard = allCards.find(c => c.id === cardId)
+            if (movedCard) {
+                queryClient.setQueriesData<TerminalStageResult>(
+                    { queryKey: ['terminal-cards', stageId] },
+                    (old) => {
+                        if (!old) return old
+                        const updated = { ...movedCard, pipeline_stage_id: stageId, etapa_nome: newStage?.nome || movedCard.etapa_nome }
+                        return { ...old, cards: [updated, ...old.cards].slice(0, 50), totalCount: old.totalCount + 1 }
+                    }
+                )
+            }
+        }
+
+        // Handle move FROM terminal to active
+        if (!isTargetTerminal) {
+            const currentCard = allCards.find(c => c.id === cardId)
+            const isFromTerminal = currentCard && terminalStageIds.includes(currentCard.pipeline_stage_id as string)
+            if (isFromTerminal && currentCard) {
+                queryClient.setQueriesData<TerminalStageResult>(
+                    { queryKey: ['terminal-cards'] },
+                    (old) => {
+                        if (!old) return old
+                        if (!old.cards.some(c => c.id === cardId)) return old
+                        return { ...old, cards: old.cards.filter(c => c.id !== cardId), totalCount: Math.max(0, old.totalCount - 1) }
+                    }
+                )
+                queryClient.setQueriesData<Card[]>({ queryKey: ['cards'] }, (old) => {
+                    const updated = { ...currentCard, pipeline_stage_id: stageId, fase: newStage?.fase || currentCard.fase, etapa_nome: newStage?.nome || currentCard.etapa_nome }
+                    if (!old) return [updated]
+                    if (old.some(c => c.id === cardId)) return old
+                    return [...old, updated]
+                })
+            }
+        }
+
+        return () => {
+            for (const [key, data] of cardSnapshots) {
+                queryClient.setQueryData(key, data)
+            }
+            for (const [key, data] of termSnapshots) {
+                queryClient.setQueryData(key, data)
+            }
+        }
+    }
+
     const moveCardMutation = useMutation({
         mutationFn: async ({ cardId, stageId, motivoId, comentario }: { cardId: string, stageId: string, motivoId?: string, comentario?: string }) => {
             const { error } = await supabase.rpc('mover_card', {
@@ -274,85 +351,11 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
             if (error) throw error
         },
         onMutate: ({ cardId, stageId }) => {
-            const qk = ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, terminalStageIds]
-            // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-            queryClient.cancelQueries({ queryKey: qk })
-
-            // Snapshot the previous value
-            const previousCards = queryClient.getQueryData<Card[]>(qk)
-
-            // Find new stage info for complete update
-            const newStage = stages?.find((s) => s.id === stageId)
-            const isTerminalStage = terminalStageIds.includes(stageId)
-
-            // Optimistically update to the new value
-            if (previousCards) {
-                queryClient.setQueryData<Card[]>(qk, (old) => {
-                    if (!old) return []
-                    // Se movendo para stage terminal, remover do cache do Kanban
-                    if (isTerminalStage) {
-                        return old.filter((card) => card.id !== cardId)
-                    }
-                    return old.map((card) => {
-                        if (card.id === cardId) {
-                            return {
-                                ...card,
-                                pipeline_stage_id: stageId,
-                                fase: newStage?.fase || card.fase,
-                                etapa_nome: newStage?.nome || card.etapa_nome
-                            }
-                        }
-                        return card
-                    })
-                })
-
-                // Se movendo para terminal, adicionar no cache de terminal-cards (per-stage)
-                if (isTerminalStage) {
-                    const movedCard = previousCards.find(c => c.id === cardId)
-                    if (movedCard) {
-                        queryClient.setQueriesData<TerminalStageResult>(
-                            { queryKey: ['terminal-cards', stageId] },
-                            (old) => {
-                                if (!old) return old
-                                const updated = { ...movedCard, pipeline_stage_id: stageId, etapa_nome: newStage?.nome || movedCard.etapa_nome }
-                                return { ...old, cards: [updated, ...old.cards].slice(0, 50), totalCount: old.totalCount + 1 }
-                            }
-                        )
-                    }
-                }
-
-                // Se movendo DE terminal para ativo, remover do terminal e adicionar ao ativo
-                if (!isTerminalStage) {
-                    const currentCard = allCards.find(c => c.id === cardId)
-                    const isFromTerminal = currentCard && terminalStageIds.includes(currentCard.pipeline_stage_id as string)
-                    if (isFromTerminal && currentCard) {
-                        queryClient.setQueriesData<TerminalStageResult>(
-                            { queryKey: ['terminal-cards'] },
-                            (old) => {
-                                if (!old) return old
-                                const hasCard = old.cards.some(c => c.id === cardId)
-                                if (!hasCard) return old
-                                return { ...old, cards: old.cards.filter(c => c.id !== cardId), totalCount: Math.max(0, old.totalCount - 1) }
-                            }
-                        )
-                        queryClient.setQueryData<Card[]>(qk, (old) => {
-                            const updated = { ...currentCard, pipeline_stage_id: stageId, fase: newStage?.fase || currentCard.fase, etapa_nome: newStage?.nome || currentCard.etapa_nome }
-                            if (!old) return [updated]
-                            return [...old, updated]
-                        })
-                    }
-                }
-            }
-
-            // Return a context object with the snapshotted value
-            return { previousCards }
+            const rollback = applyOptimisticMove(cardId, stageId)
+            return { rollback }
         },
         onError: (_err, _variables, context) => {
-            const qk = ['cards', productFilter, viewMode, subView, filters, groupFilters, myTeamMembers, terminalStageIds]
-            // If the mutation fails, use the context returned from onMutate to roll back
-            if (context?.previousCards) {
-                queryClient.setQueryData(qk, context.previousCards)
-            }
+            context?.rollback?.()
         },
         onSuccess: () => {
             // Only refetch after successful mutation
@@ -438,90 +441,115 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event
 
-        if (over && active.id !== over.id) {
-            const cardId = active.id as string
-            const stageId = over.id as string
-            const currentStageId = active.data.current?.pipeline_stage_id
-            const targetStage = stages?.find((s) => s.id === stageId)
-            const card = active.data.current as Card
+        // Clear drag overlay immediately — no delay
+        setActiveCard(null)
 
-            if (stageId !== currentStageId) {
-                // 0. Check Loss Reason (Is Lost Stage?)
-                // Verifica tanto a flag is_lost quanto o nome da stage (fallback)
-                const isLostStage = targetStage?.is_lost === true ||
-                    targetStage?.nome?.toLowerCase().includes('perdido') ||
-                    targetStage?.nome?.toLowerCase().includes('lost')
+        if (!over || active.id === over.id) return
 
-                if (isLostStage) {
+        const cardId = active.id as string
+        const stageId = over.id as string
+        const currentStageId = active.data.current?.pipeline_stage_id
+        const targetStage = stages?.find((s) => s.id === stageId)
+        const card = active.data.current as Card
+
+        if (stageId === currentStageId) return
+
+        // --- SYNC GATE 1: Loss Stage ---
+        const isLostStage = targetStage?.is_lost === true ||
+            targetStage?.nome?.toLowerCase().includes('perdido') ||
+            targetStage?.nome?.toLowerCase().includes('lost')
+
+        if (isLostStage) {
+            setPendingMove({ cardId, stageId, targetStageName: targetStage?.nome || 'Perdido' })
+            setLossReasonModalOpen(true)
+            return
+        }
+
+        // --- SYNC GATE 2: Field & rule validation (no network calls) ---
+        const syncResult = validateMoveSync(card as unknown as Record<string, unknown>, stageId)
+
+        if (syncResult.missingRules?.some(r => r.key === 'lost_reason_required')) {
+            setPendingMove({ cardId, stageId, targetStageName: targetStage?.nome || 'Perdido' })
+            setLossReasonModalOpen(true)
+            return
+        }
+
+        if (!syncResult.valid) {
+            setPendingMove({
+                cardId, stageId,
+                targetStageName: targetStage?.nome || 'Nova Etapa',
+                missingFields: syncResult.missingFields,
+            })
+            setQualityGateModalOpen(true)
+            return
+        }
+
+        // --- SYNC GATE 3: Governance (target_phase_id) ---
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types
+        const targetPhaseId = (targetStage as any)?.target_phase_id as string | null
+        if (targetPhaseId) {
+            const targetPhase = phasesData?.find(p => p.id === targetPhaseId)
+            setPendingMove({
+                cardId, stageId,
+                currentOwnerId: active.data.current?.dono_atual_id,
+                sdrName: active.data.current?.sdr_owner_id ? 'SDR Atual' : undefined,
+                targetStageName: targetStage?.nome || 'Nova Etapa',
+                targetPhaseId,
+                targetPhaseName: targetPhase?.name || 'Nova Fase'
+            })
+            setStageChangeModalOpen(true)
+            return
+        }
+
+        // UUID validation
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (!uuidRegex.test(cardId) || !uuidRegex.test(stageId)) {
+            console.error('Invalid UUIDs for move:', { cardId, stageId })
+            return
+        }
+
+        // ===== ALL SYNC GATES PASSED — optimistic update NOW =====
+        const rollback = applyOptimisticMove(cardId, stageId)
+
+        // --- ASYNC GATE: Proposal/task validation (only if rules exist) ---
+        if (hasAsyncRules(stageId)) {
+            try {
+                const asyncResult = await validateMove(card as unknown as Record<string, unknown>, stageId)
+                if (!asyncResult.valid) {
+                    rollback()
                     setPendingMove({
-                        cardId,
-                        stageId,
-                        targetStageName: targetStage?.nome || 'Perdido',
-                    })
-                    setLossReasonModalOpen(true)
-                    setActiveCard(null)
-                    return
-                }
-
-                // 1. Check Quality Gate (Mandatory Fields, Proposals, Tasks & Rules)
-                const validation = await validateMove(card, stageId)
-
-                // Check for Lost Reason Rule
-                if (validation.missingRules?.some(r => r.key === 'lost_reason_required')) {
-                    setPendingMove({
-                        cardId,
-                        stageId,
-                        targetStageName: targetStage?.nome || 'Perdido',
-                    })
-                    setLossReasonModalOpen(true)
-                    setActiveCard(null)
-                    return
-                }
-
-                if (!validation.valid) {
-                    setPendingMove({
-                        cardId,
-                        stageId,
+                        cardId, stageId,
                         targetStageName: targetStage?.nome || 'Nova Etapa',
-                        missingFields: validation.missingFields,
-                        missingProposals: validation.missingProposals,
-                        missingTasks: validation.missingTasks
+                        missingFields: asyncResult.missingFields,
+                        missingProposals: asyncResult.missingProposals,
+                        missingTasks: asyncResult.missingTasks,
                     })
                     setQualityGateModalOpen(true)
-                    setActiveCard(null) // Reset active card to remove drag overlay
                     return
                 }
-
-                // 2. Check Governance Rules (Target Phase)
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target_phase_id pendente de regeneracao de types
-                const targetPhaseId = (targetStage as any)?.target_phase_id as string | null
-                if (targetPhaseId) {
-                    const targetPhase = phasesData?.find(p => p.id === targetPhaseId)
-                    setPendingMove({
-                        cardId,
-                        stageId,
-                        currentOwnerId: active.data.current?.dono_atual_id,
-                        sdrName: active.data.current?.sdr_owner_id ? 'SDR Atual' : undefined,
-                        targetStageName: targetStage?.nome || 'Nova Etapa',
-                        targetPhaseId,
-                        targetPhaseName: targetPhase?.name || 'Nova Fase'
-                    })
-                    setStageChangeModalOpen(true)
-                    setActiveCard(null)
-                    return
-                }
-
-                // Validate UUIDs
-                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-                if (!uuidRegex.test(cardId) || !uuidRegex.test(stageId)) {
-                    console.error('Invalid UUIDs for move:', { cardId, stageId })
-                    return
-                }
-
-                moveCardMutation.mutate({ cardId, stageId })
+            } catch (err) {
+                console.error('[QualityGate] Async validation failed — move allowed (fail-open):', err)
             }
         }
 
+        // --- EXECUTE: Persist to database ---
+        try {
+            const { error } = await supabase.rpc('mover_card', {
+                p_card_id: cardId,
+                p_nova_etapa_id: stageId,
+            })
+            if (error) throw error
+            queryClient.invalidateQueries({ queryKey: ['cards'] })
+            queryClient.invalidateQueries({ queryKey: ['terminal-cards'] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard-funnel'] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+        } catch (err) {
+            console.error('Error moving card:', err)
+            rollback()
+        }
+    }
+
+    const handleDragCancel = () => {
         setActiveCard(null)
     }
 
@@ -652,7 +680,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                         isDragging && "cursor-grabbing"
                     )}
                 >
-                    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
                         <div className="flex gap-4 w-max min-w-full px-4 items-stretch pt-2 h-full">
                             <div className="flex gap-6 items-stretch h-full">
                                 {allCards.length === 0 ? (
@@ -713,12 +741,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                                     )
                                 })}
                             </div>
-                            <DragOverlay
-                                dropAnimation={{
-                                    duration: 0,
-                                    easing: 'ease',
-                                }}
-                            >
+                            <DragOverlay dropAnimation={null}>
                                 {activeCard ? (
                                     <div className="rotate-3 scale-105 cursor-grabbing opacity-80">
                                         <KanbanCard card={activeCard} />

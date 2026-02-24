@@ -309,9 +309,19 @@ export function useQualityGate() {
         }
     }
 
+    const hasAsyncRules = (targetStageId: string): boolean => {
+        if (!rules) return false
+        return rules.some(r =>
+            r.stage_id === targetStageId &&
+            r.is_blocking &&
+            (r.requirement_type === 'proposal' || r.requirement_type === 'task')
+        )
+    }
+
     return {
         validateMove,
         validateMoveSync,
+        hasAsyncRules,
         // Keep backward compat alias
         validateMoveFields: validateMoveSync
     }
