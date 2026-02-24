@@ -172,10 +172,28 @@ Deno.serve(async (req) => {
                     const customFields: Array<{ customFieldId: number; fieldValue: string }> = [];
                     let skippedFields: string[] = [];
 
-                    for (const [fieldId, value] of Object.entries(event.payload || {})) {
-                        // Skip trigger metadata fields
-                        if (METADATA_FIELDS.has(fieldId)) continue;
+                    // Flatten nested objects so inner keys can match field mappings
+                    // e.g. observacoes: { o_que_e_importante: "..." } → o_que_e_importante: "..."
+                    const flatPayload: Record<string, unknown> = {};
+                    for (const [key, val] of Object.entries(event.payload || {})) {
+                        if (METADATA_FIELDS.has(key)) continue;
+                        if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+                            // Keep the key itself if it has a mapping (e.g. orcamento → deal[value])
+                            if (fieldMapLookup.has(key)) {
+                                flatPayload[key] = val;
+                            }
+                            // Also flatten inner keys for nested objects (e.g. observacoes.o_que_e_importante)
+                            for (const [innerKey, innerVal] of Object.entries(val as Record<string, unknown>)) {
+                                if (fieldMapLookup.has(innerKey) && !(innerKey in flatPayload)) {
+                                    flatPayload[innerKey] = innerVal;
+                                }
+                            }
+                        } else {
+                            flatPayload[key] = val;
+                        }
+                    }
 
+                    for (const [fieldId, value] of Object.entries(flatPayload)) {
                         // Check if it's already in AC format (deal[fieldname])
                         const standardMatch = fieldId.match(/^deal\[(\w+)\]$/);
                         if (standardMatch) {
@@ -191,20 +209,44 @@ Deno.serve(async (req) => {
                             if (acStandardMatch) {
                                 const stdField = acStandardMatch[1];
                                 let stdValue: unknown;
-                                if (Array.isArray(value)) {
-                                    stdValue = value.join(', ');
-                                } else if (value !== null && typeof value === 'object') {
-                                    stdValue = JSON.stringify(value);
+
+                                if (stdField === 'value') {
+                                    // deal[value] — AC expects numeric value in cents
+                                    // Handle orcamento object: extract total_calculado or valor
+                                    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                                        const obj = value as Record<string, unknown>;
+                                        // Hierarquia: total_calculado (SmartBudget v2)
+                                        //           > valor (orcamento legado simples)
+                                        //           > total (trigger activities antigo)
+                                        const numValue = obj.total_calculado ?? obj.valor ?? obj.total;
+                                        stdValue = typeof numValue === 'number' ? numValue * 100 : 0;
+                                    } else if (typeof value === 'number') {
+                                        stdValue = value * 100;
+                                    } else if (typeof value === 'string') {
+                                        const parsed = parseFloat(value);
+                                        stdValue = isNaN(parsed) ? 0 : parsed * 100;
+                                    } else {
+                                        stdValue = 0;
+                                    }
                                 } else {
-                                    stdValue = value;
-                                }
-                                // AC stores deal[value] in cents
-                                if (stdField === 'value' && typeof stdValue === 'number') {
-                                    stdValue = stdValue * 100;
+                                    // Other standard fields (title, status, etc.)
+                                    if (Array.isArray(value)) {
+                                        stdValue = value.join(', ');
+                                    } else if (value !== null && typeof value === 'object') {
+                                        stdValue = JSON.stringify(value);
+                                    } else {
+                                        stdValue = value;
+                                    }
                                 }
                                 standardFields[stdField] = stdValue;
                             } else {
                                 // Custom field - AC expects numeric ID
+                                const numericId = parseInt(acFieldId, 10);
+                                if (isNaN(numericId) || numericId === 0) {
+                                    console.warn(`[integration-dispatch] Invalid custom field ID "${acFieldId}" for field "${fieldId}", skipping`);
+                                    skippedFields.push(`${fieldId}(invalid_id:${acFieldId})`);
+                                    continue;
+                                }
                                 // Arrays (e.g. destinos: ["Japão", "Brasil"]) → comma-separated string
                                 let fieldValue: string;
                                 if (Array.isArray(value)) {
@@ -215,7 +257,7 @@ Deno.serve(async (req) => {
                                     fieldValue = String(value ?? '');
                                 }
                                 customFields.push({
-                                    customFieldId: parseInt(acFieldId, 10) || 0,
+                                    customFieldId: numericId,
                                     fieldValue
                                 });
                             }
