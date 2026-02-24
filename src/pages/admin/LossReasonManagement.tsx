@@ -9,7 +9,9 @@ import {
     Eye,
     EyeOff,
     Loader2,
-    AlertTriangle
+    AlertTriangle,
+    Pencil,
+    Check
 } from 'lucide-react';
 import AdminPageHeader from '../../components/admin/ui/AdminPageHeader';
 import { Button } from '@/components/ui/Button';
@@ -21,6 +23,8 @@ import { cn } from '@/lib/utils';
 export default function LossReasonManagement() {
     const queryClient = useQueryClient();
     const [newReason, setNewReason] = useState('');
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
 
     // Fetch Loss Reasons
     const { data: reasons, isLoading } = useQuery({
@@ -94,6 +98,43 @@ export default function LossReasonManagement() {
         }
     });
 
+    // Rename Mutation
+    const renameMutation = useMutation({
+        mutationFn: async ({ id, nome }: { id: string; nome: string }) => {
+            if (!nome.trim()) throw new Error("O nome não pode estar vazio");
+            const { error } = await supabase
+                .from('motivos_perda')
+                .update({ nome: nome.trim() })
+                .eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            toast.success("Motivo renomeado!");
+            setEditingId(null);
+            setEditingName('');
+            queryClient.invalidateQueries({ queryKey: ['loss-reasons'] });
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao renomear: ${error.message}`);
+        }
+    });
+
+    const startEditing = (reason: { id: string; nome: string }) => {
+        setEditingId(reason.id);
+        setEditingName(reason.nome);
+    };
+
+    const cancelEditing = () => {
+        setEditingId(null);
+        setEditingName('');
+    };
+
+    const saveEditing = () => {
+        if (editingId && editingName.trim()) {
+            renameMutation.mutate({ id: editingId, nome: editingName });
+        }
+    };
+
     const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
         createMutation.mutate(newReason);
@@ -166,45 +207,95 @@ export default function LossReasonManagement() {
                                                     : "bg-slate-50 border-slate-100 opacity-60"
                                             )}
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <span className={cn(
-                                                    "font-medium text-sm",
-                                                    reason.ativo ? "text-slate-700" : "text-slate-400 line-through"
-                                                )}>
-                                                    {reason.nome}
-                                                </span>
-                                                {!reason.ativo && (
-                                                    <Badge variant="outline" className="text-xs text-slate-400 border-slate-200">
-                                                        Inativo
-                                                    </Badge>
-                                                )}
-                                            </div>
+                                            {editingId === reason.id ? (
+                                                <>
+                                                    <div className="flex items-center gap-2 flex-1 mr-2">
+                                                        <Input
+                                                            value={editingName}
+                                                            onChange={(e) => setEditingName(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') saveEditing();
+                                                                if (e.key === 'Escape') cancelEditing();
+                                                            }}
+                                                            className="h-8 text-sm bg-white"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={saveEditing}
+                                                            disabled={!editingName.trim() || renameMutation.isPending}
+                                                            title="Salvar"
+                                                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                        >
+                                                            {renameMutation.isPending
+                                                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                                                : <Check className="w-4 h-4" />}
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={cancelEditing}
+                                                            title="Cancelar"
+                                                            className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                                                        >
+                                                            <XCircle className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={cn(
+                                                            "font-medium text-sm",
+                                                            reason.ativo ? "text-slate-700" : "text-slate-400 line-through"
+                                                        )}>
+                                                            {reason.nome}
+                                                        </span>
+                                                        {!reason.ativo && (
+                                                            <Badge variant="outline" className="text-xs text-slate-400 border-slate-200">
+                                                                Inativo
+                                                            </Badge>
+                                                        )}
+                                                    </div>
 
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => toggleActiveMutation.mutate({ id: reason.id, ativo: !reason.ativo })}
-                                                    title={reason.ativo ? "Desativar" : "Ativar"}
-                                                    className="h-8 w-8 text-slate-400 hover:text-slate-700"
-                                                >
-                                                    {reason.ativo ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                                </Button>
-
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => {
-                                                        if (confirm('Tem certeza que deseja excluir este motivo?')) {
-                                                            deleteMutation.mutate(reason.id);
-                                                        }
-                                                    }}
-                                                    title="Excluir permanentemente"
-                                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => startEditing(reason)}
+                                                            title="Renomear"
+                                                            className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => toggleActiveMutation.mutate({ id: reason.id, ativo: !reason.ativo })}
+                                                            title={reason.ativo ? "Desativar" : "Ativar"}
+                                                            className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                                                        >
+                                                            {reason.ativo ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => {
+                                                                if (confirm('Tem certeza que deseja excluir este motivo?')) {
+                                                                    deleteMutation.mutate(reason.id);
+                                                                }
+                                                            }}
+                                                            title="Excluir permanentemente"
+                                                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     ))
                                 )}
