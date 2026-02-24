@@ -22,7 +22,8 @@ import {
     FileText,
     Sparkles,
     ChevronsUpDown,
-    Star
+    Star,
+    UserPlus
 } from 'lucide-react';
 import { MultiSelectEmail } from '@/components/ui/MultiSelectEmail';
 import { useAuth } from '@/contexts/AuthContext';
@@ -214,6 +215,21 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
             return data;
         },
         staleTime: 1000 * 60,
+    });
+
+    // Fetch main contact email for meeting quick-add
+    const { data: mainContact } = useQuery({
+        queryKey: ['card-main-contact-email', cardId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('cards')
+                .select('contato:contatos!cards_pessoa_principal_id_fkey(id, nome, sobrenome, email)')
+                .eq('id', cardId)
+                .single();
+            if (error) throw error;
+            return data?.contato as { id: string; nome: string; sobrenome: string | null; email: string | null } | null;
+        },
+        staleTime: 1000 * 60 * 5,
     });
 
     const { data: teamMemberIds } = useQuery({
@@ -909,6 +925,27 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                                     Participantes Externos (E-mails)
                                     <span className="text-red-500">*</span>
                                 </Label>
+                                {/* Quick-add main contact email */}
+                                {mainContact?.email && !externalParticipants.includes(mainContact.email) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setExternalParticipants(prev => [...prev, mainContact.email!])}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded-full hover:bg-purple-100 transition-colors w-fit"
+                                    >
+                                        <UserPlus className="h-3 w-3" />
+                                        <span>
+                                            Adicionar {mainContact.nome}
+                                            {mainContact.sobrenome ? ` ${mainContact.sobrenome}` : ''}
+                                        </span>
+                                        <span className="text-purple-400">({mainContact.email})</span>
+                                    </button>
+                                )}
+                                {mainContact && !mainContact.email && (
+                                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                                        <Mail className="h-3 w-3" />
+                                        Contato principal sem e-mail cadastrado
+                                    </p>
+                                )}
                                 <MultiSelectEmail
                                     value={externalParticipants}
                                     onChange={setExternalParticipants}
