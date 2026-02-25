@@ -32,6 +32,7 @@ interface OutboundTrigger {
     sync_field_mode: 'all' | 'selected' | 'exclude';
     sync_fields: string[] | null;
     // Controles
+    action_type: 'create_only' | 'update_only' | 'all';
     action_mode: 'allow' | 'block';
     is_active: boolean;
     priority: number;
@@ -59,6 +60,7 @@ interface TriggerFormData {
     eventTypes: string[];
     syncFieldMode: 'all' | 'selected' | 'exclude';
     syncFields: string[];
+    actionType: 'create_only' | 'update_only' | 'all';
     actionMode: 'allow' | 'block';
     priority: number;
 }
@@ -72,11 +74,13 @@ const emptyFormData: TriggerFormData = {
     eventTypes: ['stage_change', 'field_update', 'won', 'lost'],
     syncFieldMode: 'all',
     syncFields: [],
+    actionType: 'update_only',
     actionMode: 'allow',
     priority: 100
 };
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
+    'card_created': 'Criacao de Card',
     'stage_change': 'Mudanca de Estagio',
     'field_update': 'Atualizacao de Campo',
     'won': 'Ganho',
@@ -194,6 +198,7 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
                 event_types: formData.eventTypes,
                 sync_field_mode: formData.syncFieldMode,
                 sync_fields: formData.syncFieldMode !== 'all' && formData.syncFields.length > 0 ? formData.syncFields : null,
+                action_type: formData.actionType,
                 action_mode: formData.actionMode,
                 priority: formData.priority,
                 is_active: true
@@ -227,6 +232,7 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
                 event_types: formData.eventTypes,
                 sync_field_mode: formData.syncFieldMode,
                 sync_fields: formData.syncFieldMode !== 'all' && formData.syncFields.length > 0 ? formData.syncFields : null,
+                action_type: formData.actionType,
                 action_mode: formData.actionMode,
                 priority: formData.priority
             };
@@ -310,6 +316,7 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
             eventTypes: trigger.event_types || ['stage_change', 'field_update', 'won', 'lost'],
             syncFieldMode: trigger.sync_field_mode || 'all',
             syncFields: trigger.sync_fields || [],
+            actionType: trigger.action_type || 'update_only',
             actionMode: trigger.action_mode || 'allow',
             priority: trigger.priority || 100
         });
@@ -373,6 +380,62 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
                         />
                         <p className="text-xs text-slate-500 mt-1">Menor = mais prioritario</p>
                     </div>
+                </div>
+
+                {/* Tipo de Operacao */}
+                <div className="space-y-2 p-4 bg-indigo-50 rounded-lg">
+                    <h4 className="font-medium text-indigo-700">Tipo de Operacao</h4>
+                    <div className="flex gap-2 flex-wrap">
+                        <Button
+                            type="button"
+                            variant={formData.actionType === 'update_only' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFormData(prev => ({
+                                ...prev,
+                                actionType: 'update_only',
+                                eventTypes: prev.eventTypes.filter(e => e !== 'card_created')
+                            }))}
+                            className={formData.actionType === 'update_only' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                        >
+                            Apenas Atualizacao
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={formData.actionType === 'create_only' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFormData(prev => ({
+                                ...prev,
+                                actionType: 'create_only',
+                                eventTypes: ['card_created']
+                            }))}
+                            className={formData.actionType === 'create_only' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                        >
+                            Apenas Criacao
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={formData.actionType === 'all' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFormData(prev => ({
+                                ...prev,
+                                actionType: 'all',
+                                eventTypes: prev.eventTypes.includes('card_created')
+                                    ? prev.eventTypes
+                                    : [...prev.eventTypes, 'card_created']
+                            }))}
+                            className={formData.actionType === 'all' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
+                        >
+                            Criacao + Atualizacao
+                        </Button>
+                    </div>
+                    <p className="text-xs text-indigo-600">
+                        {formData.actionType === 'update_only'
+                            ? 'Sincroniza apenas alteracoes em cards que ja existem no ActiveCampaign'
+                            : formData.actionType === 'create_only'
+                                ? 'Cria deal no ActiveCampaign quando card e criado no CRM (sem external_id)'
+                                : 'Cria deal no AC para cards novos e sincroniza alteracoes dos existentes'
+                        }
+                    </p>
                 </div>
 
                 {/* Acao */}
@@ -598,20 +661,28 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
                 {/* Tipos de Evento */}
                 <div className="space-y-3 p-4 bg-amber-50 rounded-lg">
                     <h4 className="font-medium text-amber-700">Tipos de Evento</h4>
-                    <div className="flex flex-wrap gap-2">
-                        {Object.entries(EVENT_TYPE_LABELS).map(([key, label]) => (
-                            <Button
-                                key={key}
-                                type="button"
-                                variant={formData.eventTypes.includes(key) ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => toggleEventType(key)}
-                                className={formData.eventTypes.includes(key) ? 'bg-amber-600 hover:bg-amber-700' : ''}
-                            >
-                                {formData.eventTypes.includes(key) ? '✓ ' : ''}{label}
-                            </Button>
-                        ))}
-                    </div>
+                    {formData.actionType === 'create_only' ? (
+                        <p className="text-sm text-amber-700">
+                            Evento fixo: <strong>Criacao de Card</strong> (apenas criacao de novos deals no AC)
+                        </p>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {Object.entries(EVENT_TYPE_LABELS)
+                                .filter(([key]) => formData.actionType === 'update_only' ? key !== 'card_created' : true)
+                                .map(([key, label]) => (
+                                <Button
+                                    key={key}
+                                    type="button"
+                                    variant={formData.eventTypes.includes(key) ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => toggleEventType(key)}
+                                    className={formData.eventTypes.includes(key) ? 'bg-amber-600 hover:bg-amber-700' : ''}
+                                >
+                                    {formData.eventTypes.includes(key) ? '✓ ' : ''}{label}
+                                </Button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Filtro de Campos (apenas para field_update) */}
@@ -799,6 +870,19 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
                                                     {/* Nome e Acao */}
                                                     <div className="flex items-center gap-2 mb-2">
                                                         <p className="font-semibold text-slate-800">{trigger.name}</p>
+                                                        <Badge
+                                                            className={
+                                                                trigger.action_type === 'create_only'
+                                                                    ? 'bg-blue-100 text-blue-700'
+                                                                    : trigger.action_type === 'all'
+                                                                        ? 'bg-purple-100 text-purple-700'
+                                                                        : 'bg-amber-100 text-amber-700'
+                                                            }
+                                                        >
+                                                            {trigger.action_type === 'create_only' ? 'Criacao'
+                                                                : trigger.action_type === 'all' ? 'Criacao + Atualizacao'
+                                                                : 'Atualizacao'}
+                                                        </Badge>
                                                         <Badge
                                                             className={trigger.action_mode === 'allow'
                                                                 ? 'bg-green-100 text-green-700'
@@ -997,6 +1081,7 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
                     <ul className="text-sm text-slate-600 space-y-1 list-disc list-inside">
                         <li><strong>Sem regras:</strong> Todos os eventos de outbound sao sincronizados normalmente</li>
                         <li><strong>Com regras:</strong> Apenas eventos que correspondem a uma regra "Permitir" sao sincronizados</li>
+                        <li><strong>Tipo de Operacao:</strong> "Atualizacao" sincroniza cards existentes no AC, "Criacao" cria deals novos, "Ambos" faz os dois</li>
                         <li><strong>Prioridade:</strong> Regras com menor numero sao avaliadas primeiro</li>
                         <li><strong>Primeira regra vence:</strong> A primeira regra que faz match determina a acao</li>
                         <li><strong>Nenhuma regra match:</strong> Evento e bloqueado por padrao</li>

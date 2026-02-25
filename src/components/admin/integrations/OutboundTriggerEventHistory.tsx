@@ -62,6 +62,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 };
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
+    card_created: 'Criacao',
     stage_change: 'Mudanca de Etapa',
     won: 'Ganho',
     lost: 'Perdido',
@@ -107,6 +108,36 @@ function EventDetailPanel({
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Dados do Evento
                 </h4>
+
+                {eventType === 'card_created' && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                            <ArrowUpRight className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="text-sm text-blue-700 font-medium">Card Criado no CRM</span>
+                        </div>
+                        {!!payload['titulo'] && (
+                            <div className="text-xs text-slate-600">
+                                Titulo: <strong>{String(payload['titulo'])}</strong>
+                            </div>
+                        )}
+                        {!!payload['valor_estimado'] && (
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="text-sm text-slate-600">
+                                    Valor Estimado: R$ {Number(payload['valor_estimado']).toLocaleString('pt-BR')}
+                                </span>
+                            </div>
+                        )}
+                        {!!payload['target_external_stage_name'] && (
+                            <div className="flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="text-sm text-slate-600">
+                                    Destino AC: <strong>{String(payload['target_external_stage_name'])}</strong>
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {eventType === 'stage_change' && (
                     <div className="space-y-1.5">
