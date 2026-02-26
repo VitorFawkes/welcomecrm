@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
@@ -10,6 +10,7 @@ import {
     AlertCircle,
     User,
     Play,
+    Pause,
     FileText,
     Image as ImageIcon,
     ExternalLink,
@@ -32,6 +33,7 @@ interface WhatsAppMessage {
     sender_name: string | null;
     message_type: string | null;
     media_url: string | null;
+    media_content: string | null;
     status: string | null;
     created_at: string | null;
     sent_by_user_name: string | null;
@@ -124,6 +126,93 @@ function getStatusIcon(message: WhatsAppMessage) {
     return <Clock className="w-3 h-3 text-muted-foreground" />;
 }
 
+const SPEED_OPTIONS = [1, 1.5, 2] as const;
+
+// Audio player with play/pause, progress bar, speed control, and duration
+function AudioPlayer({ url }: { url: string }) {
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [playing, setPlaying] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [speed, setSpeed] = useState<number>(1);
+
+    useEffect(() => {
+        const audio = new Audio(url);
+        audioRef.current = audio;
+
+        audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) setProgress(audio.currentTime / audio.duration);
+        });
+        audio.addEventListener('ended', () => { setPlaying(false); setProgress(0); });
+
+        return () => { audio.pause(); audio.src = ''; };
+    }, [url]);
+
+    const toggle = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (playing) { audio.pause(); } else { audio.play(); }
+        setPlaying(!playing);
+    };
+
+    const cycleSpeed = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        const idx = SPEED_OPTIONS.indexOf(speed as typeof SPEED_OPTIONS[number]);
+        const next = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+        audio.playbackRate = next;
+        setSpeed(next);
+    };
+
+    const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+        const audio = audioRef.current;
+        if (!audio || !audio.duration) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        audio.currentTime = pct * audio.duration;
+        setProgress(pct);
+    };
+
+    const fmt = (s: number) => {
+        if (!s || !isFinite(s)) return '0:00';
+        const m = Math.floor(s / 60);
+        const sec = Math.floor(s % 60);
+        return `${m}:${sec.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className="flex items-center gap-2 bg-black/10 rounded-full px-3 py-2 mb-2">
+            <button
+                onClick={toggle}
+                className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors shrink-0"
+            >
+                {playing
+                    ? <Pause className="w-4 h-4 fill-current" />
+                    : <Play className="w-4 h-4 fill-current" />
+                }
+            </button>
+            <div className="flex-1 h-1.5 bg-white/30 rounded-full cursor-pointer" onClick={seek}>
+                <div
+                    className="h-full bg-white/70 rounded-full transition-[width] duration-100"
+                    style={{ width: `${progress * 100}%` }}
+                />
+            </div>
+            <span className="text-[10px] opacity-70 tabular-nums shrink-0 w-8 text-right">
+                {playing ? fmt(duration - (progress * duration)) : fmt(duration)}
+            </span>
+            <button
+                onClick={cycleSpeed}
+                className="text-[10px] font-semibold opacity-70 hover:opacity-100 transition-opacity shrink-0 w-7 text-center"
+                title="Velocidade de reprodução"
+            >
+                {speed}x
+            </button>
+            <Mic className="w-4 h-4 opacity-60 shrink-0" />
+        </div>
+    );
+}
+
 // Render media content
 function MessageMedia({ message }: { message: WhatsAppMessage }) {
     const { media_url, message_type } = message;
@@ -149,23 +238,7 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
     }
 
     if (isAudio) {
-        return (
-            <div className="flex items-center gap-2 bg-black/10 rounded-full px-3 py-2 mb-2">
-                <button
-                    onClick={() => {
-                        const audio = new Audio(media_url);
-                        audio.play();
-                    }}
-                    className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
-                >
-                    <Play className="w-4 h-4 fill-current" />
-                </button>
-                <div className="flex-1 h-1 bg-white/30 rounded-full">
-                    <div className="w-1/3 h-full bg-white/60 rounded-full" />
-                </div>
-                <Mic className="w-4 h-4 opacity-60" />
-            </div>
-        );
+        return <AudioPlayer url={media_url} />;
     }
 
     if (isVideo) {
@@ -252,6 +325,23 @@ function MessageBubble({ message }: { message: WhatsAppMessage }) {
                 {/* Media content */}
                 <MessageMedia message={message} />
 
+                {/* Media transcription/description */}
+                {message.media_content && (
+                    <div className={cn(
+                        "text-xs italic mt-1 px-2 py-1.5 rounded",
+                        message.is_from_me
+                            ? "bg-green-600/30 text-green-50"
+                            : "bg-slate-100 text-slate-500 border border-slate-200"
+                    )}>
+                        <span className="font-medium not-italic">
+                            {message.message_type === 'audio' ? 'Transcrição: ' :
+                             message.message_type === 'image' ? 'Descrição: ' :
+                             message.message_type === 'document' ? 'Conteúdo: ' : ''}
+                        </span>
+                        {message.media_content}
+                    </div>
+                )}
+
                 {/* Message body */}
                 {body && (
                     <p className={cn(
@@ -324,7 +414,7 @@ export function WhatsAppHistory({ contactId, className }: WhatsAppHistoryProps) 
             const { data, error } = await (supabase
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('whatsapp_messages') as any)
-                .select('id, contact_id, card_id, body, direction, is_from_me, sender_name, message_type, media_url, status, created_at, sent_by_user_name, fase_label')
+                .select('id, contact_id, card_id, body, direction, is_from_me, sender_name, message_type, media_url, media_content, status, created_at, sent_by_user_name, fase_label')
                 .eq('contact_id', contactId)
                 .order('created_at', { ascending: true })
                 .limit(200);
@@ -361,7 +451,19 @@ export function WhatsAppHistory({ contactId, className }: WhatsAppHistoryProps) 
                     filter: `contact_id=eq.${contactId}`
                 },
                 () => {
-                    // Invalidate query to refetch with new message
+                    queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', contactId] });
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'whatsapp_messages',
+                    filter: `contact_id=eq.${contactId}`
+                },
+                () => {
+                    // Refetch when media_content/body is updated by Edge Function
                     queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', contactId] });
                 }
             )
