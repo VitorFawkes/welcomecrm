@@ -8,7 +8,35 @@
 - IMPORTANT: NUNCA modifique view/trigger/function SQL sem ler docs/SQL_SOP.md primeiro
 - IMPORTANT: Antes de criar qualquer hook, componente ou página, verifique no Mapa do Projeto abaixo se já existe algo similar
 - IMPORTANT: Ao criar hook/página/componente novo, ATUALIZAR o MAPA DO PROJETO abaixo antes de finalizar
+- IMPORTANT: Toda migration em `supabase/migrations/` DEVE ser aplicada ao banco remoto ANTES de escrever código que dependa dela. Workflow: 1) SQL → 2) Aplicar via Management API → 3) Verificar via REST → 4) `touch .claude/.migration_applied` → 5) Frontend. O Stop hook BLOQUEIA se detectar .sql novo sem marker.
 - Commits em português. Co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
+
+## Protocolo de Migrations (OBRIGATÓRIO)
+**Workflow:** Escrever SQL → Aplicar → Verificar → Marcar → Frontend
+
+```bash
+# 1. Aplicar migration ao banco remoto
+source .env && python3 -c "
+import json,subprocess,os
+sql = open('supabase/migrations/SEU_ARQUIVO.sql').read()
+r = subprocess.run(['curl','-sS','-X','POST',
+  'https://api.supabase.com/v1/projects/szyrzxvlptqqheizyrxu/database/query',
+  '-H','Authorization: Bearer '+os.environ['SUPABASE_ACCESS_TOKEN'],
+  '-H','Content-Type: application/json',
+  '-d',json.dumps({'query':sql})], capture_output=True, text=True)
+print(r.stdout[:500])
+"
+
+# 2. Verificar que as mudanças existem no banco (exemplo para view)
+source .env && curl -sS "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/NOME_VIEW?select=COLUNA_NOVA&limit=1" \
+  --header "apikey: $VITE_SUPABASE_ANON_KEY" \
+  --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+
+# 3. Marcar como aplicada (libera o Stop hook)
+touch .claude/.migration_applied
+```
+
+**Se a migration tiver múltiplos statements que falham via Management API**, aplique cada statement separadamente ou use `psql` direto. O importante é verificar que o resultado está no banco.
 
 ## Arquitetura (3 Suns)
 Toda entidade orbita 3 entidades centrais: `cards`, `contatos`, `profiles`.
@@ -39,6 +67,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Cadência | admin/cadence/* | Motor de automação de vendas v3 |
 | Lixeira | admin/Lixeira.tsx | Itens deletados |
 | Proposta Pública | public/ProposalView.tsx | Visualização do cliente |
+| Relatórios | reports/ReportsPage.tsx | Report builder + dashboards customizados (sidebar + Outlet) |
 
 ### Hooks Mais Usados (src/hooks/)
 | Hook | Usado em | O que faz |
@@ -76,13 +105,21 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | useOperationsData | 1 | Viagens realizadas, sub-cards, qualidade por planner via RPC |
 | useFinancialData | 1 | Receita vs margem, top destinos, receita por produto via RPC |
 | useRetentionData | 1 | Cohort de recompra + KPIs de recorrência via RPC |
+| useBriefingIA | 1 | Processa áudio de briefing do consultor via n8n webhook (Whisper + GPT-5.1) |
+| useFunnelByOwner | 1 | Funil operacional com breakdown por responsável (stacked bars) via RPC |
+| useReportBuilderStore | 1 | Zustand store do Report Builder (IQR, viz, filtros, ~30 ações) |
+| useReportEngine | 2 | IQR → RPC report_query_engine → dados agregados |
+| useReportDrillDown | 1 | Drill-down em ponto do gráfico → registros individuais via RPC |
+| useFieldRegistry | 2 | Campos/dimensões/medidas filtrados por permissão, por source |
+| useSavedReports | 4+ | CRUD relatórios customizados (custom_reports) |
+| useSavedDashboards | 4+ | CRUD dashboards + widgets (custom_dashboards, dashboard_widgets) |
 
 ### Componentes Principais (src/components/)
 | Área | Componentes-chave |
 |------|-------------------|
 | Layout | Header, Sidebar, Layout, ProductSwitcher, NotificationCenter |
 | Pipeline | KanbanBoard, PipelineListView, CreateCardModal, FilterDrawer, DocumentBadge |
-| Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements, FinanceiroWidget, CardTeamSection, DocumentCollectionWidget |
+| Card | CardHeader, DynamicFieldRenderer, ActivityFeed, CardFiles, StageRequirements, FinanceiroWidget, CardTeamSection, DocumentCollectionWidget, BriefingIAModal, AudioRecorder |
 | Propostas | ProposalBuilder, SectionEditor, AddItemMenu, VersionHistory |
 | Admin | StudioUnified, IntegrationBuilder, KanbanCardSettings, JuliaIAConfig |
 | Health | IntegrationHealthTab, PulseGrid, ActiveAlertsList, HealthRulesConfig |
@@ -92,7 +129,8 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Monde | MondeWidget |
 | UI Base | src/components/ui/ — 29 componentes Radix UI (Button, Dialog, Select, etc.) |
 | Resiliência | NetworkStatusBanner (banner offline/online no Layout) |
-| Analytics | AnalyticsSidebar, GlobalControls, KpiCard, ChartCard, views/* (Overview, Team, Funnel, SLA, WhatsApp, Operations, Financial, Retention) |
+| Analytics | AnalyticsSidebar, GlobalControls, KpiCard, ChartCard, views/OverviewView, views/TeamView, views/FunnelView, views/SLAView, views/WhatsAppView, views/OperationsView, views/FinancialView, views/RetentionView, views/PlaceholderView |
+| Relatórios | ReportsSidebar, ReportBuilder, ReportViewer, ReportsList, builder/* (SourceSelector, FieldPicker, ConfigPanel, FilterPanel, VizSelector, ReportPreview, ComparisonToggle, SaveReportDialog), renderers/* (ChartRenderer, BarChart, LineChart, AreaChart, PieChart, Table, Kpi, Funnel, Composed, DrillDownPanel), DashboardEditor, DashboardViewer, DashboardsList, dashboard/* (DashboardGrid, WidgetCard, AddWidgetDialog, DashboardFilters) |
 
 ### Tabelas do Banco (principais)
 | Tabela | Papel | FK principais |
@@ -118,6 +156,9 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | card_team_members | Equipe do card (assistentes, apoio) | → cards, profiles |
 | document_types | Tipos de documentos reutilizáveis (passaporte, RG, etc.) | — |
 | card_document_requirements | Checklist de documentos por card/viajante | → cards, contatos, document_types |
+| custom_reports | Relatórios customizados (IQR config + visualization) | → profiles |
+| custom_dashboards | Dashboards de relatórios com filtros globais | → profiles |
+| dashboard_widgets | Widgets no grid do dashboard | → custom_dashboards, custom_reports |
 
 ### Campos IA no Cards (Agente WhatsApp)
 | Coluna | Tipo | Propósito |
@@ -130,11 +171,21 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | Script | O que faz |
 |--------|-----------|
 | create-n8n-travel-agent.js | Cria workflow n8n do agente Julia (WhatsApp AI) por transformação do modelo |
+| create-n8n-briefing-ia.js | Cria workflow n8n "Briefing IA" (áudio consultor → Whisper → GPT-5.1 → campos CRM) |
 
 ### Docs Extras (docs/)
 | Arquivo | O que faz |
 |---------|-----------|
 | welcome-trips-faq.md | FAQ da Welcome Trips para ferramenta Info do Agent 3 (Julia) |
+
+### Workflow n8n — Briefing IA (Áudio Consultor)
+- **Workflow ID:** `1Aes61ybHxItErg8`
+- **Webhook:** `https://n8n-n8n.ymnmx7.easypanel.host/webhook/briefing-ia`
+- **18 nós** — Pipeline: Webhook → Extrai Params → Prepara Audio (base64→binary) → Whisper API (HTTP Request c/ credential OpenAI) → Extrai Transcrição → Busca Card → Busca Config → Monta Contexto → AI Briefing (GPT-5.1 Agent) → Valida Output → If Tem Atualização → Merge → Atualiza Card (RPC) → Log Activity → Sucesso/Sem Atualização
+- **Reusa:** `get_ai_extraction_config()` e `update_card_from_ai_extraction()` do Atualizador Campos
+- **Frontend:** Botão "Briefing IA" em ActionButtons → BriefingIAModal → AudioRecorder (gravar/upload) → useBriefingIA hook
+- **Input:** Áudio base64 do consultor (max 10min, WebM/MP3/M4A/WAV)
+- **Output:** Briefing text + campos extraídos (destinos, orçamento, época, etc.)
 
 ### Workflow n8n — Agente Julia (WhatsApp AI)
 - **Workflow ID:** `tvh1SN7VDgy8V3VI`

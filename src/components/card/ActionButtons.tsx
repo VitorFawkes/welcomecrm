@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mail, X, Send, Loader2, Trash2, Zap } from 'lucide-react'
+import { Mail, X, Send, Loader2, Trash2, Zap, Sparkles } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useCreateProposal } from '@/hooks/useProposal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useArchiveCard } from '@/hooks/useArchiveCard'
 import DeleteCardModal from './DeleteCardModal'
+import BriefingIAModal from './BriefingIAModal'
 import { toast } from 'sonner'
 
 interface ActionButtonsProps {
@@ -32,6 +33,7 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
         body: ''
     })
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [showBriefingIA, setShowBriefingIA] = useState(false)
 
     const { archive, isArchiving } = useArchiveCard({
         onSuccess: () => navigate('/pipeline')
@@ -280,6 +282,15 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                     {isCreatingProposal ? 'Criando...' : 'Proposta'}
                 </button>
 
+                <button
+                    onClick={() => setShowBriefingIA(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm font-medium"
+                    title="Briefing IA — Enviar áudio e preencher campos automaticamente"
+                >
+                    <Sparkles className="h-4 w-4" />
+                    Briefing IA
+                </button>
+
                 {profile?.is_admin === true && (
                     <button
                         onClick={async () => {
@@ -393,6 +404,12 @@ export default function ActionButtons({ card }: ActionButtonsProps) {
                 onConfirm={() => archive(card.id)}
                 isLoading={isArchiving}
                 cardTitle={card.titulo || undefined}
+            />
+
+            <BriefingIAModal
+                isOpen={showBriefingIA}
+                onClose={() => setShowBriefingIA(false)}
+                cardId={card.id}
             />
         </>
     )
