@@ -92,7 +92,14 @@ export default function DocumentCollectionWidget({ cardId, card }: DocumentColle
     })
   }
 
-  const existingTypeIds = [...new Set(requirements.map(r => r.document_type_id))]
+  // Map: typeId → Set of contatoIds that already have this type
+  const existingAssignments = new Map<string, Set<string>>()
+  for (const r of requirements) {
+    if (!existingAssignments.has(r.document_type_id)) {
+      existingAssignments.set(r.document_type_id, new Set())
+    }
+    existingAssignments.get(r.document_type_id)!.add(r.contato_id)
+  }
 
   const handleCreateTask = async () => {
     if (!taskResponsibleId) return
@@ -317,7 +324,7 @@ export default function DocumentCollectionWidget({ cardId, card }: DocumentColle
         isOpen={isSetupOpen}
         onClose={() => setIsSetupOpen(false)}
         cardId={cardId}
-        existingTypeIds={existingTypeIds}
+        existingAssignments={existingAssignments}
         onConfirm={(assignments) => addRequirements({ assignments })}
       />
     </div>

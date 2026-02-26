@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Search, Plus, FileCheck, Users, ListChecks, X, FileText, Upload } from 'lucide-react'
+import { Search, Plus, FileCheck, Users, ListChecks, X, FileText, Upload, Check as CheckIcon } from 'lucide-react'
 import { useDocumentTypes } from '../../../hooks/useDocumentTypes'
 import { useCardPeople } from '../../../hooks/useCardPeople'
 import { cn } from '../../../lib/utils'
@@ -13,7 +13,7 @@ interface DocumentSetupModalProps {
   isOpen: boolean
   onClose: () => void
   cardId: string
-  existingTypeIds: string[]
+  existingAssignments: Map<string, Set<string>>
   onConfirm: (assignments: Array<{ typeId: string; contatoId: string; modo: DocumentModo }>) => Promise<void>
 }
 
@@ -40,7 +40,7 @@ export default function DocumentSetupModal({
   isOpen,
   onClose,
   cardId,
-  existingTypeIds,
+  existingAssignments,
   onConfirm,
 }: DocumentSetupModalProps) {
   const { documentTypes, isLoading: loadingTypes, createDocumentType, isCreating } = useDocumentTypes()
@@ -53,15 +53,29 @@ export default function DocumentSetupModal({
   const [showNewTypeForm, setShowNewTypeForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Filter types by search and exclude already-added
+  // Reset state when modal opens
+  const prevOpen = useRef(false)
+  if (isOpen && !prevOpen.current) {
+    // Entered from closed → reset
+    if (assignments.size > 0) setAssignments(new Map())
+    if (search) setSearch('')
+    if (showNewTypeForm) setShowNewTypeForm(false)
+  }
+  prevOpen.current = isOpen
+
+  // Filter types by search — only hide if ALL people already have this type
   const filteredTypes = useMemo(() => {
     const q = search.toLowerCase()
     return documentTypes.filter(t => {
-      if (existingTypeIds.includes(t.id)) return false
+      // Hide type only if every person already has it assigned
+      const assignedContacts = existingAssignments.get(t.id)
+      if (assignedContacts && people.length > 0 && people.every(p => assignedContacts.has(p.id))) {
+        return false
+      }
       if (!q) return true
       return t.nome.toLowerCase().includes(q)
     })
-  }, [documentTypes, search, existingTypeIds])
+  }, [documentTypes, search, existingAssignments, people])
 
   const toggleType = (typeId: string) => {
     setAssignments(prev => {
@@ -70,8 +84,13 @@ export default function DocumentSetupModal({
         next.delete(typeId)
       } else {
         const type = documentTypes.find(t => t.id === typeId)
+        // Only pre-select people who don't already have this type
+        const alreadyAssigned = existingAssignments.get(typeId)
+        const availablePeople = alreadyAssigned
+          ? people.filter(p => !alreadyAssigned.has(p.id))
+          : people
         next.set(typeId, {
-          contatoIds: new Set(people.map(p => p.id)),
+          contatoIds: new Set(availablePeople.map(p => p.id)),
           modo: type ? getDefaultModo(type) : 'ambos',
         })
       }
@@ -248,11 +267,15 @@ export default function DocumentSetupModal({
                           </div>
                         )}
                       </div>
-                      {isSelected && assignment && (
-                        <span className="text-[10px] font-medium text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded-full shrink-0">
-                          {assignment.contatoIds.size}/{people.length}
-                        </span>
-                      )}
+                      {isSelected && assignment && (() => {
+                        const alreadyCount = existingAssignments.get(type.id)?.size ?? 0
+                        const availableCount = people.length - alreadyCount
+                        return (
+                          <span className="text-[10px] font-medium text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded-full shrink-0">
+                            {assignment.contatoIds.size}/{availableCount}
+                          </span>
+                        )
+                      })()}
                     </button>
 
                     {/* Expanded section when selected */}
@@ -287,19 +310,25 @@ export default function DocumentSetupModal({
                           <div className="flex flex-wrap gap-1.5">
                             {people.map(p => {
                               const isAssigned = assignment?.contatoIds.has(p.id) ?? false
+                              const alreadyExists = existingAssignments.get(type.id)?.has(p.id) ?? false
                               return (
                                 <button
                                   key={p.id}
-                                  onClick={(e) => { e.stopPropagation(); togglePerson(type.id, p.id) }}
+                                  onClick={(e) => { e.stopPropagation(); if (!alreadyExists) togglePerson(type.id, p.id) }}
+                                  disabled={alreadyExists}
                                   className={cn(
                                     "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors border",
-                                    isAssigned
-                                      ? "bg-teal-100 text-teal-800 border-teal-300 hover:bg-teal-200"
-                                      : "bg-white text-gray-400 border-gray-200 hover:border-gray-300 hover:text-gray-500"
+                                    alreadyExists
+                                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                      : isAssigned
+                                        ? "bg-teal-100 text-teal-800 border-teal-300 hover:bg-teal-200"
+                                        : "bg-white text-gray-400 border-gray-200 hover:border-gray-300 hover:text-gray-500"
                                   )}
+                                  title={alreadyExists ? 'Já adicionado anteriormente' : undefined}
                                 >
                                   {personName(p)}
-                                  {isAssigned && <X className="h-3 w-3" />}
+                                  {alreadyExists && <CheckIcon className="h-3 w-3 text-green-500" />}
+                                  {isAssigned && !alreadyExists && <X className="h-3 w-3" />}
                                 </button>
                               )
                             })}
