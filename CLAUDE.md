@@ -1,6 +1,7 @@
 # WelcomeCRM - Instruções
 
-**Supabase Project:** `szyrzxvlptqqheizyrxu`
+**Supabase Produção:** `szyrzxvlptqqheizyrxu`
+**Supabase Staging:** `ivmebyvjarcvrkrbemam`
 **Stack:** React + Vite + TailwindCSS + Supabase (PostgreSQL + Edge Functions) + TypeScript Strict
 
 ## Regras Invioláveis
@@ -8,35 +9,56 @@
 - IMPORTANT: NUNCA modifique view/trigger/function SQL sem ler docs/SQL_SOP.md primeiro
 - IMPORTANT: Antes de criar qualquer hook, componente ou página, verifique no Mapa do Projeto abaixo se já existe algo similar
 - IMPORTANT: Ao criar hook/página/componente novo, ATUALIZAR o MAPA DO PROJETO abaixo antes de finalizar
-- IMPORTANT: Toda migration em `supabase/migrations/` DEVE ser aplicada ao banco remoto ANTES de escrever código que dependa dela. Workflow: 1) SQL → 2) Aplicar via Management API → 3) Verificar via REST → 4) `touch .claude/.migration_applied` → 5) Frontend. O Stop hook BLOQUEIA se detectar .sql novo sem marker.
+- IMPORTANT: NUNCA aplicar migrations diretamente em PRODUÇÃO. Sempre STAGING primeiro. Ver "Protocolo de Migrations" abaixo.
+- IMPORTANT: Ao criar view/coluna nova usada pelo frontend, adicionar a query ao smoke test em `.claude/hooks/schema-smoke-test.sh`
 - Commits em português. Co-author: `Co-Authored-By: Claude <noreply@anthropic.com>`
 
+## Ambientes (OBRIGATÓRIO ENTENDER)
+
+| Ambiente | Banco | Quando |
+|----------|-------|--------|
+| `npm run dev` (local) | **STAGING** (ivmebyvjarcvrkrbemam) | Desenvolvimento |
+| Vercel Preview (branches) | **STAGING** | PRs e testes |
+| Vercel Production (main) | **PRODUÇÃO** (szyrzxvlptqqheizyrxu) | Usuários finais |
+
+**Regra:** O agente SEMPRE trabalha contra staging. Produção só é tocada na etapa de promoção.
+
 ## Protocolo de Migrations (OBRIGATÓRIO)
-**Workflow:** Escrever SQL → Aplicar → Verificar → Marcar → Frontend
 
+### Fluxo: Staging → Teste → Produção
+
+**Passo 1 — Aplicar no STAGING:**
 ```bash
-# 1. Aplicar migration ao banco remoto
-source .env && python3 -c "
-import json,subprocess,os
-sql = open('supabase/migrations/SEU_ARQUIVO.sql').read()
-r = subprocess.run(['curl','-sS','-X','POST',
-  'https://api.supabase.com/v1/projects/szyrzxvlptqqheizyrxu/database/query',
-  '-H','Authorization: Bearer '+os.environ['SUPABASE_ACCESS_TOKEN'],
-  '-H','Content-Type: application/json',
-  '-d',json.dumps({'query':sql})], capture_output=True, text=True)
-print(r.stdout[:500])
-"
+bash .claude/hooks/apply-to-staging.sh supabase/migrations/SEU_ARQUIVO.sql
+```
 
-# 2. Verificar que as mudanças existem no banco (exemplo para view)
-source .env && curl -sS "https://szyrzxvlptqqheizyrxu.supabase.co/rest/v1/NOME_VIEW?select=COLUNA_NOVA&limit=1" \
-  --header "apikey: $VITE_SUPABASE_ANON_KEY" \
-  --header "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+**Passo 2 — Testar:** O frontend local (`npm run dev`) já aponta para staging. Verificar que funciona.
 
-# 3. Marcar como aplicada (libera o Stop hook)
+**Passo 3 — Promover para PRODUÇÃO** (quando o usuário pedir):
+```bash
+bash .claude/hooks/promote-to-prod.sh supabase/migrations/SEU_ARQUIVO.sql
+```
+Esse script aplica no banco de produção E roda o smoke test automaticamente.
+
+**Passo 4 — Marcar:**
+```bash
 touch .claude/.migration_applied
 ```
 
-**Se a migration tiver múltiplos statements que falham via Management API**, aplique cada statement separadamente ou use `psql` direto. O importante é verificar que o resultado está no banco.
+### Quando o usuário diz...
+
+| Frase do usuário | O que o agente faz |
+|-------------------|-------------------|
+| "Crie uma migration" / feature normal | Escrever SQL → aplicar no STAGING → testar → código frontend |
+| "Aplique no staging" | `bash .claude/hooks/apply-to-staging.sh <arquivo>` |
+| "Promova para produção" / "Suba para produção" | `bash .claude/hooks/promote-to-prod.sh <arquivo>` para CADA migration pendente |
+| "Está tudo ok, pode subir" | Promover todas migrations pendentes + `touch .claude/.migration_applied` |
+
+### Regras de segurança
+- NUNCA usar `SUPABASE_ACCESS_TOKEN` (produção) direto. Sempre via script `promote-to-prod.sh`
+- NUNCA pular o staging. Se urgente, aplicar no staging primeiro mesmo assim.
+- Se a migration falhar no staging, corrigir ANTES de promover.
+- O Stop hook BLOQUEIA se detectar `.sql` novo sem marker `.claude/.migration_applied`
 
 ## Arquitetura (3 Suns)
 Toda entidade orbita 3 entidades centrais: `cards`, `contatos`, `profiles`.
