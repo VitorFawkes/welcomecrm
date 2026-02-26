@@ -139,7 +139,7 @@ export default function BarChartRenderer({
                             <LabelList
                                 dataKey={key}
                                 position={isHorizontal ? 'right' : 'top'}
-                                formatter={(val: number) => autoFormat(val, keyFormats?.[key] ?? labelFormat)}
+                                formatter={(val: unknown) => autoFormat(Number(val), keyFormats?.[key] ?? labelFormat)}
                                 style={{ fontSize: 10, fontWeight: 500, fill: '#475569' }}
                             />
                         )}

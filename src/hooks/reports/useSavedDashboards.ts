@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import type { Json } from '@/database.types'
 import { useAuth } from '@/contexts/AuthContext'
 import type { SavedDashboard, DashboardWidget, DashboardGlobalFilters } from '@/lib/reports/reportTypes'
 
@@ -33,9 +34,10 @@ export function useSavedDashboard(dashboardId: string | undefined) {
                 .from('custom_dashboards')
                 .select('*')
                 .eq('id', dashboardId)
-                .single()
+                .maybeSingle()
 
             if (error) throw error
+            if (!data) throw new Error('Dashboard não encontrado')
             return data as unknown as SavedDashboard
         },
         enabled: !!dashboardId,
@@ -79,12 +81,13 @@ export function useCreateDashboard() {
                     description: params.description || null,
                     created_by: session!.user.id,
                     visibility: params.visibility || 'private',
-                    global_filters: params.global_filters || {},
+                    global_filters: (params.global_filters || {}) as unknown as { [key: string]: Json | undefined },
                 })
                 .select()
-                .single()
+                .maybeSingle()
 
             if (error) throw error
+            if (!data) throw new Error('Falha ao criar dashboard — verifique suas permissões')
             return data as unknown as SavedDashboard
         },
         onSuccess: () => {
@@ -117,14 +120,16 @@ export function useUpdateDashboard() {
                 .update(updates)
                 .eq('id', params.id)
                 .select()
-                .single()
+                .maybeSingle()
 
             if (error) throw error
+            if (!data) throw new Error('Dashboard não encontrado ou sem permissão para editar')
             return data as unknown as SavedDashboard
         },
         onSuccess: (data: SavedDashboard) => {
             queryClient.invalidateQueries({ queryKey: DASHBOARDS_KEY })
             queryClient.invalidateQueries({ queryKey: [...DASHBOARDS_KEY, data.id] })
+            queryClient.invalidateQueries({ queryKey: [...DASHBOARDS_KEY, data.id, 'widgets'] })
         },
     })
 }
@@ -170,9 +175,10 @@ export function useAddWidget() {
                     grid_h: params.grid_h ?? 4,
                 })
                 .select()
-                .single()
+                .maybeSingle()
 
             if (error) throw error
+            if (!data) throw new Error('Falha ao adicionar widget — verifique suas permissões')
             return data as unknown as DashboardWidget
         },
         onSuccess: (data: DashboardWidget) => {
@@ -195,7 +201,11 @@ export function useUpdateWidgetLayout() {
                     .update({ grid_x: w.grid_x, grid_y: w.grid_y, grid_w: w.grid_w, grid_h: w.grid_h })
                     .eq('id', w.id)
             )
-            await Promise.all(updates)
+            const results = await Promise.all(updates)
+            const failed = results.filter(r => r.error)
+            if (failed.length > 0) {
+                throw new Error(failed[0].error!.message)
+            }
         },
         onSuccess: (_: unknown, params: { dashboardId: string; widgets: { id: string; grid_x: number; grid_y: number; grid_w: number; grid_h: number }[] }) => {
             queryClient.invalidateQueries({ queryKey: [...DASHBOARDS_KEY, params.dashboardId, 'widgets'] })

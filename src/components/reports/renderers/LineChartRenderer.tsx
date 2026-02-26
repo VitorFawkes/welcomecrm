@@ -87,7 +87,7 @@ export default function LineChartRenderer({
                             <LabelList
                                 dataKey={key}
                                 position="top"
-                                formatter={(val: number) => autoFormat(val, keyFormats?.[key] ?? labelFormat)}
+                                formatter={(val: unknown) => autoFormat(Number(val), keyFormats?.[key] ?? labelFormat)}
                                 style={{ fontSize: 10, fontWeight: 500, fill: '#475569' }}
                             />
                         )}
