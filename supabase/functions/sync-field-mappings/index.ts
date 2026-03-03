@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
                 external_field_name: catalogEntry?.field_name || fieldLabel,
                 section: inbound.section || null,
                 sync_always: inbound.sync_always || false,
-                is_active: false // Começa desativado para revisão manual
+                is_active: true  // Ativo por default (sync admin-triggered)
             });
         }
 

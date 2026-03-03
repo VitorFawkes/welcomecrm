@@ -7,10 +7,31 @@ import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { toast } from 'sonner';
-import { Check, RefreshCw, Settings, ChevronDown, ChevronRight, Loader2, ArrowRightLeft, Search } from 'lucide-react';
+import { Check, RefreshCw, Settings, ChevronDown, ChevronRight, Loader2, ArrowRightLeft, Search, StickyNote } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { useSections, useSectionLabelsMap } from '@/hooks/useSections';
+
+// ── Notes AC config ──
+interface NotesConfig {
+    enabled: boolean;
+    sections: {
+        sdr: boolean;
+        planner: boolean;
+        pos_venda: boolean;
+    };
+}
+
+const DEFAULT_NOTES_CONFIG: NotesConfig = {
+    enabled: true,
+    sections: { sdr: true, planner: true, pos_venda: true }
+};
+
+const NOTES_SECTIONS = [
+    { key: 'sdr' as const, label: 'SDR / Briefing', description: 'Observações do briefing inicial (campo: briefing_inicial.observacoes)' },
+    { key: 'planner' as const, label: 'Planner / Observações Críticas', description: 'Observações do planner (campo: produto_data.observacoes_criticas)' },
+    { key: 'pos_venda' as const, label: 'Pós-Venda', description: 'Observações pós-venda (campo: produto_data.observacoes_pos_venda)' },
+];
 
 interface SystemField {
     key: string;
@@ -180,6 +201,57 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         }
     });
 
+    // ── Notes AC config (integration_settings) ──
+    const { data: notesConfig = DEFAULT_NOTES_CONFIG } = useQuery({
+        queryKey: ['outbound-notes-config'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('integration_settings')
+                .select('value')
+                .eq('key', 'OUTBOUND_NOTES_SECTIONS')
+                .maybeSingle();
+            if (data?.value) {
+                try { return JSON.parse(data.value) as NotesConfig; } catch { /* fall through */ }
+            }
+            return DEFAULT_NOTES_CONFIG;
+        }
+    });
+
+    const updateNotesConfig = useMutation({
+        mutationFn: async (config: NotesConfig) => {
+            const { error } = await supabase
+                .from('integration_settings')
+                .upsert({ key: 'OUTBOUND_NOTES_SECTIONS', value: JSON.stringify(config) }, { onConflict: 'key' });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['outbound-notes-config'] });
+            toast.success('Configuração de Notas AC atualizada');
+        },
+        onError: (e) => toast.error(`Erro: ${e.message}`)
+    });
+
+    const toggleNoteSection = (sectionKey: 'sdr' | 'planner' | 'pos_venda') => {
+        const next = {
+            ...notesConfig,
+            sections: { ...notesConfig.sections, [sectionKey]: !notesConfig.sections[sectionKey] }
+        };
+        // If all sections disabled, disable the feature entirely
+        const anyEnabled = Object.values(next.sections).some(Boolean);
+        next.enabled = anyEnabled;
+        updateNotesConfig.mutate(next);
+    };
+
+    const toggleNotesEnabled = () => {
+        if (notesConfig.enabled) {
+            // Disable all
+            updateNotesConfig.mutate({ enabled: false, sections: { sdr: false, planner: false, pos_venda: false } });
+        } else {
+            // Enable all
+            updateNotesConfig.mutate(DEFAULT_NOTES_CONFIG);
+        }
+    };
+
     // Compute visible fields for the selected phase
     // Logic: Match useFieldConfig behavior - default visible = true if no config exists
     const visibleFieldsInPhase = useMemo(() => {
@@ -253,7 +325,7 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
         });
 
         return grouped;
-    }, [systemFields, visibleFieldsInPhase, searchTerm]);
+    }, [systemFields, visibleFieldsInPhase, searchTerm, governableSectionKeys]);
 
     // Lookup for existing mappings
     const mappingByField = useMemo(() => {
@@ -534,6 +606,73 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
                 </div>
             </div>
 
+            {/* Notes AC — Auto sync de observações para Notas do deal */}
+            <Card className="border-violet-200 bg-violet-50/30">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <StickyNote className="w-5 h-5 text-violet-600" />
+                            <div>
+                                <CardTitle className="text-base text-violet-900">
+                                    Notas do ActiveCampaign
+                                </CardTitle>
+                                <CardDescription className="text-violet-600/80">
+                                    Observações do CRM são compiladas e enviadas como notas do deal no AC automaticamente.
+                                </CardDescription>
+                            </div>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                                "text-xs h-8 border-violet-300",
+                                notesConfig.enabled
+                                    ? "bg-violet-100 text-violet-700 hover:bg-violet-200"
+                                    : "text-slate-500 hover:bg-slate-100"
+                            )}
+                            onClick={toggleNotesEnabled}
+                        >
+                            {notesConfig.enabled ? 'Ativo' : 'Desativado'}
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="border border-violet-200 rounded-lg divide-y divide-violet-100">
+                        {NOTES_SECTIONS.map(ns => {
+                            const enabled = notesConfig.sections[ns.key];
+                            return (
+                                <div
+                                    key={ns.key}
+                                    className={cn(
+                                        "flex items-center justify-between px-4 py-3 transition-colors cursor-pointer hover:bg-violet-50",
+                                        enabled && "bg-violet-50/50"
+                                    )}
+                                    onClick={() => toggleNoteSection(ns.key)}
+                                >
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-slate-800">{ns.label}</span>
+                                        <span className="text-xs text-slate-500">{ns.description}</span>
+                                    </div>
+                                    <div className={cn(
+                                        "w-9 h-5 rounded-full relative transition-colors",
+                                        enabled ? "bg-violet-500" : "bg-slate-300"
+                                    )}>
+                                        <div className={cn(
+                                            "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
+                                            enabled ? "translate-x-4" : "translate-x-0.5"
+                                        )} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <p className="text-xs text-violet-500/80 mt-3">
+                        Cada alteração cria uma nova nota no deal do AC com as seções habilitadas.
+                        As notas são cumulativas (append-only).
+                    </p>
+                </CardContent>
+            </Card>
+
             {/* Sections */}
             {sectionKeys.length === 0 ? (
                 <Card className="p-8 text-center text-muted-foreground">
@@ -576,17 +715,17 @@ export function OutboundFieldMappingTab({ integrationId }: OutboundFieldMappingT
 
                             {isExpanded && (
                                 <CardContent className="pt-0">
-                                    <div className="border rounded-lg overflow-hidden">
+                                    <div className="border rounded-lg">
                                         <table className="w-full">
                                             <thead className="bg-muted/50">
                                                 <tr>
-                                                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-1/3">
+                                                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-[35%]">
                                                         Campo CRM
                                                     </th>
-                                                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-1/3">
+                                                    <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground w-[45%]">
                                                         → Campo ActiveCampaign
                                                     </th>
-                                                    <th className="text-center px-4 py-2 text-xs font-medium text-muted-foreground w-24">
+                                                    <th className="text-center px-4 py-2 text-xs font-medium text-muted-foreground w-[80px]">
                                                         Modo
                                                     </th>
                                                 </tr>

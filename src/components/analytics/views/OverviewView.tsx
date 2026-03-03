@@ -126,17 +126,19 @@ export default function OverviewView() {
         viagem_confirmada_count: 0, viagem_confirmada_rate: 0,
     }
 
-    // Filter stages by phase based on viewMode
+    // Filter stages by phase based on viewMode + hide empty stages in financial metrics
     const filteredStageData = useMemo(() => {
         if (!chartData?.length) return []
-        if (viewMode === 'all') return chartData
-        if (viewMode === 'sdr') return chartData.filter(d => d.fase === 'SDR')
-        if (viewMode === 'planner') return chartData.filter(d => d.fase === 'Planner')
-        // Pós-venda: handle accent variations
-        return chartData.filter(d =>
-            d.fase !== 'SDR' && d.fase !== 'Planner'
-        )
-    }, [chartData, viewMode])
+        let filtered = chartData
+        if (viewMode === 'sdr') filtered = filtered.filter(d => d.fase === 'SDR')
+        else if (viewMode === 'planner') filtered = filtered.filter(d => d.fase === 'Planner')
+        else if (viewMode === 'pos') filtered = filtered.filter(d => d.fase !== 'SDR' && d.fase !== 'Planner')
+        // In financial modes, hide stages with no data (total=0) to avoid empty bars
+        if (metricMode !== 'cards') {
+            filtered = filtered.filter(d => (d.total as number) > 0)
+        }
+        return filtered
+    }, [chartData, viewMode, metricMode])
 
     // Phase stage counts for the indicator bar (uses filteredStageData for consistency)
     const phaseCounts = useMemo(() => {
@@ -302,7 +304,7 @@ export default function OverviewView() {
                     </div>
                 }
             >
-                {filteredStageData.length > 0 ? (
+                {filteredStageData.length > 0 && allOwners.length > 0 ? (
                     <div className="w-full overflow-x-auto overflow-y-hidden pb-1 custom-scrollbar">
                         <div style={{ minWidth: viewMode === 'all' ? `${Math.max(900, filteredStageData.length * 80)}px` : undefined, width: viewMode !== 'all' ? '100%' : undefined, height: 480 }}>
                             <ResponsiveContainer width="100%" height="100%">
@@ -325,13 +327,34 @@ export default function OverviewView() {
                                     />
                                     <Tooltip
                                         cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                                        contentStyle={{
-                                            borderRadius: '8px',
-                                            border: '1px solid #e2e8f0',
-                                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                                            fontSize: '12px',
+                                        content={({ active, payload, label }) => {
+                                            if (!active || !payload?.length) return null
+                                            const nonZero = payload.filter(p => p.dataKey !== 'total' && (Number(p.value) || 0) > 0)
+                                            if (nonZero.length === 0) return null
+                                            const stageTotal = payload.find(p => p.dataKey === 'total')
+                                            return (
+                                                <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs max-w-[260px]">
+                                                    <p className="font-medium text-slate-900 mb-1.5 truncate">{label}</p>
+                                                    <div className="space-y-0.5">
+                                                        {nonZero.map(entry => (
+                                                            <div key={entry.dataKey as string} className="flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                                                                <span className="text-slate-600 truncate">{entry.name}</span>
+                                                                <span className="ml-auto font-semibold text-slate-800 whitespace-nowrap">
+                                                                    {isFinancialMetric ? formatCurrencyFull(Number(entry.value) || 0) : entry.value}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {stageTotal && (Number(stageTotal.value) || 0) > 0 && (
+                                                        <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex justify-between font-semibold text-slate-900">
+                                                            <span>Total</span>
+                                                            <span>{isFinancialMetric ? formatCurrencyFull(Number(stageTotal.value) || 0) : stageTotal.value}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
                                         }}
-                                        formatter={isFinancialMetric ? (value: number, name: string) => [formatCurrencyFull(value), name] : undefined}
                                     />
                                     <Legend
                                         wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }}
@@ -356,6 +379,7 @@ export default function OverviewView() {
                                                         drillStageId: sid,
                                                         drillOwnerId: oid,
                                                         drillSource: 'stage_entries',
+                                                        excludeTerminal: true,
                                                     })
                                                 }
                                             }}
@@ -373,9 +397,36 @@ export default function OverviewView() {
                                             dataKey="total"
                                             position="top"
                                             offset={6}
-                                            className="font-bold text-[11px] fill-slate-700"
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            formatter={(val: any) => (val > 0 ? (isFinancialMetric ? formatCurrency(val) : val) : '')}
+                                            content={(props: any) => {
+                                                const { x, y, width, value, index } = props
+                                                if (!value || value <= 0) return null
+                                                const label = isFinancialMetric ? formatCurrency(value) : value
+                                                const stage = filteredStageData[index]
+                                                const sid = stage ? stageIdMap.get(stage.stage as string) : undefined
+                                                return (
+                                                    <text
+                                                        x={x + (width || 0) / 2}
+                                                        y={y - 6}
+                                                        textAnchor="middle"
+                                                        className="font-bold text-[11px] fill-slate-700"
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            if (sid) {
+                                                                drillDown.open({
+                                                                    label: `${stage.stage} — Todos`,
+                                                                    drillStageId: sid,
+                                                                    drillSource: 'stage_entries',
+                                                                    excludeTerminal: true,
+                                                                })
+                                                            }
+                                                        }}
+                                                    >
+                                                        {label}
+                                                    </text>
+                                                )
+                                            }}
                                         />
                                     </Line>
                                 </ComposedChart>
@@ -397,7 +448,9 @@ export default function OverviewView() {
                     </div>
                 ) : (
                     <div className="h-[450px] flex items-center justify-center text-sm text-slate-400">
-                        Nenhum dado de funil no período selecionado
+                        {filteredStageData.length > 0 && allOwners.length === 0
+                            ? `Nenhum dado de ${metricMode === 'receita' ? 'receita' : 'faturamento'} no período — tente a métrica "Qtd"`
+                            : 'Nenhum dado de funil no período selecionado'}
                     </div>
                 )}
             </ChartCard>
@@ -443,8 +496,9 @@ export default function OverviewView() {
                                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                                     fontSize: '12px',
                                 }}
-                                formatter={(value: number, name: string) => [
-                                    formatCurrencyFull(value),
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                formatter={(value: any, name: string) => [
+                                    formatCurrencyFull(Number(value) || 0),
                                     name
                                 ]}
                             />

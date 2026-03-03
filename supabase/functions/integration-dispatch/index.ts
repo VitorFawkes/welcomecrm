@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
     const { data: settings } = await supabase
         .from('integration_settings')
         .select('key, value')
-        .in('key', ['OUTBOUND_SYNC_ENABLED', 'OUTBOUND_SHADOW_MODE']);
+        .in('key', ['OUTBOUND_SYNC_ENABLED', 'OUTBOUND_SHADOW_MODE', 'OUTBOUND_NOTES_SECTIONS']);
 
     const settingsMap = (settings || []).reduce((acc, s) => {
         acc[s.key] = s.value;
@@ -49,6 +49,14 @@ Deno.serve(async (req) => {
 
     const syncEnabled = settingsMap['OUTBOUND_SYNC_ENABLED'] === 'true';
     const shadowMode = settingsMap['OUTBOUND_SHADOW_MODE'] === 'true';
+
+    // Notes config: which observation sections to sync as AC Notes
+    let notesConfig = { enabled: true, sections: { sdr: true, planner: true, pos_venda: true } };
+    try {
+        if (settingsMap['OUTBOUND_NOTES_SECTIONS']) {
+            notesConfig = JSON.parse(settingsMap['OUTBOUND_NOTES_SECTIONS']);
+        }
+    } catch { /* use defaults */ }
 
     if (!syncEnabled) {
         console.log('[integration-dispatch] Outbound sync is disabled');
@@ -249,7 +257,7 @@ Deno.serve(async (req) => {
                     const obsNote = (event.payload as Record<string, unknown>)?._observacoes_note as
                         { sdr?: Record<string, unknown>; planner?: Record<string, unknown>; pos_venda?: Record<string, unknown> } | undefined;
 
-                    if (obsNote && event.external_id) {
+                    if (obsNote && event.external_id && notesConfig.enabled) {
                         try {
                             const sections: string[] = [];
                             const formatSection = (title: string, data: Record<string, unknown> | undefined) => {
@@ -261,9 +269,9 @@ Deno.serve(async (req) => {
                                     sections.push(`── ${title} ──\n${lines.join('\n')}`);
                                 }
                             };
-                            formatSection('SDR / Briefing', obsNote.sdr);
-                            formatSection('Planner / Observações Críticas', obsNote.planner);
-                            formatSection('Pós-Venda', obsNote.pos_venda);
+                            if (notesConfig.sections.sdr) formatSection('SDR / Briefing', obsNote.sdr);
+                            if (notesConfig.sections.planner) formatSection('Planner / Observações Críticas', obsNote.planner);
+                            if (notesConfig.sections.pos_venda) formatSection('Pós-Venda', obsNote.pos_venda);
 
                             if (sections.length > 0) {
                                 const noteBody = `[CRM Observações — ${new Date().toLocaleDateString('pt-BR')}]\n\n${sections.join('\n\n')}`;

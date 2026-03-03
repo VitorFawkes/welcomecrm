@@ -84,7 +84,7 @@ export function SearchableSelect({
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 disabled={disabled}
                 className={cn(
-                    "flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer",
+                    "flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-2.5 py-1.5 text-xs shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer",
                     className
                 )}
             >
@@ -104,7 +104,7 @@ export function SearchableSelect({
 
             {/* Dropdown */}
             {isOpen && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
+                <div className="absolute z-50 mt-1 w-full min-w-[280px] rounded-md border bg-popover shadow-lg">
                     {/* Search Input */}
                     <div className="p-2 border-b">
                         <div className="relative">
@@ -115,7 +115,7 @@ export function SearchableSelect({
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder={searchPlaceholder}
-                                className="w-full h-8 pl-8 pr-3 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                                className="w-full h-7 pl-8 pr-3 text-xs rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
                             />
                             {searchTerm && (
                                 <X
@@ -129,7 +129,7 @@ export function SearchableSelect({
                     {/* Options List */}
                     <div className="max-h-[300px] overflow-y-auto">
                         {filteredOptions.length === 0 ? (
-                            <div className="p-3 text-sm text-muted-foreground text-center">
+                            <div className="p-2.5 text-xs text-muted-foreground text-center">
                                 Nenhum resultado encontrado
                             </div>
                         ) : (
@@ -152,7 +152,7 @@ export function SearchableSelect({
                                         key={option.value}
                                         onClick={() => handleSelect(option.value)}
                                         className={cn(
-                                            "flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-accent",
+                                            "flex items-center justify-between px-2.5 py-1.5 text-xs cursor-pointer hover:bg-accent",
                                             option.value === value && "bg-accent/50 font-medium"
                                         )}
                                     >
