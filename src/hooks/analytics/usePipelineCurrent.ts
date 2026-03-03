@@ -30,6 +30,7 @@ export interface PipelineCurrentAging {
     stage_id: string
     stage_nome: string
     fase: string
+    fase_slug: string
     bucket_0_3: number
     bucket_3_7: number
     bucket_7_14: number
@@ -44,6 +45,7 @@ export interface PipelineCurrentOwner {
     avg_age_days: number
     sla_breach: number
     by_phase: { sdr: number; planner: number; 'pos-venda': number }
+    by_phase_value: { sdr: number; planner: number; 'pos-venda': number }
 }
 
 export interface PipelineCurrentDeal {
@@ -51,6 +53,7 @@ export interface PipelineCurrentDeal {
     titulo: string
     stage_nome: string
     fase: string
+    fase_slug: string
     owner_nome: string
     owner_id: string | null
     valor_total: number
