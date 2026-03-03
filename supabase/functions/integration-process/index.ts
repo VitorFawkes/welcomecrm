@@ -1093,6 +1093,24 @@ Deno.serve(async (req) => {
                     };
 
                     // ═══════════════════════════════════════════════════════════════════
+                    // SYNC: deal[value] → produto_data.orcamento (smart_budget format)
+                    // Ensures the "Investimento" section field shows the AC deal value
+                    // ═══════════════════════════════════════════════════════════════════
+                    if (value > 0) {
+                        if (!cardPayload_produtoData) cardPayload_produtoData = {};
+                        // Only set orcamento if not already populated (protect manual edits)
+                        const existingOrcamento = existingCard?.produto_data?.orcamento;
+                        if (!existingOrcamento || !existingOrcamento.tipo) {
+                            cardPayload_produtoData.orcamento = {
+                                tipo: 'total',
+                                valor: value,
+                                total_calculado: value,
+                                display: `R$ ${value.toLocaleString('pt-BR')}`
+                            };
+                        }
+                    }
+
+                    // ═══════════════════════════════════════════════════════════════════
                     // ENTERPRISE: Include produto_data and briefing_inicial if populated
                     // ═══════════════════════════════════════════════════════════════════
                     if (cardPayload_produtoData && Object.keys(cardPayload_produtoData).length > 0) {
