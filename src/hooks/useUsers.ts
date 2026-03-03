@@ -12,6 +12,7 @@ export interface User {
     team_id?: string | null;
     department_id?: string | null;
     created_at: string;
+    produtos?: ('TRIPS' | 'WEDDING' | 'CORP')[] | null;
     teams?: {
         id: string;
         name: string;
@@ -69,6 +70,18 @@ export function useUsers() {
         },
     });
 
+    const resetPassword = useMutation({
+        mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error } = await supabase.rpc('reset_user_password' as any, {
+                p_user_id: userId,
+                p_new_password: newPassword,
+            });
+
+            if (error) throw error;
+        },
+    });
+
     return {
         users: usersQuery.data || [],
         isLoading: usersQuery.isLoading,
@@ -77,5 +90,6 @@ export function useUsers() {
         refetch: usersQuery.refetch,
         toggleUserStatus,
         deleteUser,
+        resetPassword,
     };
 }

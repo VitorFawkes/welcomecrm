@@ -322,11 +322,11 @@ export default function OwnerSelector({
                                             setIsOpen(false)
                                         }}
                                         className={cn(
-                                            'w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors',
+                                            'w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors',
                                             !autoMode && !value && 'bg-slate-50'
                                         )}
                                     >
-                                        <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
+                                        <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center">
                                             <User className="h-4 w-4 text-slate-400" />
                                         </div>
                                         <div className="text-left">
@@ -349,12 +349,12 @@ export default function OwnerSelector({
                                             setIsOpen(false)
                                         }}
                                         className={cn(
-                                            'w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors',
+                                            'w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors',
                                             autoMode && 'bg-indigo-50'
                                         )}
                                     >
-                                        <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                                            <Zap className="h-4 w-4 text-indigo-600" />
+                                        <div className="h-7 w-7 rounded-full bg-indigo-100 flex items-center justify-center">
+                                            <Zap className="h-3.5 w-3.5 text-indigo-600" />
                                         </div>
                                         <div className="text-left">
                                             <p className="text-sm font-medium text-slate-900">Auto-atribuir</p>
@@ -385,11 +385,11 @@ export default function OwnerSelector({
                                         type="button"
                                         onClick={() => handleSelect(user)}
                                         className={cn(
-                                            'w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors',
+                                            'w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors',
                                             value === user.id && 'bg-indigo-50'
                                         )}
                                     >
-                                        <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
+                                        <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center">
                                             <User className="h-4 w-4 text-slate-600" />
                                         </div>
                                         <div className="flex-1 text-left min-w-0">

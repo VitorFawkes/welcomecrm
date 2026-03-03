@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- dynamic field renderer handles arbitrary data shapes */
 import React from 'react'
 import {
     MapPin, Calendar, DollarSign, Tag, X, Check, Edit2, AlertCircle,
@@ -112,7 +113,7 @@ const FieldCard = ({
     return (
         <div
             className={cn(
-                "group relative p-3.5 rounded-xl border transition-all duration-300",
+                "group relative p-2.5 rounded-xl border transition-all duration-300",
                 correctionMode
                     ? "bg-[#fdfbf7] border-amber-200/50 border-dashed hover:border-amber-300 hover:bg-[#fffdf9] cursor-pointer"
                     : cn(
@@ -127,7 +128,7 @@ const FieldCard = ({
             onClick={onEdit}
         >
             <div className={cn(
-                "absolute top-3 right-3 flex items-center gap-1.5 transition-opacity duration-300",
+                "absolute top-2 right-2 flex items-center gap-1.5 transition-opacity duration-300",
                 correctionMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}>
                 {correctionMode ? (
@@ -152,7 +153,7 @@ const FieldCard = ({
 
             <div className="flex items-start gap-3">
                 <div className={cn(
-                    "p-2 rounded-lg transition-colors shadow-sm",
+                    "p-1.5 rounded-lg transition-colors shadow-sm",
                     correctionMode ? "bg-gray-100 text-gray-400 grayscale" : iconColor
                 )}>
                     <Icon className="h-4 w-4" />
@@ -176,7 +177,7 @@ const FieldCard = ({
 
                     {/* Main Value */}
                     <div className={cn(
-                        "text-sm font-medium leading-relaxed break-words",
+                        "text-xs font-medium leading-relaxed break-words",
                         correctionMode ? "font-mono text-gray-700 font-medium" : "text-gray-900"
                     )}>
                         {(() => {
@@ -283,7 +284,7 @@ export default function UniversalFieldRenderer({
                     <Textarea
                         value={value || ''}
                         onChange={(e) => onChange?.(e.target.value)}
-                        className="min-h-[120px] bg-white border border-gray-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition-colors"
+                        className="min-h-[80px] bg-white border border-gray-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition-colors"
                         placeholder={field.label || ''}
                     />
                 )
@@ -350,8 +351,8 @@ export default function UniversalFieldRenderer({
                                         key={idx}
                                         type="button"
                                         onClick={() => {
+                                            const newExplanations = { ...explanations }
                                             let newSelected: string[]
-                                            let newExplanations = { ...explanations }
 
                                             if (isSelected) {
                                                 newSelected = selectedValues.filter((v: string) => v !== optValue)
@@ -395,7 +396,7 @@ export default function UniversalFieldRenderer({
 
                                         return (
                                             <div key={val} className="animate-in slide-in-from-top-2 duration-200">
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                <label className="block text-xs font-medium text-gray-700 mb-0.5">
                                                     {optLabel}
                                                 </label>
                                                 <Textarea
@@ -440,7 +441,7 @@ export default function UniversalFieldRenderer({
 
                 return (
                     <div className="space-y-2">
-                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">Marque os itens aplicáveis:</label>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide">Marque os itens aplicáveis:</label>
                         <div className="space-y-2 bg-gray-50/50 p-3 rounded-lg border border-gray-200">
                             {options.length === 0 ? (
                                 <p className="text-sm text-gray-400 italic">Nenhuma opção configurada.</p>
@@ -455,15 +456,15 @@ export default function UniversalFieldRenderer({
                                         <div key={idx} className="space-y-2">
                                             <label
                                                 className={cn(
-                                                    "flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors",
+                                                    "flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors",
                                                     isChecked ? "bg-green-50 border border-green-200" : "bg-white border border-gray-100 hover:bg-gray-50"
                                                 )}
                                             >
                                                 <Checkbox
                                                     checked={isChecked}
                                                     onCheckedChange={() => {
+                                                        const newExplanations = { ...explanations }
                                                         let newSelected: string[]
-                                                        let newExplanations = { ...explanations }
 
                                                         if (isChecked) {
                                                             newSelected = checkedValues.filter((v: string) => v !== optValue)
@@ -475,7 +476,7 @@ export default function UniversalFieldRenderer({
                                                     }}
                                                 />
                                                 <span className={cn(
-                                                    "text-sm font-medium flex-1",
+                                                    "text-xs font-medium flex-1",
                                                     isChecked ? "text-green-800" : "text-gray-700"
                                                 )}>
                                                     {optLabel}
@@ -511,12 +512,12 @@ export default function UniversalFieldRenderer({
             }
             case 'boolean':
                 return (
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                    <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
                         <Checkbox
                             checked={!!value}
                             onCheckedChange={(checked) => onChange?.(!!checked)}
                         />
-                        <span className="text-sm font-medium text-gray-900">{field.label}</span>
+                        <span className="text-xs font-medium text-gray-900">{field.label}</span>
                     </div>
                 )
             case 'date':
@@ -527,7 +528,7 @@ export default function UniversalFieldRenderer({
                         onChange={(e) => onChange?.(e.target.value)}
                     />
                 )
-            case 'datetime':
+            case 'datetime': {
                 // Handle various datetime string formats from integrations
                 // Convert "YYYY-MM-DD HH:MM:SS" to "YYYY-MM-DDTHH:MM" for input
                 const normalizedDatetime = (() => {
@@ -545,6 +546,7 @@ export default function UniversalFieldRenderer({
                         onChange={(e) => onChange?.(e.target.value)}
                     />
                 )
+            }
             case 'date_range': {
                 const rangeValue = typeof value === 'object' ? value : { start: '', end: '' }
                 // Check if field options has includeTime flag
@@ -555,7 +557,7 @@ export default function UniversalFieldRenderer({
                 return (
                     <div className="flex gap-2">
                         <div className="flex-1">
-                            <label className="text-sm font-medium text-gray-500 mb-1 block">{includeTime ? 'Data/Hora Início' : 'Início'}</label>
+                            <label className="text-xs font-medium text-gray-500 mb-0.5 block">{includeTime ? 'Data/Hora Início' : 'Início'}</label>
                             <Input
                                 type={inputType}
                                 value={rangeValue?.start || ''}
@@ -563,7 +565,7 @@ export default function UniversalFieldRenderer({
                             />
                         </div>
                         <div className="flex-1">
-                            <label className="text-sm font-medium text-gray-500 mb-1 block">{includeTime ? 'Data/Hora Fim' : 'Fim'}</label>
+                            <label className="text-xs font-medium text-gray-500 mb-0.5 block">{includeTime ? 'Data/Hora Fim' : 'Fim'}</label>
                             <Input
                                 type={inputType}
                                 value={rangeValue?.end || ''}
@@ -582,7 +584,7 @@ export default function UniversalFieldRenderer({
                                 type="number"
                                 value={value || ''}
                                 onChange={(e) => onChange?.(parseFloat(e.target.value) || 0)}
-                                className="pl-12 text-lg font-semibold"
+                                className="pl-12 text-sm font-semibold"
                                 placeholder="0,00"
                             />
                         </div>
@@ -592,10 +594,10 @@ export default function UniversalFieldRenderer({
                 const currencyRangeValue = typeof value === 'object' ? value : { min: '', max: '' }
                 return (
                     <div className="space-y-3">
-                        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">Faixa de Valor</label>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide">Faixa de Valor</label>
                         <div className="flex gap-3 items-center">
                             <div className="flex-1">
-                                <label className="text-sm font-medium text-gray-500 mb-1 block">Mínimo</label>
+                                <label className="text-xs font-medium text-gray-500 mb-0.5 block">Mínimo</label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">R$</span>
                                     <Input
@@ -609,7 +611,7 @@ export default function UniversalFieldRenderer({
                             </div>
                             <span className="text-gray-400 font-medium mt-5">até</span>
                             <div className="flex-1">
-                                <label className="text-sm font-medium text-gray-500 mb-1 block">Máximo</label>
+                                <label className="text-xs font-medium text-gray-500 mb-0.5 block">Máximo</label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">R$</span>
                                     <Input
@@ -633,11 +635,11 @@ export default function UniversalFieldRenderer({
                             try {
                                 const parsed = JSON.parse(e.target.value)
                                 onChange?.(parsed)
-                            } catch (err) {
+                            } catch {
                                 onChange?.(e.target.value)
                             }
                         }}
-                        className="font-mono min-h-[120px]"
+                        className="font-mono min-h-[80px]"
                         placeholder="{}"
                     />
                 )
@@ -898,28 +900,28 @@ export default function UniversalFieldRenderer({
         return (
             <div
                 className={cn(
-                    "group relative p-4 rounded-xl border transition-all duration-200 bg-white",
+                    "group relative p-2.5 rounded-xl border transition-all duration-200 bg-white",
                     "border-gray-300 hover:shadow-md cursor-pointer hover:border-indigo-400"
                 )}
                 onClick={onEdit}
             >
-                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Edit2 className="h-4 w-4 text-indigo-500" />
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Edit2 className="h-3.5 w-3.5 text-indigo-500" />
                 </div>
 
-                <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-green-100 text-green-600">
+                <div className="flex items-start gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-green-100 text-green-600">
                         <CheckSquare className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wide mb-2 text-gray-500">
+                        <p className="text-xs font-medium uppercase tracking-wide mb-1 text-gray-500">
                             {field.label}
                         </p>
 
                         {/* Render each checklist item */}
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                             {options.length === 0 ? (
-                                <span className="text-gray-400 italic text-sm">Nenhum item configurado</span>
+                                <span className="text-gray-400 italic text-xs">Nenhum item configurado</span>
                             ) : (
                                 options.map((opt: any, idx: number) => {
                                     const optValue = typeof opt === 'object' ? opt.value : opt
@@ -932,7 +934,7 @@ export default function UniversalFieldRenderer({
                                         <div key={idx} className="space-y-1">
                                             <div
                                                 className={cn(
-                                                    "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm",
+                                                    "flex items-center gap-2 px-2 py-1 rounded-md text-xs",
                                                     isChecked
                                                         ? "bg-green-50 text-green-800"
                                                         : "bg-gray-50 text-gray-500"

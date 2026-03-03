@@ -9,6 +9,7 @@ export interface FunnelStageData {
     ordem: number
     current_count: number
     total_valor: number
+    receita_total: number
     avg_days_in_stage: number
     p75_days_in_stage: number
 }
@@ -44,10 +45,10 @@ export function useFunnelConversion() {
 }
 
 export function useLossReasons() {
-    const { dateRange, product, mode, stageId, ownerIds } = useAnalyticsFilters()
+    const { dateRange, product, mode, stageId, ownerIds, tagIds } = useAnalyticsFilters()
 
     return useQuery({
-        queryKey: ['analytics', 'loss-reasons', dateRange.start, dateRange.end, product, mode, stageId, ownerIds],
+        queryKey: ['analytics', 'loss-reasons', dateRange.start, dateRange.end, product, mode, stageId, ownerIds, tagIds],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC nova
             const { data, error } = await (supabase.rpc as any)('analytics_loss_reasons', {
@@ -57,6 +58,7 @@ export function useLossReasons() {
                 p_mode: mode,
                 p_stage_id: stageId,
                 p_owner_ids: ownerIds.length > 0 ? ownerIds : undefined,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
             })
             if (error) throw error
             return (data as unknown as LossReason[]) || []

@@ -113,36 +113,20 @@ export default function CardDetail() {
 
     return (
         <div className="h-full bg-gray-50 flex flex-col overflow-hidden">
-            {/* Breadcrumb */}
-            <div className="flex-none bg-white border-b border-slate-200 px-6 py-2">
-                <nav className="flex items-center gap-2 text-sm">
-                    <button
-                        onClick={() => navigate('/pipeline')}
-                        className="text-slate-500 hover:text-slate-700 transition-colors"
-                    >
-                        Pipeline
-                    </button>
-                    <span className="text-slate-300">/</span>
-                    <span className="text-slate-900 font-medium truncate max-w-[200px]">
-                        {card.titulo || 'Viagem'}
-                    </span>
-                </nav>
-            </div>
-
             {/* Sticky Header */}
-            <div className="sticky top-0 z-10 bg-white shadow-md">
+            <div className="sticky top-0 z-10 bg-white shadow-sm">
                 <CardHeader card={card} />
             </div>
 
             {/* Tags Row */}
-            <div className="px-6 pt-3 pb-1">
+            <div className="px-4 py-1">
                 <TagSelector cardId={card.id!} produto={card.produto} />
             </div>
 
             {/* 2-Column Layout: Work Area + Context/Accountability */}
-            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 p-6">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 p-4">
                 {/* CENTER COLUMN - Work Area (What to do) */}
-                <div className="min-h-0 overflow-y-auto space-y-4 pr-2 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
+                <div className="min-h-0 overflow-y-auto space-y-3 pr-2 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
                     {/* Sub-Card Parent Banner (if this is a sub-card) */}
                     {isSubCard && parentCard && subCardMode && (
                         <SubCardParentBanner
@@ -186,10 +170,10 @@ export default function CardDetail() {
                 </div>
 
                 {/* SIDEBAR - Context & Accountability */}
-                <div className="min-h-0 overflow-y-auto space-y-4 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
+                <div className="min-h-0 overflow-y-auto space-y-3 scroll-smooth" style={{ scrollbarGutter: 'stable', overscrollBehaviorY: 'contain' }}>
                     {/* Sub-Cards List (for cards in Pós-venda) */}
                     {showSubCards && (
-                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
                             <SubCardsList
                                 parentCardId={card.id!}
                                 parentTitle={card.titulo || 'Card'}

@@ -19,7 +19,7 @@ import KpiCard from '../KpiCard'
 import ChartCard from '../ChartCard'
 import { QueryErrorState } from '@/components/ui/QueryErrorState'
 import { useOverviewKpis, useFunnelData, useRevenueTimeseries } from '@/hooks/analytics/useOverviewData'
-import { useFunnelByOwner } from '@/hooks/analytics/useFunnelByOwner'
+import { useFunnelByOwner, type FunnelMetric } from '@/hooks/analytics/useFunnelByOwner'
 import { useDrillDownStore, type DrillDownContext } from '@/hooks/analytics/useAnalyticsDrillDown'
 import { useAnalyticsFilters } from '@/hooks/analytics/useAnalyticsFilters'
 import { formatCurrency, formatCurrencyFull } from '@/utils/whatsappFormatters'
@@ -53,19 +53,25 @@ function getOwnerColor(owner: string, idx: number): string {
     return SPECIAL_COLORS[owner] || OWNER_COLORS[idx % OWNER_COLORS.length]
 }
 
+const LABEL_MAX = 12
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Recharts custom tick typing
-function CustomXAxisTick(props: any) {
+function RotatedXTick(props: any) {
     const { x, y, payload } = props
     if (!payload?.value) return null
-    const words: string[] = payload.value.split(' ')
-    const mid = Math.ceil(words.length / 2)
-    const line1 = words.slice(0, mid).join(' ')
-    const line2 = words.slice(mid).join(' ')
+    const full: string = payload.value
+    const label = full.length > LABEL_MAX ? full.slice(0, LABEL_MAX - 1) + '…' : full
     return (
         <g transform={`translate(${x},${y})`}>
-            <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={11}>
-                <tspan x={0} dy="0em">{line1}</tspan>
-                {line2 && <tspan x={0} dy="1.2em">{line2}</tspan>}
+            <title>{full}</title>
+            <text
+                x={0} y={0} dy={8}
+                textAnchor="end"
+                fill="#475569"
+                fontSize={10}
+                transform="rotate(-55)"
+            >
+                {label}
             </text>
         </g>
     )
@@ -80,9 +86,11 @@ export default function OverviewView() {
     const { data: kpis, isLoading: kpisLoading, error: kpisError, refetch: refetchKpis } = useOverviewKpis()
     const { data: funnelData, isLoading: funnelLoading, error: funnelError, refetch: refetchFunnel } = useFunnelData()
     const { data: revenueData, isLoading: revenueLoading, error: revenueError, refetch: refetchRevenue } = useRevenueTimeseries()
-    const { data: funnelByOwnerRaw, chartData, allOwners, isLoading: funnelByOwnerLoading, error: funnelByOwnerError, refetch: refetchFunnelByOwner } = useFunnelByOwner()
+    const [metricMode, setMetricMode] = useState<FunnelMetric>('cards')
+    const { data: funnelByOwnerRaw, chartData, allOwners, isLoading: funnelByOwnerLoading, error: funnelByOwnerError, refetch: refetchFunnelByOwner } = useFunnelByOwner(metricMode)
     const hasError = !!(kpisError || funnelError || revenueError || funnelByOwnerError)
     const handleRetry = () => { refetchKpis(); refetchFunnel(); refetchRevenue(); refetchFunnelByOwner() }
+    const isFinancialMetric = metricMode !== 'cards'
 
     const [viewMode, setViewMode] = useState<PhaseViewMode>('all')
 
@@ -260,58 +268,82 @@ export default function OverviewView() {
                 isLoading={funnelByOwnerLoading}
                 colSpan={2}
                 actions={
-                    <div className="flex bg-slate-100 rounded-lg p-1">
-                        {(['all', 'sdr', 'planner', 'pos'] as const).map((m) => (
-                            <button
-                                key={m}
-                                onClick={() => setViewMode(m)}
-                                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                                    viewMode === m
-                                        ? 'bg-white text-slate-900 shadow-sm'
-                                        : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                            >
-                                {m === 'all' ? 'Todos' : m === 'pos' ? 'Pós-Venda' : m.toUpperCase()}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-2">
+                        <div className="flex bg-slate-100 rounded-lg p-1">
+                            {([['cards', 'Qtd'], ['faturamento', 'R$ Fat.'], ['receita', 'R$ Rec.']] as const).map(([m, label]) => (
+                                <button
+                                    key={m}
+                                    onClick={() => setMetricMode(m)}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                                        metricMode === m
+                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex bg-slate-100 rounded-lg p-1">
+                            {(['all', 'sdr', 'planner', 'pos'] as const).map((m) => (
+                                <button
+                                    key={m}
+                                    onClick={() => setViewMode(m)}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                                        viewMode === m
+                                            ? 'bg-white text-slate-900 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    {m === 'all' ? 'Todos' : m === 'pos' ? 'Pós-Venda' : m.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 }
             >
                 {filteredStageData.length > 0 ? (
                     <div className="w-full overflow-x-auto overflow-y-hidden pb-1 custom-scrollbar">
-                        <div className={`${viewMode === 'all' ? 'min-w-[2400px]' : 'w-full'} h-[450px]`}>
+                        <div style={{ minWidth: viewMode === 'all' ? `${Math.max(900, filteredStageData.length * 80)}px` : undefined, width: viewMode !== 'all' ? '100%' : undefined, height: 480 }}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={filteredStageData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                                <ComposedChart data={filteredStageData} margin={{ top: 24, right: 20, left: 10, bottom: 100 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis
                                         dataKey="stage"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={<CustomXAxisTick />}
+                                        tick={<RotatedXTick />}
                                         interval={0}
+                                        height={100}
                                     />
                                     <YAxis
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: '#64748b', fontSize: 12 }}
+                                        tick={{ fill: '#64748b', fontSize: 11 }}
+                                        width={isFinancialMetric ? 70 : 40}
+                                        tickFormatter={isFinancialMetric ? (v: number) => formatCurrency(v) : undefined}
                                     />
                                     <Tooltip
-                                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                                        cursor={{ fill: 'rgba(0,0,0,0.04)' }}
                                         contentStyle={{
                                             borderRadius: '8px',
-                                            border: 'none',
+                                            border: '1px solid #e2e8f0',
                                             boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                                             fontSize: '12px',
                                         }}
+                                        formatter={isFinancialMetric ? (value: number, name: string) => [formatCurrencyFull(value), name] : undefined}
                                     />
-                                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                    <Legend
+                                        wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }}
+                                        formatter={(value: string) => value.length > 20 ? value.slice(0, 18) + '…' : value}
+                                    />
                                     {allOwners.map((owner, idx) => (
                                         <Bar
                                             key={owner}
                                             dataKey={owner}
                                             stackId="a"
                                             fill={getOwnerColor(owner, idx)}
-                                            maxBarSize={60}
+                                            maxBarSize={48}
                                             cursor="pointer"
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             onClick={(data: any) => {
@@ -327,16 +359,7 @@ export default function OverviewView() {
                                                     })
                                                 }
                                             }}
-                                        >
-                                            <LabelList
-                                                dataKey={owner}
-                                                position="inside"
-                                                fill="rgba(0,0,0,0.6)"
-                                                className="font-bold text-[10px]"
-                                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                formatter={(val: any) => (val > 0 ? val : '')}
-                                            />
-                                        </Bar>
+                                        />
                                     ))}
                                     <Line
                                         type="monotone"
@@ -349,17 +372,17 @@ export default function OverviewView() {
                                         <LabelList
                                             dataKey="total"
                                             position="top"
-                                            offset={10}
-                                            className="font-bold text-xs fill-slate-600"
+                                            offset={6}
+                                            className="font-bold text-[11px] fill-slate-700"
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            formatter={(val: any) => (val > 0 ? val : '')}
+                                            formatter={(val: any) => (val > 0 ? (isFinancialMetric ? formatCurrency(val) : val) : '')}
                                         />
                                     </Line>
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
                         {viewMode === 'all' && phaseCounts.sdr + phaseCounts.planner + phaseCounts.pos > 0 && (
-                            <div className="flex min-w-[2400px] -mt-4 px-[20px] text-xs font-bold text-center uppercase tracking-wider gap-1">
+                            <div className="flex -mt-2 px-[50px] text-xs font-bold text-center uppercase tracking-wider gap-1" style={{ minWidth: `${Math.max(900, filteredStageData.length * 80)}px` }}>
                                 {phaseCounts.sdr > 0 && (
                                     <div style={{ flex: phaseCounts.sdr }} className="border-t-4 border-blue-200 text-blue-500 pt-1">SDR</div>
                                 )}

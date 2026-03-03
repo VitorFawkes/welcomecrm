@@ -165,14 +165,14 @@ interface FieldCardProps {
 
 function FieldCard({ icon: Icon, iconColor, label, value }: FieldCardProps) {
     return (
-        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-            <div className="flex items-center gap-2 mb-1">
-                <div className={cn("p-1 rounded-md", iconColor)}>
+        <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+                <div className={cn("p-0.5 rounded-md", iconColor)}>
                     <Icon className="h-3 w-3" />
                 </div>
-                <span className="text-xs font-medium text-gray-500 uppercase">{label}</span>
+                <span className="text-[11px] font-medium text-gray-500 uppercase">{label}</span>
             </div>
-            <div className="text-sm font-medium text-gray-900 pl-7">
+            <div className="text-sm font-medium text-gray-900 pl-5">
                 {value || '-'}
             </div>
         </div>
@@ -422,9 +422,9 @@ export default function TripInformation({ card }: TripInformationProps) {
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all duration-500">
 
             {/* VIEW SWITCHER */}
-            <div className="border-b border-gray-200 bg-gray-50/50 px-4 pt-4">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <div className="border-b border-gray-200 bg-gray-50/50 px-3 pt-2">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                         Informações da Viagem
                     </h3>
 
@@ -445,7 +445,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                     )}
                 </div>
 
-                <div className="flex gap-6 overflow-x-auto pb-1 scrollbar-hide">
+                <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
                     {phases?.filter(p => p.active)
                         .filter(p => p.visible_in_card !== false) // Respect visibility setting from StudioStructure
                         .slice(0, 6) // Limit to 6 phases
@@ -472,7 +472,7 @@ export default function TripInformation({ card }: TripInformationProps) {
                                         }
                                     }}
                                     className={cn(
-                                        "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                        "pb-2 text-xs font-medium border-b-2 transition-colors px-1 flex items-center gap-1.5 whitespace-nowrap",
                                         isActive
                                             ? activeColorClass
                                             : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -490,13 +490,13 @@ export default function TripInformation({ card }: TripInformationProps) {
 
             {/* CONTENT AREA */}
             <div className={cn(
-                "p-5",
+                "p-3",
                 correctionMode && "bg-[#fffbf7]"
             )}>
 
                 {/* DYNAMIC WATERFALL VIEW (SDR, PLANNER, POS_VENDA, etc) */}
                 {(viewMode === SystemPhase.SDR || viewMode === SystemPhase.PLANNER || viewMode === SystemPhase.POS_VENDA || phases?.some(p => p.slug === viewMode)) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {visibleFields.length === 0 && (
                             <div className="col-span-full text-center py-8 text-gray-500 italic">
                                 Nenhum campo configurado para esta fase.
@@ -529,7 +529,7 @@ export default function TripInformation({ card }: TripInformationProps) {
 
                 {/* DYNAMIC PHASES VIEW (Generic Render) */}
                 {!['sdr', 'planner', 'pos_venda', 'marketing'].includes(viewMode) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {/* Render ALL visible fields for this dynamic phase */}
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {getVisibleFields(card.pipeline_stage_id!).map((field: any) => (

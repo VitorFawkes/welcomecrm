@@ -91,12 +91,13 @@ function calculateValues(data: Partial<OrcamentoViagem>): Partial<OrcamentoViage
 }
 
 // Parse legacy orcamento format { total, por_pessoa }
-function parseExistingValue(value: any, viajantes?: number): OrcamentoViagem | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- legacy format parsing requires dynamic shape
+function parseExistingValue(value: Record<string, any> | null | undefined, viajantes?: number): OrcamentoViagem | null {
     if (!value) return null
 
     // Already in new format
     if (value.tipo) {
-        return { ...value, quantidade_viajantes: viajantes || value.quantidade_viajantes }
+        return { ...(value as unknown as OrcamentoViagem), quantidade_viajantes: viajantes || value.quantidade_viajantes }
     }
 
     // Legacy format { total, por_pessoa }
@@ -164,6 +165,7 @@ export default function SmartBudgetField({
 
     const [showTypeDropdown, setShowTypeDropdown] = useState(false)
 
+    // Sync external value → local state
     useEffect(() => {
         const parsed = parseExistingValue(value, quantidadeViajantes)
         if (parsed) {
@@ -176,10 +178,11 @@ export default function SmartBudgetField({
         if (localData.quantidade_viajantes !== quantidadeViajantes) {
             const newData = { ...localData, quantidade_viajantes: quantidadeViajantes }
             const calculated = calculateValues(newData)
-            const final = { ...newData, ...calculated, display: buildDisplay({ ...newData, ...calculated }) }
-            setLocalData(final)
-            onChange?.(final)
+            const updated = { ...newData, ...calculated, display: buildDisplay({ ...newData, ...calculated }) }
+            setLocalData(updated)
+            onChange?.(updated)
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only react to quantidadeViajantes changes
     }, [quantidadeViajantes])
 
     const updateData = (updates: Partial<OrcamentoViagem>) => {
@@ -238,10 +241,10 @@ export default function SmartBudgetField({
 
     return (
         <FieldWrapper label={label} required={required} error={error} helpText={helpText}>
-            <div className="space-y-4">
+            <div className="space-y-3">
                 {/* Viajantes Context */}
                 {quantidadeViajantes > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-blue-50 rounded-lg border border-blue-100">
                         <Users className="h-4 w-4 text-blue-600" />
                         <span className="text-sm text-blue-800">
                             <strong>{quantidadeViajantes}</strong> {quantidadeViajantes === 1 ? 'viajante' : 'viajantes'}
@@ -254,7 +257,7 @@ export default function SmartBudgetField({
                     <button
                         type="button"
                         onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                        className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                         <div className="text-left">
                             <div className="text-sm font-medium text-gray-900">{selectedTipo?.label}</div>
@@ -274,7 +277,7 @@ export default function SmartBudgetField({
                                     type="button"
                                     onClick={() => handleTypeChange(tipo.value)}
                                     className={cn(
-                                        "w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0",
+                                        "w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0",
                                         localData.tipo === tipo.value && "bg-green-50"
                                     )}
                                 >
@@ -298,7 +301,7 @@ export default function SmartBudgetField({
                             {localData.tipo === 'total' ? 'Valor total' : 'Valor por pessoa'}
                         </label>
                         <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">R$</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">R$</span>
                             <input
                                 type="number"
                                 min="0"
@@ -306,7 +309,7 @@ export default function SmartBudgetField({
                                 value={localData.valor || ''}
                                 onChange={(e) => handleValueChange(parseFloat(e.target.value) || 0)}
                                 onBlur={() => onSave?.()}
-                                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-semibold"
+                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-base font-semibold"
                                 placeholder="0"
                             />
                         </div>
@@ -355,13 +358,13 @@ export default function SmartBudgetField({
 
                 {/* Calculated Values Display */}
                 {localData.display && (
-                    <div className="p-4 bg-green-50 rounded-lg border border-green-100">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Calculator className="h-4 w-4 text-green-600" />
+                    <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                        <div className="flex items-center gap-2 mb-1.5">
+                            <Calculator className="h-3.5 w-3.5 text-green-600" />
                             <span className="text-sm font-bold text-green-900">Resumo</span>
                         </div>
 
-                        <div className="text-lg font-bold text-green-800 mb-2">
+                        <div className="text-base font-bold text-green-800 mb-1.5">
                             {localData.display}
                         </div>
 

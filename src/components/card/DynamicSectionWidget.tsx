@@ -201,12 +201,12 @@ export default function DynamicSectionWidget({
     if (loadingFields || loadingSections) {
         return (
             <div className="rounded-xl border border-gray-300 bg-white shadow-sm overflow-hidden">
-                <div className="border-b border-gray-200 bg-gray-50/50 px-4 py-3">
+                <div className="border-b border-gray-200 bg-gray-50/50 px-3 py-2">
                     <div className="h-4 bg-gray-200 rounded w-1/3 animate-pulse"></div>
                 </div>
-                <div className="p-4 space-y-4">
-                    <div className="h-10 bg-gray-100 rounded animate-pulse"></div>
-                    <div className="h-10 bg-gray-100 rounded animate-pulse"></div>
+                <div className="p-3 space-y-2">
+                    <div className="h-8 bg-gray-100 rounded animate-pulse"></div>
+                    <div className="h-8 bg-gray-100 rounded animate-pulse"></div>
                 </div>
             </div>
         )
@@ -227,23 +227,23 @@ export default function DynamicSectionWidget({
             "rounded-xl border border-gray-300 bg-white shadow-sm overflow-hidden",
             className
         )}>
-            {/* Header - matches ObservacoesEstruturadas */}
-            <div className="border-b border-gray-200 bg-gray-50/50 px-4 py-3">
+            {/* Header */}
+            <div className="border-b border-gray-200 bg-gray-50/50 px-3 py-2">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className={cn("p-1.5 rounded-lg", iconBgClass)}>
+                        <div className={cn("p-1 rounded-lg", iconBgClass)}>
                             {(() => {
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 const Icon = (iconName ? (Icons as any)[iconName] : null) || Layers
-                                return <Icon className={cn("h-4 w-4", textClass)} />
+                                return <Icon className={cn("h-3.5 w-3.5", textClass)} />
                             })()}
                         </div>
-                        <h3 className="text-sm font-semibold text-gray-900">
+                        <h3 className="text-xs font-semibold text-gray-900">
                             {section?.label || sectionKey}
                         </h3>
                     </div>
 
-                    {/* Save Button - only shows when dirty, matches ObservacoesEstruturadas */}
+                    {/* Save Button */}
                     {updateCard.isPending ? (
                         <div className="flex items-center gap-1.5 text-xs text-gray-500">
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -252,13 +252,13 @@ export default function DynamicSectionWidget({
                     ) : isDirty ? (
                         <button
                             onClick={handleSave}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
                         >
                             <Check className="h-3 w-3" />
-                            Salvar Alterações
+                            Salvar
                         </button>
                     ) : updateCard.isSuccess ? (
-                        <div className="flex items-center gap-1.5 text-xs text-green-600">
+                        <div className="flex items-center gap-1 text-xs text-green-600">
                             <Check className="h-3 w-3" />
                             Salvo
                         </div>
@@ -266,19 +266,19 @@ export default function DynamicSectionWidget({
                 </div>
             </div>
 
-            {/* Content - fields always in edit mode, matches ObservacoesEstruturadas */}
-            <div className="p-4" onKeyDown={handleKeyDown}>
-                <div className="space-y-4">
+            {/* Content */}
+            <div className="p-3" onKeyDown={handleKeyDown}>
+                <div className="space-y-2">
                     {fields.map((field) => {
                         const blocking = isFieldBlocking(field.key)
                         return (
                         <div key={field.key}>
                             <label className={cn(
-                                "flex items-center gap-1.5 text-xs font-medium mb-2",
+                                "flex items-center gap-1 text-[11px] font-medium mb-0.5",
                                 blocking ? "text-red-700" : "text-gray-700"
                             )}>
                                 <div className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
+                                    "w-1 h-1 rounded-full",
                                     blocking ? "bg-red-500" : "bg-gray-400"
                                 )} />
                                 {field.label}

@@ -70,7 +70,7 @@ export default function CardTeamSection({ card }: CardTeamSectionProps) {
             {/* Header */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors rounded-t-xl"
+                className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50 transition-colors rounded-t-xl"
             >
                 <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-slate-500" />
@@ -89,7 +89,7 @@ export default function CardTeamSection({ card }: CardTeamSectionProps) {
             </button>
 
             {isOpen && (
-                <div className="px-4 pb-4 space-y-3">
+                <div className="px-3 pb-3 space-y-2">
                     {/* Members list */}
                     {isLoading ? (
                         <div className="text-xs text-slate-400 py-2">Carregando...</div>

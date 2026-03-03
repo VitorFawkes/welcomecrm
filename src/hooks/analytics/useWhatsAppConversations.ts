@@ -67,7 +67,7 @@ export interface WaConversationsResult {
 const PAGE_SIZE = 25
 
 export function useWhatsAppConversations() {
-    const { dateRange, product, ownerIds } = useAnalyticsFilters()
+    const { dateRange, product, ownerIds, tagIds } = useAnalyticsFilters()
 
     const [statusFilter, setStatusFilter] = useState<ConversationStatus | null>(null)
     const [sortBy, setSortBy] = useState<ConversationSortKey>('last_message_at')
@@ -91,7 +91,7 @@ export function useWhatsAppConversations() {
     const query = useQuery({
         queryKey: [
             'analytics', 'whatsapp-conversations',
-            dateRange.start, dateRange.end, product, ownerIds,
+            dateRange.start, dateRange.end, product, ownerIds, tagIds,
             statusFilter, sortBy, sortDir, page, debouncedSearch,
             phaseSlug, stageId, instance,
         ],
@@ -102,6 +102,7 @@ export function useWhatsAppConversations() {
                 p_to: dateRange.end,
                 p_produto: product === 'ALL' ? null : product,
                 p_owner_ids: ownerIds.length > 0 ? ownerIds : undefined,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
                 p_status: statusFilter,
                 p_sort_by: sortBy,
                 p_sort_dir: sortDir,

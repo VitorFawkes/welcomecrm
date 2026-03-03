@@ -94,19 +94,19 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
             {/* Header */}
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
             >
                 <div className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-indigo-600" />
+                    <MessageSquare className="h-4 w-4 text-indigo-600" />
                     <h3 className="text-sm font-semibold text-gray-900">Histórico de Conversas</h3>
                     <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
                         {(emailData?.length || 0) + (meetingsData?.length || 0)}
                     </span>
                 </div>
                 {isExpanded ? (
-                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                    <ChevronUp className="h-4 w-4 text-gray-400" />
                 ) : (
-                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
                 )}
             </button>
 
@@ -118,7 +118,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                         <button
                             onClick={() => setActiveTab('whatsapp')}
                             className={cn(
-                                "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
                                 activeTab === 'whatsapp'
                                     ? "border-green-500 text-green-700 bg-white"
                                     : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -131,7 +131,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                         <button
                             onClick={() => setActiveTab('email')}
                             className={cn(
-                                "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
                                 activeTab === 'email'
                                     ? "border-blue-500 text-blue-700 bg-white"
                                     : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -144,7 +144,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                         <button
                             onClick={() => setActiveTab('meetings')}
                             className={cn(
-                                "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
                                 activeTab === 'meetings'
                                     ? "border-purple-500 text-purple-700 bg-white"
                                     : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -176,7 +176,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                             <button
                                 onClick={() => setActiveTab('ai')}
                                 className={cn(
-                                    "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                    "flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
                                     activeTab === 'ai'
                                         ? "border-indigo-500 text-indigo-700 bg-white"
                                         : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -191,7 +191,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                     {/* Content Area */}
                     <div className="p-0">
                         {activeTab === 'whatsapp' && (
-                            <div className="h-[500px]">
+                            <div className="h-[400px]">
                                 <WhatsAppHistory contactId={contactId || null} className="h-full" />
                             </div>
                         )}
@@ -215,7 +215,7 @@ export default function ConversationHistory({ cardId, contactId }: ConversationH
                         )}
 
                         {activeTab === 'meetings' && (
-                            <div className="h-[500px]">
+                            <div className="h-[400px]">
                                 <MeetingTimeline cardId={cardId} className="h-full" />
                             </div>
                         )}

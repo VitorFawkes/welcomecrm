@@ -19,16 +19,17 @@ export interface RetentionKpis {
 }
 
 export function useRetentionCohort() {
-    const { dateRange, product } = useAnalyticsFilters()
+    const { dateRange, product, tagIds } = useAnalyticsFilters()
 
     return useQuery({
-        queryKey: ['analytics', 'retention-cohort', dateRange.start, dateRange.end, product],
+        queryKey: ['analytics', 'retention-cohort', dateRange.start, dateRange.end, product, tagIds],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC nova
             const { data, error } = await (supabase.rpc as any)('analytics_retention_cohort', {
                 p_date_start: dateRange.start,
                 p_date_end: dateRange.end,
                 p_product: product === 'ALL' ? null : product,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
             })
             if (error) throw error
             return (data as unknown as RetentionCohortRow[]) || []
@@ -39,16 +40,17 @@ export function useRetentionCohort() {
 }
 
 export function useRetentionKpis() {
-    const { dateRange, product } = useAnalyticsFilters()
+    const { dateRange, product, tagIds } = useAnalyticsFilters()
 
     return useQuery({
-        queryKey: ['analytics', 'retention-kpis', dateRange.start, dateRange.end, product],
+        queryKey: ['analytics', 'retention-kpis', dateRange.start, dateRange.end, product, tagIds],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC nova
             const { data, error } = await (supabase.rpc as any)('analytics_retention_kpis', {
                 p_date_start: dateRange.start,
                 p_date_end: dateRange.end,
                 p_product: product === 'ALL' ? null : product,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
             })
             if (error) throw error
             return (data as unknown as RetentionKpis) || null

@@ -298,19 +298,19 @@ export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
 
     if (isLoading) {
         return (
-            <div className="rounded-lg border bg-white p-4 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Atividades</h3>
+            <div className="rounded-lg border bg-white p-3 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">Atividades</h3>
                 <p className="text-xs text-gray-500">Carregando...</p>
             </div>
         )
     }
 
     return (
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Atividades</h3>
+        <div className="rounded-lg border bg-white p-3 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-900 mb-2">Atividades</h3>
 
             {activities && activities.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                     {activities.map((activity) => {
                         const Icon = activityIcons[activity.tipo as keyof typeof activityIcons] || activityIcons.default
                         const colorClass = activityColors[activity.tipo as keyof typeof activityColors] || activityColors.default

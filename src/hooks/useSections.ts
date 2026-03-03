@@ -69,9 +69,10 @@ export function useSectionsByPosition(position: SectionPosition) {
 /**
  * Returns only governable sections (for StudioUnified matrix).
  * Replaces GOVERNABLE_SECTIONS constant.
+ * When `produto` is provided, returns only sections relevant to that product (product-specific + shared).
  */
-export function useGovernableSections() {
-    const { data: sections, ...rest } = useSections()
+export function useGovernableSections(produto?: string) {
+    const { data: sections, ...rest } = useSections(produto)
 
     return {
         data: sections?.filter(s => s.is_governable),

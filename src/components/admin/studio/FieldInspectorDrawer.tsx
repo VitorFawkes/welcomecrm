@@ -9,9 +9,16 @@ import type { Database } from '../../../database.types'
 import UniversalFieldRenderer from '../../fields/UniversalFieldRenderer'
 import { FIELD_TYPES } from '../../../constants/admin'
 import { useGovernableSections } from '../../../hooks/useSections'
+import { useProductContext } from '../../../hooks/useProductContext'
 import SortableOptionsList from './SortableOptionsList'
 
 type SystemField = Database['public']['Tables']['system_fields']['Row']
+
+interface FieldOption {
+    label: string
+    value: string
+    color?: string
+}
 
 interface FieldInspectorDrawerProps {
     isOpen: boolean
@@ -23,21 +30,24 @@ interface FieldInspectorDrawerProps {
 
 export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, isCreating = false }: FieldInspectorDrawerProps) {
     const [formData, setFormData] = useState<Partial<SystemField>>({})
-    const [options, setOptions] = useState<any[]>([])
+    const [options, setOptions] = useState<FieldOption[]>([])
     const [newOptionLabel, setNewOptionLabel] = useState('')
     const [optionError, setOptionError] = useState<string | null>(null)
 
-    // Fetch governable sections dynamically
-    const { data: governableSections = [] } = useGovernableSections()
+    const { currentProduct } = useProductContext()
+
+    // Fetch governable sections filtered by current product (no TRIPS sections for WEDDING and vice-versa)
+    const { data: governableSections = [] } = useGovernableSections(currentProduct)
     const sectionOptions = governableSections.map(s => ({ value: s.key, label: s.label }))
 
     useEffect(() => {
         if (field) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData(field)
             // Parse options if they exist
             if (field.options) {
                 if (Array.isArray(field.options)) {
-                    setOptions(field.options)
+                    setOptions(field.options as unknown as FieldOption[])
                 } else {
                     setOptions([])
                 }
@@ -50,7 +60,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
     const handleSave = () => {
         onSave({
             ...formData,
-            options: options.length > 0 ? options : null
+            options: (options.length > 0 ? options : null) as unknown as SystemField['options']
         })
         onClose()
     }
@@ -84,6 +94,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
     useEffect(() => {
         if (isCreating && !keyTouched && formData.label) {
             const generatedKey = formData.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData((prev: Partial<SystemField>) => ({ ...prev, key: generatedKey }))
         }
     }, [formData.label, isCreating, keyTouched])
@@ -91,7 +102,7 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
     // Construct preview field object
     const previewField = {
         ...formData,
-        options: options
+        options: options as unknown as SystemField['options']
     }
 
     return (
@@ -118,18 +129,18 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                             {/* Generate appropriate preview value based on field type */}
                             {(() => {
                                 // Compute preview value based on type
-                                let previewValue: any = 'Valor de Exemplo'
+                                let previewValue: string | number | boolean | string[] | Record<string, unknown> = 'Valor de Exemplo'
 
                                 switch (formData.type) {
                                     case 'multiselect':
                                         previewValue = options.length > 0
-                                            ? options.slice(0, 2).map((o: any) => o.label || o.value)
+                                            ? options.slice(0, 2).map((o) => o.label || o.value)
                                             : ['Opção 1', 'Opção 2']
                                         break
                                     case 'checklist':
                                         // For checklist, show some items as checked
                                         previewValue = options.length > 0
-                                            ? options.slice(0, 2).map((o: any) => o.value || o.label)
+                                            ? options.slice(0, 2).map((o) => o.value || o.label)
                                             : ['item_1', 'item_2']
                                         break
                                     case 'select':
@@ -254,15 +265,15 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                     <Select
                                         value={formData.type || 'text'}
                                         onChange={val => setFormData({ ...formData, type: val })}
-                                        options={FIELD_TYPES as any}
+                                        options={FIELD_TYPES as unknown as { value: string; label: string }[]}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Seção</Label>
                                     <Select
-                                        value={formData.section || 'trip_info'}
+                                        value={formData.section || sectionOptions[0]?.value || ''}
                                         onChange={val => setFormData({ ...formData, section: val })}
-                                        options={sectionOptions.length > 0 ? sectionOptions : [{ value: 'trip_info', label: 'Informações da Viagem' }]}
+                                        options={sectionOptions}
                                     />
                                 </div>
                             </div>
@@ -275,10 +286,10 @@ export default function FieldInspectorDrawer({ isOpen, onClose, field, onSave, i
                                 <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors">
                                     <input
                                         type="checkbox"
-                                        checked={(formData.options as any)?.includeTime || false}
+                                        checked={(formData.options as Record<string, unknown>)?.includeTime as boolean || false}
                                         onChange={(e) => setFormData({
                                             ...formData,
-                                            options: { ...((formData.options as any) || {}), includeTime: e.target.checked }
+                                            options: { ...((formData.options as Record<string, unknown>) || {}), includeTime: e.target.checked }
                                         })}
                                         className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                                     />

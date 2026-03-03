@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useSections, useSectionMutations, type Section } from '../../../hooks/useSections'
+import { useProductContext } from '../../../hooks/useProductContext'
 import { Plus, Trash2, GripVertical, Edit2, Check, X, Lock } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { Button } from '../../ui/Button'
@@ -77,7 +78,9 @@ const defaultFormData: SectionFormData = {
 
 export default function SectionManager() {
     const { toast } = useToast()
-    const { data: sections = [], isLoading } = useSections()
+    const { currentProduct } = useProductContext()
+    // Filter sections by current product: show product-specific sections + shared (NULL) sections
+    const { data: sections = [], isLoading } = useSections(currentProduct)
     const { createSection, updateSection, deleteSection, reorderSections } = useSectionMutations()
 
     const [isAdding, setIsAdding] = useState(false)

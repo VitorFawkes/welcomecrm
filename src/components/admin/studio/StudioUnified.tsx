@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { Loader2, Plus, Trash2, Eye, EyeOff, CheckSquare, Square, LayoutTemplate, Shield, Edit2, Layers, Grid, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '../../../lib/utils'
+import { useProductContext } from '../../../hooks/useProductContext'
 import FieldInspectorDrawer from './FieldInspectorDrawer'
 import type { Database } from '../../../database.types'
 
@@ -39,32 +40,46 @@ const COLORS = [
     { label: 'Cinza', value: 'bg-gray-500' },
 ]
 
+// Map product → pipeline UUID (each product has its own pipeline)
+const PRODUCT_PIPELINE_MAP: Record<string, string> = {
+    TRIPS:   'c8022522-4a1d-411c-9387-efe03ca725ee',
+    WEDDING: 'f4611f84-ce9c-48ad-814b-dcd6081f15db',
+}
+
 export default function StudioUnified() {
     const queryClient = useQueryClient()
+    const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS
+
     const [isAdding, setIsAdding] = useState(false)
     const [editingField, setEditingField] = useState<SystemField | null>(null)
     const [viewMode, setViewMode] = useState<'matrix' | 'macro'>('macro')
 
     // --- Data Fetching ---
-    // Fetch sections FIRST (needed for default values below)
-    const { data: sectionsData = [], isLoading: loadingSections } = useSections()
+    // Fetch sections filtered by current product (product-specific + shared NULL sections)
+    const { data: sectionsData = [], isLoading: loadingSections } = useSections(currentProduct)
     const governableSections = sectionsData.filter(s => s.is_governable)
-    const defaultSection = sectionsData[0]?.key || 'trip_info'
+    const defaultSection = governableSections[0]?.key || sectionsData[0]?.key || 'wedding_info'
 
     // New Field State (uses defaultSection from above)
     const [newField, setNewField] = useState<Partial<SystemField>>({
         key: '',
         label: '',
         type: 'text',
-        section: 'trip_info', // Will be updated via useEffect when sections load
+        section: defaultSection,
         active: true,
         is_system: false
     })
 
     const { data: stages } = useQuery({
-        queryKey: ['pipeline-stages-unified'],
+        queryKey: ['pipeline-stages-unified', pipelineId],
         queryFn: async () => {
-            const { data } = await supabase.from('pipeline_stages').select('*, pipeline_phases!pipeline_stages_phase_id_fkey(order_index)').order('ordem')
+            // Filter stages by the current product's pipeline — users should never see stages from another product
+            const { data } = await supabase
+                .from('pipeline_stages')
+                .select('*, pipeline_phases!pipeline_stages_phase_id_fkey(order_index)')
+                .eq('pipeline_id', pipelineId)
+                .order('ordem')
             // Sort by phase order_index then stage ordem
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const sorted = (data || []).sort((a: any, b: any) => {
@@ -375,15 +390,22 @@ export default function StudioUnified() {
         return 'none'
     }
 
+    // Filter fields to only those belonging to sections relevant to the current product.
+    // This ensures TRIPS fields don't appear in the WEDDING matrix and vice-versa.
+    const productFields = useMemo(() => {
+        if (!fields) return []
+        const validSectionKeys = new Set(sectionsData.map(s => s.key))
+        return fields.filter(f => !f.section || validSectionKeys.has(f.section))
+    }, [fields, sectionsData])
+
     const fieldsBySection = useMemo(() => {
-        if (!fields) return {}
-        return fields.reduce((acc, field) => {
+        return productFields.reduce((acc, field) => {
             const section = field.section || 'details'
             if (!acc[section]) acc[section] = []
             acc[section].push(field)
             return acc
         }, {} as Record<string, SystemField[]>)
-    }, [fields])
+    }, [productFields])
 
     // DEFINITIVE FIX: Sort stages by Phase order first, then by Stage ordem
     // This ensures stages appear in Kanban order: SDR → PLANNER → PÓS-VENDA → RESOLUÇÃO

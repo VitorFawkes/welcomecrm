@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { AlertTriangle, Check, Loader2, Tag, Plane, FileCheck } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -12,6 +12,7 @@ import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
 import { FieldLockButton } from './FieldLockButton'
 
 type Card = Database['public']['Tables']['cards']['Row'] & {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     briefing_inicial?: any | null
 }
 
@@ -30,12 +31,16 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
     const { data: stages } = usePipelineStages()
 
     // Data Sources
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const productData = useMemo(() => (card.produto_data as any) || EMPTY_OBJECT, [card.produto_data])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const briefingData = useMemo(() => (card.briefing_inicial as any) || EMPTY_OBJECT, [card.briefing_inicial])
 
     // State
     const [viewMode, setViewMode] = useState<ViewMode>(SystemPhase.SDR)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [editedObs, setEditedObs] = useState<any>({})
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [lastSavedObs, setLastSavedObs] = useState<any>({})
     const [isDirty, setIsDirty] = useState(false)
 
@@ -61,40 +66,35 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
         return card.pipeline_stage_id
     }, [viewMode, phases, stages, card.pipeline_stage_id])
 
-    // Sync ViewMode with Card Stage
-    useEffect(() => {
-        if (!phases) return
+    // Sync ViewMode with Card Stage (render-time pattern per React docs)
+    const derivedViewMode = useMemo(() => {
+        if (!phases) return SystemPhase.SDR
 
         const currentStage = stages?.find(s => s.id === card.pipeline_stage_id)
         const currentPhase = phases.find(p => p.name === currentStage?.fase)
-        let targetMode: string = SystemPhase.SDR
 
-        // Only switch to current phase if it exists, has a slug, AND is visible
         if (currentPhase && currentPhase.slug && currentPhase.visible_in_card !== false) {
-            targetMode = currentPhase.slug
-        } else {
-            // Default to SDR if phase not found or hidden
-            const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
-            if (sdrPhase && sdrPhase.slug) targetMode = sdrPhase.slug
+            return currentPhase.slug
         }
 
-        setViewMode(prev => {
-            if (prev !== targetMode) return targetMode
-            return prev
-        })
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+        const sdrPhase = phases.find(p => p.slug === SystemPhase.SDR)
+        return (sdrPhase && sdrPhase.slug) ? sdrPhase.slug : SystemPhase.SDR
     }, [card.pipeline_stage_id, phases, stages])
 
+    const [prevDerivedMode, setPrevDerivedMode] = useState(derivedViewMode)
+    if (prevDerivedMode !== derivedViewMode) {
+        setPrevDerivedMode(derivedViewMode)
+        setViewMode(derivedViewMode)
+    }
+
     // Determine active section key based on viewMode
-    // All "Informações Importantes" views use the same section ('observacoes_criticas')
-    // Visibility per stage is controlled by stage_field_config, not by different sections
     const activeSectionKey = useMemo(() => {
         switch (viewMode) {
             case SystemPhase.SDR:
             case SystemPhase.PLANNER:
             case SystemPhase.POS_VENDA:
-                return 'observacoes_criticas' // Single section for all "Info Importantes"
-            default: return viewMode // Dynamic phases use their slug as key
+                return 'observacoes_criticas'
+            default: return viewMode
         }
     }, [viewMode])
 
@@ -104,17 +104,19 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
             case SystemPhase.SDR: return briefingData.observacoes || {}
             case SystemPhase.PLANNER: return productData.observacoes_criticas || {}
             case SystemPhase.POS_VENDA: return productData.observacoes_pos_venda || {}
-            default: return productData[viewMode] || {} // Dynamic phases stored in product_data[slug]
+            default: return productData[viewMode] || {}
         }
     }, [viewMode, briefingData, productData])
 
-    // Sync local state when activeData changes
-    useEffect(() => {
+    // Sync local state when activeData changes (render-time pattern)
+    const [prevActiveDataStr, setPrevActiveDataStr] = useState('')
+    const activeDataStr = JSON.stringify(activeData)
+    if (prevActiveDataStr !== activeDataStr) {
+        setPrevActiveDataStr(activeDataStr)
         setEditedObs(activeData)
         setLastSavedObs(activeData)
         setIsDirty(false)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-    }, [activeData])
+    }
 
     // Fetch Field Configs
     const { getVisibleFields, isLoading: loadingConfig } = useFieldConfig()
@@ -136,6 +138,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
 
     // Mutation to save changes
     const updateCard = useMutation({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         mutationFn: async (newData: any) => {
             const { error } = await supabase
                 .from('cards')
@@ -154,6 +157,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
     const handleSave = async () => {
         if (!isDirty) return
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let updatePayload: any = {}
 
         if (viewMode === SystemPhase.SDR) {
@@ -194,7 +198,9 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
         }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleChange = useCallback((key: string, value: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setEditedObs((prev: any) => {
             const next = { ...prev, [key]: value }
             setIsDirty(JSON.stringify(next) !== JSON.stringify(lastSavedObs))
@@ -209,6 +215,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
         }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const renderFieldInput = (field: any) => {
         const value = editedObs[field.key]
 
@@ -238,13 +245,13 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
     return (
         <div className="rounded-xl border border-gray-300 bg-white shadow-sm overflow-hidden">
             {/* Header & Tabs */}
-            <div className="border-b border-gray-200 bg-gray-50/50 px-4 pt-4">
-                <div className="flex items-center justify-between mb-4">
+            <div className="border-b border-gray-200 bg-gray-50/50 px-3 pt-2">
+                <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-red-100 rounded-lg">
-                            <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <div className="p-1 bg-red-100 rounded-lg">
+                            <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
                         </div>
-                        <h3 className="text-sm font-semibold text-gray-900">Informações Importantes</h3>
+                        <h3 className="text-xs font-semibold text-gray-900">Informações Importantes</h3>
                     </div>
 
                     {updateCard.isPending ? (
@@ -255,20 +262,20 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                     ) : isDirty ? (
                         <button
                             onClick={handleSave}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
+                            className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
                         >
                             <Check className="h-3 w-3" />
-                            Salvar Alterações
+                            Salvar
                         </button>
                     ) : updateCard.isSuccess ? (
-                        <div className="flex items-center gap-1.5 text-xs text-green-600">
+                        <div className="flex items-center gap-1 text-xs text-green-600">
                             <Check className="h-3 w-3" />
                             Salvo
                         </div>
                     ) : null}
                 </div>
 
-                <div className="flex gap-6 overflow-x-auto pb-1 scrollbar-hide">
+                <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
                     {/* SDR Tab */}
                     {visibleLegacyPhases.sdr && (
                         <button
@@ -282,13 +289,13 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                                 }
                             }}
                             className={cn(
-                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                "pb-2 text-xs font-medium border-b-2 transition-colors px-1 flex items-center gap-1.5 whitespace-nowrap",
                                 viewMode === SystemPhase.SDR
                                     ? "border-blue-500 text-blue-600"
                                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                             )}
                         >
-                            <Tag className="h-4 w-4" />
+                            <Tag className="h-3.5 w-3.5" />
                             SDR
                         </button>
                     )}
@@ -306,13 +313,13 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                                 }
                             }}
                             className={cn(
-                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                "pb-2 text-xs font-medium border-b-2 transition-colors px-1 flex items-center gap-1.5 whitespace-nowrap",
                                 viewMode === SystemPhase.PLANNER
                                     ? "border-purple-500 text-purple-600"
                                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                             )}
                         >
-                            <Plane className="h-4 w-4" />
+                            <Plane className="h-3.5 w-3.5" />
                             Planner
                         </button>
                     )}
@@ -330,13 +337,13 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                                 }
                             }}
                             className={cn(
-                                "pb-3 text-sm font-medium border-b-2 transition-colors px-1 flex items-center gap-2 whitespace-nowrap",
+                                "pb-2 text-xs font-medium border-b-2 transition-colors px-1 flex items-center gap-1.5 whitespace-nowrap",
                                 viewMode === SystemPhase.POS_VENDA
                                     ? "border-green-500 text-green-600"
                                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                             )}
                         >
-                            <FileCheck className="h-4 w-4" />
+                            <FileCheck className="h-3.5 w-3.5" />
                             Pós-Venda
                         </button>
                     )}
@@ -344,7 +351,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
             </div>
 
             {/* Content */}
-            <div className="p-4" onKeyDown={handleKeyDown}>
+            <div className="p-3" onKeyDown={handleKeyDown}>
                 {loadingConfig ? (
                     <div className="flex justify-center py-8">
                         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -359,7 +366,7 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
                         {fields.map((field, index) => {
                             // Determine if field should be full width
                             const isFullWidth = ['textarea', 'multiselect', 'checklist', 'json', 'destinos'].includes(field.type) || field.key === 'destinos'
@@ -372,12 +379,12 @@ export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturada
                                 <div
                                     key={field.key}
                                     className={cn(
-                                        "space-y-2",
+                                        "space-y-1",
                                         isFullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
                                     )}
                                 >
-                                    <label className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", dotColor)} />
+                                    <label className="flex items-center gap-1.5 mb-0.5 text-[11px] font-semibold text-gray-700 uppercase tracking-wide">
+                                        <div className={cn("w-1 h-1 rounded-full flex-shrink-0", dotColor)} />
                                         {field.label}
                                         {/* Lock Button - Sempre visível ao lado do nome */}
                                         <FieldLockButton

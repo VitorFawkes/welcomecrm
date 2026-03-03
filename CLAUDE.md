@@ -195,6 +195,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | dashboard_widgets | Widgets no grid do dashboard | → custom_dashboards, custom_reports |
 | card_tags | Definições de tags (gerenciadas por admins): name, color, produto, is_active | → profiles (created_by) |
 | card_tag_assignments | M:N cards↔tags: assign/unassign por qualquer user autenticado | → cards, card_tags |
+| invitations | Convites de novos membros com token 7 dias: email, role, team_id, **produtos** (text[] | NULL = todos) | → profiles (created_by), teams |
 
 ### Campos IA no Cards (Agente WhatsApp)
 | Coluna | Tipo | Propósito |

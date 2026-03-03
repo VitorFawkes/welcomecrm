@@ -300,8 +300,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
         // 1. High Priority: Active Change Request
         if (hasActiveChange) {
             return (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-medium">
-                    <RefreshCw className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-medium">
+                    <RefreshCw className="h-3 w-3" />
                     Mudança ativa
                 </div>
             )
@@ -322,8 +322,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 if (diffDays < 0) {
                     const daysLate = Math.abs(diffDays)
                     return (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
-                            <Clock className="h-3.5 w-3.5" />
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                            <Clock className="h-3 w-3" />
                             Atrasada há {daysLate} dia{daysLate > 1 ? 's' : ''}
                         </div>
                     )
@@ -332,8 +332,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 // Today
                 if (diffDays === 0) {
                     return (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs font-medium">
-                            <Clock className="h-3.5 w-3.5" />
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs font-medium">
+                            <Clock className="h-3 w-3" />
                             Para hoje
                         </div>
                     )
@@ -341,8 +341,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
                 // Future
                 return (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium">
-                        <Calendar className="h-3.5 w-3.5" />
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-medium">
+                        <Calendar className="h-3 w-3" />
                         Para daqui a {diffDays} dia{diffDays > 1 ? 's' : ''}
                     </div>
                 )
@@ -351,8 +351,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
         // 3. Warning: No Next Task
         return (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
-                <AlertCircle className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                <AlertCircle className="h-3 w-3" />
                 Sem próxima tarefa
             </div>
         )
@@ -702,7 +702,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
             <div className="flex flex-col bg-white border-b border-gray-200 shadow-sm">
                 {/* Top Bar: Breadcrumbs & Stage */}
-                <div className="px-6 py-2 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100">
+                <div className="px-4 py-1.5 flex items-center justify-between gap-2 border-b border-gray-100">
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                         <button onClick={() => navigate(-1)} className="hover:text-gray-900 flex items-center gap-1 transition-colors">
                             <ArrowLeft className="h-4 w-4" /> Voltar
@@ -717,9 +717,9 @@ export default function CardHeader({ card }: CardHeaderProps) {
                     </div>
 
                     {/* Stage Selector & Time in Stage */}
-                    <div className="relative z-20 flex items-center gap-3">
+                    <div className="relative z-20 flex items-center gap-2">
                         {daysInStage !== null && (
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 text-xs font-medium text-gray-500" title="Tempo nesta etapa">
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-50 border border-gray-200 text-xs font-medium text-gray-500" title="Tempo nesta etapa">
                                 <History className="h-3 w-3" />
                                 {daysInStage}d
                             </div>
@@ -728,7 +728,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                         <div className="relative">
                             <button
                                 onClick={() => setShowStageDropdown(!showStageDropdown)}
-                                className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm font-medium transition-all border border-gray-200 hover:border-gray-300"
+                                className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm font-medium transition-all border border-gray-200 hover:border-gray-300"
                             >
                                 <span className={cn(
                                     "w-2 h-2 rounded-full",
@@ -768,9 +768,9 @@ export default function CardHeader({ card }: CardHeaderProps) {
                 </div>
 
                 {/* Main Content: Title & Actions */}
-                <div className="px-4 md:px-6 py-4 md:py-5 flex flex-col gap-4 md:gap-6">
+                <div className="px-4 py-2.5 flex flex-col gap-2">
                     {/* Row 1: Title */}
-                    <div className="flex-1 min-w-0 space-y-3">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                         <div className="flex items-start gap-3">
                             {isEditingTitle ? (
                                 <div className="flex items-center gap-2 flex-1 max-w-2xl">
@@ -779,7 +779,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                         value={editedTitle}
                                         onChange={(e) => setEditedTitle(e.target.value)}
                                         onKeyDown={handleTitleKeyDown}
-                                        className="flex-1 text-3xl font-bold text-gray-900 border-b-2 border-indigo-500 bg-transparent outline-none px-1 py-1"
+                                        className="flex-1 text-xl font-bold text-gray-900 tracking-tight border-b-2 border-indigo-500 bg-transparent outline-none px-1 py-0.5"
                                         autoFocus
                                     />
                                     <div className="flex gap-1">
@@ -801,7 +801,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 <div className="group flex items-center gap-3">
                                     <h1
                                         onClick={() => setIsEditingTitle(true)}
-                                        className="text-3xl font-bold text-gray-900 truncate cursor-pointer hover:text-indigo-900 transition-colors"
+                                        className="text-xl font-bold text-gray-900 tracking-tight truncate cursor-pointer hover:text-indigo-900 transition-colors"
                                         title={card.titulo || ''}
                                     >
                                         {card.titulo}
@@ -815,7 +815,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                         </div>
 
                         {/* Metadata Row: Badges | Value | Trip Date */}
-                        <div className="flex flex-wrap items-center gap-2 md:gap-3 text-sm">
+                        <div className="flex flex-wrap items-center gap-1.5 text-sm">
                             <span className={cn(
                                 "px-2.5 py-0.5 rounded-full font-semibold text-xs uppercase tracking-wide",
                                 getPhaseColor(currentFase)
@@ -896,7 +896,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             )}
 
                             {/* Divider */}
-                            <div className="h-4 w-px bg-gray-300 mx-1" />
+                            <div className="h-3.5 w-px bg-gray-300" />
 
                             {/* Value - Always show when data exists */}
                             {(() => {
@@ -930,7 +930,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                         if (typeof valorDisplay === 'string') {
                                             return (
                                                 <div className="flex items-center gap-1.5 text-gray-600 font-medium">
-                                                    <DollarSign className="h-3.5 w-3.5 text-gray-400" />
+                                                    <DollarSign className="h-3 w-3 text-gray-400" />
                                                     {valorDisplay}
                                                 </div>
                                             )
@@ -938,7 +938,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                         // Se é número, formatar
                                         return (
                                             <div className="flex items-center gap-1.5 text-gray-600 font-medium">
-                                                <DollarSign className="h-3.5 w-3.5 text-gray-400" />
+                                                <DollarSign className="h-3 w-3 text-gray-400" />
                                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorDisplay)}
                                             </div>
                                         )
@@ -949,7 +949,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 if (card.valor_estimado || card.valor_final) {
                                     return (
                                         <div className="flex items-center gap-1.5 text-gray-600 font-medium">
-                                            <DollarSign className="h-3.5 w-3.5 text-gray-400" />
+                                            <DollarSign className="h-3 w-3 text-gray-400" />
                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                                                 (card.status_comercial === 'ganho' || card.status_comercial === 'perdido')
                                                     ? (card.valor_final || card.valor_estimado || 0)
@@ -964,12 +964,12 @@ export default function CardHeader({ card }: CardHeaderProps) {
                             {/* Receita - Visível para todos */}
                             {card.receita != null && (
                                 <>
-                                    <div className="h-4 w-px bg-gray-300 mx-1" />
+                                    <div className="h-3.5 w-px bg-gray-300" />
                                     <div
                                         className="flex items-center gap-1.5 text-amber-700 font-medium"
                                         title="Receita/Margem da viagem"
                                     >
-                                        <TrendingUp className="h-3.5 w-3.5 text-amber-500" />
+                                        <TrendingUp className="h-3 w-3 text-amber-500" />
                                         {new Intl.NumberFormat('pt-BR', {
                                             style: 'currency',
                                             currency: 'BRL'
@@ -1000,7 +1000,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                     if (epocaViagem?.display) {
                                         return (
                                             <>
-                                                <div className="h-4 w-px bg-gray-300 mx-1" />
+                                                <div className="h-3.5 w-px bg-gray-300" />
                                                 <div className="flex items-center gap-1.5 text-gray-600 font-medium">
                                                     <Calendar className="h-3.5 w-3.5 text-gray-400" />
                                                     {epocaViagem.display}
@@ -1034,7 +1034,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                     const daysToTrip = Math.floor((tripDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
                                     return (
                                         <>
-                                            <div className="h-4 w-px bg-gray-300 mx-1" />
+                                            <div className="h-3.5 w-px bg-gray-300" />
                                             <div className="flex items-center gap-1.5 text-gray-600 font-medium">
                                                 <Calendar className="h-3.5 w-3.5 text-gray-400" />
                                                 {tripDate.getDate()} de {tripDate.toLocaleString('pt-BR', { month: 'short' })}
@@ -1074,7 +1074,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
 
                                 return (
                                     <div key={field.key} className="flex items-center gap-2">
-                                        <div className="h-4 w-px bg-gray-300 mx-1" />
+                                        <div className="h-3.5 w-px bg-gray-300" />
                                         <div className="flex items-center gap-1.5 text-gray-600 font-medium" title={field.label}>
                                             <span className="text-gray-400 text-xs uppercase font-bold">{field.label}:</span>
                                             {displayValue}
@@ -1086,12 +1086,12 @@ export default function CardHeader({ card }: CardHeaderProps) {
                     </div>
 
                     {/* Row 2: Owners & Actions */}
-                    <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100">
-                        {/* Phase columns */}
-                        <div className="flex items-start gap-6 flex-wrap">
+                    <div className="flex items-center justify-between gap-3 pt-1.5 border-t border-gray-100">
+                        {/* Phase columns — compact horizontal */}
+                        <div className="flex items-center gap-4 flex-wrap">
                             {/* SDR */}
-                            <div className="flex flex-col gap-0.5 min-w-[150px]">
-                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">SDR</span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-none">SDR</span>
                                 <OwnerSelector
                                     value={card.sdr_owner_id}
                                     onChange={(id) => handleSdrSelect(id)}
@@ -1101,9 +1101,11 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 />
                             </div>
 
+                            <div className="h-4 w-px bg-gray-200" />
+
                             {/* Planner + Assistente */}
-                            <div className="flex flex-col gap-0.5 min-w-[150px]">
-                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Planner</span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Planner</span>
                                 <OwnerSelector
                                     value={card.vendas_owner_id}
                                     onChange={(id) => handlePlannerSelect(id)}
@@ -1111,7 +1113,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                     compact
                                     showNoSdrOption
                                 />
-                                <span className="text-[10px] font-medium text-slate-300 uppercase tracking-wider leading-none mt-1.5 mb-0.5">Assistente</span>
+                                <span className="text-[10px] font-medium text-slate-300 leading-none">Assist.</span>
                                 <OwnerSelector
                                     value={assistentePlanner?.profile_id || null}
                                     onChange={(id) => handleAssistentePlannerSelect(id)}
@@ -1122,9 +1124,11 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 />
                             </div>
 
+                            <div className="h-4 w-px bg-gray-200" />
+
                             {/* Pós-Venda + Assistente */}
-                            <div className="flex flex-col gap-0.5 min-w-[150px]">
-                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Pós-Venda</span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Pós</span>
                                 <OwnerSelector
                                     value={card.pos_owner_id}
                                     onChange={(id) => handlePosVendaSelect(id)}
@@ -1132,7 +1136,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                     compact
                                     showNoSdrOption
                                 />
-                                <span className="text-[10px] font-medium text-slate-300 uppercase tracking-wider leading-none mt-1.5 mb-0.5">Assistente</span>
+                                <span className="text-[10px] font-medium text-slate-300 leading-none">Assist.</span>
                                 <OwnerSelector
                                     value={assistentePos?.profile_id || null}
                                     onChange={(id) => handleAssistentePosSelect(id)}
@@ -1145,15 +1149,15 @@ export default function CardHeader({ card }: CardHeaderProps) {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex flex-wrap items-center gap-2 md:gap-3 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                             {missingBlocking.length > 0 && (
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setQualityGateModalOpen(true)}
-                                    className="gap-2 text-red-600 border-red-200 bg-red-50"
+                                    className="gap-1.5 text-red-600 border-red-200 bg-red-50"
                                 >
-                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertCircle className="h-3.5 w-3.5" />
                                     <span className="hidden sm:inline">{missingBlocking.length}</span> Pendências
                                 </Button>
                             )}

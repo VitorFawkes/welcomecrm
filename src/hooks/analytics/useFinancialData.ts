@@ -49,10 +49,10 @@ export function useFinancialBreakdown() {
 }
 
 export function useTopDestinations() {
-    const { dateRange, product, mode, stageId, ownerIds } = useAnalyticsFilters()
+    const { dateRange, product, mode, stageId, ownerIds, tagIds } = useAnalyticsFilters()
 
     return useQuery({
-        queryKey: ['analytics', 'top-destinations', dateRange.start, dateRange.end, product, mode, stageId, ownerIds],
+        queryKey: ['analytics', 'top-destinations', dateRange.start, dateRange.end, product, mode, stageId, ownerIds, tagIds],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC nova
             const { data, error } = await (supabase.rpc as any)('analytics_top_destinations', {
@@ -63,6 +63,7 @@ export function useTopDestinations() {
                 p_product: product === 'ALL' ? null : product,
                 p_stage_id: stageId,
                 p_owner_ids: ownerIds.length > 0 ? ownerIds : undefined,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
             })
             if (error) throw error
             return (data as unknown as TopDestination[]) || []
@@ -73,10 +74,10 @@ export function useTopDestinations() {
 }
 
 export function useRevenueByProduct() {
-    const { dateRange, product, mode, stageId, ownerIds } = useAnalyticsFilters()
+    const { dateRange, product, mode, stageId, ownerIds, tagIds } = useAnalyticsFilters()
 
     return useQuery({
-        queryKey: ['analytics', 'revenue-by-product', dateRange.start, dateRange.end, product, mode, stageId, ownerIds],
+        queryKey: ['analytics', 'revenue-by-product', dateRange.start, dateRange.end, product, mode, stageId, ownerIds, tagIds],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC nova
             const { data, error } = await (supabase.rpc as any)('analytics_revenue_by_product', {
@@ -86,6 +87,7 @@ export function useRevenueByProduct() {
                 p_product: product === 'ALL' ? null : product,
                 p_stage_id: stageId,
                 p_owner_ids: ownerIds.length > 0 ? ownerIds : undefined,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
             })
             if (error) throw error
             return (data as unknown as RevenueByProduct[]) || []

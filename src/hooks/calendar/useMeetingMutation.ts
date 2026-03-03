@@ -103,7 +103,10 @@ export function useMeetingMutation() {
         onSuccess: (result, vars) => {
             invalidateAll(vars.card_id)
             toast.success('Reunião criada!')
-            sendMeetingInvite(result.id, vars.card_id, 'created', user?.id || '')
+            // Only send invite when meeting_link is present (Julia creates without link)
+            if (vars.meeting_link) {
+                sendMeetingInvite(result.id, vars.card_id, 'created', user?.id || '')
+            }
         },
         onError: (error: Error) => {
             toast.error(error.message || 'Erro ao criar reunião')
@@ -112,6 +115,8 @@ export function useMeetingMutation() {
 
     const updateMeeting = useMutation({
         mutationFn: async ({ id, updates }: { id: string; cardId: string; updates: TarefaUpdate }) => {
+            let previousMeetingLink: string | null = null
+
             // Preserve created_at_stage_id in metadata
             if (updates.metadata && typeof updates.metadata === 'object') {
                 const { data: current } = await supabase
@@ -122,6 +127,7 @@ export function useMeetingMutation() {
 
                 if (current?.metadata && typeof current.metadata === 'object') {
                     const existing = current.metadata as Record<string, unknown>
+                    previousMeetingLink = (existing.meeting_link as string) || null
                     const incoming = updates.metadata as Record<string, unknown>
                     updates.metadata = {
                         ...existing,
@@ -137,10 +143,16 @@ export function useMeetingMutation() {
                 .eq('id', id)
 
             if (error) throw error
+            return { previousMeetingLink }
         },
-        onSuccess: (_, vars) => {
+        onSuccess: (result, vars) => {
             invalidateAll(vars.cardId)
             toast.success('Reunião atualizada!')
+            // Auto-send invite when meeting_link is ADDED (wasn't there before)
+            const newLink = (vars.updates.metadata as Record<string, unknown> | undefined)?.meeting_link as string | undefined
+            if (newLink && !result.previousMeetingLink) {
+                sendMeetingInvite(vars.id, vars.cardId, 'created', user?.id || '')
+            }
         },
         onError: (error: Error) => {
             toast.error(error.message || 'Erro ao atualizar reunião')

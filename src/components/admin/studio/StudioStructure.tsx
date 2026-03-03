@@ -31,13 +31,22 @@ import StageInspectorDrawer from './StageInspectorDrawer'
 import PhaseSettingsDrawer from './PhaseSettingsDrawer'
 import PromptModal, { ConfirmModal } from './PromptModal'
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases'
+import { useProductContext } from '../../../hooks/useProductContext'
 import type { Database } from '../../../database.types'
+
+const PRODUCT_PIPELINE_MAP: Record<string, string> = {
+    TRIPS:   'c8022522-4a1d-411c-9387-efe03ca725ee',
+    WEDDING: 'f4611f84-ce9c-48ad-814b-dcd6081f15db',
+}
 
 type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row']
 type PipelinePhase = Database['public']['Tables']['pipeline_phases']['Row']
 
 export default function StudioStructure() {
     const queryClient = useQueryClient()
+    const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS
+
     const [activeId, setActiveId] = useState<string | null>(null)
     const [activeType, setActiveType] = useState<'Phase' | 'Stage' | null>(null)
 
@@ -45,11 +54,12 @@ export default function StudioStructure() {
     const { data: phasesData, isLoading: loadingPhases } = usePipelinePhases()
 
     const { data: stagesData, isLoading: loadingStages } = useQuery({
-        queryKey: ['pipeline-stages-studio'],
+        queryKey: ['pipeline-stages-studio', pipelineId],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('pipeline_stages')
                 .select('*, pipeline_phases!pipeline_stages_phase_id_fkey(order_index)')
+                .eq('pipeline_id', pipelineId)
                 .order('ordem')
             if (error) throw error
             // Sort by phase order_index then stage ordem

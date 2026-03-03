@@ -13,6 +13,7 @@ import { usePipelineStages } from '@/hooks/usePipelineStages'
 import { useDrillDownStore } from '@/hooks/analytics/useAnalyticsDrillDown'
 import { cn } from '@/lib/utils'
 import { QueryErrorState } from '@/components/ui/QueryErrorState'
+import { formatCurrency } from '@/utils/whatsappFormatters'
 
 const FUNNEL_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#0ea5e9']
 
@@ -98,7 +99,7 @@ export default function FunnelView() {
             )}
 
             {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <KpiCard
                     title="Total no Funil"
                     value={stages.reduce((sum, s) => sum + s.current_count, 0)}
@@ -121,8 +122,8 @@ export default function FunnelView() {
                     title="Motivos de Perda"
                     value={(lossData || []).length}
                     icon={TrendingDown}
-                    color="text-rose-600"
-                    bgColor="bg-rose-50"
+                    color="text-amber-600"
+                    bgColor="bg-amber-50"
                     isLoading={lossLoading}
                 />
                 <KpiCard
@@ -159,10 +160,28 @@ export default function FunnelView() {
                                 tick={{ fontSize: 10, fill: '#334155' }}
                                 axisLine={false}
                                 tickLine={false}
+                                tickFormatter={(v: string) => v.length > 24 ? v.slice(0, 23) + '…' : v}
                             />
                             <Tooltip
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                                formatter={(value: number) => [value, 'Cards']}
+                                content={({ active, payload, label }) => {
+                                    if (!active || !payload?.length) return null
+                                    const row = payload[0]?.payload
+                                    if (!row) return null
+                                    return (
+                                        <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs">
+                                            <p className="font-medium text-slate-900 mb-1.5">{label}</p>
+                                            <div className="space-y-1">
+                                                <p className="text-slate-700">Cards: <span className="font-semibold">{row.current_count}</span></p>
+                                                {Number(row.total_valor) > 0 && (
+                                                    <p className="text-teal-600">Faturamento: <span className="font-semibold">{formatCurrency(Number(row.total_valor))}</span></p>
+                                                )}
+                                                {Number(row.receita_total) > 0 && (
+                                                    <p className="text-green-600">Receita: <span className="font-semibold">{formatCurrency(Number(row.receita_total))}</span></p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                }}
                             />
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             <Bar dataKey="current_count" radius={[0, 6, 6, 0]} barSize={20} cursor="pointer" onClick={(data: any) => { const s = data?.payload || data; if (s?.stage_id) drillDown.open({ label: s.stage_nome, drillStageId: s.stage_id, drillSource: 'stage_entries' }) }}>
@@ -195,7 +214,9 @@ export default function FunnelView() {
                                     <th className="text-right px-4 py-3 font-medium text-slate-500">Entrada</th>
                                     <th className="text-right px-4 py-3 font-medium text-slate-500">Saída</th>
                                     <th className="text-right px-4 py-3 font-medium text-slate-500">Perda</th>
-                                    <th className="text-right px-6 py-3 font-medium text-slate-500">Conversão</th>
+                                    <th className="text-right px-4 py-3 font-medium text-slate-500">Conversão</th>
+                                    <th className="text-right px-4 py-3 font-medium text-slate-500">Faturamento</th>
+                                    <th className="text-right px-6 py-3 font-medium text-slate-500">Receita</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -214,8 +235,12 @@ export default function FunnelView() {
                                             <td className="text-right px-4 py-3">
                                                 {drop > 0 ? <span className="text-rose-500 font-medium">-{drop}</span> : <span className="text-slate-300">0</span>}
                                             </td>
-                                            <td className="text-right px-6 py-3">
+                                            <td className="text-right px-4 py-3">
                                                 <span className={cn('font-bold', rateColor)}>{rate}%</span>
+                                            </td>
+                                            <td className="text-right px-4 py-3 text-slate-600 tabular-nums">{formatCurrency(Number(stage.total_valor))}</td>
+                                            <td className="text-right px-6 py-3 tabular-nums">
+                                                <span className={Number(stage.receita_total) > 0 ? 'text-green-600 font-medium' : 'text-slate-400'}>{formatCurrency(Number(stage.receita_total))}</span>
                                             </td>
                                         </tr>
                                     )
@@ -248,6 +273,7 @@ export default function FunnelView() {
                                 tick={{ fontSize: 10, fill: '#334155' }}
                                 axisLine={false}
                                 tickLine={false}
+                                tickFormatter={(v: string) => v.length > 24 ? v.slice(0, 23) + '…' : v}
                             />
                             <Tooltip content={<TimeTooltip />} cursor={{ fill: 'rgba(0,0,0,0.03)' }} />
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -315,6 +341,7 @@ export default function FunnelView() {
                                 tick={{ fontSize: 11, fill: '#334155' }}
                                 axisLine={false}
                                 tickLine={false}
+                                tickFormatter={(v: string) => v.length > 28 ? v.slice(0, 27) + '…' : v}
                             />
                             <Tooltip
                                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}

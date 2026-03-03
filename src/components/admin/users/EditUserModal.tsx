@@ -6,7 +6,7 @@ import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
-import { Shield, Users } from 'lucide-react';
+import { Shield, Users, Layers, Plane, Heart, Building2 } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -17,14 +17,21 @@ import {
 import { useRoles } from '../../../hooks/useRoles';
 import { useTeamOptions } from '../../../hooks/useTeams';
 import type { Database } from '../../../database.types';
+import { cn } from '../../../lib/utils';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
+
+const PRODUCTS = [
+    { value: 'TRIPS',   label: 'Welcome Trips',    icon: Plane,      color: 'text-teal-500' },
+    { value: 'WEDDING', label: 'Welcome Weddings',  icon: Heart,      color: 'text-rose-500' },
+    { value: 'CORP',    label: 'Welcome Corp',      icon: Building2,  color: 'text-purple-500' },
+] as const;
 
 interface EditUserModalProps {
     user: Profile | null;
     isOpen: boolean;
     onClose: () => void;
-    teams?: any[]; // Legacy prop, now using useTeamOptions
+    teams?: unknown[]; // Legacy prop, now using useTeamOptions
     onSuccess?: () => void;
 }
 
@@ -42,7 +49,8 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
         nome: '',
         email: '',
         role_id: '',
-        team_id: 'none'
+        team_id: 'none',
+        produtos: [] as string[]
     });
 
     // Load user data when modal opens
@@ -51,14 +59,32 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
             setFormData({
                 nome: user.nome || '',
                 email: user.email || '',
-                role_id: (user as any).role_id || '',
-                team_id: (user as any).team_id || 'none'
+                role_id: user.role_id || '',
+                team_id: user.team_id || 'none',
+                produtos: (user.produtos as string[]) || []
             });
         }
     }, [user]);
 
+    const toggleProduct = (value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            produtos: prev.produtos.includes(value)
+                ? prev.produtos.filter(p => p !== value)
+                : [...prev.produtos, value]
+        }));
+    };
+
+    type AppProduct = Database['public']['Enums']['app_product'];
+    type ProfileUpdates = {
+        nome: string;
+        role_id: string | null;
+        team_id: string | null;
+        produtos: AppProduct[] | null;
+    };
+
     const updateMutation = useMutation({
-        mutationFn: async (updates: any) => {
+        mutationFn: async (updates: ProfileUpdates) => {
             const { error } = await supabase
                 .from('profiles')
                 .update(updates)
@@ -68,6 +94,7 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['profiles'] });
+            queryClient.invalidateQueries({ queryKey: ['users'] });
             toast({
                 title: 'Usuário atualizado',
                 description: 'As informações foram salvas com sucesso.',
@@ -76,7 +103,7 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
             if (onSuccess) onSuccess();
             onClose();
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             toast({
                 title: 'Erro ao atualizar',
                 description: error.message || 'Ocorreu um erro ao salvar as alterações.',
@@ -94,7 +121,8 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
             await updateMutation.mutateAsync({
                 nome: formData.nome,
                 role_id: formData.role_id || null,
-                team_id: formData.team_id === 'none' ? null : formData.team_id
+                team_id: formData.team_id === 'none' ? null : formData.team_id,
+                produtos: formData.produtos.length > 0 ? (formData.produtos as AppProduct[]) : null
             });
         } finally {
             setIsLoading(false);
@@ -182,6 +210,37 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
                             />
                             <p className="text-xs text-muted-foreground">
                                 Define a qual equipe o usuário pertence (organização).
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="border-t border-slate-200" />
+
+                    {/* Product Access Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <Layers className="w-4 h-4 text-primary" />
+                            Acesso a Produtos
+                        </div>
+
+                        <div className="space-y-2">
+                            {PRODUCTS.map(p => (
+                                <label key={p.value} className="flex items-center gap-3 cursor-pointer py-1">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.produtos.includes(p.value)}
+                                        onChange={() => toggleProduct(p.value)}
+                                        className="rounded border-slate-300 text-indigo-600 w-4 h-4 flex-shrink-0"
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <p.icon className={cn('w-4 h-4', p.color)} />
+                                        <span className="text-sm text-foreground">{p.label}</span>
+                                    </div>
+                                </label>
+                            ))}
+                            <p className="text-xs text-muted-foreground pl-1 pt-1">
+                                Nenhum selecionado = acesso a todos os produtos.
                             </p>
                         </div>
                     </div>

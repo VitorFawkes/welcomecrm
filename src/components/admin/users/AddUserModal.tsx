@@ -6,9 +6,10 @@ import { Select } from '../../ui/Select';
 import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
-import { Copy, Check, UserPlus, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Copy, Check, UserPlus, Link as LinkIcon, Loader2, Layers, Plane, Heart, Building2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRoles } from '../../../hooks/useRoles';
+import { cn } from '../../../lib/utils';
 
 interface Team {
     id: string;
@@ -20,6 +21,12 @@ interface AddUserModalProps {
     onSuccess: () => void;
 }
 
+const PRODUCTS = [
+    { value: 'TRIPS',   label: 'Welcome Trips',   icon: Plane,     color: 'text-teal-500' },
+    { value: 'WEDDING', label: 'Welcome Weddings', icon: Heart,     color: 'text-rose-500' },
+    { value: 'CORP',    label: 'Welcome Corp',     icon: Building2, color: 'text-purple-500' },
+] as const;
+
 export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -29,8 +36,15 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('');
     const [inviteTeam, setInviteTeam] = useState('');
+    const [inviteProdutos, setInviteProdutos] = useState<string[]>([]);
     const [generatedLink, setGeneratedLink] = useState('');
     const [copied, setCopied] = useState(false);
+
+    const toggleProduct = (value: string) => {
+        setInviteProdutos(prev =>
+            prev.includes(value) ? prev.filter(p => p !== value) : [...prev, value]
+        );
+    };
 
     const handleGenerateInvite = async () => {
         if (!inviteEmail || !inviteRole) {
@@ -42,11 +56,14 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
         try {
             if (!user) throw new Error('No user');
 
-            const { data: token, error } = await supabase.rpc('generate_invite', {
+            // generate_invite tem p_produtos não refletido nos tipos gerados ainda
+            type GenerateInviteRpc = (fn: string, params: Record<string, string | string[] | null>) => Promise<{ data: string | null; error: { message: string } | null }>;
+            const { data: token, error } = await (supabase.rpc as unknown as GenerateInviteRpc)('generate_invite', {
                 p_email: inviteEmail,
-                p_role: inviteRole as any,
-                p_team_id: (inviteTeam || null) as any,
-                p_created_by: user.id
+                p_role: inviteRole,
+                p_team_id: inviteTeam || null,
+                p_created_by: user.id,
+                p_produtos: inviteProdutos.length > 0 ? inviteProdutos : null
             });
 
             if (error) throw error;
@@ -116,6 +133,39 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
                                 ]}
                             />
                         </div>
+                    </div>
+
+                    {/* Product Access */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            <Layers className="w-4 h-4 text-primary" />
+                            Acesso a Produtos
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            {PRODUCTS.map(p => (
+                                <label
+                                    key={p.value}
+                                    className={cn(
+                                        'flex flex-col items-center gap-1.5 p-3 rounded-lg border cursor-pointer transition-colors',
+                                        inviteProdutos.includes(p.value)
+                                            ? 'border-indigo-300 bg-indigo-50'
+                                            : 'border-slate-200 bg-white hover:bg-slate-50'
+                                    )}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={inviteProdutos.includes(p.value)}
+                                        onChange={() => toggleProduct(p.value)}
+                                        className="sr-only"
+                                    />
+                                    <p.icon className={cn('w-5 h-5', p.color)} />
+                                    <span className="text-xs font-medium text-foreground">{p.value}</span>
+                                </label>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Nenhum selecionado = acesso a todos os produtos.
+                        </p>
                     </div>
 
                     {generatedLink ? (

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-    ShieldCheck, Package, GitPullRequest, Users, ChevronUp, ChevronDown,
+    ShieldCheck, Package, GitPullRequest, Users, ChevronUp, ChevronDown, DollarSign, Wallet,
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
@@ -14,7 +14,7 @@ import { QueryErrorState } from '@/components/ui/QueryErrorState'
 import { formatCurrency } from '@/utils/whatsappFormatters'
 import { cn } from '@/lib/utils'
 
-type SortKey = 'viagens' | 'mudancas' | 'mudancas_por_viagem' | 'receita'
+type SortKey = 'viagens' | 'mudancas' | 'mudancas_por_viagem' | 'faturamento' | 'receita'
 type SortDir = 'asc' | 'desc'
 
 export default function OperationsView() {
@@ -68,7 +68,7 @@ export default function OperationsView() {
             )}
 
             {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 <KpiCard
                     title="Viagens Realizadas"
                     value={kpis?.viagens_realizadas ?? 0}
@@ -78,6 +78,26 @@ export default function OperationsView() {
                     isLoading={isLoading}
                     onClick={() => drillDown.open({ label: 'Viagens Realizadas', drillStatus: 'ganho', drillSource: 'closed_deals' })}
                     clickHint="Ver cards"
+                />
+                <KpiCard
+                    title="Faturamento"
+                    value={formatCurrency(kpis?.valor_total ?? 0)}
+                    icon={DollarSign}
+                    color="text-teal-600"
+                    bgColor="bg-teal-50"
+                    isLoading={isLoading}
+                    onClick={() => navigate('/analytics/financial')}
+                    clickHint="Ver financeiro"
+                />
+                <KpiCard
+                    title="Receita (Margem)"
+                    value={formatCurrency(kpis?.receita ?? 0)}
+                    icon={Wallet}
+                    color="text-rose-600"
+                    bgColor="bg-rose-50"
+                    isLoading={isLoading}
+                    onClick={() => navigate('/analytics/financial')}
+                    clickHint="Ver financeiro"
                 />
                 <KpiCard
                     title="Mudanças / Viagem"
@@ -185,6 +205,12 @@ export default function OperationsView() {
                                     Mud./Viagem {sortIcon('mudancas_por_viagem')}
                                 </th>
                                 <th
+                                    className="text-right px-4 py-3 font-medium text-slate-500 cursor-pointer select-none hover:text-slate-700 whitespace-nowrap"
+                                    onClick={() => handleSort('faturamento')}
+                                >
+                                    Faturamento {sortIcon('faturamento')}
+                                </th>
+                                <th
                                     className="text-right px-6 py-3 font-medium text-slate-500 cursor-pointer select-none hover:text-slate-700 whitespace-nowrap"
                                     onClick={() => handleSort('receita')}
                                 >
@@ -196,14 +222,14 @@ export default function OperationsView() {
                             {isLoading ? (
                                 Array.from({ length: 3 }).map((_, i) => (
                                     <tr key={i} className="border-b border-slate-50">
-                                        <td colSpan={5} className="px-6 py-4">
+                                        <td colSpan={6} className="px-6 py-4">
                                             <div className="h-4 bg-slate-100 rounded animate-pulse" />
                                         </td>
                                     </tr>
                                 ))
                             ) : sortedPlanners.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                                         Nenhum planner com viagens no período
                                     </td>
                                 </tr>
@@ -226,6 +252,7 @@ export default function OperationsView() {
                                                 {p.mudancas_por_viagem}
                                             </span>
                                         </td>
+                                        <td className="text-right px-4 py-3 text-slate-600">{formatCurrency(p.faturamento)}</td>
                                         <td className="text-right px-6 py-3 text-slate-700 font-medium">{formatCurrency(p.receita)}</td>
                                     </tr>
                                 ))
@@ -250,7 +277,7 @@ export default function OperationsView() {
                         >
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                             <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                            <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11, fill: '#334155' }} axisLine={false} tickLine={false} />
+                            <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11, fill: '#334155' }} axisLine={false} tickLine={false} tickFormatter={(v: string) => v.length > 16 ? v.slice(0, 15) + '…' : v} />
                             <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }} />
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             <Bar dataKey="viagens" fill="#22c55e" radius={[0, 4, 4, 0]} barSize={18} name="Viagens" cursor="pointer" onClick={(data: any) => { const d = data?.payload || data; if (d?.planner_id) drillDown.open({ label: `${d.name} — Viagens`, drillOwnerId: d.planner_id, drillStatus: 'ganho', drillSource: 'closed_deals' }) }} />

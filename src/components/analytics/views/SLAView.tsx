@@ -226,6 +226,7 @@ export default function SLAView() {
                                     tick={{ fontSize: 10, fill: '#334155' }}
                                     axisLine={false}
                                     tickLine={false}
+                                    tickFormatter={(v: string) => v.length > 24 ? v.slice(0, 23) + '…' : v}
                                 />
                                 <Tooltip
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}

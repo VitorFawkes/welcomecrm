@@ -83,10 +83,10 @@ export interface WhatsAppMetricsV2 {
 // ── Hook ──
 
 export function useWhatsAppAnalytics() {
-    const { dateRange, product, granularity, ownerIds } = useAnalyticsFilters()
+    const { dateRange, product, granularity, ownerIds, tagIds } = useAnalyticsFilters()
 
     return useQuery({
-        queryKey: ['analytics', 'whatsapp-v2', dateRange.start, dateRange.end, product, granularity, ownerIds],
+        queryKey: ['analytics', 'whatsapp-v2', dateRange.start, dateRange.end, product, granularity, ownerIds, tagIds],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC retorna JSONB
             const { data, error } = await (supabase.rpc as any)('analytics_whatsapp_v2', {
@@ -95,6 +95,7 @@ export function useWhatsAppAnalytics() {
                 p_produto: product === 'ALL' ? null : product,
                 p_owner_ids: ownerIds.length > 0 ? ownerIds : undefined,
                 p_granularity: granularity,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
             })
             if (error) throw error
             return (data as unknown as WhatsAppMetricsV2) || null

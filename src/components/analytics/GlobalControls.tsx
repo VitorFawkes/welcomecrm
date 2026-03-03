@@ -155,7 +155,9 @@ export default function GlobalControls() {
 
     return (
         <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-3">
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+            {/* Left: scrollable controls */}
+            <div className="flex items-center gap-3 flex-1 min-w-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                 {/* Analysis mode dropdown — 3 sections */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -293,58 +295,10 @@ export default function GlobalControls() {
                         </button>
                     ))}
                 </div>
+            </div>{/* end left scrollable */}
 
-                <div className="flex-1" />
-
-                {/* Consultant filter (multi-select) */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button className={cn(
-                            'inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500',
-                            ownerIds.length > 0
-                                ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                        )}>
-                            <User className="w-3.5 h-3.5 shrink-0" />
-                            <span className="max-w-[140px] truncate">{ownerLabel}</span>
-                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52 max-h-[320px] overflow-y-auto">
-                        <div className="flex items-center justify-between px-2 py-1">
-                            <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold p-0">
-                                Consultores
-                            </DropdownMenuLabel>
-                            {ownerIds.length > 0 && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setOwnerIds([]) }}
-                                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium"
-                                >
-                                    Limpar
-                                </button>
-                            )}
-                        </div>
-                        <DropdownMenuSeparator />
-                        {(consultants || []).map((c) => (
-                            <DropdownMenuItem
-                                key={c.id}
-                                onClick={(e) => { e.preventDefault(); toggleOwnerId(c.id) }}
-                                className="flex items-center gap-2 text-xs cursor-pointer"
-                            >
-                                <div className={cn(
-                                    'w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors',
-                                    ownerIds.includes(c.id)
-                                        ? 'bg-indigo-600 border-indigo-600'
-                                        : 'border-slate-300'
-                                )}>
-                                    {ownerIds.includes(c.id) && <Check className="w-2.5 h-2.5 text-white" />}
-                                </div>
-                                {c.nome}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-
+                {/* Right-side filters: Tags + Consultant + Product */}
+                <div className="flex items-center gap-2 shrink-0">
                 {/* Tag filter (only shown if there are tags) */}
                 {allTags.length > 0 && (
                     <DropdownMenu>
@@ -356,7 +310,7 @@ export default function GlobalControls() {
                                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                             )}>
                                 <Tag className="w-3.5 h-3.5 shrink-0" />
-                                <span className="max-w-[120px] truncate">{tagLabel}</span>
+                                <span className="max-w-[100px] truncate">{tagLabel}</span>
                                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             </button>
                         </DropdownMenuTrigger>
@@ -400,8 +354,57 @@ export default function GlobalControls() {
                     </DropdownMenu>
                 )}
 
+                {/* Consultant filter (multi-select) */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button className={cn(
+                            'inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500',
+                            ownerIds.length > 0
+                                ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        )}>
+                            <User className="w-3.5 h-3.5 shrink-0" />
+                            <span className="max-w-[120px] truncate">{ownerLabel}</span>
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52 max-h-[320px] overflow-y-auto">
+                        <div className="flex items-center justify-between px-2 py-1">
+                            <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold p-0">
+                                Consultores
+                            </DropdownMenuLabel>
+                            {ownerIds.length > 0 && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setOwnerIds([]) }}
+                                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium"
+                                >
+                                    Limpar
+                                </button>
+                            )}
+                        </div>
+                        <DropdownMenuSeparator />
+                        {(consultants || []).map((c) => (
+                            <DropdownMenuItem
+                                key={c.id}
+                                onClick={(e) => { e.preventDefault(); toggleOwnerId(c.id) }}
+                                className="flex items-center gap-2 text-xs cursor-pointer"
+                            >
+                                <div className={cn(
+                                    'w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors',
+                                    ownerIds.includes(c.id)
+                                        ? 'bg-indigo-600 border-indigo-600'
+                                        : 'border-slate-300'
+                                )}>
+                                    {ownerIds.includes(c.id) && <Check className="w-2.5 h-2.5 text-white" />}
+                                </div>
+                                {c.nome}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
                 {/* Product filter */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 pl-1 border-l border-slate-200">
                     <Filter className="w-3.5 h-3.5 text-slate-400" />
                     {products.map((p) => (
                         <button
@@ -417,6 +420,7 @@ export default function GlobalControls() {
                             {p.label}
                         </button>
                     ))}
+                </div>
                 </div>
             </div>
         </div>

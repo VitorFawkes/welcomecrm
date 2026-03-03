@@ -91,10 +91,10 @@ export function useFunnelData() {
 }
 
 export function useRevenueTimeseries() {
-    const { dateRange, granularity, product, mode, stageId, ownerIds } = useAnalyticsFilters()
+    const { dateRange, granularity, product, mode, stageId, ownerIds, tagIds } = useAnalyticsFilters()
 
     return useQuery({
-        queryKey: ['analytics', 'revenue-timeseries', dateRange.start, dateRange.end, granularity, product, mode, stageId, ownerIds],
+        queryKey: ['analytics', 'revenue-timeseries', dateRange.start, dateRange.end, granularity, product, mode, stageId, ownerIds, tagIds],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC não existe nos types até deploy da migration
             const { data, error } = await (supabase.rpc as any)('analytics_revenue_timeseries', {
@@ -105,6 +105,7 @@ export function useRevenueTimeseries() {
                 p_mode: mode,
                 p_stage_id: stageId,
                 p_owner_ids: ownerIds.length > 0 ? ownerIds : undefined,
+                p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
             })
             if (error) throw error
             return (data as unknown as RevenuePoint[]) || []

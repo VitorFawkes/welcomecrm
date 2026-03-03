@@ -80,8 +80,8 @@ export default function Pipeline() {
             <div className="flex h-full flex-col relative overflow-hidden bg-gray-50/50">
 
                 {/* Header Section: Compact single row */}
-                <div className="flex-shrink-0 py-3 px-6 bg-white/50 backdrop-blur-sm border-b border-gray-200/50 z-10">
-                    <header className="flex items-center justify-between gap-4 mb-3">
+                <div className="flex-shrink-0 py-2 px-6 bg-white/50 backdrop-blur-sm border-b border-gray-200/50 z-10">
+                    <header className="flex items-center justify-between gap-4 mb-1">
                         <div className="flex items-center gap-4">
                             <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Pipeline</h1>
                             <span className="text-sm text-gray-400 hidden md:inline">Gerencie suas oportunidades</span>
@@ -116,7 +116,7 @@ export default function Pipeline() {
                         </div>
                     </header>
 
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-4 flex-wrap flex-1">
                                 {/* Search Bar */}
@@ -204,7 +204,7 @@ export default function Pipeline() {
                                 {/* Sort Dropdown */}
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all min-w-[140px] justify-between group">
+                                        <button className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all min-w-[140px] justify-between group">
                                             <div className="flex items-center">
                                                 <ArrowUpDown className="h-4 w-4 mr-2 text-gray-500 group-hover:text-primary transition-colors" />
                                                 <span className="text-gray-500 mr-1">Ordenar:</span>
@@ -265,7 +265,7 @@ export default function Pipeline() {
                                 {/* Smart Filter Button */}
                                 <button
                                     onClick={() => setIsFilterDrawerOpen(true)}
-                                    className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
+                                    className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-sm transition-all"
                                 >
                                     <Filter className="h-4 w-4 mr-2 text-gray-500" />
                                     Filtros
@@ -275,7 +275,7 @@ export default function Pipeline() {
 
                                 <button
                                     onClick={() => setIsCreateModalOpen(true)}
-                                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark border border-transparent rounded-lg shadow-sm transition-all"
+                                    className="flex items-center px-4 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary-dark border border-transparent rounded-lg shadow-sm transition-all"
                                 >
                                     <span className="mr-1.5 text-lg leading-none">+</span>
                                     Novo Card

@@ -74,7 +74,8 @@ function buildDisplay(data: Partial<EpocaViagem>): string {
     return ''
 }
 
-function parseExistingValue(value: any): EpocaViagem | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- legacy format parsing requires dynamic shape
+function parseExistingValue(value: Record<string, any> | null | undefined): EpocaViagem | null {
     if (!value) return null
 
     // Handle legacy format { inicio, fim, flexivel }
@@ -128,9 +129,11 @@ export default function FlexibleDateField({
 
     const [showTypeDropdown, setShowTypeDropdown] = useState(false)
 
+    // Sync external value → local state
     useEffect(() => {
         const parsed = parseExistingValue(value)
         if (parsed) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- valid prop→state sync for controlled component
             setLocalData(parsed)
         }
     }, [value])
@@ -195,13 +198,13 @@ export default function FlexibleDateField({
 
     return (
         <FieldWrapper label={label} required={required} error={error} helpText={helpText}>
-            <div className="space-y-4">
+            <div className="space-y-3">
                 {/* Type Selector */}
                 <div className="relative">
                     <button
                         type="button"
                         onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                        className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                         <div className="text-left">
                             <div className="text-sm font-medium text-gray-900">{selectedTipo?.label}</div>
@@ -221,7 +224,7 @@ export default function FlexibleDateField({
                                     type="button"
                                     onClick={() => handleTypeChange(tipo.value)}
                                     className={cn(
-                                        "w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0",
+                                        "w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0",
                                         localData.tipo === tipo.value && "bg-indigo-50"
                                     )}
                                 >
@@ -363,7 +366,7 @@ export default function FlexibleDateField({
                 )}
 
                 {localData.tipo === 'indefinido' && (
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <p className="text-sm text-gray-600 text-center">
                             O cliente ainda não definiu a época da viagem
                         </p>
@@ -372,7 +375,7 @@ export default function FlexibleDateField({
 
                 {/* Flexible Toggle */}
                 {localData.tipo !== 'indefinido' && (
-                    <label className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100 cursor-pointer hover:bg-amber-100/50 transition-colors">
+                    <label className="flex items-center gap-2.5 p-2.5 bg-amber-50 rounded-lg border border-amber-100 cursor-pointer hover:bg-amber-100/50 transition-colors">
                         <input
                             type="checkbox"
                             checked={localData.flexivel}

@@ -4,6 +4,8 @@ import { supabase } from '../../../lib/supabase';
 import { X, Save, Eye, EyeOff, CheckSquare, Square, Loader2, Check } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases';
+import { useProductContext } from '../../../hooks/useProductContext';
+import { useSections } from '../../../hooks/useSections';
 import type { Database } from '../../../database.types';
 
 type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'];
@@ -18,6 +20,7 @@ interface StageInspectorDrawerProps {
 
 export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageInspectorDrawerProps) {
     const queryClient = useQueryClient();
+    const { currentProduct } = useProductContext();
     const [activeTab, setActiveTab] = useState<'general' | 'data'>('general');
 
     // Local state for stage details
@@ -31,14 +34,23 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
         }
     }, [stageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Sections for the current product — used to filter which fields to show
+    const { data: productSections = [] } = useSections(currentProduct);
+
     // --- Data Fetching ---
-    const { data: fields } = useQuery({
+    const { data: allFields } = useQuery({
         queryKey: ['system-fields-inspector'],
         queryFn: async () => {
             const { data } = await supabase.from('system_fields').select('*').order('order_index').order('label');
             return data as SystemField[];
         },
         enabled: isOpen
+    });
+
+    // Filter fields to only those belonging to sections of the current product
+    const fields = allFields?.filter(f => {
+        if (!f.section) return true
+        return productSections.some(s => s.key === f.section)
     });
 
     const { data: configs } = useQuery({

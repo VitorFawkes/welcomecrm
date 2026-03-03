@@ -224,10 +224,11 @@ export default function FinancialView() {
                                 <YAxis
                                     dataKey="destino"
                                     type="category"
-                                    width={130}
+                                    width={140}
                                     tick={{ fontSize: 11, fill: '#334155' }}
                                     axisLine={false}
                                     tickLine={false}
+                                    tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 17) + '…' : v}
                                 />
                                 <Tooltip
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}

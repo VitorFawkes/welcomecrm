@@ -303,8 +303,8 @@ export default function CardTasks({ cardId, requiredTasks = [] }: CardTasksProps
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-            <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4">
+            <div className="px-3 py-2 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-gray-500" />
                     Agenda & Tarefas
@@ -316,7 +316,7 @@ export default function CardTasks({ cardId, requiredTasks = [] }: CardTasksProps
                 </h3>
                 <button
                     onClick={() => { setEditingTask(null); setModalMode('create'); setIsModalOpen(true); }}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-full transition-colors flex items-center gap-1"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     Novo Item
@@ -381,19 +381,19 @@ export default function CardTasks({ cardId, requiredTasks = [] }: CardTasksProps
                             <div
                                 key={task.id}
                                 onClick={() => handleEdit(task)}
-                                className={`p-3 hover:bg-gray-50 transition-colors group relative cursor-pointer ${
+                                className={`px-3 py-2 hover:bg-gray-50 transition-colors group relative cursor-pointer ${
                                     isMudanca && !task.concluida
                                         ? 'border-l-4 border-l-orange-400 bg-orange-50/40'
                                         : ''
                                 } ${task.concluida ? (isRescheduled(task) ? 'opacity-75 bg-gray-50/30' : 'opacity-60 bg-gray-50/50') : ''}`}
                             >
-                                <div className="flex items-start gap-3">
+                                <div className="flex items-start gap-2.5">
                                     {/* Checkbox / Toggle */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleToggleComplete(task); }}
                                         className={`mt-0.5 flex-shrink-0 transition-colors ${task.concluida ? 'text-green-500' : 'text-gray-300 hover:text-green-500'}`}
                                     >
-                                        {task.concluida ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                                        {task.concluida ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
                                     </button>
 
                                     <div className="flex-1 min-w-0">

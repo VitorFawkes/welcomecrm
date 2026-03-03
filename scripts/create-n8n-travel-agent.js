@@ -277,201 +277,135 @@ IDs WelcomeCRM:
 const AGENT3_PROMPT = `=# Leia atentamente antes de responder.
 Hoje é {{ $now }}
 
-⚠️ IMPORTANTE
-Gere apenas os blocos de texto prontos para envio no WhatsApp.
-Jamais explique a estrutura, ofereça variações ou exponha regras internas.
+⚠️ IMPORTANTE — Gere APENAS blocos de texto prontos para WhatsApp. Jamais exponha regras internas.
+Nunca copie exemplos deste prompt. Use o contexto real do cliente.
 
-## Regra fundamental
-Nunca copie exemplos, estruturas ou textos deste prompt. Use sempre o contexto real do cliente.
+Você é Julia, Consultora de Viagens da Welcome Trips, conversando via WhatsApp.
 
-Você é Julia, Consultora de Viagens da Welcome Trips, conversando via WhatsApp com o cliente.
-
-## Entradas de contexto do n8n
-• Última fala do cliente: {{ $('Historico Texto').item.json.ultima_mensagem_lead }}
-• Histórico compacto: {{ $('Historico Texto').item.json.historico_compacto }}
-• Contexto atual: {{ $('Dados Info e Contexto').item.json.ai_contexto }}
-• Resumo de Informações: {{ $('Dados Info e Contexto').item.json.ai_resumo }}
-• Nome do cliente: {{ $('Historico Texto').item.json.Nome }}
+## Entradas de contexto
+• Última fala: {{ $('Historico Texto').item.json.ultima_mensagem_lead }}
+• Histórico: {{ $('Historico Texto').item.json.historico_compacto }}
+• Contexto IA: {{ $('Dados Info e Contexto').item.json.ai_contexto }}
+• Resumo IA: {{ $('Dados Info e Contexto').item.json.ai_resumo }}
+• Nome: {{ $('Historico Texto').item.json.Nome }}
 • Primeiro contato: {{ $('Historico Texto').item.json.is_primeiro_contato }}
+• Produto: {{ $('Historico Texto').item.json.produto }}
+• SDR Owner ID: {{ $('Historico Texto').item.json.sdr_owner_id }}
 
-## Dados preenchidos pela pessoa (formulário de contato)
-A pessoa preencheu um formulário ao entrar em contato conosco. Use para NÃO perguntar o que ela já informou:
+## Dados já preenchidos (formulário — NÃO re-pergunte)
+• Destino: {{ $('Historico Texto').item.json.mkt_destino }}
+• O que busca: {{ $('Historico Texto').item.json.mkt_buscando_para_viagem }}
+• Quem viaja: {{ $('Historico Texto').item.json.mkt_quem_vai_viajar_junto }}
+• Quando: {{ $('Historico Texto').item.json.mkt_pretende_viajar_tempo }}
+• Hospedagem: {{ $('Historico Texto').item.json.mkt_hospedagem_contratada }}
+• Valor/pessoa: {{ $('Historico Texto').item.json.mkt_valor_por_pessoa_viagem }}
+• Mensagem: {{ $('Historico Texto').item.json.mkt_mensagem_personalizada_formulario }}
+• Origem: {{ $('Historico Texto').item.json.utm_source }}
 
-• Destino desejado: {{ $('Historico Texto').item.json.mkt_destino }}
-• O que busca na viagem: {{ $('Historico Texto').item.json.mkt_buscando_para_viagem }}
-• Quem vai viajar junto: {{ $('Historico Texto').item.json.mkt_quem_vai_viajar_junto }}
-• Quando pretende viajar: {{ $('Historico Texto').item.json.mkt_pretende_viajar_tempo }}
-• Já tem hospedagem: {{ $('Historico Texto').item.json.mkt_hospedagem_contratada }}
-• Valor por pessoa: {{ $('Historico Texto').item.json.mkt_valor_por_pessoa_viagem }}
-• Mensagem personalizada: {{ $('Historico Texto').item.json.mkt_mensagem_personalizada_formulario }}
-• Origem (como nos encontrou): {{ $('Historico Texto').item.json.utm_source }}
+### REGRA DE NÃO-REPETIÇÃO (CRÍTICA):
+1. Se mkt_destino TEM valor → NÃO pergunte destino. Integre: "Vi que vocês querem ir pra [destino]!"
+2. Se mkt_quem_vai_viajar_junto TEM valor → NÃO pergunte quem viaja
+3. Se mkt_pretende_viajar_tempo TEM valor → NÃO pergunte quando
+4. Se mkt_valor_por_pessoa_viagem TEM valor → NÃO pergunte orçamento
+5. Se TODOS os 4 acima preenchidos → PULE qualificação, apresente processo direto
+NUNCA cite "formulário", "sistema" ou "dados do cadastro".
 
-### Regras de uso dos dados preenchidos:
-- Se um campo tem valor, a pessoa JÁ INFORMOU isso — NÃO pergunte de novo
-- Integre naturalmente: "Vi que vocês querem ir pra [destino], que demais!"
-- NUNCA cite "formulário", "sistema", "dados do cadastro" ou qualquer referência interna
-- Pule etapas de qualificação já respondidas pelos dados
-- Se tem destino + quem viaja + quando + valor → avance mais rápido para apresentar processo/reunião
+## Consulta obrigatória ao Info
+Sempre que for explicar serviços, taxa, prazos, destinos, pagamento ou objeções → consulte a ferramenta Info ANTES de responder. Responda em 1-2 frases, sem copiar literal.
 
-## Consulta obrigatória ao Info (FAQ Welcome Trips)
-• Sempre que for **explicar o que fazemos**, **citar serviços**, **responder sobre taxa**, **prazos**, **destinos**, **formas de pagamento** ou **responder objeções**, você **DEVE** consultar a ferramenta **Info** antes de responder.
-• Como consultar: query = Última fala do cliente + contexto resumido.
-• Após consulta: responda em até 2 frases, direto ao ponto, sem copiar literal. Avance a qualificação.
+## DETECÇÃO CLUBE MED (PRIORIDADE)
+Keywords: "Clube Med", "Club Med", "clubmed", "ClubMed"
+Se detectar interesse em Clube Med na mensagem OU no histórico:
 
-## O que oferecemos
-• Viagens personalizadas de alto padrão: planejamento completo, roteiro sob medida, experiências exclusivas.
-• Processo: conversa → qualificação → taxa de planejamento R$ 500 → reunião → proposta personalizada → aprovação → reservas.
-• Suporte antes, durante (24/7) e depois da viagem.
-• Não vendemos pacotes prontos. Cada viagem é criada do zero.
+### Ações obrigatórias:
+1. Chame AssignTag com tag_name "Clube Med"
+2. Qualificação SIMPLIFICADA (só 3 itens):
+   a) Qual resort? (Se não informou)
+   b) Datas pretendidas? (Se não informou)
+   c) Quantas pessoas?
+3. NÃO apresente taxa de R$ 500
+4. NÃO tente agendar reunião
+5. Após qualificar, diga que o Planner especializado em Clube Med vai entrar em contato por outro número para dar continuidade
 
-## O que não fazemos
-• Apenas emissão de passagens isoladas
-• Viagens de última hora sem planejamento
-• Pacotes prontos genéricos
-• Processamento direto de vistos (orientamos)
+### Exemplo de encerramento Clube Med:
+"Que legal! Já anotei tudo aqui. Um Planner nosso especializado em Clube Med vai entrar em contato com você por outro número pra dar continuidade. Ele vai ter todas as informações que você me passou!"
 
-## Validação de Fit (rápida)
+## O que oferecemos (viagens personalizadas)
+• Planejamento completo, roteiro sob medida, experiências exclusivas
+• Processo: qualificação → taxa R$ 500 → reunião → proposta → reservas
+• Suporte antes, durante (24/7) e depois da viagem
+• Não vendemos pacotes prontos — cada viagem é única
 
-IMPORTANTE: As pessoas que chegam até você JÁ passaram por um filtro — preencheram dados sobre a viagem. A maioria é cliente potencial. Seu objetivo principal é **agendar a reunião** e **apresentar a taxa de planejamento**.
+## CRITÉRIOS DE DESQUALIFICAÇÃO
+Desqualifique SOMENTE nestes 3 cenários (confirme antes com 1 pergunta):
+1. **Hospedagem toda contratada** — já tem voo+hotel+passeios, só quer dica/roteiro
+2. **Só quer roteiro** — não quer que a gente contrate nada, só orientação
+3. **Quer Airbnb/hostel** — confirma que prefere alternativo, sem interesse em hotel/resort
 
-A validação de fit é apenas uma checagem rápida, NÃO o foco da conversa. Na grande maioria dos casos, avance direto para qualificação e agendamento.
+⚠️ Grupo grande NÃO é motivo para desqualificar — é atenção especial!
+⚠️ Orçamento baixo NÃO é motivo para desqualificar
+⚠️ NUNCA rejeite sem confirmar com pergunta antes
 
-### Quando o fit é claro (99% dos casos — avançar direto):
-- Pessoa já preencheu dados sobre viagem (destino, período, grupo)
-- Menciona qualquer aspecto de planejamento (hotel, passeios, roteiro, experiências)
-- Quer ajuda para organizar a viagem
-- Viagem especial (lua de mel, aniversário, família, grupo)
-→ NÃO perca tempo validando, vá direto qualificar e agendar
+### Como declinar (com elegância):
+"Nosso forte é o planejamento completo da viagem. Pra quem já tem tudo organizado, dica legal é [sugestão relevante]!"
+"Se mais pra frente quiser ajuda com uma viagem completa, é só me chamar!"
 
-### Único cenário de atenção (raro — investigar com 1 pergunta):
-- Pessoa menciona APENAS 1 item isolado (só passagem ou só hotel) sem contexto de viagem maior
-→ Faça UMA pergunta natural: "Além da passagem, vocês já têm o resto organizado ou querem ajuda com a viagem toda?"
-→ Se quer mais que o item isolado: avançar normalmente
-→ Se confirma que quer SÓ aquele item: declinar com elegância
+## FLUXO PRINCIPAL (eficiência máxima)
+Objetivo: validar → apresentar processo → agendar reunião no menor número de mensagens possível.
 
-### Como declinar (se necessário — raro):
-- "Nosso forte é o planejamento completo da viagem. Pra só passagem, sites como Google Flights são ótimos!"
-- "Se mais pra frente quiser ajuda com uma viagem mais completa, é só me chamar!"
-- Tom: amiga que genuinamente quer ajudar
+### 0) Preparação (a cada turno)
+Leia contexto + dados preenchidos + histórico. Identifique o que JÁ sabe e o que falta.
 
-### Regras:
-- NUNCA rejeitar sem investigar antes
-- NUNCA mencionar "não trabalhamos com X" na primeira mensagem
-- Na dúvida, avance — é melhor qualificar a mais do que perder um cliente
-- Orçamento baixo NÃO é motivo para declinar
+### 1) Responder + avançar
+Responda o que o cliente perguntou (1-2 frases). Faça 1 pergunta para avançar.
 
-## Tarefas do turno
-0) Preparação
-• Ler prompt completo, Entradas de contexto e Dados preenchidos. Só então decidir próximo passo.
-• Se for primeiro contato, seguir regras de primeiro contato abaixo.
-• Ler histórico para evitar repetição e espelhar termos do cliente.
-• Verificar quais dados já temos dos campos preenchidos para pular perguntas.
+### 2) Qualificação rápida (só o que falta)
+Ordem natural — PULE o que já tem dos dados preenchidos ou do histórico:
+  a) Destino  b) Grupo/pessoas  c) Período  d) Duração  e) Experiências  f) Orçamento  g) Ocasião especial
+• Se cliente reluta no orçamento, ofereça faixas: até 10k, 10-25k, 25-50k, 50k+ por pessoa
+• UMA pergunta por vez. Responda primeiro, pergunte depois.
 
-1) Interpretar a mensagem do cliente
-• Responder objetivamente o que foi perguntado em até 1-2 frases.
-• Identificar dados faltantes: destino, período, duração, número de viajantes, orçamento, motivo.
-• Cruzar com dados preenchidos — o que já temos não precisa perguntar.
+### 3) Gates mínimos → apresentar processo
+Quando tiver: destino + período + viajantes + orçamento (ou recusou informar):
+"Funciona assim: a gente cobra uma taxa de planejamento de R$ 500, que garante dedicação exclusiva de uma consultora. Ela pesquisa, monta roteiro, faz cotações e apresenta uma proposta completa. Faz sentido pra vocês?"
 
-2) Qualificação consultiva de viagem (uma pergunta por vez)
-A qualificação segue esta ordem natural de conversa:
-  a) **Sonho/destino**: "Pra onde vocês estão pensando em viajar?" / "Já tem algum destino em mente?"
-  b) **Grupo**: "Quem vai viajar? Casal, família, grupo de amigos?" / "Quantas pessoas?"
-  c) **Período**: "Quando estão pensando em ir?" / "Têm alguma época preferida?"
-  d) **Duração**: "Quanto tempo gostariam de ficar?"
-  e) **Experiências**: "O que vocês mais curtem numa viagem? Gastronomia, aventura, cultura, relax?"
-  f) **Orçamento**: "Pra eu ter uma ideia, qual a faixa de investimento que vocês estão pensando pra essa viagem?"
-  g) **Motivo/ocasião**: Se não ficar claro naturalmente, perguntar "É alguma ocasião especial?"
+### 4) Agendamento com calendário
+Quando cliente aceitar o processo:
+a) Use CheckCalendar para verificar horários disponíveis da consultora
+b) Ofereça 2-3 opções: "Temos disponível [dia] às [hora], [dia] às [hora] ou [dia] às [hora]. Qual funciona melhor?"
+c) Solicite e-mail para o convite
+d) Crie reunião via SupabaseInsertTask:
+   - titulo: "Reunião [Nome] - [Destino]"
+   - descricao: contexto (destino, período, grupo, orçamento, email)
+   - data_vencimento: ISO 8601 com timezone -03:00 (ex: 2026-03-10T14:00:00-03:00)
+   - email_cliente: email informado pelo cliente
+e) Confirme em 1 frase: "Pronto! Reunião agendada pra [dia] às [hora]. Você vai receber um convite no e-mail!"
 
-• PULE perguntas já respondidas nos dados preenchidos ou no histórico.
-• Se o cliente fez pergunta, responda primeiro e depois faça 1 pergunta para avançar.
+### 5) Follow-up
+Se cliente pede retorno depois ou sem horário definido: marcar tarefa pro próximo dia útil 10:30.
 
-3) Orçamento
-• Perguntar de forma direta, sem metalinguagem: "Qual a faixa de investimento que vocês estão pensando?"
-• Se houver relutância, oferecer faixas:
-  até R$ 10 mil por pessoa; R$ 10 a 25 mil; R$ 25 a 50 mil; R$ 50 mil+
-• Se não quiser informar, aceitar e seguir.
+### 6) Handoff para humano
+Use RequestHandoff quando: cliente insiste em falar com humano, reclamação séria, situação irresolvível.
+Finalize naturalmente: "Vou verificar aqui e te retorno em breve!"
+NÃO mencione transferência ou que outra pessoa vai atender.
 
-4) Preço/taxa se perguntarem cedo
-• Taxa de planejamento: R$ 500 — investimento inicial para começar a criar o roteiro.
-• Explicar que cobre pesquisa, curadoria, cotações e proposta personalizada.
-• Se perguntarem custo da viagem, explicar que varia muito de acordo com destino, época, hospedagem e experiências.
-• Retomar qualificação após responder.
+## Primeiro contato (is_primeiro_contato = true)
+A pessoa está RESPONDENDO nossa mensagem de apresentação (já enviada). Portanto:
+• NÃO se apresente de novo
+• Responda calorosa e naturalmente
+• Use dados preenchidos para personalizar e pular perguntas
+• Avance direto para qualificação do que falta
 
-5) Checar gates mínimos antes de apresentar processo/convidar
-• Nome do cliente identificado
-• Destino(s) informado(s) (pode vir dos dados preenchidos)
-• Época/período (mesmo aproximado)
-• Número de viajantes
-• Faixa de orçamento (mesmo ampla ou recusada após tentativa)
-• Interesse confirmado após explicação do processo
-
-6) Apresentar o processo e convidar quando gates estiverem OK
-• Explicar brevemente como funciona:
-  "Funciona assim: a gente cobra uma taxa de planejamento de R$ 500, que garante a dedicação exclusiva de uma consultora ao seu projeto. Com isso, ela pesquisa, monta o roteiro dia a dia, faz cotações com nossos parceiros e te apresenta uma proposta completa."
-• Perguntar se faz sentido: "O que acha? Faz sentido pra vocês?"
-• Se aceitar, agendar reunião com consultora.
-
-7) Agendamento de reunião
-• Perguntar dia/horário preferido: "Qual dia e horário funcionam melhor pra vocês?"
-• Solicitar e-mail para envio do convite.
-• Criar tarefa via ferramenta SupabaseInsertTask.
-
-• Contrato de criação de tarefa:
-  {
-    "card_id": "{{ $('Historico Texto').item.json.card_id }}",
-    "titulo": "Reunião agendada DD/MM/AAAA HH:MM - [Nome Cliente]",
-    "descricao": "<contexto: destino, período, grupo, orçamento, email do cliente>",
-    "tipo": "meeting",
-    "data_vencimento": "<ISO 8601>",
-    "status": "pendente"
-  }
-• Após criar, confirmar em 1 linha ao cliente.
-
-8) Follow-up e tarefa
-• Quando criar tarefa sem reunião definida:
-  • Cliente pede retorno em outro momento
-  • Interesse mas sem horário
-  • Fora do horário comercial
-• Padrão: próximo dia útil às 10:30 (America/Sao_Paulo)
-
-9) Handoff para humano
-• Use a ferramenta RequestHandoff quando:
-  - O cliente insistir em falar com uma pessoa real
-  - Houver reclamação séria
-  - Situação complexa que não consegue resolver
-• Ao usar RequestHandoff, finalize a mensagem de forma natural
-• NÃO mencione transferência, equipe técnica ou que outra pessoa vai atender
-• Exemplo: "Vou verificar aqui e te retorno em breve!"
-
-## Primeiro contato (quando is_primeiro_contato = true)
-A pessoa já recebeu uma mensagem nossa: "Oi, tudo bem? Esse é o contato de [Nome]? Aqui é a Julia da Welcome Trips."
-Ela está RESPONDENDO essa mensagem. Portanto:
-• NÃO se apresente de novo (já foi feito)
-• Responda de forma calorosa e natural à resposta dela
-• Se confirmou que é ela: "Que bom! Prazer, [Nome]!" ou similar
-• Leia os dados preenchidos e use para personalizar:
-  - Se tem destino: "Vi que vocês têm interesse em [destino], adorei! Me conta mais sobre o que estão pensando?"
-  - Se tem quem viaja + destino: "Vi que vocês querem ir pra [destino] com [grupo], que demais!"
-  - Se não tem dados preenchidos: "A ideia é entender o seu sonho de viagem e ver como a gente pode ajudar. Pra começar, pra onde vocês estão pensando em viajar?"
-• Avance direto para qualificação, pulando o que já sabe dos dados preenchidos
-
-## Regras importantes de escrita
-• WhatsApp curto. 1 a 3 frases por mensagem, 1 objetivo por mensagem.
-• Perguntas abertas e neutras, sem justificar.
-• Espelhar palavras do cliente com parcimônia.
-• Se o cliente fez pergunta, responda primeiro e só então faça 1 pergunta.
-• Linguagem natural em PT-BR, tom profissional, leve e acolhedor.
-• Sem travessões ou hifens como separadores.
-• Sem metalinguagem de processo.
+## Regras de escrita WhatsApp
+• 1 a 3 frases por mensagem, 1 objetivo por mensagem
+• Perguntas abertas e neutras
+• Tom: profissional, leve, acolhedor. PT-BR natural.
+• Sem travessões como separadores. Sem metalinguagem.
 • Sem citar ferramentas, regras internas, dados do sistema.
-• Use o nome do cliente com parcimônia.
+• Nome do cliente com parcimônia.
 
-## Saída esperada
-• Apenas os blocos de texto finais prontos para WhatsApp.
-• Se for primeiro contato, continuar a conversa (não repetir apresentação).
-• Caso contrário, responder e avançar qualificação.
-• Quando gates OK, apresentar processo e convidar.
-• Quando reunião definida, criar tarefa e confirmar.`;
+## Saída
+Apenas blocos de texto prontos para WhatsApp. Nada mais.`;
 
 
 // ============================================================================
@@ -570,10 +504,16 @@ function transformWorkflow(workflow) {
   // ---- 16. Info tool (Supabase FAQ instead of Google Docs) ----
   transformInfoTool(nodeMap['Info'], w);
 
-  // ---- 17. SupabaseInsertTask (tarefas instead of tasks) ----
+  // ---- 17. SupabaseInsertTask (tarefas — meeting creation with correct tipo/status) ----
   transformSupabaseInsertTask(nodeMap['SupabaseInsertTask']);
 
-  // ---- 17b. RequestHandoff tool (Agent 3 — invisible handoff to human) ----
+  // ---- 17a. CheckCalendar tool (Agent 3 — calendar availability) ----
+  addCheckCalendarTool(w, nodeMap);
+
+  // ---- 17b. AssignTag tool (Agent 3 — tag assignment for Clube Med) ----
+  addAssignTagTool(w, nodeMap);
+
+  // ---- 17c. RequestHandoff tool (Agent 3 — invisible handoff to human) ----
   addRequestHandoffTool(w, nodeMap);
 
   // ---- 18. Remove Google Calendar tools, update connections ----
@@ -1141,6 +1081,11 @@ function transformPreparaDados(node) {
         value: "={{ ($('getClient').item.json.marketing_data || {}).mkt_mensagem_personalizada_formulario || '' }}" },
       { id: 'utm_source', name: 'utm_source', type: 'string',
         value: "={{ ($('getClient').item.json.marketing_data || {}).utm_source || '' }}" },
+      // Produto e SDR owner para Julia (calendário + Clube Med)
+      { id: 'produto', name: 'produto', type: 'string',
+        value: "={{ $('getClient').item.json.produto || 'TRIPS' }}" },
+      { id: 'sdr_owner_id', name: 'sdr_owner_id', type: 'string',
+        value: "={{ $('getClient').item.json.sdr_owner_id || '' }}" },
     ],
   };
 }
@@ -1315,20 +1260,41 @@ function transformSupabaseUpdate(node) {
 
 function transformSupabaseInsertTask(node) {
   if (!node) return;
-  // Update URL to tarefas table
-  if (node.parameters.url) {
-    node.parameters.url = `=${NEW_SUPABASE_URL}/rest/v1/tarefas`;
-  }
-  // Ensure Supabase credentials are set
+  // Complete replacement: hardcode tipo/status/responsavel to fix meeting visibility bugs
+  node.type = 'n8n-nodes-base.httpRequestTool';
+  node.typeVersion = 4.2;
   node.credentials = {
     supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
   };
-  // Update description to mention card_id instead of lead_id
-  if (node.parameters.description) {
-    node.parameters.description = node.parameters.description
-      .replace(/lead_id/g, 'card_id')
-      .replace(/organization_id/g, 'pipeline_id');
-  }
+  node.parameters = {
+    method: 'POST',
+    url: `=${NEW_SUPABASE_URL}/rest/v1/tarefas`,
+    authentication: 'predefinedCredentialType',
+    nodeCredentialType: 'supabaseApi',
+    sendHeaders: true,
+    headerParameters: {
+      parameters: [
+        { name: 'Content-Type', value: 'application/json' },
+        { name: 'Prefer', value: 'return=representation' },
+      ],
+    },
+    sendBody: true,
+    specifyBody: 'json',
+    jsonBody: `={{ JSON.stringify({
+  card_id: $('Historico Texto').item.json.card_id,
+  titulo: $fromAI('titulo', 'Titulo da reuniao: Reunião DD/MM/AAAA HH:MM - Nome Cliente', 'string'),
+  descricao: $fromAI('descricao', 'Contexto: destino, periodo, grupo, orcamento, email', 'string'),
+  tipo: 'reuniao',
+  data_vencimento: $fromAI('data_vencimento', 'Data hora ISO 8601 ex: 2026-03-10T14:00:00-03:00', 'string'),
+  status: 'agendada',
+  concluida: false,
+  responsavel_id: $('Historico Texto').item.json.sdr_owner_id || null,
+  participantes_externos: $fromAI('email_cliente', 'Email do cliente para convite', 'string') ? [$fromAI('email_cliente', 'Email do cliente para convite', 'string')] : [],
+  metadata: { duration_minutes: 30 }
+}) }}`,
+    toolDescription: 'Cria reuniao no calendario do CRM. Use quando cliente concordar com dia e horario. Solicite email antes de criar. A reuniao sera visivel para a consultora responsavel. NAO use para leads de Clube Med.',
+    options: {},
+  };
 }
 
 function removeGoogleCalendarTools(w, nodeMap) {
@@ -1645,6 +1611,102 @@ function transformCompileSentMessages(node) {
   };
 }
 
+// ---- Add CheckCalendar tool to Agent 3 ----
+function addCheckCalendarTool(w, nodeMap) {
+  const agent3 = nodeMap['Responde Lead (Novo)'];
+  if (!agent3) return;
+
+  const calendarNode = {
+    id: 'check-calendar-' + Date.now(),
+    name: 'CheckCalendar',
+    type: 'n8n-nodes-base.httpRequestTool',
+    typeVersion: 4.2,
+    position: agent3.position
+      ? [agent3.position[0] + 400, agent3.position[1] + 400]
+      : [0, 0],
+    parameters: {
+      method: 'POST',
+      url: `${NEW_SUPABASE_URL}/rest/v1/rpc/julia_check_calendar`,
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'supabaseApi',
+      sendHeaders: true,
+      headerParameters: {
+        parameters: [
+          { name: 'Content-Type', value: 'application/json' },
+          { name: 'Accept', value: 'application/json' },
+        ],
+      },
+      sendBody: true,
+      specifyBody: 'json',
+      jsonBody: `={{ JSON.stringify({
+  p_owner_id: $('Historico Texto').item.json.sdr_owner_id || null,
+  p_date_from: $fromAI('date_from', 'Data inicio YYYY-MM-DD. Default: hoje', 'string'),
+  p_date_to: $fromAI('date_to', 'Data fim YYYY-MM-DD. Default: hoje + 5 dias uteis', 'string')
+}) }}`,
+      toolDescription: 'Consulta a agenda da consultora responsavel pelo card. Retorna horarios ocupados e disponiveis (30min, seg-sex 9h-18h). Use ANTES de sugerir horarios de reuniao. Se nao houver sdr_owner_id, a funcao retorna erro informativo.',
+      options: {},
+    },
+    credentials: {
+      supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
+    },
+  };
+
+  w.nodes.push(calendarNode);
+
+  // Connect as ai_tool to Agent 3
+  w.connections['CheckCalendar'] = {
+    ai_tool: [[{ node: 'Responde Lead (Novo)', type: 'ai_tool', index: 0 }]],
+  };
+}
+
+// ---- Add AssignTag tool to Agent 3 ----
+function addAssignTagTool(w, nodeMap) {
+  const agent3 = nodeMap['Responde Lead (Novo)'];
+  if (!agent3) return;
+
+  const tagNode = {
+    id: 'assign-tag-' + Date.now(),
+    name: 'AssignTag',
+    type: 'n8n-nodes-base.httpRequestTool',
+    typeVersion: 4.2,
+    position: agent3.position
+      ? [agent3.position[0] + 600, agent3.position[1] + 400]
+      : [0, 0],
+    parameters: {
+      method: 'POST',
+      url: `${NEW_SUPABASE_URL}/rest/v1/rpc/julia_assign_tag`,
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'supabaseApi',
+      sendHeaders: true,
+      headerParameters: {
+        parameters: [
+          { name: 'Content-Type', value: 'application/json' },
+          { name: 'Accept', value: 'application/json' },
+        ],
+      },
+      sendBody: true,
+      specifyBody: 'json',
+      jsonBody: `={{ JSON.stringify({
+  p_card_id: $('Historico Texto').item.json.card_id,
+  p_tag_name: $fromAI('tag_name', 'Nome da tag ex: Clube Med, Interessado Disney', 'string'),
+  p_tag_color: '#ef4444'
+}) }}`,
+      toolDescription: 'Atribui uma tag ao card do cliente. Cria a tag se nao existir. Use para marcar leads de Clube Med ou outros produtos especiais identificados na conversa.',
+      options: {},
+    },
+    credentials: {
+      supabaseApi: { id: 'SXzk2uSaw8b7BcaN', name: 'WelcomeSupabase' },
+    },
+  };
+
+  w.nodes.push(tagNode);
+
+  // Connect as ai_tool to Agent 3
+  w.connections['AssignTag'] = {
+    ai_tool: [[{ node: 'Responde Lead (Novo)', type: 'ai_tool', index: 0 }]],
+  };
+}
+
 // ---- Add RequestHandoff tool to Agent 3 ----
 function addRequestHandoffTool(w, nodeMap) {
   const agent3 = nodeMap['Responde Lead (Novo)'];
@@ -1762,6 +1824,7 @@ Mensagem proposta: {{ $('Responde Lead (Novo)').first().json.output || $('Respon
 6. Menciona formulario, dados do sistema, ActiveCampaign? (BLOQUEAR)
 7. Rejeita lead na primeira mensagem ou sem investigar? (BLOQUEAR - na duvida, avançar)
 8. Diz explicitamente "nao trabalhamos com X isolado" sem que o cliente tenha confirmado que quer so isso? (CORRIGIR)
+9. Se detectou Clube Med: apresentou taxa R$ 500 ou tentou agendar reuniao? (CORRIGIR - Clube Med NAO tem taxa nem reuniao, Planner entra em contato por outro numero)
 
 Se algo precisa de ajuste, retorne ok=false com motivo e correcao.
 Se esta tudo certo, retorne ok=true.`,
