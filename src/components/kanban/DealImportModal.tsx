@@ -281,10 +281,12 @@ export default function DealImportModal({ isOpen, onClose, onSuccess, currentPro
             if (dataTel && dataTel.length > 0) return dataTel[0].id
         }
 
-        // Priority 4: Name (Exact)
+        // Priority 4: Name (busca nome e sobrenome)
         const name = row['nome_contato'] ? String(row['nome_contato']).trim() : null
         if (name) {
-            const { data } = await supabase.from('contatos').select('id').ilike('nome', name).limit(1)
+            const { data } = await supabase.from('contatos').select('id')
+                .or(`nome.ilike.%${name}%,sobrenome.ilike.%${name}%`)
+                .limit(1)
             if (data && data.length > 0) return data[0].id
         }
 

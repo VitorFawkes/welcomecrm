@@ -45,23 +45,31 @@ export function useGlobalSearch() {
                 })
             }
 
-            // Search Contacts (nome, email e telefone)
+            // Search Contacts (nome, sobrenome, email e telefone)
+            // Multi-word: also match first word→nome AND rest→sobrenome
+            const words = query.trim().split(/\s+/)
+            let contactFilter = `nome.ilike.${searchTerm},sobrenome.ilike.${searchTerm},email.ilike.${searchTerm},telefone.ilike.${searchTerm}`
+            if (words.length >= 2) {
+                contactFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
+            }
+
             const { data: contacts } = await supabase
                 .from('contatos')
-                .select('id, nome, email, telefone')
+                .select('id, nome, sobrenome, email, telefone')
                 .is('deleted_at', null)
-                .or(`nome.ilike.${searchTerm},email.ilike.${searchTerm},telefone.ilike.${searchTerm}`)
+                .or(contactFilter)
                 .limit(5)
 
             if (contacts) {
                 contacts.forEach(contact => {
+                    const fullName = [contact.nome, contact.sobrenome].filter(Boolean).join(' ')
                     allResults.push({
                         id: contact.id,
                         type: 'contact',
-                        title: contact.nome || 'Sem nome',
+                        title: fullName || 'Sem nome',
                         subtitle: contact.email || contact.telefone || '',
                         icon: '👤',
-                        href: `/pessoas?search=${encodeURIComponent(contact.nome || '')}`,
+                        href: `/pessoas?search=${encodeURIComponent(fullName)}`,
                     })
                 })
             }

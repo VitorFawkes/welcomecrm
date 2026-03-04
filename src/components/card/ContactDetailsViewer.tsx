@@ -86,7 +86,7 @@ export default function ContactDetailsViewer({ contact, card }: ContactDetailsVi
                     {contact.nome.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1">
-                    <h2 className="text-xl font-bold text-gray-900">{contact.nome} {contact.sobrenome}</h2>
+                    <h2 className="text-xl font-bold text-gray-900">{[contact.nome, contact.sobrenome].filter(Boolean).join(' ')}</h2>
                     <div className="flex items-center gap-2 mt-1">
                         <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium uppercase tracking-wide">
                             {contact.tipo_pessoa || 'Adulto'}

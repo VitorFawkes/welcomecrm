@@ -273,7 +273,7 @@ app.openapi(
         if (id) {
             query = query.eq("id", id);
         } else if (search) {
-            query = query.or(`nome.ilike.%${search}%,email.ilike.%${search}%`);
+            query = query.or(`nome.ilike.%${search}%,sobrenome.ilike.%${search}%,email.ilike.%${search}%`);
         }
 
         const { data, error } = await query;

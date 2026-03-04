@@ -49,12 +49,18 @@ export function GlobalSearchModal() {
                 })
             }
 
-            // Search Contacts
+            // Search Contacts — multi-word: first word→nome AND rest→sobrenome
+            const words = query.trim().split(/\s+/)
+            let contactFilter = `nome.ilike.${searchTerm},sobrenome.ilike.${searchTerm},email.ilike.${searchTerm},telefone.ilike.${searchTerm}`
+            if (words.length >= 2) {
+                contactFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
+            }
+
             const { data: contacts } = await supabase
                 .from('contatos')
                 .select('id, nome, sobrenome, email, telefone')
                 .is('deleted_at', null)
-                .or(`nome.ilike.${searchTerm},sobrenome.ilike.${searchTerm},email.ilike.${searchTerm}`)
+                .or(contactFilter)
                 .limit(5)
 
             if (contacts) {
@@ -65,7 +71,7 @@ export function GlobalSearchModal() {
                         type: 'contact',
                         title: fullName || 'Sem nome',
                         subtitle: contact.email || contact.telefone || '',
-                        href: `/pessoas?search=${encodeURIComponent(contact.nome || '')}`,
+                        href: `/pessoas?search=${encodeURIComponent(fullName)}`,
                     })
                 })
             }

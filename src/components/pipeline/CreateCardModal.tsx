@@ -265,11 +265,16 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
         queryKey: ['indicacao-search', debouncedIndicacao],
         queryFn: async () => {
             if (!debouncedIndicacao) return []
+            const words = debouncedIndicacao.trim().split(/\s+/)
+            let searchFilter = `nome.ilike.%${debouncedIndicacao}%,sobrenome.ilike.%${debouncedIndicacao}%,email.ilike.%${debouncedIndicacao}%,telefone.ilike.%${debouncedIndicacao}%`
+            if (words.length >= 2) {
+                searchFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
+            }
             const { data, error } = await supabase
                 .from('contatos')
                 .select('id, nome, sobrenome, telefone, email')
                 .is('deleted_at', null)
-                .or(`nome.ilike.%${debouncedIndicacao}%,sobrenome.ilike.%${debouncedIndicacao}%,email.ilike.%${debouncedIndicacao}%,telefone.ilike.%${debouncedIndicacao}%`)
+                .or(searchFilter)
                 .limit(6)
             if (error) throw error
             return data

@@ -210,7 +210,7 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
                         >
                             <option value="">{loading ? 'Carregando...' : 'Selecione um responsável...'}</option>
                             {potentialGuardians.map(g => (
-                                <option key={g.id} value={g.id}>{g.nome}</option>
+                                <option key={g.id} value={g.id}>{[g.nome, g.sobrenome].filter(Boolean).join(' ') || 'Sem nome'}</option>
                             ))}
                         </select>
                     </div>

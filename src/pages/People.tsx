@@ -49,9 +49,11 @@ export default function People() {
         if (mergeData && Object.keys(mergeData).length > 0) {
             try {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await (supabase.from('contatos') as any)
+                const { error: updateError } = await (supabase.from('contatos') as any)
                     .update(mergeData)
                     .eq('id', contactId)
+
+                if (updateError) throw updateError
 
                 // Inserir em contato_meios se telefone/email novos
                 const meiosToInsert = []
@@ -74,10 +76,13 @@ export default function People() {
                     })
                 }
                 if (meiosToInsert.length > 0) {
-                    await supabase.from('contato_meios').upsert(meiosToInsert, {
+                    const { error: meiosError } = await supabase.from('contato_meios').upsert(meiosToInsert, {
                         onConflict: 'tipo,valor_normalizado',
                         ignoreDuplicates: true
                     })
+                    if (meiosError) {
+                        console.error('Error upserting contato_meios:', meiosError)
+                    }
                 }
 
                 toast.success('Dados mesclados ao contato existente')

@@ -9,7 +9,7 @@ interface ContactStats {
     total_trips: number
     last_trip_date: string | null
     next_trip_date: string | null
-    top_destinations: any
+    top_destinations: Record<string, unknown>
     is_group_leader: boolean
     updated_at: string
 }
@@ -70,7 +70,12 @@ export function usePeopleIntelligence() {
             // Apply Filters
             if (filters.search) {
                 const term = `%${filters.search}%`
-                query = query.or(`nome.ilike.${term},sobrenome.ilike.${term},email.ilike.${term},cpf.ilike.${term}`)
+                const words = filters.search.trim().split(/\s+/)
+                let searchFilter = `nome.ilike.${term},sobrenome.ilike.${term},email.ilike.${term},cpf.ilike.${term}`
+                if (words.length >= 2) {
+                    searchFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
+                }
+                query = query.or(searchFilter)
             }
 
             if (filters.type !== 'all') {
@@ -164,7 +169,7 @@ export function usePeopleIntelligence() {
             .select('total_spend, total_trips, is_group_leader')
 
         if (data) {
-            const statsData = data as any[]
+            const statsData = data as { total_spend: number | null; total_trips: number | null; is_group_leader: boolean | null }[]
             const stats = statsData.reduce((acc, curr) => ({
                 totalPeople: acc.totalPeople, // Keep the real count
                 totalSpend: acc.totalSpend + (curr.total_spend || 0),

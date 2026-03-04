@@ -89,9 +89,16 @@ function agingCellColor(count: number): string {
     return 'bg-rose-50 text-rose-700'
 }
 
-function getDealRisk(deal: { is_sla_breach: boolean; days_in_stage: number }): 'critical' | 'warning' | 'normal' {
-    if (deal.is_sla_breach || deal.days_in_stage > 14) return 'critical'
-    if (deal.days_in_stage > 7) return 'warning'
+function getDealRisk(deal: { is_sla_breach: boolean; days_in_stage: number }, refMode: DateRef): 'critical' | 'warning' | 'normal' {
+    if (deal.is_sla_breach) return 'critical'
+    // Thresholds de aging só fazem sentido para "na etapa" — deals com 30+ dias desde criação são normais
+    if (refMode === 'stage') {
+        if (deal.days_in_stage > 14) return 'critical'
+        if (deal.days_in_stage > 7) return 'warning'
+    } else {
+        if (deal.days_in_stage > 90) return 'critical'
+        if (deal.days_in_stage > 60) return 'warning'
+    }
     return 'normal'
 }
 
@@ -124,16 +131,18 @@ export default function PipelineCurrentView() {
     // ── Debounce value inputs ──
     useEffect(() => {
         const timer = setTimeout(() => {
-            const val = valueMinInput ? parseFloat(valueMinInput) : null
-            setDebouncedMin(val && !isNaN(val) ? val : null)
+            if (valueMinInput === '') { setDebouncedMin(null); return }
+            const val = parseFloat(valueMinInput)
+            setDebouncedMin(!isNaN(val) ? val : null)
         }, 500)
         return () => clearTimeout(timer)
     }, [valueMinInput])
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            const val = valueMaxInput ? parseFloat(valueMaxInput) : null
-            setDebouncedMax(val && !isNaN(val) ? val : null)
+            if (valueMaxInput === '') { setDebouncedMax(null); return }
+            const val = parseFloat(valueMaxInput)
+            setDebouncedMax(!isNaN(val) ? val : null)
         }, 500)
         return () => clearTimeout(timer)
     }, [valueMaxInput])
@@ -157,21 +166,23 @@ export default function PipelineCurrentView() {
     }, [setActiveView, setDatePreset])
 
     // ── "Meu Pipeline" ──
-    const isMyPipeline = !!(profile?.id && ownerIds.length === 1 && ownerIds[0] === profile.id)
+    const profileId = profile?.id
+    const isMyPipeline = !!(profileId && ownerIds.length === 1 && ownerIds[0] === profileId)
     const toggleMyPipeline = useCallback(() => {
-        if (!profile?.id) return
-        setOwnerIds(isMyPipeline ? [] : [profile.id])
-    }, [profile?.id, isMyPipeline, setOwnerIds])
+        if (!profileId) return
+        if (isMyPipeline) { setOwnerIds([]) } else { setOwnerIds([profileId]) }
+    }, [profileId, isMyPipeline, setOwnerIds])
 
-    // ── Data decomposition ──
-    const allStages = data?.stages || []
-    const allAging = data?.aging || []
-    const allOwners = data?.owners || []
-    const allDeals = data?.top_deals || []
-    const globalKpis = data?.kpis || {
+    // ── Data decomposition (stable refs) ──
+    const EMPTY_KPI = useMemo(() => ({
         total_open: 0, total_value: 0, total_receita: 0, avg_ticket: 0,
         avg_receita_ticket: 0, avg_age_days: 0, sla_breach_count: 0, sla_breach_pct: 0,
-    }
+    }), [])
+    const allStages = useMemo(() => data?.stages ?? [], [data?.stages])
+    const allAging = useMemo(() => data?.aging ?? [], [data?.aging])
+    const allOwners = useMemo(() => data?.owners ?? [], [data?.owners])
+    const allDeals = useMemo(() => data?.top_deals ?? [], [data?.top_deals])
+    const globalKpis = useMemo(() => data?.kpis ?? EMPTY_KPI, [data?.kpis, EMPTY_KPI])
 
     const isMonetary = metric !== 'cards'
 
@@ -349,7 +360,7 @@ export default function PipelineCurrentView() {
         )
     }
 
-    const SortIcon = ({ field }: { field: DealSortField }) => {
+    const sortIcon = (field: DealSortField) => {
         if (dealSort.field !== field) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1" />
         return dealSort.dir === 'desc'
             ? <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />
@@ -759,32 +770,32 @@ export default function PipelineCurrentView() {
                                     className="text-left py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
                                     onClick={() => toggleDealSort('owner_nome')}
                                 >
-                                    <span className="inline-flex items-center">Responsável <SortIcon field="owner_nome" /></span>
+                                    <span className="inline-flex items-center">Responsável {sortIcon('owner_nome')}</span>
                                 </th>
                                 <th
                                     className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
                                     onClick={() => toggleDealSort('valor_total')}
                                 >
-                                    <span className="inline-flex items-center justify-end">Fat. <SortIcon field="valor_total" /></span>
+                                    <span className="inline-flex items-center justify-end">Fat. {sortIcon('valor_total')}</span>
                                 </th>
                                 <th
                                     className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
                                     onClick={() => toggleDealSort('receita')}
                                 >
-                                    <span className="inline-flex items-center justify-end">Rec. <SortIcon field="receita" /></span>
+                                    <span className="inline-flex items-center justify-end">Rec. {sortIcon('receita')}</span>
                                 </th>
                                 <th
                                     className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
                                     onClick={() => toggleDealSort('days_in_stage')}
                                 >
-                                    <span className="inline-flex items-center justify-end">Dias <SortIcon field="days_in_stage" /></span>
+                                    <span className="inline-flex items-center justify-end">Dias {sortIcon('days_in_stage')}</span>
                                 </th>
                                 <th className="text-center py-2.5 pl-2 text-slate-500 font-medium">SLA</th>
                             </tr>
                         </thead>
                         <tbody>
                             {sortedDeals.map((deal) => {
-                                const risk = getDealRisk(deal)
+                                const risk = getDealRisk(deal, dateRef)
                                 return (
                                     <tr
                                         key={deal.card_id}

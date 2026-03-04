@@ -56,17 +56,23 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         queryFn: async () => {
             if (!debouncedSearch) return []
 
+            const words = debouncedSearch.trim().split(/\s+/)
+            let searchFilter = `nome.ilike.%${debouncedSearch}%,sobrenome.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefone.ilike.%${debouncedSearch}%`
+            if (words.length >= 2) {
+                searchFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
+            }
+
             const { data, error } = await supabase
                 .from('contatos')
                 .select('*')
                 .is('deleted_at', null)
-                .or(`nome.ilike.%${debouncedSearch}%,sobrenome.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefone.ilike.%${debouncedSearch}%`)
+                .or(searchFilter)
                 .limit(8)
 
             if (error) throw error
             return data as Database['public']['Tables']['contatos']['Row'][]
         },
-        enabled: debouncedSearch.length > 2
+        enabled: debouncedSearch.length >= 2
     })
 
     // Create contact mutation
