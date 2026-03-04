@@ -360,6 +360,10 @@ Deno.serve(async (req) => {
                                     } else {
                                         stdValue = 0;
                                     }
+                                    // Sanity check: values > R$ 10M (1 billion cents) are suspicious
+                                    if (typeof stdValue === 'number' && stdValue > 1_000_000_000) {
+                                        console.warn(`[integration-dispatch] WARNING: Suspiciously high deal value ${stdValue} cents (R$ ${(stdValue / 100).toLocaleString()}) for deal ${event.external_id}. Possible centavos-as-reais bug.`);
+                                    }
                                 } else {
                                     // Other standard fields (title, status, etc.)
                                     if (Array.isArray(value)) {

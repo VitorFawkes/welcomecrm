@@ -1,16 +1,20 @@
 -- ============================================================
--- analytics_pipeline_current: Snapshot do pipeline em aberto
--- Retorna KPIs, distribuição por stage, aging heatmap,
--- carga por consultor e top deals em risco.
--- Sem filtro de datas — mostra estado atual.
+-- Pipeline Atual v3: Filtros inteligentes para gestores
+-- 1. p_date_ref: 'stage' (entrada na etapa) ou 'created' (criação)
+-- 2. p_value_min / p_value_max: filtro por faixa de valor
+-- 3. Receita em todas as CTEs (kpis, stages, owners, top_deals)
 -- ============================================================
 
 DROP FUNCTION IF EXISTS analytics_pipeline_current(TEXT, UUID[], UUID[]);
+DROP FUNCTION IF EXISTS analytics_pipeline_current(TEXT, UUID[], UUID[], TEXT, NUMERIC, NUMERIC);
 
 CREATE OR REPLACE FUNCTION analytics_pipeline_current(
     p_product    TEXT     DEFAULT NULL,
     p_owner_ids  UUID[]   DEFAULT NULL,
-    p_tag_ids    UUID[]   DEFAULT NULL
+    p_tag_ids    UUID[]   DEFAULT NULL,
+    p_date_ref   TEXT     DEFAULT 'stage',   -- 'stage' | 'created'
+    p_value_min  NUMERIC  DEFAULT NULL,
+    p_value_max  NUMERIC  DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -27,11 +31,14 @@ BEGIN
             c.pipeline_stage_id,
             c.dono_atual_id,
             COALESCE(c.valor_final, c.valor_estimado, 0) AS valor,
-            c.receita,
+            COALESCE(c.receita, 0) AS receita_val,
             c.produto,
             c.created_at,
             c.stage_entered_at,
-            EXTRACT(EPOCH FROM (NOW() - COALESCE(c.stage_entered_at, c.updated_at, c.created_at))) / 86400.0 AS days_in_stage,
+            CASE WHEN p_date_ref = 'created'
+                 THEN EXTRACT(EPOCH FROM (NOW() - c.created_at)) / 86400.0
+                 ELSE EXTRACT(EPOCH FROM (NOW() - COALESCE(c.stage_entered_at, c.updated_at, c.created_at))) / 86400.0
+            END AS days_in_stage,
             s.nome AS stage_nome,
             s.ordem,
             s.sla_hours,
@@ -54,13 +61,17 @@ BEGIN
           AND (p_product IS NULL OR c.produto::TEXT = p_product)
           AND _a_owner_ok(c.dono_atual_id, NULL, p_owner_ids)
           AND _a_tag_ok(c.id, p_tag_ids)
+          AND (p_value_min IS NULL OR COALESCE(c.valor_final, c.valor_estimado, 0) >= p_value_min)
+          AND (p_value_max IS NULL OR COALESCE(c.valor_final, c.valor_estimado, 0) <= p_value_max)
     ),
     -- KPIs
     kpis AS (
         SELECT jsonb_build_object(
             'total_open', COUNT(*),
             'total_value', COALESCE(SUM(valor), 0),
+            'total_receita', COALESCE(SUM(receita_val), 0),
             'avg_ticket', CASE WHEN COUNT(*) > 0 THEN ROUND(COALESCE(SUM(valor), 0) / COUNT(*)::NUMERIC, 0) ELSE 0 END,
+            'avg_receita_ticket', CASE WHEN COUNT(*) > 0 THEN ROUND(COALESCE(SUM(receita_val), 0) / COUNT(*)::NUMERIC, 0) ELSE 0 END,
             'avg_age_days', ROUND(COALESCE(AVG(days_in_stage), 0)::NUMERIC, 1),
             'sla_breach_count', COUNT(*) FILTER (
                 WHERE sla_hours IS NOT NULL AND sla_hours > 0 AND days_in_stage * 24 > sla_hours
@@ -88,6 +99,7 @@ BEGIN
                     'ordem', ordem,
                     'card_count', COUNT(*),
                     'valor_total', COALESCE(SUM(valor), 0),
+                    'receita_total', COALESCE(SUM(receita_val), 0),
                     'avg_days', ROUND(AVG(days_in_stage)::NUMERIC, 1),
                     'sla_breach_count', COUNT(*) FILTER (
                         WHERE sla_hours IS NOT NULL AND sla_hours > 0 AND days_in_stage * 24 > sla_hours
@@ -108,6 +120,7 @@ BEGIN
                     'stage_id', pipeline_stage_id,
                     'stage_nome', stage_nome,
                     'fase', fase,
+                    'fase_slug', fase_slug,
                     'bucket_0_3', COUNT(*) FILTER (WHERE days_in_stage <= 3),
                     'bucket_3_7', COUNT(*) FILTER (WHERE days_in_stage > 3 AND days_in_stage <= 7),
                     'bucket_7_14', COUNT(*) FILTER (WHERE days_in_stage > 7 AND days_in_stage <= 14),
@@ -116,7 +129,7 @@ BEGIN
                 MIN(fase_order) AS fase_order,
                 MIN(ordem) AS ordem
             FROM open_cards
-            GROUP BY pipeline_stage_id, stage_nome, fase
+            GROUP BY pipeline_stage_id, stage_nome, fase, fase_slug
         ) sub
     ),
     -- Carga por consultor
@@ -129,6 +142,7 @@ BEGIN
                     'owner_nome', COALESCE(owner_nome, 'Não atribuído'),
                     'total_cards', COUNT(*),
                     'total_value', COALESCE(SUM(valor), 0),
+                    'total_receita', COALESCE(SUM(receita_val), 0),
                     'avg_age_days', ROUND(AVG(days_in_stage)::NUMERIC, 1),
                     'sla_breach', COUNT(*) FILTER (
                         WHERE sla_hours IS NOT NULL AND sla_hours > 0 AND days_in_stage * 24 > sla_hours
@@ -137,6 +151,16 @@ BEGIN
                         'sdr', COUNT(*) FILTER (WHERE fase_slug = 'sdr'),
                         'planner', COUNT(*) FILTER (WHERE fase_slug = 'planner'),
                         'pos-venda', COUNT(*) FILTER (WHERE fase_slug NOT IN ('sdr', 'planner', 'resolucao'))
+                    ),
+                    'by_phase_value', jsonb_build_object(
+                        'sdr', COALESCE(SUM(valor) FILTER (WHERE fase_slug = 'sdr'), 0),
+                        'planner', COALESCE(SUM(valor) FILTER (WHERE fase_slug = 'planner'), 0),
+                        'pos-venda', COALESCE(SUM(valor) FILTER (WHERE fase_slug NOT IN ('sdr', 'planner', 'resolucao')), 0)
+                    ),
+                    'by_phase_receita', jsonb_build_object(
+                        'sdr', COALESCE(SUM(receita_val) FILTER (WHERE fase_slug = 'sdr'), 0),
+                        'planner', COALESCE(SUM(receita_val) FILTER (WHERE fase_slug = 'planner'), 0),
+                        'pos-venda', COALESCE(SUM(receita_val) FILTER (WHERE fase_slug NOT IN ('sdr', 'planner', 'resolucao')), 0)
                     )
                 ) AS row_data,
                 COUNT(*) AS total_cards
@@ -144,7 +168,7 @@ BEGIN
             GROUP BY dono_atual_id, owner_nome
         ) sub
     ),
-    -- Top deals em risco (mais tempo na etapa)
+    -- Top deals em risco
     top_deals AS (
         SELECT jsonb_agg(row_data ORDER BY dis DESC) AS val
         FROM (
@@ -154,9 +178,11 @@ BEGIN
                     'titulo', titulo,
                     'stage_nome', stage_nome,
                     'fase', fase,
+                    'fase_slug', fase_slug,
                     'owner_nome', COALESCE(owner_nome, 'Não atribuído'),
                     'owner_id', dono_atual_id,
                     'valor_total', valor,
+                    'receita', receita_val,
                     'days_in_stage', ROUND(days_in_stage::NUMERIC, 1),
                     'sla_hours', sla_hours,
                     'is_sla_breach', (sla_hours IS NOT NULL AND sla_hours > 0 AND days_in_stage * 24 > sla_hours),

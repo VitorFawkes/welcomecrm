@@ -42,5 +42,12 @@ SMOKE_ANON="$VITE_SUPABASE_ANON_KEY" \
 SMOKE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
 bash "$SCRIPT_DIR/schema-smoke-test.sh"
 
+# Registrar no migration log (tracking por arquivo)
+LOG_FILE="$SCRIPT_DIR/../.migration_log"
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) | $SQL_FILE | applied_to_prod" >> "$LOG_FILE"
+
+# Manter marker booleano para backward compat
+touch "$SCRIPT_DIR/../.migration_applied"
+
 echo ""
-echo "Promoção concluída. Rode: touch .claude/.migration_applied"
+echo "Promoção concluída e registrada em .claude/.migration_log"

@@ -50,29 +50,48 @@ if [ -n "$NEW_FILES" ]; then
   fi
 fi
 
-# ── Migration guard: bloqueia se .sql novo/modificado sem marker ──
+# ── Migration guard: bloqueia se .sql novo/modificado sem registro no log ──
 SQL_NEW=$(git ls-files --others --exclude-standard 2>/dev/null | grep -E '^supabase/migrations/.*\.sql$')
 SQL_MOD=$(git diff --name-only 2>/dev/null | grep -E '^supabase/migrations/.*\.sql$')
 ALL_SQL=$(printf "%s\n%s" "$SQL_NEW" "$SQL_MOD" | sort -u | grep -v '^$')
 
 if [ -n "$ALL_SQL" ]; then
+  LOG_FILE="$CWD/.claude/.migration_log"
   MARKER="$CWD/.claude/.migration_applied"
-  if [ ! -f "$MARKER" ] || [ "$(find "$MARKER" -mmin +30 2>/dev/null)" ]; then
-    echo "" >&2
-    echo "BLOQUEADO: Migrations SQL detectadas mas não promovidas para produção:" >&2
-    echo "$ALL_SQL" | sed 's/^/  /' >&2
-    echo "" >&2
-    echo "Workflow obrigatório:" >&2
-    echo "  1. bash .claude/hooks/apply-to-staging.sh <arquivo.sql>" >&2
-    echo "  2. Testar com npm run dev (aponta para staging)" >&2
-    echo "  3. bash .claude/hooks/promote-to-prod.sh <arquivo.sql>" >&2
-    echo "  4. touch .claude/.migration_applied" >&2
-    echo "" >&2
-    echo "Veja CLAUDE.md seção 'Protocolo de Migrations'." >&2
-    exit 2
+  PENDING_SQL=""
+
+  # Checar cada arquivo contra o log por arquivo
+  while IFS= read -r sql_file; do
+    if [ -f "$LOG_FILE" ] && grep -qF "$sql_file" "$LOG_FILE"; then
+      : # Já registrado no log — ok
+    else
+      PENDING_SQL=$(printf "%s\n%s" "$PENDING_SQL" "$sql_file")
+    fi
+  done <<< "$ALL_SQL"
+
+  PENDING_SQL=$(echo "$PENDING_SQL" | grep -v '^$')
+
+  if [ -n "$PENDING_SQL" ]; then
+    # Fallback: aceitar marker booleano < 30 min (backward compat)
+    if [ -f "$MARKER" ] && [ -z "$(find "$MARKER" -mmin +30 2>/dev/null)" ]; then
+      : # Marker recente — permitir (backward compat)
+    else
+      echo "" >&2
+      echo "BLOQUEADO: Migrations SQL não registradas em .claude/.migration_log:" >&2
+      echo "$PENDING_SQL" | sed 's/^/  /' >&2
+      echo "" >&2
+      echo "Workflow obrigatório:" >&2
+      echo "  1. bash .claude/hooks/apply-to-staging.sh <arquivo.sql>" >&2
+      echo "  2. Testar com npm run dev (aponta para staging)" >&2
+      echo "  3. bash .claude/hooks/promote-to-prod.sh <arquivo.sql>" >&2
+      echo "     (promote-to-prod.sh registra automaticamente no log)" >&2
+      echo "" >&2
+      echo "Veja CLAUDE.md seção 'Protocolo de Migrations'." >&2
+      exit 2
+    fi
   fi
 
-  # Smoke test contra produção (se marker existe, verificar que schema está ok)
+  # Smoke test contra produção (se tem migrations, verificar que schema está ok)
   SMOKE_SCRIPT="$CWD/.claude/hooks/schema-smoke-test.sh"
   if [ -f "$SMOKE_SCRIPT" ]; then
     SMOKE_OUTPUT=$("$SMOKE_SCRIPT" 2>&1)

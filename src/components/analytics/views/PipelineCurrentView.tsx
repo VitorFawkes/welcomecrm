@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     Briefcase,
@@ -6,6 +6,10 @@ import {
     Clock,
     AlertTriangle,
     ReceiptText,
+    User as UserIcon,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -15,16 +19,18 @@ import KpiCard from '../KpiCard'
 import ChartCard from '../ChartCard'
 import PhaseSummaryCard from '../PhaseSummaryCard'
 import { QueryErrorState } from '@/components/ui/QueryErrorState'
-import { usePipelineCurrent, type PipelineCurrentAging } from '@/hooks/analytics/usePipelineCurrent'
+import { usePipelineCurrent, type PipelineCurrentAging, type DateRef } from '@/hooks/analytics/usePipelineCurrent'
 import { useDrillDownStore } from '@/hooks/analytics/useAnalyticsDrillDown'
 import { useAnalyticsFilters } from '@/hooks/analytics/useAnalyticsFilters'
+import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency } from '@/utils/whatsappFormatters'
 import { cn } from '@/lib/utils'
 
 // ── Constants ──
 
 type PhaseFilter = 'all' | 'sdr' | 'planner' | 'pos-venda'
-type MetricMode = 'cards' | 'valor'
+type MetricMode = 'cards' | 'faturamento' | 'receita'
+type DealSortField = 'days_in_stage' | 'valor_total' | 'receita' | 'owner_nome'
 
 const PHASE_COLORS: Record<string, string> = {
     sdr: '#3b82f6',
@@ -100,13 +106,44 @@ const RISK_STYLES = {
 export default function PipelineCurrentView() {
     const navigate = useNavigate()
     const drillDown = useDrillDownStore()
-    const { setActiveView, setDatePreset } = useAnalyticsFilters()
+    const { profile } = useAuth()
+    const { setActiveView, setDatePreset, ownerIds, setOwnerIds } = useAnalyticsFilters()
 
-    const { data, isLoading, error, refetch } = usePipelineCurrent()
-
+    // ── View-specific filter state ──
     const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('all')
-    const [stageMetric, setStageMetric] = useState<MetricMode>('cards')
-    const [ownerMetric, setOwnerMetric] = useState<MetricMode>('cards')
+    const [metric, setMetric] = useState<MetricMode>('cards')
+    const [dateRef, setDateRef] = useState<DateRef>('stage')
+    const [valueMinInput, setValueMinInput] = useState('')
+    const [valueMaxInput, setValueMaxInput] = useState('')
+    const [debouncedMin, setDebouncedMin] = useState<number | null>(null)
+    const [debouncedMax, setDebouncedMax] = useState<number | null>(null)
+    const [dealSort, setDealSort] = useState<{ field: DealSortField; dir: 'asc' | 'desc' }>({
+        field: 'days_in_stage', dir: 'desc',
+    })
+
+    // ── Debounce value inputs ──
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const val = valueMinInput ? parseFloat(valueMinInput) : null
+            setDebouncedMin(val && !isNaN(val) ? val : null)
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [valueMinInput])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const val = valueMaxInput ? parseFloat(valueMaxInput) : null
+            setDebouncedMax(val && !isNaN(val) ? val : null)
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [valueMaxInput])
+
+    // ── Fetch data ──
+    const { data, isLoading, error, refetch } = usePipelineCurrent({
+        dateRef,
+        valueMin: debouncedMin,
+        valueMax: debouncedMax,
+    })
 
     // Hide date pickers for this snapshot view
     useEffect(() => {
@@ -119,14 +156,24 @@ export default function PipelineCurrentView() {
         }
     }, [setActiveView, setDatePreset])
 
+    // ── "Meu Pipeline" ──
+    const isMyPipeline = !!(profile?.id && ownerIds.length === 1 && ownerIds[0] === profile.id)
+    const toggleMyPipeline = useCallback(() => {
+        if (!profile?.id) return
+        setOwnerIds(isMyPipeline ? [] : [profile.id])
+    }, [profile?.id, isMyPipeline, setOwnerIds])
+
+    // ── Data decomposition ──
     const allStages = data?.stages || []
     const allAging = data?.aging || []
     const allOwners = data?.owners || []
     const allDeals = data?.top_deals || []
     const globalKpis = data?.kpis || {
-        total_open: 0, total_value: 0, avg_ticket: 0,
-        avg_age_days: 0, sla_breach_count: 0, sla_breach_pct: 0,
+        total_open: 0, total_value: 0, total_receita: 0, avg_ticket: 0,
+        avg_receita_ticket: 0, avg_age_days: 0, sla_breach_count: 0, sla_breach_pct: 0,
     }
+
+    const isMonetary = metric !== 'cards'
 
     // ── Phase summaries (always from ALL data) ──
     const phaseSummaries = useMemo(() => {
@@ -135,10 +182,11 @@ export default function PipelineCurrentView() {
             const filtered = allStages.filter(s => matchesPhase(s.fase_slug, slug))
             const count = filtered.reduce((sum, s) => sum + s.card_count, 0)
             const value = filtered.reduce((sum, s) => sum + s.valor_total, 0)
+            const receita = filtered.reduce((sum, s) => sum + (s.receita_total || 0), 0)
             const avgDays = count > 0
                 ? +(filtered.reduce((sum, s) => sum + s.avg_days * s.card_count, 0) / count).toFixed(1)
                 : 0
-            return { slug, label: PHASE_LABELS[slug], color: PHASE_COLORS[slug], count, value, avgDays }
+            return { slug, label: PHASE_LABELS[slug], color: PHASE_COLORS[slug], count, value, receita, avgDays }
         })
     }, [allStages])
 
@@ -156,20 +204,19 @@ export default function PipelineCurrentView() {
         allAging.filter(a => matchesPhase(a.fase_slug, phaseFilter))
     , [allAging, phaseFilter])
 
-    const topDeals = useMemo(() =>
-        phaseFilter === 'all' ? allDeals : allDeals.filter(d => matchesPhase(d.fase_slug, phaseFilter))
-    , [allDeals, phaseFilter])
-
     // ── Derived KPIs (recalc when phase filter active) ──
     const kpis = useMemo(() => {
         if (phaseFilter === 'all') return globalKpis
         const count = stages.reduce((sum, s) => sum + s.card_count, 0)
         const value = stages.reduce((sum, s) => sum + s.valor_total, 0)
+        const receita = stages.reduce((sum, s) => sum + (s.receita_total || 0), 0)
         const slaBreach = stages.reduce((sum, s) => sum + s.sla_breach_count, 0)
         return {
             total_open: count,
             total_value: value,
+            total_receita: receita,
             avg_ticket: count > 0 ? Math.round(value / count) : 0,
+            avg_receita_ticket: count > 0 ? Math.round(receita / count) : 0,
             avg_age_days: count > 0
                 ? +(stages.reduce((sum, s) => sum + s.avg_days * s.card_count, 0) / count).toFixed(1)
                 : 0,
@@ -195,6 +242,11 @@ export default function PipelineCurrentView() {
         stages.map(s => ({ ...s, display_nome: stageDisplayNames.get(s.stage_id) || s.stage_nome }))
     , [stages, stageDisplayNames])
 
+    // ── Stage chart data key ──
+    const stageDataKey = metric === 'cards' ? 'card_count'
+        : metric === 'faturamento' ? 'valor_total'
+        : 'receita_total'
+
     // ── Owner chart data ──
     const ownerChartData = useMemo(() => {
         let filtered = allOwners
@@ -204,31 +256,39 @@ export default function PipelineCurrentView() {
                     const phKey = phaseFilter as keyof typeof o.by_phase
                     const cards = o.by_phase[phKey] || 0
                     const value = o.by_phase_value[phKey] || 0
-                    return { ...o, total_cards: cards, total_value: value }
+                    const rec = o.by_phase_receita?.[phKey] || 0
+                    return { ...o, total_cards: cards, total_value: value, total_receita: rec }
                 })
                 .filter(o => o.total_cards > 0)
                 .sort((a, b) => b.total_cards - a.total_cards)
         }
+
+        const getVal = (o: typeof filtered[0], phase: string) => {
+            const phKey = phase as keyof typeof o.by_phase
+            if (metric === 'cards') return o.by_phase[phKey] || 0
+            if (metric === 'faturamento') return o.by_phase_value[phKey] || 0
+            return o.by_phase_receita?.[phKey] || 0
+        }
+
         return filtered.slice(0, 12).map(o => {
             if (phaseFilter !== 'all') {
-                const phKey = phaseFilter as keyof typeof o.by_phase
                 return {
                     name: o.owner_nome,
                     owner_id: o.owner_id,
-                    [phaseFilter]: ownerMetric === 'cards' ? (o.by_phase[phKey] || 0) : (o.by_phase_value[phKey] || 0),
-                    total: ownerMetric === 'cards' ? o.total_cards : o.total_value,
+                    [phaseFilter]: getVal(o, phaseFilter),
+                    total: metric === 'cards' ? o.total_cards : metric === 'faturamento' ? o.total_value : o.total_receita,
                 }
             }
             return {
                 name: o.owner_nome,
                 owner_id: o.owner_id,
-                sdr: ownerMetric === 'cards' ? o.by_phase.sdr : o.by_phase_value.sdr,
-                planner: ownerMetric === 'cards' ? o.by_phase.planner : o.by_phase_value.planner,
-                'pos-venda': ownerMetric === 'cards' ? o.by_phase['pos-venda'] : o.by_phase_value['pos-venda'],
-                total: ownerMetric === 'cards' ? o.total_cards : o.total_value,
+                sdr: getVal(o, 'sdr'),
+                planner: getVal(o, 'planner'),
+                'pos-venda': getVal(o, 'pos-venda'),
+                total: metric === 'cards' ? o.total_cards : metric === 'faturamento' ? o.total_value : o.total_receita,
             }
         })
-    }, [allOwners, phaseFilter, ownerMetric])
+    }, [allOwners, phaseFilter, metric])
 
     const ownerBarKeys = useMemo(() => {
         if (phaseFilter !== 'all') return [phaseFilter]
@@ -250,6 +310,24 @@ export default function PipelineCurrentView() {
         bucket_14_plus: aging.reduce((s, a) => s + a.bucket_14_plus, 0),
     }), [aging])
 
+    // ── Sorted deals ──
+    const sortedDeals = useMemo(() => {
+        const filtered = phaseFilter === 'all' ? allDeals : allDeals.filter(d => matchesPhase(d.fase_slug, phaseFilter))
+        return [...filtered].sort((a, b) => {
+            const { field, dir } = dealSort
+            let va: number | string, vb: number | string
+            switch (field) {
+                case 'valor_total': va = a.valor_total; vb = b.valor_total; break
+                case 'receita': va = a.receita || 0; vb = b.receita || 0; break
+                case 'days_in_stage': va = a.days_in_stage; vb = b.days_in_stage; break
+                case 'owner_nome': va = a.owner_nome; vb = b.owner_nome; break
+                default: va = a.days_in_stage; vb = b.days_in_stage
+            }
+            if (typeof va === 'string') return dir === 'asc' ? va.localeCompare(vb as string) : (vb as string).localeCompare(va)
+            return dir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number)
+        })
+    }, [allDeals, phaseFilter, dealSort])
+
     // ── Drill-down handlers ──
     const handleStageDrill = (stageId: string, stageName: string) => {
         drillDown.open({ label: stageName, drillStageId: stageId, drillSource: 'current_stage', excludeTerminal: true })
@@ -262,25 +340,28 @@ export default function PipelineCurrentView() {
         drillDown.open({ label: 'Pipeline Aberto', drillSource: 'current_stage', excludeTerminal: true })
     }
 
-    // ── Metric toggle button ──
-    const MetricToggle = ({ value, onChange }: { value: MetricMode; onChange: (v: MetricMode) => void }) => (
-        <div className="flex bg-slate-100 rounded-lg p-0.5">
-            {([['cards', 'Qtd'], ['valor', 'R$']] as const).map(([v, label]) => (
-                <button
-                    key={v}
-                    onClick={() => onChange(v)}
-                    className={cn(
-                        'px-2.5 py-1 text-[10px] font-semibold rounded-md transition-colors',
-                        value === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                    )}
-                >
-                    {label}
-                </button>
-            ))}
-        </div>
-    )
+    // ── Sort toggle handler ──
+    const toggleDealSort = (field: DealSortField) => {
+        setDealSort(prev =>
+            prev.field === field
+                ? { field, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+                : { field, dir: 'desc' }
+        )
+    }
 
-    const stageDataKey = stageMetric === 'cards' ? 'card_count' : 'valor_total'
+    const SortIcon = ({ field }: { field: DealSortField }) => {
+        if (dealSort.field !== field) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1" />
+        return dealSort.dir === 'desc'
+            ? <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />
+            : <ArrowUp className="w-3 h-3 text-indigo-500 ml-1" />
+    }
+
+    // ── Formatting helpers ──
+    const formatMetricValue = (v: number) =>
+        isMonetary ? `${(v / 1000).toFixed(0)}k` : String(v)
+
+    const tooltipFormatter = (value: number, name: string) =>
+        isMonetary ? [formatCurrency(value), PHASE_LABELS[name] || name] : [value, PHASE_LABELS[name] || name]
 
     return (
         <div className="space-y-5">
@@ -300,23 +381,23 @@ export default function PipelineCurrentView() {
                     subtitle={unassignedCount > 0 ? `${unassignedCount} sem responsável` : undefined}
                 />
                 <KpiCard
-                    title="Valor no Pipeline"
-                    value={formatCurrency(kpis.total_value)}
+                    title={metric === 'receita' ? 'Receita no Pipeline' : 'Faturamento no Pipeline'}
+                    value={formatCurrency(metric === 'receita' ? kpis.total_receita : kpis.total_value)}
                     icon={DollarSign}
                     color="text-emerald-600"
                     bgColor="bg-emerald-50"
                     isLoading={isLoading}
                 />
                 <KpiCard
-                    title="Ticket Médio"
-                    value={formatCurrency(kpis.avg_ticket)}
+                    title={metric === 'receita' ? 'Receita Média' : 'Ticket Médio'}
+                    value={formatCurrency(metric === 'receita' ? kpis.avg_receita_ticket : kpis.avg_ticket)}
                     icon={ReceiptText}
                     color="text-indigo-600"
                     bgColor="bg-indigo-50"
                     isLoading={isLoading}
                 />
                 <KpiCard
-                    title="Idade Média (dias)"
+                    title={dateRef === 'stage' ? 'Idade Média (etapa)' : 'Idade Média (criação)'}
                     value={kpis.avg_age_days}
                     icon={Clock}
                     color="text-amber-600"
@@ -333,6 +414,102 @@ export default function PipelineCurrentView() {
                 />
             </div>
 
+            {/* ── Filter Toolbar ── */}
+            <div className="flex items-center gap-3 flex-wrap bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm">
+                {/* Date reference toggle */}
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Referência</span>
+                    <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                        {([['stage', 'Na Etapa'], ['created', 'Criação']] as const).map(([val, label]) => (
+                            <button
+                                key={val}
+                                onClick={() => setDateRef(val)}
+                                className={cn(
+                                    'px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+                                    dateRef === val
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'text-slate-600 hover:bg-slate-50'
+                                )}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="w-px h-6 bg-slate-200" />
+
+                {/* Unified metric toggle */}
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Métrica</span>
+                    <div className="flex bg-slate-100 rounded-lg p-0.5">
+                        {([['cards', 'Qtd'], ['faturamento', 'Fat.'], ['receita', 'Receita']] as const).map(([v, label]) => (
+                            <button
+                                key={v}
+                                onClick={() => setMetric(v)}
+                                className={cn(
+                                    'px-2.5 py-1 text-[10px] font-semibold rounded-md transition-colors',
+                                    metric === v
+                                        ? 'bg-white text-slate-800 shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-600'
+                                )}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="w-px h-6 bg-slate-200" />
+
+                {/* Value range */}
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Valor</span>
+                    <span className="text-[10px] text-slate-400">R$</span>
+                    <input
+                        type="number"
+                        placeholder="Min"
+                        value={valueMinInput}
+                        onChange={e => setValueMinInput(e.target.value)}
+                        className="w-20 px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-1 focus:ring-indigo-300 focus:border-indigo-300 outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400">a</span>
+                    <input
+                        type="number"
+                        placeholder="Max"
+                        value={valueMaxInput}
+                        onChange={e => setValueMaxInput(e.target.value)}
+                        className="w-20 px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:ring-1 focus:ring-indigo-300 focus:border-indigo-300 outline-none"
+                    />
+                    {(valueMinInput || valueMaxInput) && (
+                        <button
+                            onClick={() => { setValueMinInput(''); setValueMaxInput('') }}
+                            className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                            Limpar
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex-1" />
+
+                {/* Meu Pipeline */}
+                {profile?.id && (
+                    <button
+                        onClick={toggleMyPipeline}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors',
+                            isMyPipeline
+                                ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        )}
+                    >
+                        <UserIcon className="w-3.5 h-3.5" />
+                        Meu Pipeline
+                    </button>
+                )}
+            </div>
+
             {/* ── Phase Summary Cards ── */}
             <div className="grid grid-cols-3 gap-4">
                 {phaseSummaries.map(ps => (
@@ -341,7 +518,7 @@ export default function PipelineCurrentView() {
                         label={ps.label}
                         color={ps.color}
                         cardCount={ps.count}
-                        totalValue={ps.value}
+                        totalValue={metric === 'receita' ? ps.receita : ps.value}
                         avgDays={ps.avgDays}
                         isActive={phaseFilter === ps.slug}
                         onClick={() => setPhaseFilter(phaseFilter === ps.slug ? 'all' : ps.slug as PhaseFilter)}
@@ -373,10 +550,11 @@ export default function PipelineCurrentView() {
             {/* ── Distribuição por Etapa ── */}
             <ChartCard
                 title="Distribuição por Etapa"
-                description={phaseFilter === 'all' ? 'Cards abertos por etapa' : `Etapas de ${PHASE_LABELS[phaseFilter]}`}
+                description={phaseFilter === 'all'
+                    ? `Cards abertos por etapa — ${metric === 'cards' ? 'quantidade' : metric === 'faturamento' ? 'faturamento' : 'receita'}`
+                    : `Etapas de ${PHASE_LABELS[phaseFilter]}`}
                 colSpan={2}
                 isLoading={isLoading}
-                actions={<MetricToggle value={stageMetric} onChange={setStageMetric} />}
             >
                 <div style={{ width: '100%', height: Math.max(280, chartStages.length * 8 + 100) }}>
                     <ResponsiveContainer>
@@ -384,12 +562,12 @@ export default function PipelineCurrentView() {
                             <XAxis dataKey="display_nome" tick={RotatedXTick} interval={0} height={70} />
                             <YAxis
                                 tick={{ fontSize: 11, fill: '#64748b' }}
-                                width={stageMetric === 'valor' ? 70 : 40}
-                                tickFormatter={stageMetric === 'valor' ? (v: number) => `${(v / 1000).toFixed(0)}k` : undefined}
+                                width={isMonetary ? 70 : 40}
+                                tickFormatter={isMonetary ? (v: number) => `${(v / 1000).toFixed(0)}k` : undefined}
                             />
                             <Tooltip
                                 formatter={(value: number, name: string) => {
-                                    if (name === 'valor_total') return [formatCurrency(value), 'Valor']
+                                    if (name === 'valor_total' || name === 'receita_total') return [formatCurrency(value), name === 'valor_total' ? 'Faturamento' : 'Receita']
                                     return [value, 'Cards']
                                 }}
                                 labelFormatter={(label) => {
@@ -413,7 +591,7 @@ export default function PipelineCurrentView() {
                                     dataKey={stageDataKey}
                                     position="top"
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    formatter={(v: any) => stageMetric === 'valor' ? `${(Number(v) / 1000).toFixed(0)}k` : v}
+                                    formatter={(v: any) => formatMetricValue(Number(v))}
                                     style={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
                                 />
                             </Bar>
@@ -447,7 +625,13 @@ export default function PipelineCurrentView() {
             {/* ── Row: Aging + Owner Workload ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Aging Heatmap */}
-                <ChartCard title="Tempo na Etapa (Aging)" description="Cards por faixa de dias em cada etapa" isLoading={isLoading}>
+                <ChartCard
+                    title={dateRef === 'stage' ? 'Tempo na Etapa (Aging)' : 'Tempo desde Criação (Aging)'}
+                    description={dateRef === 'stage'
+                        ? 'Cards por faixa de dias na etapa atual'
+                        : 'Cards por faixa de dias desde a criação'}
+                    isLoading={isLoading}
+                >
                     <div className="px-4 pb-2 overflow-x-auto">
                         <table className="w-full text-xs">
                             <thead>
@@ -512,9 +696,12 @@ export default function PipelineCurrentView() {
                 {/* Owner Workload */}
                 <ChartCard
                     title="Carga por Consultor"
-                    description={phaseFilter === 'all' ? 'Cards por responsável, segmentados por fase' : `Cards de ${PHASE_LABELS[phaseFilter]} por responsável`}
+                    description={
+                        phaseFilter === 'all'
+                            ? `Por responsável — ${metric === 'cards' ? 'quantidade' : metric === 'faturamento' ? 'faturamento' : 'receita'}`
+                            : `${PHASE_LABELS[phaseFilter]} por responsável`
+                    }
                     isLoading={isLoading}
-                    actions={<MetricToggle value={ownerMetric} onChange={setOwnerMetric} />}
                 >
                     <div style={{ width: '100%', height: Math.max(280, ownerChartData.length * 36 + 40) }}>
                         <ResponsiveContainer>
@@ -522,14 +709,12 @@ export default function PipelineCurrentView() {
                                 <XAxis
                                     type="number"
                                     tick={{ fontSize: 11, fill: '#64748b' }}
-                                    tickFormatter={ownerMetric === 'valor' ? (v: number) => `${(v / 1000).toFixed(0)}k` : undefined}
+                                    tickFormatter={isMonetary ? (v: number) => `${(v / 1000).toFixed(0)}k` : undefined}
                                 />
                                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} width={130} />
                                 <Tooltip
                                     contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
-                                    formatter={(value: number, name: string) =>
-                                        ownerMetric === 'valor' ? [formatCurrency(value), PHASE_LABELS[name] || name] : [value, PHASE_LABELS[name] || name]
-                                    }
+                                    formatter={tooltipFormatter}
                                 />
                                 {ownerBarKeys.map(key => (
                                     <Bar
@@ -554,7 +739,12 @@ export default function PipelineCurrentView() {
             {/* ── Deals em Risco ── */}
             <ChartCard
                 title="Deals em Risco"
-                description={`Top ${topDeals.length} cards com mais tempo na etapa atual`}
+                description={`Top ${sortedDeals.length} cards — ordenado por ${
+                    dealSort.field === 'days_in_stage' ? (dateRef === 'stage' ? 'tempo na etapa' : 'tempo desde criação')
+                    : dealSort.field === 'valor_total' ? 'faturamento'
+                    : dealSort.field === 'receita' ? 'receita'
+                    : 'responsável'
+                } ${dealSort.dir === 'desc' ? '(maior)' : '(menor)'}`}
                 colSpan={2}
                 isLoading={isLoading}
             >
@@ -562,17 +752,38 @@ export default function PipelineCurrentView() {
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="border-b border-slate-200">
-                                <th className="text-left py-2.5 pr-3 text-slate-500 font-medium">Título</th>
+                                <th className="text-left py-2.5 pr-3 text-slate-500 font-medium">Titulo</th>
                                 <th className="text-left py-2.5 px-2 text-slate-500 font-medium">Contato</th>
                                 <th className="text-left py-2.5 px-2 text-slate-500 font-medium">Fase / Etapa</th>
-                                <th className="text-left py-2.5 px-2 text-slate-500 font-medium">Responsável</th>
-                                <th className="text-right py-2.5 px-2 text-slate-500 font-medium">Valor</th>
-                                <th className="text-right py-2.5 px-2 text-slate-500 font-medium">Dias</th>
+                                <th
+                                    className="text-left py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleDealSort('owner_nome')}
+                                >
+                                    <span className="inline-flex items-center">Responsável <SortIcon field="owner_nome" /></span>
+                                </th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleDealSort('valor_total')}
+                                >
+                                    <span className="inline-flex items-center justify-end">Fat. <SortIcon field="valor_total" /></span>
+                                </th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleDealSort('receita')}
+                                >
+                                    <span className="inline-flex items-center justify-end">Rec. <SortIcon field="receita" /></span>
+                                </th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleDealSort('days_in_stage')}
+                                >
+                                    <span className="inline-flex items-center justify-end">Dias <SortIcon field="days_in_stage" /></span>
+                                </th>
                                 <th className="text-center py-2.5 pl-2 text-slate-500 font-medium">SLA</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {topDeals.map((deal) => {
+                            {sortedDeals.map((deal) => {
                                 const risk = getDealRisk(deal)
                                 return (
                                     <tr
@@ -592,7 +803,7 @@ export default function PipelineCurrentView() {
                                                     className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white shrink-0"
                                                     style={{ background: getPhaseColor(deal.fase_slug) }}
                                                 >
-                                                    {deal.fase_slug === 'sdr' ? 'SDR' : deal.fase_slug === 'planner' ? 'PLAN' : 'PÓS'}
+                                                    {deal.fase_slug === 'sdr' ? 'SDR' : deal.fase_slug === 'planner' ? 'PLAN' : 'POS'}
                                                 </span>
                                                 <span className="text-slate-600 truncate max-w-[100px]" title={deal.stage_nome}>{deal.stage_nome}</span>
                                             </div>
@@ -602,6 +813,9 @@ export default function PipelineCurrentView() {
                                         </td>
                                         <td className="py-2 px-2 text-right text-slate-700 tabular-nums">
                                             {deal.valor_total > 0 ? formatCurrency(deal.valor_total) : '—'}
+                                        </td>
+                                        <td className="py-2 px-2 text-right text-slate-700 tabular-nums">
+                                            {(deal.receita || 0) > 0 ? formatCurrency(deal.receita) : '—'}
                                         </td>
                                         <td className="py-2 px-2 text-right tabular-nums font-semibold text-slate-800">
                                             {deal.days_in_stage}
@@ -620,10 +834,11 @@ export default function PipelineCurrentView() {
                                     </tr>
                                 )
                             })}
-                            {topDeals.length === 0 && !isLoading && (
+                            {sortedDeals.length === 0 && !isLoading && (
                                 <tr>
-                                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                                    <td colSpan={8} className="py-8 text-center text-slate-400">
                                         Nenhum card em aberto{phaseFilter !== 'all' ? ` em ${PHASE_LABELS[phaseFilter]}` : ''}
+                                        {(debouncedMin || debouncedMax) ? ' nesta faixa de valor' : ''}
                                     </td>
                                 </tr>
                             )}

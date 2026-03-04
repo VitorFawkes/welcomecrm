@@ -226,8 +226,8 @@ Deno.serve(async (req) => {
             .eq('is_active', true);
         const { data: systemFields } = await supabase.from('system_fields').select('key, type, section');
 
-        // Load Topology (include fase for SDR owner assignment, is_lost/is_won for status routing, ordem/phase_id for anti-regression)
-        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome, fase, is_lost, is_won, ordem, phase_id');
+        // Load Topology (include fase for SDR owner assignment, is_lost/is_won/is_planner_won for status routing, ordem/phase_id for anti-regression)
+        const { data: pipelineStages } = await supabase.from('pipeline_stages').select('id, pipeline_id, nome, fase, is_lost, is_won, is_planner_won, ordem, phase_id');
         const { data: pipelines } = await supabase.from('pipelines').select('id, nome, produto');
         const { data: pipelinePhases } = await supabase.from('pipeline_phases').select('id, order_index');
 
@@ -674,6 +674,11 @@ Deno.serve(async (req) => {
                 const acStageId = payload.stage || payload.stage_id || payload.d_stageid || payload['deal[stageid]'];
                 const acPipelineId = payload.pipeline || payload.pipeline_id || payload['deal[pipelineid]'];
 
+                // EARLY STATUS DETECTION: Extract deal status before trigger/stage checks
+                // so lost deals (AC status=2) can bypass blocking logic downstream.
+                const earlyStatus = mapStatus(payload.status || payload['deal[status]']);
+                const isLostDeal = earlyStatus === 'perdido';
+
                 // 3.1.1 CHECK INBOUND TRIGGER RULES (selective entity creation)
                 // BYPASS triggers for manual sync operations (import_mode: 'sync' or force_update: true)
                 const isManualSync = importMode === 'sync' || payload.force_update === true;
@@ -692,13 +697,21 @@ Deno.serve(async (req) => {
                     );
 
                     if (!triggerCheck.allowed) {
-                        stats.ignored_by_trigger++;
-                        await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`, triggerCheck.trigger?.id || null);
-                        results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
-                        continue;
+                        // LOST DEAL BYPASS: AC status=2 must always be processed for existing cards.
+                        // A deal marked as lost may come from any AC pipeline/stage, including
+                        // ones without configured trigger rules (e.g. Pipeline 31 Desqualificados).
+                        // We only bypass for deal_update (not deal_add — never create new cards as lost).
+                        if (isLostDeal && event.event_type !== 'deal_add') {
+                            log += ` [TRIGGER_BYPASS: AC status=lost, event allowed despite no trigger match]`;
+                        } else {
+                            stats.ignored_by_trigger++;
+                            await updateEventStatus(event.id, 'ignored', `Trigger blocked: ${triggerCheck.reason}`, triggerCheck.trigger?.id || null);
+                            results.push({ id: event.id, status: 'ignored', reason: triggerCheck.reason });
+                            continue;
+                        }
+                    } else {
+                        matchedTrigger = triggerCheck.trigger;
                     }
-
-                    matchedTrigger = triggerCheck.trigger;
                 }
 
                 let targetStageId: string | null = null;
@@ -728,7 +741,18 @@ Deno.serve(async (req) => {
                 const isMoveEvent = event.event_type === 'deal_add' || event.event_type === 'deal_update' || event.event_type === 'deal_state';
 
                 if (isMoveEvent && !targetStageId) {
-                    throw new Error(`Unmapped Stage: AC Stage ${acStageId} (Pipeline ${acPipelineId})`);
+                    const isWonDeal = earlyStatus === 'ganho';
+                    if (isLostDeal) {
+                        // Lost deals don't need a mapped AC stage — the lost override
+                        // downstream will assign the correct is_lost stage for the card's pipeline.
+                        log += ` [UNMAPPED_BYPASS: Stage ${acStageId} (Pipeline ${acPipelineId}) unmapped, but status=lost will force to Fechado-Perdido]`;
+                    } else if (isWonDeal) {
+                        // Won deals don't need a mapped AC stage — the won override
+                        // downstream will assign the correct is_planner_won stage for the card's pipeline.
+                        log += ` [UNMAPPED_BYPASS: Stage ${acStageId} (Pipeline ${acPipelineId}) unmapped, but status=won will force to is_planner_won stage]`;
+                    } else {
+                        throw new Error(`Unmapped Stage: AC Stage ${acStageId} (Pipeline ${acPipelineId})`);
+                    }
                 }
 
                 // 3.2 Resolve Topology
@@ -860,13 +884,14 @@ Deno.serve(async (req) => {
                 // 3.5 Prepare DB Payload
                 const dealId = payload.id || payload['deal[id]'] || payload.deal_id;
                 const title = payload.title || payload['deal[title]'] || 'Sem Título';
-                // AC webhooks send deal[value] formatted with commas ("10,000.00")
-                // and deal[value_raw] as clean numeric ("10000").
+                // AC webhooks: deal[value] = reais formatado ("40,000.00")
+                // deal[value_raw] = CENTAVOS (4000000 = R$ 40.000)
                 // parseFloat("10,000.00") = 10 (stops at comma!) — use value_raw first.
+                // IMPORTANT: value_raw is in centavos, divide by 100 for reais.
                 const rawValue = payload['deal[value_raw]'] || payload.value_raw;
                 const formattedValue = payload.value || payload['deal[value]'] || '0';
                 const value = rawValue
-                    ? parseFloat(String(rawValue))
+                    ? parseFloat(String(rawValue)) / 100  // centavos → reais
                     : parseFloat(String(formattedValue).replace(/,/g, ''));
                 const status = mapStatus(payload.status || payload['deal[status]']);
 
@@ -1094,15 +1119,27 @@ Deno.serve(async (req) => {
 
                     // ═══════════════════════════════════════════════════════════════════
                     // SYNC: deal[value] → produto_data.orcamento (smart_budget format)
-                    // Ensures the "Investimento" section field shows the AC deal value
+                    // Ensures the "Investimento" section field shows the AC deal value.
+                    // IMPORTANT: trg_sync_travel_normalized (BEFORE UPDATE OF produto_data)
+                    // overwrites valor_estimado from orcamento.total_calculado.
+                    // So we MUST keep orcamento in sync with the deal value to avoid
+                    // the trigger reverting valor_estimado to the old orcamento value.
                     // ═══════════════════════════════════════════════════════════════════
                     if (value > 0) {
                         if (!cardPayload_produtoData) cardPayload_produtoData = {};
-                        // Only set orcamento if not already populated (protect manual edits)
                         const existingOrcamento = existingCard?.produto_data?.orcamento;
                         if (!existingOrcamento || !existingOrcamento.tipo) {
+                            // No orcamento yet — create it
                             cardPayload_produtoData.orcamento = {
                                 tipo: 'total',
+                                valor: value,
+                                total_calculado: value,
+                                display: `R$ ${value.toLocaleString('pt-BR')}`
+                            };
+                        } else if (existingOrcamento.total_calculado !== value || existingOrcamento.valor !== value) {
+                            // Orcamento exists but value changed — update value fields
+                            cardPayload_produtoData.orcamento = {
+                                ...existingOrcamento,
                                 valor: value,
                                 total_calculado: value,
                                 display: `R$ ${value.toLocaleString('pt-BR')}`
@@ -1241,12 +1278,41 @@ Deno.serve(async (req) => {
                     // ═══════════════════════════════════════════════════════════════════
 
                     // If AC says deal is lost (status=2), force card to the is_lost stage
+                    // Scoped to the card's pipeline to avoid cross-pipeline mismatch (TRIPS vs WEDDING)
                     if (status === 'perdido') {
-                        const lostStage = pipelineStages?.find(s => s.is_lost === true);
-                        if (lostStage) {
-                            targetStageId = lostStage.id;
+                        const scopePipelineId = existingCard?.pipeline_id || topology?.pipelineId || null;
+
+                        const scopedLostStage = scopePipelineId
+                            ? pipelineStages?.find(s => s.is_lost === true && s.pipeline_id === scopePipelineId)
+                            : null;
+
+                        // Fallback: first is_lost stage found (backward compat if pipeline unknown)
+                        const finalLostStage = scopedLostStage || pipelineStages?.find(s => s.is_lost === true);
+
+                        if (finalLostStage) {
+                            targetStageId = finalLostStage.id;
                             topology = resolveTopology(targetStageId);
-                            log += ' [AC status=lost -> forced to Fechado-Perdido]';
+                            log += ` [AC status=lost -> forced to Fechado-Perdido (pipeline: ${topology?.pipelineName || 'unknown'})]`;
+                        }
+                    }
+
+                    // If AC says deal is won (status=1), force card to the is_planner_won stage
+                    // For TRIPS: "Viagem Confirmada (Ganho)" [is_planner_won=true]
+                    // Scoped to the card's pipeline to avoid cross-pipeline mismatch
+                    if (status === 'ganho') {
+                        const scopePipelineId = existingCard?.pipeline_id || topology?.pipelineId || null;
+
+                        const scopedWonStage = scopePipelineId
+                            ? pipelineStages?.find(s => s.is_planner_won === true && s.pipeline_id === scopePipelineId)
+                            : null;
+
+                        const fallbackWonStage = pipelineStages?.find(s => s.is_planner_won === true);
+                        const finalWonStage = scopedWonStage || fallbackWonStage;
+
+                        if (finalWonStage) {
+                            targetStageId = finalWonStage.id;
+                            topology = resolveTopology(targetStageId);
+                            log += ` [AC status=won -> forced to ${topology?.stageName || finalWonStage.nome} (pipeline: ${topology?.pipelineName || 'unknown'})]`;
                         }
                     }
 

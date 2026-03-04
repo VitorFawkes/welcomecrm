@@ -309,6 +309,34 @@ for (const [key, value] of Object.entries(camposRaw)) {
       if (!isNaN(num) && num > 0) camposValidados[key] = num;
       break;
 
+    case 'smart_budget':
+      if (typeof value === 'number' && value > 0) {
+        camposValidados[key] = value;
+      } else if (typeof value === 'object' && value !== null) {
+        if (value.tipo) {
+          camposValidados[key] = value;
+        } else if (value.min > 0 && value.max > 0 && value.max >= value.min) {
+          camposValidados[key] = value;
+        } else if (value.por_pessoa > 0) {
+          camposValidados[key] = value;
+        } else if (value.total > 0) {
+          camposValidados[key] = value.total;
+        }
+      }
+      break;
+
+    case 'flexible_duration':
+      if (typeof value === 'number' && value > 0) {
+        camposValidados[key] = value;
+      } else if (typeof value === 'object' && value !== null) {
+        if (value.tipo) {
+          camposValidados[key] = value;
+        } else if (value.min > 0 && value.max > 0 && value.max >= value.min) {
+          camposValidados[key] = value;
+        }
+      }
+      break;
+
     case 'boolean':
       if (typeof value === 'boolean') camposValidados[key] = value;
       break;
@@ -405,7 +433,11 @@ function formatCurrency(num) {
 function convertOrcamento(value, contextData) {
   if (typeof value === 'object' && value !== null && value.tipo) return value;
   if (typeof value === 'object' && value !== null) {
-    if (value.total) return { tipo: 'total', valor: value.total, display: formatCurrency(value.total) };
+    if (value.min && value.max) {
+      const avg = Math.round((value.min + value.max) / 2);
+      return { tipo: 'range', valor_min: value.min, valor_max: value.max, total_calculado: avg, display: formatCurrency(value.min) + ' — ' + formatCurrency(value.max) };
+    }
+    if (value.total) return { tipo: 'total', valor: value.total, total_calculado: value.total, display: formatCurrency(value.total) };
     if (value.por_pessoa) {
       const qtd = contextData.quantidade_viajantes || 2;
       const total = value.por_pessoa * qtd;
@@ -414,7 +446,7 @@ function convertOrcamento(value, contextData) {
     return value;
   }
   if (typeof value === 'number') {
-    return { tipo: 'total', valor: value, display: formatCurrency(value) };
+    return { tipo: 'total', valor: value, total_calculado: value, display: formatCurrency(value) };
   }
   return value;
 }
@@ -450,14 +482,17 @@ function convertEpoca(value) {
 
 function convertDuracao(value) {
   if (typeof value === 'object' && value !== null && value.tipo) return value;
+  if (typeof value === 'object' && value !== null && value.min && value.max) {
+    return { tipo: 'range', dias_min: value.min, dias_max: value.max, display: value.min + ' a ' + value.max + ' dias' };
+  }
   if (typeof value === 'number') {
-    return { tipo: 'fixo', dias: value, display: value + ' dias' };
+    return { tipo: 'fixo', dias_min: value, dias_max: value, display: value + ' dias' };
   }
   if (typeof value === 'string') {
     const match = value.match(/(\\d+)/);
     if (match) {
       const dias = parseInt(match[1]);
-      return { tipo: 'fixo', dias, display: dias + ' dias' };
+      return { tipo: 'fixo', dias_min: dias, dias_max: dias, display: dias + ' dias' };
     }
   }
   return value;
@@ -520,11 +555,18 @@ if (fase === 'SDR') {
 // Normalizar campos calculados (para relatórios)
 if (tripInfoUpdate.orcamento) {
   const orc = newProdutoData.orcamento || newBriefing.orcamento;
-  if (orc && typeof orc === 'object' && orc.tipo === 'total') {
-    if (fase === 'SDR') {
-      newBriefing.valor_estimado = orc.valor;
-    } else {
-      newProdutoData.valor_estimado = orc.valor;
+  if (orc && typeof orc === 'object') {
+    let ve = null;
+    if (orc.total_calculado) {
+      ve = orc.total_calculado;
+    } else if (orc.tipo === 'total' && orc.valor) {
+      ve = orc.valor;
+    } else if (orc.tipo === 'range' && orc.valor_min && orc.valor_max) {
+      ve = Math.round((orc.valor_min + orc.valor_max) / 2);
+    }
+    if (ve) {
+      if (fase === 'SDR') newBriefing.valor_estimado = ve;
+      else newProdutoData.valor_estimado = ve;
     }
   }
 }
@@ -758,7 +800,10 @@ Extraia dados para os campos disponíveis abaixo. Lembre-se: o consultor está R
 
 **Exemplos de interpretação:**
 - Consultor: "Ele quer ir pra Itália" → destinos: ["Itália"]
-- Consultor: "Orçamento deles é uns 50 mil por pessoa" → orcamento: 50000
+- Consultor: "Orçamento deles é uns 50 mil" → orcamento: 50000
+- Consultor: "Entre 80 e 100 mil de orçamento" → orcamento: {"min": 80000, "max": 100000}
+- Consultor: "Uns 15 mil por pessoa" → orcamento: {"por_pessoa": 15000}
+- Consultor: "Viagem de 7 a 10 dias" → duracao_viagem: {"min": 7, "max": 10}
 - Consultor: "São 4 pessoas, o casal e dois filhos" → quantidade_viajantes: 4
 - Consultor: "Querem ir em setembro ou outubro" → epoca_viagem: "setembro-outubro"
 - Consultor: "Ela é vegetariana" → restricoes_alimentares: "vegetariana"
@@ -772,9 +817,10 @@ Extraia dados para os campos disponíveis abaixo. Lembre-se: o consultor está R
 2. NÃO INVENTE ou INFIRA informações não ditas
 3. Se ambíguo, NÃO inclua
 4. Respeite formatos e valores permitidos
-5. Campos já preenchidos: SOMENTE atualize se informação NOVA ou DIFERENTE
+5. Se o campo já tem valor preenchido e a transcrição traz o MESMO dado, NÃO repita. Mas se traz dado DIFERENTE do existente, ATUALIZE (ex: campo tem "Férias Familia" mas consultor disse "Lua de mel" → extraia "Lua de mel")
 6. Transcrições de áudio podem ter erros — use bom senso para nomes de destinos
-7. Se o consultor citou um número aproximado ("uns 50 mil"), registre o valor (50000)
+7. Para FAIXAS de valor ("entre 80 e 100 mil"), retorne {"min": 80000, "max": 100000}. Para valor POR PESSOA ("15 mil por pessoa"), retorne {"por_pessoa": 15000}. Para valor único total ("uns 50 mil"), retorne número: 50000
+8. Para FAIXAS de duração ("7 a 10 dias"), retorne objeto {"min": 7, "max": 10}. Para valor fixo ("10 dias"), retorne número: 10
 
 # FORMATO DE SAÍDA (JSON estrito)
 {

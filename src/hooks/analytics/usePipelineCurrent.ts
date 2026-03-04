@@ -4,10 +4,14 @@ import { useAnalyticsFilters } from './useAnalyticsFilters'
 
 // ── Types ──────────────────────────────────────────────
 
+export type DateRef = 'stage' | 'created'
+
 export interface PipelineCurrentKpis {
     total_open: number
     total_value: number
+    total_receita: number
     avg_ticket: number
+    avg_receita_ticket: number
     avg_age_days: number
     sla_breach_count: number
     sla_breach_pct: number
@@ -22,6 +26,7 @@ export interface PipelineCurrentStage {
     ordem: number
     card_count: number
     valor_total: number
+    receita_total: number
     avg_days: number
     sla_breach_count: number
 }
@@ -42,10 +47,12 @@ export interface PipelineCurrentOwner {
     owner_nome: string
     total_cards: number
     total_value: number
+    total_receita: number
     avg_age_days: number
     sla_breach: number
     by_phase: { sdr: number; planner: number; 'pos-venda': number }
     by_phase_value: { sdr: number; planner: number; 'pos-venda': number }
+    by_phase_receita: { sdr: number; planner: number; 'pos-venda': number }
 }
 
 export interface PipelineCurrentDeal {
@@ -57,6 +64,7 @@ export interface PipelineCurrentDeal {
     owner_nome: string
     owner_id: string | null
     valor_total: number
+    receita: number
     days_in_stage: number
     sla_hours: number | null
     is_sla_breach: boolean
@@ -71,13 +79,24 @@ export interface PipelineCurrentData {
     top_deals: PipelineCurrentDeal[]
 }
 
+// ── Hook Options ────────────────────────────────────────
+
+interface UsePipelineCurrentOptions {
+    dateRef?: DateRef
+    valueMin?: number | null
+    valueMax?: number | null
+}
+
 // ── Hook ───────────────────────────────────────────────
 
-export function usePipelineCurrent() {
+export function usePipelineCurrent(options?: UsePipelineCurrentOptions) {
     const { product, ownerIds, tagIds } = useAnalyticsFilters()
+    const dateRef = options?.dateRef ?? 'stage'
+    const valueMin = options?.valueMin ?? null
+    const valueMax = options?.valueMax ?? null
 
     return useQuery({
-        queryKey: ['analytics', 'pipeline-current', product, ownerIds, tagIds],
+        queryKey: ['analytics', 'pipeline-current', product, ownerIds, tagIds, dateRef, valueMin, valueMax],
         queryFn: async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data, error } = await (supabase.rpc as any)(
@@ -86,6 +105,9 @@ export function usePipelineCurrent() {
                     p_product: product === 'ALL' ? null : product,
                     p_owner_ids: ownerIds.length > 0 ? ownerIds : undefined,
                     p_tag_ids: tagIds.length > 0 ? tagIds : undefined,
+                    p_date_ref: dateRef,
+                    p_value_min: valueMin,
+                    p_value_max: valueMax,
                 }
             )
             if (error) throw error
