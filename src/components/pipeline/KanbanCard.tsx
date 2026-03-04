@@ -41,7 +41,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
 
     const handleClick = () => {
         if (!isDragging && !showMenu) {
-            markSeen(card.id!)
+            markSeen(card.id!, card.dono_atual_id)
             navigate(`/cards/${card.id}`)
         }
     }
@@ -477,7 +477,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
                 "group relative flex cursor-grab flex-col gap-2 rounded-lg border bg-white p-3 shadow-sm transition-all duration-200 ease-out hover:shadow-md active:cursor-grabbing",
                 isDragging && "opacity-0",
                 isUnseen
-                    ? "border-l-4 border-l-indigo-500 border-t-gray-200 border-r-gray-200 border-b-gray-200 bg-indigo-50/40 hover:border-l-indigo-600"
+                    ? "border-l-4 border-l-emerald-500 border-t-gray-200 border-r-gray-200 border-b-gray-200 bg-emerald-50/40 hover:border-l-emerald-600"
                     : "border-gray-200 hover:border-gray-300"
             )}
         >

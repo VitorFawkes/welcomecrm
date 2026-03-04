@@ -68,8 +68,10 @@ export function useSeenCards() {
     return !store.seenIds.includes(cardId)
   }, [userId])
 
-  const markSeen = useCallback((cardId: string) => {
+  const markSeen = useCallback((cardId: string, ownerId?: string | null) => {
     if (!userId || !cardId) return
+    // Only the card's owner can dismiss the "new" highlight
+    if (ownerId && userId !== ownerId) return
     const store = readStore(userId)
     if (store.seenIds.includes(cardId)) return
     store.seenIds.push(cardId)

@@ -1046,7 +1046,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                                 "hover:bg-gray-50/50 transition-colors group",
                                                 hasOverdueTasks && "bg-red-50/30 hover:bg-red-50/50",
                                                 !hasOverdueTasks && hasTripSoon && "bg-orange-50/30 hover:bg-orange-50/50",
-                                                isUnseen && !hasOverdueTasks && !hasTripSoon && "bg-indigo-50/40 hover:bg-indigo-50/60 border-l-4 border-l-indigo-500"
+                                                isUnseen && !hasOverdueTasks && !hasTripSoon && "bg-emerald-50/40 hover:bg-emerald-50/60 border-l-4 border-l-emerald-500"
                                             )}
                                         >
                                             <TableCell className="px-4">

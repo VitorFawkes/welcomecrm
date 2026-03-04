@@ -35,9 +35,8 @@ export default function CardDetail() {
     const navigate = useNavigate()
     const [showLinkToGroup, setShowLinkToGroup] = useState(false)
 
-    // Mark card as seen for "new card" highlight
+    // Mark card as seen for "new card" highlight (only owner can dismiss)
     const { markSeen } = useSeenCards()
-    useEffect(() => { if (id) markSeen(id) }, [id, markSeen])
 
     // Check if card is a sub-card and get parent info
     const { isSubCard, subCardMode, parentCard } = useSubCardParent(id)
@@ -59,6 +58,11 @@ export default function CardDetail() {
         enabled: !!id,
         staleTime: 1000 * 30, // 30 seconds to avoid immediate refetch flickers
     })
+
+    // Mark as seen only when the owner opens the card
+    useEffect(() => {
+        if (id && card) markSeen(id, card.dono_atual_id)
+    }, [id, card?.dono_atual_id, markSeen])
 
     // Get the card's current phase
     const { data: stageInfo } = useQuery({
