@@ -1885,6 +1885,7 @@ export type Database = {
           group_total_pax: number | null
           group_total_revenue: number | null
           id: string
+          indicado_por_id: string | null
           is_group_parent: boolean | null
           locked_fields: Json | null
           marketing_data: Json | null
@@ -1976,6 +1977,7 @@ export type Database = {
           group_total_pax?: number | null
           group_total_revenue?: number | null
           id?: string
+          indicado_por_id?: string | null
           is_group_parent?: boolean | null
           locked_fields?: Json | null
           marketing_data?: Json | null
@@ -2067,6 +2069,7 @@ export type Database = {
           group_total_pax?: number | null
           group_total_revenue?: number | null
           id?: string
+          indicado_por_id?: string | null
           is_group_parent?: boolean | null
           locked_fields?: Json | null
           marketing_data?: Json | null

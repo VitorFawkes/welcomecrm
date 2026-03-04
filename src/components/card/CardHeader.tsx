@@ -1047,7 +1047,7 @@ export default function CardHeader({ card }: CardHeaderProps) {
                                 cardId={card.id}
                                 origem={card.origem}
                                 origemLead={card.origem_lead}
-                                indicadoPorId={(card as Record<string, unknown>).indicado_por_id as string | null}
+                                indicadoPorId={card.indicado_por_id}
                             />
 
                             {/* Mark as Lost Button OR Loss Reason Display */}
