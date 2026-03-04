@@ -38,6 +38,7 @@ function useConsultants() {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, nome')
+                .eq('active', true)
                 .not('nome', 'is', null)
                 .order('nome')
             if (error) throw error

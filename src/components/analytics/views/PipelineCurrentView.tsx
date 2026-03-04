@@ -31,6 +31,8 @@ import { cn } from '@/lib/utils'
 type PhaseFilter = 'all' | 'sdr' | 'planner' | 'pos-venda'
 type MetricMode = 'cards' | 'faturamento' | 'receita'
 type DealSortField = 'days_in_stage' | 'valor_total' | 'receita' | 'owner_nome'
+type OwnerSortField = 'total_cards' | 'total_value' | 'total_receita' | 'avg_age_days' | 'sla_breach'
+type ChartGroupBy = 'stage' | 'consultant'
 
 const PHASE_COLORS: Record<string, string> = {
     sdr: '#3b82f6',
@@ -127,6 +129,10 @@ export default function PipelineCurrentView() {
     const [dealSort, setDealSort] = useState<{ field: DealSortField; dir: 'asc' | 'desc' }>({
         field: 'days_in_stage', dir: 'desc',
     })
+    const [ownerSort, setOwnerSort] = useState<{ field: OwnerSortField; dir: 'asc' | 'desc' }>({
+        field: 'total_cards', dir: 'desc',
+    })
+    const [chartGroupBy, setChartGroupBy] = useState<ChartGroupBy>('stage')
 
     // ── Debounce value inputs ──
     useEffect(() => {
@@ -205,6 +211,16 @@ export default function PipelineCurrentView() {
     const unassignedCount = useMemo(() =>
         allOwners.find(o => o.owner_id === null)?.total_cards ?? 0
     , [allOwners])
+
+    // ── Selected owner label (for toolbar indicator) ──
+    const selectedOwnerLabel = useMemo(() => {
+        if (ownerIds.length === 0 || isMyPipeline) return null
+        if (ownerIds.length === 1) {
+            const found = allOwners.find(o => o.owner_id === ownerIds[0])
+            return found?.owner_nome ?? null
+        }
+        return `${ownerIds.length} consultores`
+    }, [ownerIds, isMyPipeline, allOwners])
 
     // ── Filtered data (by phaseFilter) ──
     const stages = useMemo(() =>
@@ -306,6 +322,30 @@ export default function PipelineCurrentView() {
         return Object.keys(PHASE_COLORS)
     }, [phaseFilter])
 
+    // ── Sorted owners for consultant table ──
+    const sortedOwners = useMemo(() => {
+        let filtered = allOwners
+        if (phaseFilter !== 'all') {
+            filtered = allOwners
+                .map(o => {
+                    const phKey = phaseFilter as keyof typeof o.by_phase
+                    return {
+                        ...o,
+                        total_cards: o.by_phase[phKey] || 0,
+                        total_value: o.by_phase_value[phKey] || 0,
+                        total_receita: o.by_phase_receita?.[phKey] || 0,
+                    }
+                })
+                .filter(o => o.total_cards > 0)
+        }
+        return [...filtered].sort((a, b) => {
+            const { field, dir } = ownerSort
+            const va = a[field] as number
+            const vb = b[field] as number
+            return dir === 'asc' ? va - vb : vb - va
+        })
+    }, [allOwners, phaseFilter, ownerSort])
+
     // ── Phase indicator counts for chart ──
     const phaseCounts = useMemo(() => ({
         sdr: stages.filter(s => s.fase_slug === 'sdr').length,
@@ -343,13 +383,17 @@ export default function PipelineCurrentView() {
     const handleStageDrill = (stageId: string, stageName: string) => {
         drillDown.open({ label: stageName, drillStageId: stageId, drillSource: 'current_stage', excludeTerminal: true })
     }
-    const handleOwnerDrill = (ownerId: string | null, ownerName: string) => {
-        if (!ownerId) return
-        drillDown.open({ label: `${ownerName} — Pipeline`, drillOwnerId: ownerId, drillSource: 'current_stage', excludeTerminal: true })
-    }
     const handleAllCardsDrill = () => {
         drillDown.open({ label: 'Pipeline Aberto', drillSource: 'current_stage', excludeTerminal: true })
     }
+    const handleOwnerFilter = useCallback((ownerId: string | null) => {
+        if (!ownerId) return
+        if (ownerIds.length === 1 && ownerIds[0] === ownerId) {
+            setOwnerIds([])
+        } else {
+            setOwnerIds([ownerId])
+        }
+    }, [ownerIds, setOwnerIds])
 
     // ── Sort toggle handler ──
     const toggleDealSort = (field: DealSortField) => {
@@ -363,6 +407,20 @@ export default function PipelineCurrentView() {
     const sortIcon = (field: DealSortField) => {
         if (dealSort.field !== field) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1" />
         return dealSort.dir === 'desc'
+            ? <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />
+            : <ArrowUp className="w-3 h-3 text-indigo-500 ml-1" />
+    }
+
+    const toggleOwnerSort = (field: OwnerSortField) => {
+        setOwnerSort(prev =>
+            prev.field === field
+                ? { field, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+                : { field, dir: 'desc' }
+        )
+    }
+    const ownerSortIcon = (field: OwnerSortField) => {
+        if (ownerSort.field !== field) return <ArrowUpDown className="w-3 h-3 text-slate-300 ml-1" />
+        return ownerSort.dir === 'desc'
             ? <ArrowDown className="w-3 h-3 text-indigo-500 ml-1" />
             : <ArrowUp className="w-3 h-3 text-indigo-500 ml-1" />
     }
@@ -504,6 +562,20 @@ export default function PipelineCurrentView() {
 
                 <div className="flex-1" />
 
+                {/* Selected consultant indicator */}
+                {selectedOwnerLabel && !isMyPipeline && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 border border-violet-200 rounded-lg">
+                        <UserIcon className="w-3.5 h-3.5 text-violet-600" />
+                        <span className="text-xs font-medium text-violet-700 max-w-[120px] truncate">{selectedOwnerLabel}</span>
+                        <button
+                            onClick={() => setOwnerIds([])}
+                            className="text-[10px] text-violet-500 hover:text-violet-700 font-bold ml-0.5"
+                        >
+                            &times;
+                        </button>
+                    </div>
+                )}
+
                 {/* Meu Pipeline */}
                 {profile?.id && (
                     <button
@@ -558,78 +630,156 @@ export default function PipelineCurrentView() {
                 ))}
             </div>
 
-            {/* ── Distribuição por Etapa ── */}
+            {/* ── Distribuição Principal ── */}
             <ChartCard
-                title="Distribuição por Etapa"
-                description={phaseFilter === 'all'
-                    ? `Cards abertos por etapa — ${metric === 'cards' ? 'quantidade' : metric === 'faturamento' ? 'faturamento' : 'receita'}`
-                    : `Etapas de ${PHASE_LABELS[phaseFilter]}`}
+                title={chartGroupBy === 'stage' ? 'Distribuição por Etapa' : 'Distribuição por Consultor'}
+                description={chartGroupBy === 'stage'
+                    ? (phaseFilter === 'all'
+                        ? `Cards abertos por etapa — ${metric === 'cards' ? 'quantidade' : metric === 'faturamento' ? 'faturamento' : 'receita'}`
+                        : `Etapas de ${PHASE_LABELS[phaseFilter]}`)
+                    : `${metric === 'cards' ? 'Quantidade' : metric === 'faturamento' ? 'Faturamento' : 'Receita'} por consultor${phaseFilter !== 'all' ? ` em ${PHASE_LABELS[phaseFilter]}` : ''} — clique para filtrar`}
                 colSpan={2}
                 isLoading={isLoading}
-            >
-                <div style={{ width: '100%', height: Math.max(280, chartStages.length * 8 + 100) }}>
-                    <ResponsiveContainer>
-                        <BarChart data={chartStages} margin={{ top: 20, right: 30, left: 10, bottom: 60 }}>
-                            <XAxis dataKey="display_nome" tick={RotatedXTick} interval={0} height={70} />
-                            <YAxis
-                                tick={{ fontSize: 11, fill: '#64748b' }}
-                                width={isMonetary ? 70 : 40}
-                                tickFormatter={isMonetary ? (v: number) => `${(v / 1000).toFixed(0)}k` : undefined}
-                            />
-                            <Tooltip
-                                formatter={(value: number, name: string) => {
-                                    if (name === 'valor_total' || name === 'receita_total') return [formatCurrency(value), name === 'valor_total' ? 'Faturamento' : 'Receita']
-                                    return [value, 'Cards']
-                                }}
-                                labelFormatter={(label) => {
-                                    const stage = chartStages.find(s => s.display_nome === label)
-                                    if (!stage) return label
-                                    return `${label} (${stage.fase}) — ${stage.card_count} cards — ${formatCurrency(stage.valor_total)}`
-                                }}
-                                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
-                            />
-                            <Bar dataKey={stageDataKey} radius={[4, 4, 0, 0]} cursor="pointer"
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                onClick={(_data: any, idx: number) => {
-                                    const s = chartStages[idx]
-                                    if (s) handleStageDrill(s.stage_id, s.display_nome)
-                                }}
+                actions={
+                    <div className="flex items-center rounded-lg border border-slate-200 overflow-hidden">
+                        {([['stage', 'Etapa'], ['consultant', 'Consultor']] as const).map(([val, label]) => (
+                            <button
+                                key={val}
+                                onClick={() => setChartGroupBy(val)}
+                                className={cn(
+                                    'px-2.5 py-1 text-[10px] font-semibold transition-colors',
+                                    chartGroupBy === val
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'text-slate-500 hover:bg-slate-50'
+                                )}
                             >
-                                {chartStages.map((s, i) => (
-                                    <Cell key={i} fill={getPhaseColor(s.fase_slug)} />
-                                ))}
-                                <LabelList
-                                    dataKey={stageDataKey}
-                                    position="top"
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    formatter={(v: any) => formatMetricValue(Number(v))}
-                                    style={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
-                                />
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-                {phaseFilter === 'all' && (
-                    <div className="flex items-center gap-0 mx-6 mt-1 mb-2">
-                        {phaseCounts.sdr > 0 && (
-                            <div className="flex items-center gap-1.5 pr-3 border-r border-slate-200">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS.sdr }} />
-                                <span className="text-[10px] font-medium text-slate-500">SDR</span>
-                            </div>
-                        )}
-                        {phaseCounts.planner > 0 && (
-                            <div className="flex items-center gap-1.5 px-3 border-r border-slate-200">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS.planner }} />
-                                <span className="text-[10px] font-medium text-slate-500">Planner</span>
-                            </div>
-                        )}
-                        {phaseCounts.pos > 0 && (
-                            <div className="flex items-center gap-1.5 pl-3">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS['pos-venda'] }} />
-                                <span className="text-[10px] font-medium text-slate-500">Pós-venda</span>
-                            </div>
-                        )}
+                                {label}
+                            </button>
+                        ))}
                     </div>
+                }
+            >
+                {chartGroupBy === 'stage' ? (
+                    <>
+                        <div style={{ width: '100%', height: Math.max(280, chartStages.length * 8 + 100) }}>
+                            <ResponsiveContainer>
+                                <BarChart data={chartStages} margin={{ top: 20, right: 30, left: 10, bottom: 60 }}>
+                                    <XAxis dataKey="display_nome" tick={RotatedXTick} interval={0} height={70} />
+                                    <YAxis
+                                        tick={{ fontSize: 11, fill: '#64748b' }}
+                                        width={isMonetary ? 70 : 40}
+                                        tickFormatter={isMonetary ? (v: number) => `${(v / 1000).toFixed(0)}k` : undefined}
+                                    />
+                                    <Tooltip
+                                        formatter={(value: number, name: string) => {
+                                            if (name === 'valor_total' || name === 'receita_total') return [formatCurrency(value), name === 'valor_total' ? 'Faturamento' : 'Receita']
+                                            return [value, 'Cards']
+                                        }}
+                                        labelFormatter={(label) => {
+                                            const stage = chartStages.find(s => s.display_nome === label)
+                                            if (!stage) return label
+                                            return `${label} (${stage.fase}) — ${stage.card_count} cards — ${formatCurrency(stage.valor_total)}`
+                                        }}
+                                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                                    />
+                                    <Bar dataKey={stageDataKey} radius={[4, 4, 0, 0]} cursor="pointer"
+                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                        onClick={(_data: any, idx: number) => {
+                                            const s = chartStages[idx]
+                                            if (s) handleStageDrill(s.stage_id, s.display_nome)
+                                        }}
+                                    >
+                                        {chartStages.map((s, i) => (
+                                            <Cell key={i} fill={getPhaseColor(s.fase_slug)} />
+                                        ))}
+                                        <LabelList
+                                            dataKey={stageDataKey}
+                                            position="top"
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            formatter={(v: any) => formatMetricValue(Number(v))}
+                                            style={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
+                                        />
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {phaseFilter === 'all' && (
+                            <div className="flex items-center gap-0 mx-6 mt-1 mb-2">
+                                {phaseCounts.sdr > 0 && (
+                                    <div className="flex items-center gap-1.5 pr-3 border-r border-slate-200">
+                                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS.sdr }} />
+                                        <span className="text-[10px] font-medium text-slate-500">SDR</span>
+                                    </div>
+                                )}
+                                {phaseCounts.planner > 0 && (
+                                    <div className="flex items-center gap-1.5 px-3 border-r border-slate-200">
+                                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS.planner }} />
+                                        <span className="text-[10px] font-medium text-slate-500">Planner</span>
+                                    </div>
+                                )}
+                                {phaseCounts.pos > 0 && (
+                                    <div className="flex items-center gap-1.5 pl-3">
+                                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS['pos-venda'] }} />
+                                        <span className="text-[10px] font-medium text-slate-500">Pós-venda</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <div style={{ width: '100%', height: Math.max(280, ownerChartData.length * 40 + 40) }}>
+                            <ResponsiveContainer>
+                                <BarChart data={ownerChartData} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                                    <XAxis
+                                        type="number"
+                                        tick={{ fontSize: 11, fill: '#64748b' }}
+                                        tickFormatter={isMonetary ? (v: number) => `${(v / 1000).toFixed(0)}k` : undefined}
+                                    />
+                                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} width={140} />
+                                    <Tooltip
+                                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                                        formatter={tooltipFormatter}
+                                        labelFormatter={(label) => {
+                                            const o = ownerChartData.find(d => d.name === label)
+                                            if (!o) return label
+                                            return `${label} — Total: ${isMonetary ? formatCurrency(o.total as number) : o.total}`
+                                        }}
+                                    />
+                                    {ownerBarKeys.map(key => (
+                                        <Bar
+                                            key={key}
+                                            dataKey={key}
+                                            stackId="a"
+                                            fill={getPhaseColor(key)}
+                                            cursor="pointer"
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            onClick={(_data: any, idx: number) => {
+                                                const o = ownerChartData[idx]
+                                                if (o?.owner_id) handleOwnerFilter(o.owner_id as string)
+                                            }}
+                                        />
+                                    ))}
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {phaseFilter === 'all' && (
+                            <div className="flex items-center gap-0 mx-6 mt-1 mb-2">
+                                <div className="flex items-center gap-1.5 pr-3 border-r border-slate-200">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS.sdr }} />
+                                    <span className="text-[10px] font-medium text-slate-500">SDR</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 px-3 border-r border-slate-200">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS.planner }} />
+                                    <span className="text-[10px] font-medium text-slate-500">Planner</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 pl-3">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: PHASE_COLORS['pos-venda'] }} />
+                                    <span className="text-[10px] font-medium text-slate-500">Pós-venda</span>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </ChartCard>
 
@@ -737,7 +887,7 @@ export default function PipelineCurrentView() {
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                         onClick={(_data: any, idx: number) => {
                                             const o = ownerChartData[idx]
-                                            if (o?.owner_id) handleOwnerDrill(o.owner_id as string, o.name)
+                                            if (o?.owner_id) handleOwnerFilter(o.owner_id as string)
                                         }}
                                     />
                                 ))}
@@ -746,6 +896,132 @@ export default function PipelineCurrentView() {
                     </div>
                 </ChartCard>
             </div>
+
+            {/* ── Performance por Consultor ── */}
+            <ChartCard
+                title="Performance por Consultor"
+                description={`${sortedOwners.length} consultores${phaseFilter !== 'all' ? ` em ${PHASE_LABELS[phaseFilter]}` : ''} — clique para filtrar`}
+                colSpan={2}
+                isLoading={isLoading}
+            >
+                <div className="px-4 pb-2 overflow-x-auto">
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="border-b border-slate-200">
+                                <th className="text-left py-2.5 pr-3 text-slate-500 font-medium">Consultor</th>
+                                <th className="text-left py-2.5 px-2 text-slate-500 font-medium">Fase</th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleOwnerSort('total_cards')}
+                                >
+                                    <span className="inline-flex items-center justify-end">Cards {ownerSortIcon('total_cards')}</span>
+                                </th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleOwnerSort('total_value')}
+                                >
+                                    <span className="inline-flex items-center justify-end">Fat. {ownerSortIcon('total_value')}</span>
+                                </th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleOwnerSort('total_receita')}
+                                >
+                                    <span className="inline-flex items-center justify-end">Rec. {ownerSortIcon('total_receita')}</span>
+                                </th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleOwnerSort('avg_age_days')}
+                                >
+                                    <span className="inline-flex items-center justify-end">Idade {ownerSortIcon('avg_age_days')}</span>
+                                </th>
+                                <th
+                                    className="text-right py-2.5 px-2 text-slate-500 font-medium cursor-pointer hover:text-slate-700 select-none"
+                                    onClick={() => toggleOwnerSort('sla_breach')}
+                                >
+                                    <span className="inline-flex items-center justify-end">SLA {ownerSortIcon('sla_breach')}</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sortedOwners.map((owner) => {
+                                const isOwnerSelected = ownerIds.length === 1 && ownerIds[0] === owner.owner_id
+                                return (
+                                    <tr
+                                        key={owner.owner_id ?? 'unassigned'}
+                                        className={cn(
+                                            'border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors',
+                                            isOwnerSelected && 'bg-indigo-50/50 border-l-2 border-l-indigo-400'
+                                        )}
+                                        onClick={() => handleOwnerFilter(owner.owner_id)}
+                                    >
+                                        <td className="py-2 pr-3 text-slate-800 font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
+                                                    {owner.owner_nome.charAt(0)}
+                                                </div>
+                                                {owner.owner_nome}
+                                            </div>
+                                        </td>
+                                        <td className="py-2 px-2">
+                                            <div className="flex items-center gap-1">
+                                                {owner.by_phase.sdr > 0 && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white" style={{ background: PHASE_COLORS.sdr }}>
+                                                        {owner.by_phase.sdr}
+                                                    </span>
+                                                )}
+                                                {owner.by_phase.planner > 0 && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white" style={{ background: PHASE_COLORS.planner }}>
+                                                        {owner.by_phase.planner}
+                                                    </span>
+                                                )}
+                                                {owner.by_phase['pos-venda'] > 0 && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white" style={{ background: PHASE_COLORS['pos-venda'] }}>
+                                                        {owner.by_phase['pos-venda']}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="py-2 px-2 text-right text-slate-700 tabular-nums font-semibold">
+                                            {owner.total_cards}
+                                        </td>
+                                        <td className="py-2 px-2 text-right text-slate-700 tabular-nums">
+                                            {formatCurrency(owner.total_value)}
+                                        </td>
+                                        <td className="py-2 px-2 text-right text-slate-700 tabular-nums">
+                                            {formatCurrency(owner.total_receita)}
+                                        </td>
+                                        <td className="py-2 px-2 text-right tabular-nums">
+                                            <span className={cn(
+                                                'text-slate-700',
+                                                owner.avg_age_days > (dateRef === 'stage' ? 14 : 90) && 'text-rose-600 font-semibold',
+                                                owner.avg_age_days > (dateRef === 'stage' ? 7 : 60) && owner.avg_age_days <= (dateRef === 'stage' ? 14 : 90) && 'text-amber-600 font-semibold',
+                                            )}>
+                                                {owner.avg_age_days}d
+                                            </span>
+                                        </td>
+                                        <td className="py-2 px-2 text-right tabular-nums">
+                                            {owner.sla_breach > 0 ? (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-700">
+                                                    {owner.sla_breach}
+                                                </span>
+                                            ) : (
+                                                <span className="text-green-600 font-medium">0</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                            {sortedOwners.length === 0 && !isLoading && (
+                                <tr>
+                                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                                        Nenhum consultor com cards{phaseFilter !== 'all' ? ` em ${PHASE_LABELS[phaseFilter]}` : ''}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </ChartCard>
 
             {/* ── Deals em Risco ── */}
             <ChartCard
@@ -819,8 +1095,16 @@ export default function PipelineCurrentView() {
                                                 <span className="text-slate-600 truncate max-w-[100px]" title={deal.stage_nome}>{deal.stage_nome}</span>
                                             </div>
                                         </td>
-                                        <td className="py-2 px-2 text-slate-600 truncate max-w-[120px]" title={deal.owner_nome}>
-                                            {deal.owner_nome}
+                                        <td className="py-2 px-2 truncate max-w-[120px]" title={deal.owner_nome}>
+                                            <button
+                                                className={cn(
+                                                    'text-slate-600 hover:text-indigo-600 hover:underline transition-colors',
+                                                    ownerIds.length === 1 && ownerIds[0] === deal.owner_id && 'text-indigo-600 font-semibold'
+                                                )}
+                                                onClick={(e) => { e.stopPropagation(); handleOwnerFilter(deal.owner_id) }}
+                                            >
+                                                {deal.owner_nome}
+                                            </button>
                                         </td>
                                         <td className="py-2 px-2 text-right text-slate-700 tabular-nums">
                                             {deal.valor_total > 0 ? formatCurrency(deal.valor_total) : '—'}
