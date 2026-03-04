@@ -4,7 +4,7 @@ import { useAnalytics } from '../context/AnalyticsContext';
 import { differenceInDays, isAfter, subDays, differenceInMinutes } from 'date-fns';
 
 export function useManagementMetrics() {
-    const { filteredData: data, dateRange, mode } = useAnalytics();
+    const { filteredData: data } = useAnalytics();
 
     const metrics = useMemo(() => {
         const { leads, trips, sdrs, planners, incidents } = data;
@@ -81,7 +81,7 @@ export function useManagementMetrics() {
 
             if (l.stage === 'Novo Lead' && daysInStage > 2) return true;
             if (l.stage === 'Proposta Enviada' && l.proposalAt && differenceInDays(new Date(), l.proposalAt) > 5) return true;
-            if (l.stage === 'Briefing Agendado' && l.briefingAt && differenceInDays(new Date(), l.briefingAt) > 7) return true;
+            if (l.stage === 'Oportunidade' && l.briefingAt && differenceInDays(new Date(), l.briefingAt) > 7) return true;
 
             return false;
         }).map(l => ({
@@ -130,7 +130,7 @@ export function useManagementMetrics() {
         const macroFunnel = [
             { stage: 'Novos', count: liveFunnel['Novo Lead'] || 0, fill: '#3b82f6' },
             { stage: 'Qualificação', count: (liveFunnel['Tentativa de Contato'] || 0) + (liveFunnel['Conectado'] || 0), fill: '#6366f1' },
-            { stage: 'Briefing', count: (liveFunnel['Aguardando Briefing'] || 0) + (liveFunnel['Briefing Agendado'] || 0), fill: '#8b5cf6' },
+            { stage: 'Briefing', count: (liveFunnel['Aguardando Briefing'] || 0) + (liveFunnel['Oportunidade'] || 0), fill: '#8b5cf6' },
             { stage: 'Proposta', count: (liveFunnel['Proposta em Construção'] || 0) + (liveFunnel['Proposta Enviada'] || 0), fill: '#ec4899' },
             { stage: 'Fechamento', count: (liveFunnel['Ajustes & Refinamentos'] || 0) + (liveFunnel['Viagem Aprovada'] || 0), fill: '#10b981' },
         ];
@@ -194,7 +194,7 @@ export function useManagementMetrics() {
             customerJourneyData,
             capacityMetrics: { inflow, capacity, utilization: capacityUtilization }
         };
-    }, [data, dateRange, mode]);
+    }, [data]);
 
     return metrics;
 }

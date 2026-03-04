@@ -123,7 +123,7 @@ async function simulate() {
   // 4. Calculate confirmedTrips
   const stageNames = [
     'Novo Lead', 'Tentativa de Contato', 'Conectado', 'Apresentação Feita',
-    'Taxa Paga / Cliente Elegível', 'Aguardando Briefing', 'Briefing Agendado',
+    'Taxa Paga / Cliente Elegível', 'Aguardando Briefing', 'Oportunidade',
     'Briefing Realizado', 'Proposta em Construção', 'Proposta Enviada',
     'Ajustes & Refinamentos', 'Viagem Aprovada', 'Reservas em Andamento',
     'Pagamento & Documentação', 'Viagem Confirmada (Ganho)', 'App & Conteúdo em Montagem',

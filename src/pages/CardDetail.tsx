@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
@@ -23,6 +23,7 @@ import { ArrowLeft, Users } from 'lucide-react'
 
 import type { Database } from '../database.types'
 import { getProductLabels } from '../lib/productLabels'
+import { useSeenCards } from '../hooks/useSeenCards'
 
 type Card = Database['public']['Tables']['cards']['Row']
 
@@ -33,6 +34,10 @@ export default function CardDetail() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [showLinkToGroup, setShowLinkToGroup] = useState(false)
+
+    // Mark card as seen for "new card" highlight
+    const { markSeen } = useSeenCards()
+    useEffect(() => { if (id) markSeen(id) }, [id, markSeen])
 
     // Check if card is a sub-card and get parent info
     const { isSubCard, subCardMode, parentCard } = useSubCardParent(id)

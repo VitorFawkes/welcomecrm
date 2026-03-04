@@ -25,6 +25,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { Button } from '../ui/Button'
+import { useSeenCards } from '../../hooks/useSeenCards'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 type Product = Database['public']['Enums']['app_product'] | 'ALL'
@@ -48,6 +49,7 @@ interface PipelineListViewProps {
 export default function PipelineListView({ productFilter, viewMode, subView, filters }: PipelineListViewProps) {
     const queryClient = useQueryClient()
     const { groupFilters } = usePipelineFilters()
+    const { isNew: isCardNew } = useSeenCards()
 
     // Dados para bulk actions
     const { data: filterOptions } = useFilterOptions()
@@ -1035,6 +1037,7 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                 sortedCards.map((card) => {
                                     const hasOverdueTasks = (card.tarefas_atrasadas as number) > 0
                                     const hasTripSoon = card.dias_ate_viagem !== null && (card.dias_ate_viagem as number) <= 30 && (card.dias_ate_viagem as number) >= 0
+                                    const isUnseen = isCardNew(card.id!, card.created_at)
 
                                     return (
                                         <TableRow
@@ -1042,7 +1045,8 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
                                             className={cn(
                                                 "hover:bg-gray-50/50 transition-colors group",
                                                 hasOverdueTasks && "bg-red-50/30 hover:bg-red-50/50",
-                                                !hasOverdueTasks && hasTripSoon && "bg-orange-50/30 hover:bg-orange-50/50"
+                                                !hasOverdueTasks && hasTripSoon && "bg-orange-50/30 hover:bg-orange-50/50",
+                                                isUnseen && !hasOverdueTasks && !hasTripSoon && "bg-indigo-50/40 hover:bg-indigo-50/60 border-l-4 border-l-indigo-500"
                                             )}
                                         >
                                             <TableCell className="px-4">

@@ -9,6 +9,36 @@ import { useAnalytics } from '../context/AnalyticsContext';
 import { format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CustomXAxisTick({ x, y, payload }: any) {
+    if (!payload || !payload.value) return null;
+
+    const words = payload.value.split(' ');
+    const line1 = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+    const line2 = words.slice(Math.ceil(words.length / 2)).join(' ');
+
+    return (
+        <g transform={`translate(${x},${y})`}>
+            <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={11}>
+                <tspan x={0} dy="0em">{line1}</tspan>
+                <tspan x={0} dy="1.2em">{line2}</tspan>
+            </text>
+        </g>
+    );
+}
+
+function IndicatorBar({ viewMode }: { viewMode: string }) {
+    if (viewMode !== 'all') return null;
+
+    return (
+        <div className="flex w-[2400px] -mt-4 px-[20px] text-xs font-bold text-center uppercase tracking-wider gap-1">
+            <div className="flex-[5] border-t-4 border-blue-200 text-blue-500 pt-1">SDR</div>
+            <div className="flex-[10] border-t-4 border-emerald-200 text-emerald-500 pt-1">Planner</div>
+            <div className="flex-[6] border-t-4 border-purple-200 text-purple-500 pt-1">Pós-Venda</div>
+        </div>
+    );
+}
+
 export function Overview() {
     const metrics = useOverviewMetrics();
     const mgmtMetrics = useManagementMetrics();
@@ -19,7 +49,7 @@ export function Overview() {
     const { stageData, allOwners } = React.useMemo(() => {
         const stages = [
             'Novo Lead', 'Tentativa de Contato', 'Conectado', 'Apresentação Feita',
-            'Taxa Paga / Cliente Elegível', 'Aguardando Briefing', 'Briefing Agendado',
+            'Taxa Paga / Cliente Elegível', 'Aguardando Briefing', 'Oportunidade',
             'Briefing Realizado', 'Proposta em Construção', 'Proposta Enviada',
             'Ajustes & Refinamentos', 'Viagem Aprovada', 'Reservas em Andamento',
             'Pagamento & Documentação', 'Viagem Confirmada (Ganho)', 'App & Conteúdo em Montagem',
@@ -48,8 +78,8 @@ export function Overview() {
                 if (s) ownerName = s.name;
             }
 
-            // @ts-ignore
-            stageObj[ownerName] = (stageObj[ownerName] || 0) + 1;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (stageObj as any)[ownerName] = ((stageObj as any)[ownerName] || 0) + 1;
             ownersSet.add(ownerName);
         });
 
@@ -79,41 +109,11 @@ export function Overview() {
 
         // Calculate totals for the chart
         return dataToReturn.map(item => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const total = allOwners.reduce((acc, owner) => acc + ((item as any)[owner] || 0), 0);
             return { ...item, total };
         });
     }, [stageData, viewMode, allOwners]);
-
-    const CustomXAxisTick = (props: any) => {
-        const { x, y, payload } = props;
-        // Safety check for payload
-        if (!payload || !payload.value) return null;
-
-        const words = payload.value.split(' ');
-        const line1 = words.slice(0, Math.ceil(words.length / 2)).join(' ');
-        const line2 = words.slice(Math.ceil(words.length / 2)).join(' ');
-
-        return (
-            <g transform={`translate(${x},${y})`}>
-                <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={11}>
-                    <tspan x={0} dy="0em">{line1}</tspan>
-                    <tspan x={0} dy="1.2em">{line2}</tspan>
-                </text>
-            </g>
-        );
-    };
-
-    const IndicatorBar = () => {
-        if (viewMode !== 'all') return null;
-
-        return (
-            <div className="flex w-[2400px] -mt-4 px-[20px] text-xs font-bold text-center uppercase tracking-wider gap-1">
-                <div className="flex-[5] border-t-4 border-blue-200 text-blue-500 pt-1">SDR</div>
-                <div className="flex-[10] border-t-4 border-emerald-200 text-emerald-500 pt-1">Planner</div>
-                <div className="flex-[6] border-t-4 border-purple-200 text-purple-500 pt-1">Pós-Venda</div>
-            </div>
-        );
-    };
 
     const revenueData = React.useMemo(() => {
         if (!dateRange.start || !dateRange.end) return [];
@@ -281,18 +281,18 @@ export function Overview() {
                                                             position="inside"
                                                             fill="rgba(0,0,0,0.6)"
                                                             className="font-bold text-[10px]"
-                                                            formatter={(val: any) => val > 0 ? val : ''}
+                                                            formatter={(val) => (val as number) > 0 ? val : ''}
                                                         />
                                                     </Bar>
                                                 );
                                             })}
                                             <Line type="monotone" dataKey="total" stroke="none" dot={false} activeDot={false} legendType="none">
-                                                <LabelList dataKey="total" position="top" offset={10} className="font-bold text-xs fill-slate-600" formatter={(val: any) => val > 0 ? val : ''} />
+                                                <LabelList dataKey="total" position="top" offset={10} className="font-bold text-xs fill-slate-600" formatter={(val) => (val as number) > 0 ? val : ''} />
                                             </Line>
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
-                                <IndicatorBar />
+                                <IndicatorBar viewMode={viewMode} />
                             </div>
 
                             {/* Left Scroll Gradient/Button */}

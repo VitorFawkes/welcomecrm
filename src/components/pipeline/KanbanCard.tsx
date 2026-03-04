@@ -12,6 +12,7 @@ import { useArchiveCard } from '../../hooks/useArchiveCard'
 import DeleteCardModal from '../card/DeleteCardModal'
 import { TagBadge } from '../card/TagBadge'
 import { useCardTags } from '../../hooks/useCardTags'
+import { useSeenCards } from '../../hooks/useSeenCards'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -26,6 +27,8 @@ import SubCardBadge from './SubCardBadge'
 
 export default function KanbanCard({ card }: KanbanCardProps) {
     const navigate = useNavigate()
+    const { isNew, markSeen } = useSeenCards()
+    const isUnseen = isNew(card.id!, card.created_at)
 
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: card.id!,
@@ -38,6 +41,7 @@ export default function KanbanCard({ card }: KanbanCardProps) {
 
     const handleClick = () => {
         if (!isDragging && !showMenu) {
+            markSeen(card.id!)
             navigate(`/cards/${card.id}`)
         }
     }
@@ -470,8 +474,11 @@ export default function KanbanCard({ card }: KanbanCardProps) {
             {...attributes}
             onClick={handleClick}
             className={cn(
-                "group relative flex cursor-grab flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-all duration-200 ease-out hover:shadow-md hover:border-gray-300 active:cursor-grabbing",
-                isDragging && "opacity-0"
+                "group relative flex cursor-grab flex-col gap-2 rounded-lg border bg-white p-3 shadow-sm transition-all duration-200 ease-out hover:shadow-md active:cursor-grabbing",
+                isDragging && "opacity-0",
+                isUnseen
+                    ? "border-l-4 border-l-indigo-500 border-t-gray-200 border-r-gray-200 border-b-gray-200 bg-indigo-50/40 hover:border-l-indigo-600"
+                    : "border-gray-200 hover:border-gray-300"
             )}
         >
             <div className="flex items-start justify-between gap-2">

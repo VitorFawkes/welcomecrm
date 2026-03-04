@@ -48,7 +48,7 @@ export function useOverviewMetrics() {
         // Funnel Counts
         const stages = [
             'Novo Lead', 'Tentativa de Contato', 'Conectado', 'Apresentação Feita',
-            'Taxa Paga / Cliente Elegível', 'Aguardando Briefing', 'Briefing Agendado',
+            'Taxa Paga / Cliente Elegível', 'Aguardando Briefing', 'Oportunidade',
             'Briefing Realizado', 'Proposta em Construção', 'Proposta Enviada',
             'Ajustes & Refinamentos', 'Viagem Aprovada', 'Reservas em Andamento',
             'Pagamento & Documentação', 'Viagem Confirmada (Ganho)', 'App & Conteúdo em Montagem',

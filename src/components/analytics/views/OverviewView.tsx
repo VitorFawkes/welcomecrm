@@ -183,7 +183,7 @@ export default function OverviewView() {
                     clickHint="Ver funil completo"
                 />
                 <KpiCard
-                    title="% Briefing Agendado"
+                    title="% Oportunidade"
                     value={`${k.briefing_agendado_rate}% (${k.briefing_count})`}
                     icon={Phone}
                     color="text-indigo-600"

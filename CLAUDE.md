@@ -119,6 +119,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | useDuplicateDetection | 2 | Detecção de duplicados em tempo real (CPF, email, telefone, nome) via RPC |
 | useDeleteContact | 1 | Soft-delete e restauração de contatos (padrão useDeleteCard) |
 | useNetworkStatus | 1 | Detecta online/offline via eventos nativos do browser |
+| useSeenCards | 3 | Tracking localStorage de cards vistos por usuário. Destaque visual para cards novos no Kanban/Lista até serem abertos |
 | useCardTeam | 2 | CRUD membros da equipe do card (assistentes, apoio) + fullTeam unificado. Usado no CardHeader e CardTeamSection |
 | useContactQuality | 1 | Auditoria e correção em lote de qualidade de dados cadastrais |
 | useDocumentTypes | 2 | Lista tipos de documentos reutilizáveis + criação inline |
@@ -150,6 +151,7 @@ Novas tabelas DEVEM ter FK para pelo menos uma dessas. Sem exceção.
 | useMeetingDrag | 1 | Drag-and-drop de reuniões entre horários/dias no calendário |
 | useMeetingMutation | 2 | CRUD de reuniões (criar, editar, deletar, reagendar) + envio de convite .ics por email via n8n |
 | useTodayMeetingCount | 2 | Contagem de reuniões do dia para badge no Sidebar e Dashboard widget |
+| useSeenCards | 3 | Rastreia cards já vistos pelo usuário via localStorage (badge "novo" no Kanban/List) |
 
 ### Componentes Principais (src/components/)
 | Área | Componentes-chave |
