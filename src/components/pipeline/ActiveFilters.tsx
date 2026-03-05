@@ -38,6 +38,7 @@ export function ActiveFilters() {
         filters.phaseFilter ||
         filters.statusComercial?.length ||
         filters.tagIds?.length ||
+        filters.noTag ||
         filters.startDate ||
         filters.endDate ||
         filters.creationStartDate ||
@@ -129,6 +130,9 @@ export function ActiveFilters() {
                 ))}
 
                 {/* Tags */}
+                {filters.noTag && (
+                    <Chip label="Sem tag" onRemove={() => removeFilter('noTag')} />
+                )}
                 {filters.tagIds?.map(tagId => {
                     const tag = tags.find(t => t.id === tagId)
                     return <Chip key={`tag-${tagId}`} label={`Tag: ${tag?.name || 'Tag'}`} onRemove={() => removeFilter('tagIds', tagId)} />

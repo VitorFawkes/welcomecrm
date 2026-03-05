@@ -25,6 +25,7 @@ export interface LeadsFilterState {
     origem?: string[]
     showArchived?: boolean
     tagIds?: string[]
+    noTag?: boolean
     // Pagination
     page: number
     pageSize: number
@@ -41,6 +42,7 @@ interface LeadsFiltersStore {
     togglePipeline: (pipelineId: string) => void
     toggleOrigem: (origem: string) => void
     toggleTag: (tagId: string) => void
+    toggleNoTag: () => void
     toggleArchived: () => void
     setPage: (page: number) => void
     setPageSize: (pageSize: number) => void
@@ -122,8 +124,12 @@ export const useLeadsFilters = create<LeadsFiltersStore>()(
                 const updated = current.includes(tagId)
                     ? current.filter(id => id !== tagId)
                     : [...current, tagId]
-                return { filters: { ...state.filters, tagIds: updated, page: 1 } }
+                return { filters: { ...state.filters, tagIds: updated, noTag: undefined, page: 1 } }
             }),
+
+            toggleNoTag: () => set((state) => ({
+                filters: { ...state.filters, noTag: !state.filters.noTag || undefined, tagIds: undefined, page: 1 }
+            })),
 
             toggleArchived: () => set((state) => ({
                 filters: { ...state.filters, showArchived: !state.filters.showArchived, page: 1 }
@@ -160,7 +166,8 @@ export const useLeadsFilters = create<LeadsFiltersStore>()(
                     filters.diasSemContatoMin !== undefined ||
                     filters.diasSemContatoMax !== undefined ||
                     filters.showArchived ||
-                    (filters.tagIds?.length ?? 0) > 0
+                    (filters.tagIds?.length ?? 0) > 0 ||
+                    filters.noTag
                 )
             }
         }),

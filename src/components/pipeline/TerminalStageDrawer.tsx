@@ -10,7 +10,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter, DrawerTi
 import type { Database } from '../../database.types'
 import { type ViewMode, type SubView, type FilterState, type GroupFilters } from '../../hooks/usePipelineFilters'
 
-type Product = Database['public']['Enums']['app_product'] | 'ALL'
+type Product = Database['public']['Enums']['app_product']
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 type Stage = Database['public']['Tables']['pipeline_stages']['Row']
 
@@ -59,9 +59,7 @@ export default function TerminalStageDrawer({
                 .select('*', { count: 'exact' })
                 .eq('pipeline_stage_id', stage.id)
 
-            if (productFilter !== 'ALL') {
-                query = query.eq('produto', productFilter)
-            }
+            query = query.eq('produto', productFilter)
 
             // Smart View Filters
             if (viewMode === 'AGENT' && subView === 'MY_QUEUE' && session?.user?.id) {
@@ -106,7 +104,8 @@ export default function TerminalStageDrawer({
             // Status, Origem & Tags
             if ((filters.statusComercial?.length ?? 0) > 0) query = query.in('status_comercial', filters.statusComercial)
             if ((filters.origem?.length ?? 0) > 0) query = query.in('origem', filters.origem)
-            if ((filters.tagIds?.length ?? 0) > 0) query = query.overlaps('tag_ids', filters.tagIds)
+            if (filters.noTag) query = query.or('tag_ids.is.null,tag_ids.eq.{}')
+            else if ((filters.tagIds?.length ?? 0) > 0) query = query.overlaps('tag_ids', filters.tagIds)
 
             // Archived + group parent exclusion
             query = query.is('archived_at', null)

@@ -34,7 +34,7 @@ import TerminalStageDrawer from './TerminalStageDrawer'
 import { useAuth } from '../../contexts/AuthContext'
 import { prepareSearchTerms } from '../../lib/utils'
 
-type Product = Database['public']['Enums']['app_product'] | 'ALL'
+type Product = Database['public']['Enums']['app_product']
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 type Stage = Database['public']['Tables']['pipeline_stages']['Row']
 
@@ -113,15 +113,13 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 .order('ordem')
 
             // Filtrar stages pelo pipeline do produto
-            if (productFilter !== 'ALL') {
-                const { data: pipeline } = await supabase.from('pipelines')
-                    .select('id')
-                    .eq('produto', productFilter)
-                    .single()
+            const { data: pipeline } = await supabase.from('pipelines')
+                .select('id')
+                .eq('produto', productFilter)
+                .single()
 
-                if (pipeline) {
-                    query = query.eq('pipeline_id', pipeline.id)
-                }
+            if (pipeline) {
+                query = query.eq('pipeline_id', pipeline.id)
             }
 
             const { data, error } = await query
@@ -176,9 +174,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                     .select('*', { count: 'exact' })
                     .eq('pipeline_stage_id', stageId)
 
-                if (productFilter !== 'ALL') {
-                    query = query.eq('produto', productFilter)
-                }
+                query = query.eq('produto', productFilter)
 
                 // Smart View Filters (mesmos do usePipelineCards)
                 if (viewMode === 'AGENT' && subView === 'MY_QUEUE' && session?.user?.id) {
@@ -236,7 +232,8 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
                 // Status & Origem & Tags
                 if ((filters.statusComercial?.length ?? 0) > 0) query = query.in('status_comercial', filters.statusComercial)
                 if ((filters.origem?.length ?? 0) > 0) query = query.in('origem', filters.origem)
-                if ((filters.tagIds?.length ?? 0) > 0) query = query.overlaps('tag_ids', filters.tagIds)
+                if (filters.noTag) query = query.or('tag_ids.is.null,tag_ids.eq.{}')
+                else if ((filters.tagIds?.length ?? 0) > 0) query = query.overlaps('tag_ids', filters.tagIds)
 
                 query = query.is('archived_at', null).eq('is_group_parent', false)
 

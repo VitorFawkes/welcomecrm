@@ -27,6 +27,7 @@ export interface FilterState {
     origem?: string[] // Multi-select: mkt, indicacao, carteira_propria, carteira_wg (+ legacy: carteira, manual, outro, site, active_campaign, whatsapp)
     docStatus?: string[] // 'pendente' | 'completo' | 'sem_documentos'
     tagIds?: string[]
+    noTag?: boolean
 }
 
 export interface GroupFilters {

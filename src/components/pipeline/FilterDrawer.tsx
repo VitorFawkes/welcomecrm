@@ -71,8 +71,18 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
             const updated = current.includes(value)
                 ? current.filter(id => id !== value)
                 : [...current, value]
-            return { ...prev, [field]: updated }
+            // Mutual exclusion: selecting a tag clears noTag
+            const extra = field === 'tagIds' ? { noTag: undefined } : {}
+            return { ...prev, [field]: updated, ...extra }
         })
+    }
+
+    const toggleNoTag = () => {
+        setLocalFilters(prev => ({
+            ...prev,
+            noTag: !prev.noTag || undefined,
+            tagIds: undefined, // Mutual exclusion: noTag clears tagIds
+        }))
     }
 
     // Filtered lists based on search
@@ -511,6 +521,18 @@ export function FilterDrawer({ isOpen, onClose }: FilterDrawerProps) {
                             </div>
                             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                                 <div className="flex flex-wrap gap-2">
+                                    <button
+                                        onClick={toggleNoTag}
+                                        className={cn(
+                                            "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-all",
+                                            localFilters.noTag
+                                                ? "bg-slate-200 text-slate-800 border-slate-400"
+                                                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                                        )}
+                                    >
+                                        <span className="w-2 h-2 rounded-full shrink-0 bg-slate-400" />
+                                        Sem tag
+                                    </button>
                                     {availableTags.map(tag => {
                                         const selected = (localFilters.tagIds || []).includes(tag.id)
                                         return (

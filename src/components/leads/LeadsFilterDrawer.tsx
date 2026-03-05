@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { X, Filter, Calendar, User, DollarSign, Clock, Layers, MapPin, Link } from 'lucide-react'
+import { X, Filter, Calendar, User, DollarSign, Clock, Layers, MapPin, Link, Tag } from 'lucide-react'
 import { Button } from '../ui/Button'
 import type { LeadsFilterState } from '../../hooks/useLeadsFilters'
 import { cn } from '../../lib/utils'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { usePipelines } from '../../hooks/usePipelines'
+import { useCardTags } from '../../hooks/useCardTags'
+import { useProductContext } from '../../hooks/useProductContext'
 import { ALL_ORIGEM_OPTIONS } from '../../lib/constants/origem'
 
 interface LeadsFilterDrawerProps {
@@ -19,6 +21,8 @@ export function LeadsFilterDrawer({ isOpen, onClose, filters, setFilters }: Lead
     const { data: options } = useFilterOptions()
     const { data: stages } = usePipelineStages()
     const { data: pipelines } = usePipelines()
+    const { currentProduct } = useProductContext()
+    const { tags: availableTags } = useCardTags(currentProduct)
 
     // Local state for the form
     const [localFilters, setLocalFilters] = useState<Partial<LeadsFilterState>>(filters)
@@ -58,19 +62,30 @@ export function LeadsFilterDrawer({ isOpen, onClose, filters, setFilters }: Lead
             diasSemContatoMin: undefined,
             diasSemContatoMax: undefined,
             origem: undefined,
+            tagIds: undefined,
+            noTag: undefined,
         }
         setLocalFilters(clearedFilters)
         setFilters(clearedFilters)
     }
 
-    const toggleSelection = (field: 'ownerIds' | 'stageIds' | 'statusComercial' | 'prioridade' | 'pipelineIds' | 'origem', value: string) => {
+    const toggleSelection = (field: 'ownerIds' | 'stageIds' | 'statusComercial' | 'prioridade' | 'pipelineIds' | 'origem' | 'tagIds', value: string) => {
         setLocalFilters(prev => {
             const current = (prev[field] as string[]) || []
             const updated = current.includes(value)
                 ? current.filter(id => id !== value)
                 : [...current, value]
-            return { ...prev, [field]: updated }
+            const extra = field === 'tagIds' ? { noTag: undefined } : {}
+            return { ...prev, [field]: updated, ...extra }
         })
+    }
+
+    const toggleNoTag = () => {
+        setLocalFilters(prev => ({
+            ...prev,
+            noTag: !prev.noTag || undefined,
+            tagIds: undefined,
+        }))
     }
 
     // Filtered lists based on search
@@ -449,6 +464,56 @@ export function LeadsFilterDrawer({ isOpen, onClose, filters, setFilters }: Lead
                             </div>
                         </div>
                     </div>
+
+                    {/* Section: Tags */}
+                    {availableTags.length > 0 && (
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                                <Tag className="h-3 w-3" /> Tags
+                            </h3>
+                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        onClick={toggleNoTag}
+                                        className={cn(
+                                            "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-all",
+                                            localFilters.noTag
+                                                ? "bg-slate-200 text-slate-800 border-slate-400"
+                                                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                                        )}
+                                    >
+                                        <span className="w-2 h-2 rounded-full shrink-0 bg-slate-400" />
+                                        Sem tag
+                                    </button>
+                                    {availableTags.map(tag => {
+                                        const selected = (localFilters.tagIds || []).includes(tag.id)
+                                        return (
+                                            <button
+                                                key={tag.id}
+                                                onClick={() => toggleSelection('tagIds', tag.id)}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-all"
+                                                style={selected ? {
+                                                    backgroundColor: tag.color + '25',
+                                                    color: tag.color,
+                                                    borderColor: tag.color + '60',
+                                                } : {
+                                                    backgroundColor: 'white',
+                                                    color: '#6b7280',
+                                                    borderColor: '#e5e7eb',
+                                                }}
+                                            >
+                                                <span
+                                                    className="w-2 h-2 rounded-full shrink-0"
+                                                    style={{ backgroundColor: tag.color }}
+                                                />
+                                                {tag.name}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
 

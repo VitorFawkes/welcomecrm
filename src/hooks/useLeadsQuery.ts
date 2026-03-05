@@ -134,7 +134,9 @@ export function useLeadsQuery({ filters, enabled = true }: UseLeadsQueryProps) {
             }
 
             // Tag filter — usa overlaps no array tag_ids da view
-            if ((filters.tagIds?.length ?? 0) > 0) {
+            if (filters.noTag) {
+                query = query.or('tag_ids.is.null,tag_ids.eq.{}')
+            } else if ((filters.tagIds?.length ?? 0) > 0) {
                 query = (query as ReturnType<typeof query.overlaps>).overlaps('tag_ids', filters.tagIds)
             }
 

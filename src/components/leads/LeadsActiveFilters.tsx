@@ -5,6 +5,8 @@ import type { LeadsFilterState } from '../../hooks/useLeadsFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { usePipelines } from '../../hooks/usePipelines'
+import { useCardTags } from '../../hooks/useCardTags'
+import { useProductContext } from '../../hooks/useProductContext'
 
 interface LeadsActiveFiltersProps {
     filters: LeadsFilterState
@@ -21,6 +23,8 @@ export default function LeadsActiveFilters({ filters, setFilters }: LeadsActiveF
     const { data: options } = useFilterOptions()
     const { data: stages } = usePipelineStages()
     const { data: pipelines } = usePipelines()
+    const { currentProduct } = useProductContext()
+    const { tags } = useCardTags(currentProduct)
 
     const profiles = options?.profiles || []
 
@@ -153,6 +157,29 @@ export default function LeadsActiveFilters({ filters, setFilters }: LeadsActiveF
             onRemove: () => setFilters({ valorMin: undefined, valorMax: undefined })
         })
     }
+
+    // No tag
+    if (filters.noTag) {
+        chips.push({
+            id: 'no-tag',
+            label: 'Sem tag',
+            onRemove: () => setFilters({ noTag: undefined })
+        })
+    }
+
+    // Tags
+    filters.tagIds?.forEach(tagId => {
+        const tag = tags.find(t => t.id === tagId)
+        if (tag) {
+            chips.push({
+                id: `tag-${tagId}`,
+                label: `Tag: ${tag.name}`,
+                onRemove: () => setFilters({
+                    tagIds: filters.tagIds?.filter(id => id !== tagId)
+                })
+            })
+        }
+    })
 
     // Days without contact
     if (filters.diasSemContatoMin !== undefined || filters.diasSemContatoMax !== undefined) {

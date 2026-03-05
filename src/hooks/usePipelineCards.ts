@@ -6,7 +6,7 @@ import type { Database } from '../database.types'
 import { prepareSearchTerms } from '../lib/utils'
 import { useTeamFilterMembers } from './useTeamFilterMembers'
 
-type Product = Database['public']['Enums']['app_product'] | 'ALL'
+type Product = Database['public']['Enums']['app_product']
 export type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
 interface UsePipelineCardsProps {
@@ -59,9 +59,7 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
             let query = (supabase.from('view_cards_acoes') as any)
                 .select('*')
 
-            if (productFilter !== 'ALL') {
-                query = query.eq('produto', productFilter)
-            }
+            query = query.eq('produto', productFilter)
 
             // Apply Smart View Filters
             if (viewMode === 'AGENT') {
@@ -176,7 +174,9 @@ export function usePipelineCards({ productFilter, viewMode, subView, filters, gr
             }
 
             // Tag Filter
-            if ((filters.tagIds?.length ?? 0) > 0) {
+            if (filters.noTag) {
+                query = query.or('tag_ids.is.null,tag_ids.eq.{}')
+            } else if ((filters.tagIds?.length ?? 0) > 0) {
                 query = query.overlaps('tag_ids', filters.tagIds)
             }
 
