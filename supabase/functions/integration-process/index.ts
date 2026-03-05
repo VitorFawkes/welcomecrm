@@ -1411,12 +1411,13 @@ Deno.serve(async (req) => {
                         const acUtmCampaign = topLevelUpdates.utm_campaign || finalMarketingData.utm_campaign;
 
                         // Normalize AC "Origem do lead" to our taxonomy
-                        // Valid origins: mkt, indicacao, carteira_propria, carteira_wg
+                        // Valid origins: mkt, indicacao, carteira_propria, carteira_wg, sorrento
                         const ORIGEM_MAP: Record<string, string> = {
                             'mkt': 'mkt', 'marketing': 'mkt',
                             'indicacao': 'indicacao', 'indicação': 'indicacao', 'referral': 'indicacao',
                             'carteira_propria': 'carteira_propria', 'carteira própria': 'carteira_propria',
                             'carteira_wg': 'carteira_wg', 'carteira wg': 'carteira_wg',
+                            'sorrento': 'sorrento',
                             // Legacy mappings → default to carteira_propria
                             'carteira': 'carteira_propria', 'recorrente': 'carteira_propria', 'recorrencia': 'carteira_propria',
                             'site': 'mkt', 'manual': 'mkt', 'outro': 'mkt',

@@ -21,3 +21,8 @@
 2026-03-04T13:31:58Z | supabase/migrations/20260304_pipeline_current_filters.sql | applied_to_prod
 2026-03-04T15:19:41Z | supabase/migrations/20260304_fix_value_conversion.sql | applied_to_prod
 2026-03-04T15:26:31Z | supabase/migrations/20260305_indicado_por_contato.sql | applied_to_prod
+2026-03-04T21:11:17Z | supabase/migrations/20260304_rename_briefing_agendado.sql | applied_to_prod
+2026-03-04T21:51:05Z | supabase/migrations/20260304_assign_produtos_members.sql | applied_to_prod
+2026-03-04T21:51:26Z | supabase/migrations/20260304_assign_produtos_members.sql | applied_to_prod
+2026-03-04T21:52:48Z | supabase/migrations/20260304_fix_admin_produtos.sql | applied_to_prod
+2026-03-05T13:26:40Z | supabase/migrations/20260305_add_origem_sorrento.sql | applied_to_prod
