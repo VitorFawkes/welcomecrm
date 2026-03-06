@@ -20,9 +20,10 @@ export function useCardTags(produto?: string) {
     const queryClient = useQueryClient()
 
     const { data: tags = [], isLoading } = useQuery({
-        queryKey: ['card-tags'],
+        queryKey: ['card-tags', produto ?? 'all'],
         queryFn: async () => {
-            const { data, error } = await (supabase as any)
+            const { data, error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tags')
                 .select('*')
                 .eq('is_active', true)
@@ -39,7 +40,8 @@ export function useCardTags(produto?: string) {
 
     const createTag = useMutation({
         mutationFn: async (input: { name: string; color: string; description?: string; produto?: string }) => {
-            const { data, error } = await (supabase as any)
+            const { data, error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tags')
                 .insert(input)
                 .select()
@@ -52,7 +54,8 @@ export function useCardTags(produto?: string) {
 
     const updateTag = useMutation({
         mutationFn: async ({ id, ...input }: Partial<CardTag> & { id: string }) => {
-            const { data, error } = await (supabase as any)
+            const { data, error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tags')
                 .update(input)
                 .eq('id', id)
@@ -66,7 +69,8 @@ export function useCardTags(produto?: string) {
 
     const deleteTag = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await (supabase as any)
+            const { error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tags')
                 .delete()
                 .eq('id', id)
@@ -87,7 +91,8 @@ export function useCardTagAssignments(cardId: string) {
     const { data: tagIds = [], isLoading } = useQuery({
         queryKey: ['card-tag-assignments', cardId],
         queryFn: async () => {
-            const { data, error } = await (supabase as any)
+            const { data, error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tag_assignments')
                 .select('tag_id')
                 .eq('card_id', cardId)
@@ -99,7 +104,8 @@ export function useCardTagAssignments(cardId: string) {
 
     const assign = useMutation({
         mutationFn: async (tagId: string) => {
-            const { error } = await (supabase as any)
+            const { error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tag_assignments')
                 .insert({
                     card_id: cardId,
@@ -117,7 +123,8 @@ export function useCardTagAssignments(cardId: string) {
 
     const unassign = useMutation({
         mutationFn: async (tagId: string) => {
-            const { error } = await (supabase as any)
+            const { error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tag_assignments')
                 .delete()
                 .eq('card_id', cardId)
@@ -140,7 +147,8 @@ export function useCardTagUsageCounts() {
     return useQuery({
         queryKey: ['card-tag-usage-counts'],
         queryFn: async () => {
-            const { data, error } = await (supabase as any)
+            const { data, error } = // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
                 .from('card_tag_assignments')
                 .select('tag_id')
             if (error) throw error

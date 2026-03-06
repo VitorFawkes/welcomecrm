@@ -1,7 +1,8 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
+import { useProductContext } from './useProductContext'
 
 type ProposalEvent = 'viewed' | 'accepted' | 'rejected' | 'in_progress' | 'expired'
 
@@ -58,6 +59,10 @@ const EVENT_CONFIG: Record<ProposalEvent, {
  */
 export function useProposalNotifications() {
     const queryClient = useQueryClient()
+    const { currentProduct } = useProductContext()
+    // Ref to access currentProduct inside the realtime callback without re-subscribing
+    const currentProductRef = useRef(currentProduct)
+    currentProductRef.current = currentProduct // eslint-disable-line react-hooks/refs
 
     const showNotification = useCallback((data: ProposalNotification) => {
         const config = EVENT_CONFIG[data.status]
@@ -99,20 +104,27 @@ export function useProposalNotifications() {
 
                     // Only notify if status changed
                     if (newData.status && newData.status !== oldData.status) {
-                        // Fetch additional data for notification
+                        // Fetch additional data for notification (include produto for isolation)
                         const { data: proposalData } = await supabase
                             .from('proposals')
                             .select(`
                                 id,
                                 status,
-                                card:cards!card_id(titulo),
+                                card:cards!card_id(titulo, produto),
                                 active_version:proposal_versions!active_version_id(title)
                             `)
                             .eq('id', newData.id as string)
                             .single()
 
                         if (proposalData) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             const pd = proposalData as any
+
+                            // Product isolation: only show notification if card belongs to current product
+                            if (pd.card?.produto && pd.card.produto !== currentProductRef.current) {
+                                return
+                            }
+
                             const notification: ProposalNotification = {
                                 id: pd.id,
                                 proposal_id: pd.id,

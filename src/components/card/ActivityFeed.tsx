@@ -12,6 +12,7 @@ interface ActivityFilters {
     startDate?: string | null
     endDate?: string | null
     type?: string | null
+    product?: string | null
 }
 
 interface ActivityFeedProps {
@@ -217,6 +218,7 @@ function getChangeDetail(tipo: string, meta: any): { oldVal: string | null; newV
 
 export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
     const queryClient = useQueryClient()
+    const hasProductFilter = !cardId && !!filters?.product
     const { data: activities, isLoading } = useQuery({
         queryKey: ['activity-feed', cardId || 'global', filters],
         queryFn: async () => {
@@ -228,9 +230,7 @@ export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
                         nome,
                         email
                     ),
-                    card:cards!card_id (
-                        titulo
-                    )
+                    card:cards!card_id(titulo, produto)
                 `)
                 .order('created_at', { ascending: false })
                 .limit(100)
@@ -261,7 +261,13 @@ export default function ActivityFeed({ cardId, filters }: ActivityFeedProps) {
                 return []
             }
 
-            return data as Activity[]
+            let result = data as Activity[]
+            // Filtrar por produto client-side (inner join via template literal não funciona com TS)
+            if (hasProductFilter) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result = result.filter((a: any) => a.card?.produto === filters!.product)
+            }
+            return result
         }
     })
 

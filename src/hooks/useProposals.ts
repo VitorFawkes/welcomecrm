@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useProductContext } from './useProductContext'
 import type { Proposal, ProposalVersion, ProposalStatus } from '@/types/proposals'
 
 // ============================================
@@ -17,6 +18,7 @@ export interface ProposalWithRelations extends Proposal {
         id: string
         titulo: string
         pessoa_principal_id: string | null
+        produto: string | null
     } | null
     creator: {
         id: string
@@ -50,8 +52,10 @@ export const proposalsListKeys = {
 // Fetch All Proposals (with filters)
 // ============================================
 export function useProposals(filters?: ProposalFilters) {
+    const { currentProduct } = useProductContext()
+
     return useQuery({
-        queryKey: proposalsListKeys.filtered(filters || {}),
+        queryKey: [...proposalsListKeys.filtered(filters || {}), currentProduct],
         queryFn: async () => {
             console.log('[useProposals] Starting query...')
 
@@ -89,7 +93,7 @@ export function useProposals(filters?: ProposalFilters) {
                     ? supabase.from('proposal_versions').select('id, title, version_number').in('id', versionIds)
                     : { data: [], error: null },
                 cardIds.length > 0
-                    ? supabase.from('cards').select('id, titulo, pessoa_principal_id').in('id', cardIds)
+                    ? supabase.from('cards').select('id, titulo, pessoa_principal_id, produto').in('id', cardIds).eq('produto', currentProduct)
                     : { data: [], error: null },
                 creatorIds.length > 0
                     ? supabase.from('profiles').select('id, email, nome').in('id', creatorIds)
@@ -107,13 +111,19 @@ export function useProposals(filters?: ProposalFilters) {
             const cardsMap = new Map((cardsRes.data || []).map(c => [c.id, c]))
             const creatorsMap = new Map((creatorsRes.data || []).map(p => [p.id, p]))
 
-            // Step 3: Merge data
-            const result: ProposalWithRelations[] = proposals.map(p => ({
-                ...p,
-                active_version: p.active_version_id ? versionsMap.get(p.active_version_id) || null : null,
-                card: p.card_id ? cardsMap.get(p.card_id) || null : null,
-                creator: p.created_by ? creatorsMap.get(p.created_by) || null : null,
-            }))
+            // Step 3: Merge data — only include proposals whose card matches the current product
+            const result: ProposalWithRelations[] = proposals
+                .filter(p => {
+                    // Exclude proposals with a card_id that doesn't belong to the current product
+                    if (p.card_id && !cardsMap.has(p.card_id)) return false
+                    return true
+                })
+                .map(p => ({
+                    ...p,
+                    active_version: p.active_version_id ? versionsMap.get(p.active_version_id) || null : null,
+                    card: p.card_id ? cardsMap.get(p.card_id) || null : null,
+                    creator: p.created_by ? creatorsMap.get(p.created_by) || null : null,
+                }))
 
             // Step 4: Client-side search filter
             let filteredResult = result
@@ -135,12 +145,16 @@ export function useProposals(filters?: ProposalFilters) {
 // Fetch Proposal Stats
 // ============================================
 export function useProposalStats() {
+    const { currentProduct } = useProductContext()
+
     return useQuery({
-        queryKey: proposalsListKeys.stats(),
+        queryKey: [...proposalsListKeys.stats(), currentProduct],
         queryFn: async () => {
+            // Join with cards to filter by current product
             const { data, error } = await supabase
                 .from('proposals')
-                .select('status')
+                .select('status, card:cards!inner!proposals_card_id_fkey(produto)')
+                .eq('cards.produto', currentProduct)
 
             if (error) throw error
 
@@ -157,6 +171,7 @@ export function useProposalStats() {
             }
 
             data.forEach(p => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const status = (p as any).status as keyof Omit<ProposalStats, 'total' | 'conversionRate'>
                 if (status in stats) {
                     stats[status]++

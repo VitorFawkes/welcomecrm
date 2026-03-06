@@ -1,20 +1,24 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useTripsFilters } from './useTripsFilters'
+import { useProductContext } from './useProductContext'
 import type { Database } from '../database.types'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
 export function useTrips() {
     const { filters } = useTripsFilters()
+    const { currentProduct } = useProductContext()
 
     return useQuery({
-        queryKey: ['trips', filters],
+        queryKey: ['trips', filters, currentProduct],
         placeholderData: keepPreviousData,
         queryFn: async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let query = (supabase.from('view_cards_acoes') as any)
                 .select('*')
                 .eq('status_comercial', 'ganho') // Only Won deals are Trips
+                .eq('produto', currentProduct)
 
             if (filters.search) {
                 const searchTerm = filters.search.trim();

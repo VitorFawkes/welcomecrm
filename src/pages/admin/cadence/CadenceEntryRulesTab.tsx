@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
+import { useProductContext } from '@/hooks/useProductContext';
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants';
 
 interface EntryRule {
     id: string;
@@ -146,6 +148,8 @@ const formatWeekdays = (days: number[]) => {
 
 export function CadenceEntryRulesTab() {
     const queryClient = useQueryClient();
+    const { currentProduct } = useProductContext();
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS;
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>(emptyFormData);
@@ -164,6 +168,7 @@ export function CadenceEntryRulesTab() {
         queryKey: ['cadence-entry-rules'],
         queryFn: async () => {
             const { data, error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('cadence_event_triggers' as any) as any)
                 .select('*')
                 .in('event_type', ['card_created', 'stage_enter'])
@@ -178,6 +183,7 @@ export function CadenceEntryRulesTab() {
         queryKey: ['cadence-templates-active'],
         queryFn: async () => {
             const { data, error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('cadence_templates' as any) as any)
                 .select('id, name, description, target_audience, is_active')
                 .eq('is_active', true)
@@ -201,7 +207,7 @@ export function CadenceEntryRulesTab() {
     });
 
     // Fetch stages
-    const { data: allStages } = usePipelineStages();
+    const { data: allStages } = usePipelineStages(pipelineId);
 
     // Filter stages by selected pipelines
     const filteredStages = allStages?.filter(s =>
@@ -268,6 +274,7 @@ export function CadenceEntryRulesTab() {
             };
 
             const { error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('cadence_event_triggers' as any) as any)
                 .insert(insertData);
             if (error) throw error;
@@ -301,6 +308,7 @@ export function CadenceEntryRulesTab() {
             };
 
             const { error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('cadence_event_triggers' as any) as any)
                 .update(updateData)
                 .eq('id', id);
@@ -320,6 +328,7 @@ export function CadenceEntryRulesTab() {
     const toggleMutation = useMutation({
         mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
             const { error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('cadence_event_triggers' as any) as any)
                 .update({ is_active: isActive })
                 .eq('id', id);
@@ -335,6 +344,7 @@ export function CadenceEntryRulesTab() {
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
             const { error } = await (supabase
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('cadence_event_triggers' as any) as any)
                 .delete()
                 .eq('id', id);
@@ -400,6 +410,7 @@ export function CadenceEntryRulesTab() {
     const isFormOpen = isAdding || editingId !== null;
     const isSaving = createMutation.isPending || updateMutation.isPending;
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const formatDelay = (minutes: number, _type: string) => {
         if (minutes < 60) return `${minutes} min`;
         if (minutes < 1440) return `${Math.round(minutes / 60)}h`;
