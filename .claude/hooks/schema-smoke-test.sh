@@ -63,6 +63,16 @@ test_query "tarefas (deleted_at + reunião)" \
 test_query "activities + joins" \
   "activities?select=id,tipo,descricao,created_at,card:cards!card_id(titulo),created_by_user:profiles!created_by(nome,email)&limit=1"
 
+# Task sync (tarefas.external_id + integration_task_type_map)
+test_query "tarefas external_id columns" \
+  "tarefas?select=id,external_id,external_source&limit=1"
+
+test_query "integration_task_type_map" \
+  "integration_task_type_map?select=id,ac_task_type,crm_task_tipo&limit=1"
+
+test_query "integration_task_sync_config" \
+  "integration_task_sync_config?select=id,inbound_enabled,outbound_enabled&limit=1"
+
 if [ $FAILED -gt 0 ]; then
   echo "" >&2
   echo "$FAILED/$TOTAL queries falharam. O banco não tem as colunas que o frontend espera." >&2

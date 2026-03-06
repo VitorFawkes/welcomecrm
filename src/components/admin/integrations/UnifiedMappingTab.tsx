@@ -7,6 +7,7 @@ import { InboundFieldMappingTab } from './InboundFieldMappingTab';
 import { OutboundFieldMappingTab } from './OutboundFieldMappingTab';
 import { OutboundStageMappingTab } from './OutboundStageMappingTab';
 import { ACFieldManager } from './ACFieldManager';
+import { TaskSyncTab } from './TaskSyncTab';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
@@ -19,7 +20,8 @@ import {
     Map,
     ArrowDownLeft,
     ArrowUpRight,
-    ArrowRightLeft
+    ArrowRightLeft,
+    ClipboardList
 } from 'lucide-react';
 
 interface UnifiedMappingTabProps {
@@ -33,7 +35,7 @@ interface MappingStats {
     fields: { inbound: number; outbound: number };
 }
 
-type MappingTabValue = 'structure' | 'stages-out' | 'fields-in' | 'fields-out' | 'catalog';
+type MappingTabValue = 'structure' | 'stages-out' | 'fields-in' | 'fields-out' | 'catalog' | 'tasks';
 
 export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
     const [activeTab, setActiveTab] = useState<MappingTabValue>('structure');
@@ -265,6 +267,16 @@ export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
                         </Badge>
                     </TabsTrigger>
                     <TabsTrigger
+                        value="tasks"
+                        className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
+                    >
+                        <ClipboardList className="w-4 h-4 text-purple-600" />
+                        Tarefas
+                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                            Bidirecional
+                        </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger
                         value="catalog"
                         className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md px-4 py-2"
                     >
@@ -291,6 +303,11 @@ export function UnifiedMappingTab({ integrationId }: UnifiedMappingTabProps) {
                 {/* Campos de Saída */}
                 <TabsContent value="fields-out" className="mt-6">
                     <OutboundFieldMappingTab integrationId={integrationId} />
+                </TabsContent>
+
+                {/* Tarefas (Bidirecional) */}
+                <TabsContent value="tasks" className="mt-6">
+                    <TaskSyncTab integrationId={integrationId} />
                 </TabsContent>
 
                 {/* Catálogo AC */}

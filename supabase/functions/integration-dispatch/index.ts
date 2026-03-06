@@ -4,9 +4,11 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 interface OutboundEvent {
     id: string;
     card_id: string;
+    tarefa_id: string | null;
     integration_id: string;
     external_id: string | null;
-    event_type: 'stage_change' | 'field_update' | 'won' | 'lost' | 'card_created';
+    event_type: 'stage_change' | 'field_update' | 'won' | 'lost' | 'card_created'
+              | 'task_created' | 'task_completed' | 'task_updated';
     payload: Record<string, unknown>;
     status: string;
     attempts: number;
@@ -81,7 +83,7 @@ Deno.serve(async (req) => {
     const { data: events, error: fetchError } = await supabase
         .from('integration_outbound_queue')
         .select(`
-            id, card_id, integration_id, external_id, event_type, payload, status, attempts,
+            id, card_id, tarefa_id, integration_id, external_id, event_type, payload, status, attempts,
             integrations:integrations(config)
         `)
         .eq('status', 'pending')
@@ -111,6 +113,29 @@ Deno.serve(async (req) => {
     for (const m of outboundFieldMaps || []) {
         if (m.internal_field && m.external_field_id) {
             fieldMapLookup.set(m.internal_field, m.external_field_id);
+        }
+    }
+
+    // 1c. Load task type mappings for task_created/task_updated (CRM tipo → AC dealTasktype)
+    const { data: taskTypeMaps } = await supabase
+        .from('integration_task_type_map')
+        .select('pipeline_id, ac_task_type, crm_task_tipo')
+        .eq('is_active', true);
+
+    const taskTypeMapLookup = new Map<string, number>();
+    for (const m of taskTypeMaps || []) {
+        taskTypeMapLookup.set(`${m.pipeline_id}:${m.crm_task_tipo}`, m.ac_task_type);
+    }
+
+    // 1d. Load user mappings for task assignee (CRM profile → AC user)
+    const { data: userMappings } = await supabase
+        .from('integration_user_map')
+        .select('internal_user_id, external_user_id');
+
+    const userMapReverse = new Map<string, string>(); // CRM profile ID → AC user ID
+    for (const m of userMappings || []) {
+        if (m.internal_user_id && m.external_user_id) {
+            userMapReverse.set(m.internal_user_id, m.external_user_id);
         }
     }
 
@@ -467,6 +492,84 @@ Deno.serve(async (req) => {
                     break;
                 }
 
+                // ═══════════════════════════════════════════════════════════════════
+                // TASK EVENTS: CRM tarefas → AC dealTasks
+                // ═══════════════════════════════════════════════════════════════════
+                case 'task_created': {
+                    httpMethod = 'POST';
+                    endpoint = '/api/3/dealTasks';
+                    isCardCreated = false; // reuse flag logic below for task write-back
+
+                    const tcPayload = event.payload as {
+                        ac_deal_id?: string; titulo?: string; tipo?: string;
+                        data_vencimento?: string; pipeline_id?: string; responsavel_id?: string;
+                    };
+
+                    const acDealId = tcPayload.ac_deal_id || event.external_id;
+                    if (!acDealId) {
+                        throw new Error('task_created: No AC deal ID available');
+                    }
+
+                    // Map CRM tipo → AC dealTasktype
+                    const pipelineId = tcPayload.pipeline_id || '';
+                    const acTaskType = taskTypeMapLookup.get(`${pipelineId}:${tcPayload.tipo}`) || 3; // 3=todo fallback
+
+                    // Map CRM responsavel_id → AC user ID
+                    const acAssignee = tcPayload.responsavel_id
+                        ? userMapReverse.get(tcPayload.responsavel_id)
+                        : undefined;
+
+                    const dealTask: Record<string, unknown> = {
+                        title: tcPayload.titulo || 'Tarefa CRM',
+                        dealTasktype: String(acTaskType),
+                        duedate: tcPayload.data_vencimento || new Date().toISOString(),
+                        relid: Number(acDealId),
+                        reltype: 'deal',
+                        status: 0
+                    };
+                    if (acAssignee) dealTask.assignee = Number(acAssignee);
+
+                    body = { dealTask };
+                    console.log(`[integration-dispatch] Task created: "${dealTask.title}" → Deal ${acDealId}`);
+                    break;
+                }
+
+                case 'task_completed': {
+                    if (!event.external_id) {
+                        throw new Error('task_completed: No AC task external_id');
+                    }
+                    endpoint = `/api/3/dealTasks/${event.external_id}`;
+                    body = { dealTask: { status: 1 } };
+                    console.log(`[integration-dispatch] Task completed: AC Task ${event.external_id}`);
+                    break;
+                }
+
+                case 'task_updated': {
+                    if (!event.external_id) {
+                        throw new Error('task_updated: No AC task external_id');
+                    }
+                    endpoint = `/api/3/dealTasks/${event.external_id}`;
+
+                    const tuPayload = event.payload as {
+                        titulo?: string; data_vencimento?: string; responsavel_id?: string;
+                        pipeline_id?: string; tipo?: string;
+                    };
+
+                    const updatedTask: Record<string, unknown> = {};
+                    if (tuPayload.titulo) updatedTask.title = tuPayload.titulo;
+                    if (tuPayload.data_vencimento) updatedTask.duedate = tuPayload.data_vencimento;
+
+                    // Map assignee
+                    if (tuPayload.responsavel_id) {
+                        const acUser = userMapReverse.get(tuPayload.responsavel_id);
+                        if (acUser) updatedTask.assignee = Number(acUser);
+                    }
+
+                    body = { dealTask: updatedTask };
+                    console.log(`[integration-dispatch] Task updated: AC Task ${event.external_id}`);
+                    break;
+                }
+
                 default:
                     throw new Error(`Unknown event type: ${event.event_type}`);
             }
@@ -494,7 +597,19 @@ Deno.serve(async (req) => {
                 console.warn(`[integration-dispatch] Could not parse API response: ${parseErr}`);
             }
 
-            // 7. Para card_created: salvar o external_id retornado pelo AC no card
+            // 7a. Para task_created: salvar o AC task ID no tarefas.external_id
+            if (event.event_type === 'task_created' && responseData?.dealTask?.id && event.tarefa_id) {
+                const newAcTaskId = String(responseData.dealTask.id);
+                await supabase.from('tarefas')
+                    .update({ external_id: newAcTaskId, external_source: 'activecampaign' })
+                    .eq('id', event.tarefa_id);
+                await supabase.from('integration_outbound_queue')
+                    .update({ external_id: newAcTaskId })
+                    .eq('id', event.id);
+                console.log(`[integration-dispatch] AC Task ${newAcTaskId} created for tarefa ${event.tarefa_id}`);
+            }
+
+            // 7b. Para card_created: salvar o external_id retornado pelo AC no card
             if (isCardCreated && responseData?.deal?.id) {
                 const newExternalId = String(responseData.deal.id);
                 await supabase.from('cards')

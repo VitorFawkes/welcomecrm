@@ -655,8 +655,138 @@ Deno.serve(async (req) => {
                     continue;
                 }
 
-                // Only process deals and dealActivity
-                if (entity !== 'deal' && entity !== 'dealActivity') {
+                // ═══════════════════════════════════════════════════════════════════
+                // DEAL ACTIVITY (TASK) HANDLER — AC deal_task events → CRM tarefas
+                // ═══════════════════════════════════════════════════════════════════
+                if (entity === 'dealActivity') {
+                    const acTaskId = payload['deal_task[id]'];
+                    const acDealId = payload['deal[id]'];
+                    const acTitle = payload['deal_task[title]'] || 'Tarefa AC';
+                    const acDueDate = payload['deal_task[duedate]'];
+                    const acNote = payload['deal_task[note]'];
+                    const acTaskType = parseInt(payload['deal_task[dealTasktype]'] || '3', 10);
+                    const acStatus = payload['deal_task[status]'];
+                    const acAssignee = payload['deal_task[assignee]'] || payload['deal_task[userid]'];
+                    const isComplete = String(acStatus) === '1';
+
+                    if (!acTaskId || !acDealId) {
+                        stats.ignored++;
+                        await updateEventStatus(event.id, 'ignored', `dealActivity missing task ID or deal ID`);
+                        continue;
+                    }
+
+                    // Find CRM card by AC deal external_id
+                    const { data: taskCard } = await supabase
+                        .from('cards')
+                        .select('id, pipeline_id')
+                        .eq('external_id', String(acDealId))
+                        .eq('external_source', 'active_campaign')
+                        .maybeSingle();
+
+                    if (!taskCard) {
+                        stats.ignored++;
+                        await updateEventStatus(event.id, 'ignored', `No card found for AC deal ${acDealId}`);
+                        continue;
+                    }
+
+                    // Check per-pipeline task sync config
+                    const { data: taskSyncConfig } = await supabase
+                        .from('integration_task_sync_config')
+                        .select('inbound_enabled')
+                        .eq('integration_id', event.integration_id)
+                        .eq('pipeline_id', taskCard.pipeline_id)
+                        .maybeSingle();
+
+                    if (!taskSyncConfig?.inbound_enabled) {
+                        stats.ignored++;
+                        await updateEventStatus(event.id, 'ignored', `Task sync inbound disabled for pipeline ${taskCard.pipeline_id}`);
+                        continue;
+                    }
+
+                    // Map AC dealTasktype → CRM tipo via integration_task_type_map
+                    const { data: typeMap } = await supabase
+                        .from('integration_task_type_map')
+                        .select('crm_task_tipo')
+                        .eq('integration_id', event.integration_id)
+                        .eq('pipeline_id', taskCard.pipeline_id)
+                        .eq('ac_task_type', acTaskType)
+                        .eq('is_active', true)
+                        .maybeSingle();
+
+                    const crmTipo = typeMap?.crm_task_tipo || 'tarefa';
+
+                    // Map AC assignee → CRM responsavel_id via integration_user_map
+                    let responsavelId: string | null = null;
+                    if (acAssignee) {
+                        const userMap = userMappings?.find(m =>
+                            m.integration_id === event.integration_id &&
+                            m.external_user_id === String(acAssignee)
+                        );
+                        responsavelId = userMap?.internal_user_id || null;
+                    }
+
+                    if (!isShadowMode) {
+                        // Check existing tarefa by external_id
+                        const { data: existingTarefa } = await supabase
+                            .from('tarefas')
+                            .select('id')
+                            .eq('external_id', String(acTaskId))
+                            .eq('external_source', 'activecampaign')
+                            .maybeSingle();
+
+                        const tarefaPayload: Record<string, any> = {
+                            card_id: taskCard.id,
+                            titulo: acTitle,
+                            tipo: crmTipo,
+                            data_vencimento: acDueDate || null,
+                            descricao: acNote || null,
+                            concluida: isComplete,
+                            status: isComplete ? 'realizada' : 'agendada',
+                            external_id: String(acTaskId),
+                            external_source: 'activecampaign'
+                        };
+                        if (isComplete) tarefaPayload.concluida_em = new Date().toISOString();
+                        if (responsavelId) tarefaPayload.responsavel_id = responsavelId;
+
+                        if (existingTarefa) {
+                            // UPDATE with loop prevention
+                            if (pgSql) {
+                                await pgSql.begin(async (tx: any) => {
+                                    await tx`SELECT set_config('app.update_source', 'integration', true)`;
+                                    await tx`UPDATE tarefas SET ${pgSql(tarefaPayload, Object.keys(tarefaPayload))} WHERE id = ${existingTarefa.id}::uuid`;
+                                });
+                            } else {
+                                await supabase.from('tarefas').update(tarefaPayload).eq('id', existingTarefa.id);
+                            }
+                            log = `Updated tarefa ${existingTarefa.id} from AC task ${acTaskId}`;
+                        } else {
+                            // INSERT new tarefa
+                            if (pgSql) {
+                                const cols = Object.keys(tarefaPayload);
+                                await pgSql.begin(async (tx: any) => {
+                                    await tx`SELECT set_config('app.update_source', 'integration', true)`;
+                                    await tx`INSERT INTO tarefas ${pgSql(tarefaPayload, cols)}`;
+                                });
+                            } else {
+                                await supabase.from('tarefas').insert(tarefaPayload);
+                            }
+                            log = `Created tarefa from AC task ${acTaskId} (tipo: ${crmTipo})`;
+                        }
+
+                        await updateEventStatus(event.id, 'processed', log);
+                        stats.updated++;
+                        results.push({ id: event.id, status: 'processed', log });
+                    } else {
+                        log = `[SHADOW] Would ${acStatus === '1' ? 'complete' : 'upsert'} tarefa from AC task ${acTaskId} (tipo: ${crmTipo})`;
+                        await updateEventStatus(event.id, 'processed_shadow', log);
+                        stats.processed_shadow++;
+                        results.push({ id: event.id, status: 'processed_shadow', log });
+                    }
+                    continue;
+                }
+
+                // Only process deals
+                if (entity !== 'deal') {
                     stats.ignored++;
                     await updateEventStatus(event.id, 'ignored', `Ignored: Entity ${entity}`);
                     continue;
