@@ -7,6 +7,7 @@
 INSERT INTO whatsapp_linha_config (
     platform_id,
     phone_number_label,
+    phone_number_id,
     ativo,
     produto,
     fase_label,
@@ -16,6 +17,7 @@ INSERT INTO whatsapp_linha_config (
 ) VALUES (
     '0ce942d3-244f-41a7-a9dd-9d69d3830be6',  -- Echo platform
     'Trips - Travel Planner',
+    'da3edcc0-a04a-4962-aa68-13758ec409be',   -- Echo phone ID
     true,
     'TRIPS',
     'Planner',
@@ -23,6 +25,7 @@ INSERT INTO whatsapp_linha_config (
     'c8022522-4a1d-411c-9387-efe03ca725ee',  -- TRIPS pipeline
     '706926c6-ed45-45ba-b393-e8338b46c066'   -- Aguardando Briefing (1ª etapa Planner)
 ) ON CONFLICT (phone_number_label) DO UPDATE SET
+    phone_number_id = EXCLUDED.phone_number_id,
     ativo       = true,
     produto     = 'TRIPS',
     fase_label  = 'Planner',
