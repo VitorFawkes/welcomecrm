@@ -76,14 +76,40 @@ export interface PipelineTaskByType {
     total: number
     completed: number
     pending: number
+    overdue: number
+}
+
+export interface PipelineTaskByStage {
+    stage_id: string
+    stage_nome: string
+    fase: string
+    fase_slug: string
+    card_count: number
+    total: number
+    completed: number
+    pending: number
+    overdue: number
+}
+
+export interface PipelineTaskByOwner {
+    owner_id: string | null
+    owner_nome: string
+    card_count: number
+    total: number
+    completed: number
+    pending: number
+    overdue: number
 }
 
 export interface PipelineCurrentTasks {
     total_created: number
     total_completed: number
     total_pending: number
+    total_overdue: number
     completion_rate: number
     by_type: PipelineTaskByType[]
+    by_stage: PipelineTaskByStage[]
+    by_owner: PipelineTaskByOwner[]
 }
 
 export interface PipelineCurrentData {

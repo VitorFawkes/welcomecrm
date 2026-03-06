@@ -1,6 +1,7 @@
 -- ============================================================
 -- Pipeline Atual v4: Métricas de tarefas dos cards abertos
--- Adiciona CTE 'tasks' com contagens total e por tipo
+-- - Totais + by_type (v4a)
+-- - by_stage, by_owner, total_overdue (v4b)
 -- ============================================================
 
 DROP FUNCTION IF EXISTS analytics_pipeline_current(TEXT, UUID[], UUID[]);
@@ -198,6 +199,7 @@ BEGIN
             'total_created',   COUNT(t.id),
             'total_completed', COUNT(t.id) FILTER (WHERE t.concluida = true),
             'total_pending',   COUNT(t.id) FILTER (WHERE t.concluida = false),
+            'total_overdue',   COUNT(t.id) FILTER (WHERE t.concluida = false AND t.data_vencimento < NOW()),
             'completion_rate', ROUND(
                 CASE WHEN COUNT(t.id) > 0
                 THEN COUNT(t.id) FILTER (WHERE t.concluida = true)::NUMERIC
@@ -209,18 +211,74 @@ BEGIN
                     'tipo', sub.tipo,
                     'total', sub.type_total,
                     'completed', sub.type_completed,
-                    'pending', sub.type_pending
+                    'pending', sub.type_pending,
+                    'overdue', sub.type_overdue
                 ) ORDER BY sub.type_total DESC)
                 FROM (
                     SELECT
                         t2.tipo,
-                        COUNT(*)                                    AS type_total,
-                        COUNT(*) FILTER (WHERE t2.concluida = true) AS type_completed,
-                        COUNT(*) FILTER (WHERE t2.concluida = false) AS type_pending
+                        COUNT(*)                                                                           AS type_total,
+                        COUNT(*) FILTER (WHERE t2.concluida = true)                                        AS type_completed,
+                        COUNT(*) FILTER (WHERE t2.concluida = false)                                       AS type_pending,
+                        COUNT(*) FILTER (WHERE t2.concluida = false AND t2.data_vencimento < NOW())         AS type_overdue
                     FROM tarefas t2
                     INNER JOIN open_cards oc2 ON oc2.id = t2.card_id
                     WHERE t2.deleted_at IS NULL
                     GROUP BY t2.tipo
+                ) sub
+            ), '[]'::jsonb),
+            'by_stage', COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'stage_id', sub.pipeline_stage_id,
+                    'stage_nome', sub.stage_nome,
+                    'fase', sub.fase,
+                    'fase_slug', sub.fase_slug,
+                    'card_count', sub.card_count,
+                    'total', sub.stage_total,
+                    'completed', sub.stage_completed,
+                    'pending', sub.stage_pending,
+                    'overdue', sub.stage_overdue
+                ) ORDER BY sub.fase_order, sub.ordem)
+                FROM (
+                    SELECT
+                        oc3.pipeline_stage_id,
+                        oc3.stage_nome,
+                        oc3.fase,
+                        oc3.fase_slug,
+                        MIN(oc3.fase_order) AS fase_order,
+                        MIN(oc3.ordem) AS ordem,
+                        COUNT(DISTINCT oc3.id)                                                              AS card_count,
+                        COUNT(t3.id)                                                                        AS stage_total,
+                        COUNT(t3.id) FILTER (WHERE t3.concluida = true)                                     AS stage_completed,
+                        COUNT(t3.id) FILTER (WHERE t3.concluida = false)                                    AS stage_pending,
+                        COUNT(t3.id) FILTER (WHERE t3.concluida = false AND t3.data_vencimento < NOW())      AS stage_overdue
+                    FROM open_cards oc3
+                    LEFT JOIN tarefas t3 ON t3.card_id = oc3.id AND t3.deleted_at IS NULL
+                    GROUP BY oc3.pipeline_stage_id, oc3.stage_nome, oc3.fase, oc3.fase_slug
+                ) sub
+            ), '[]'::jsonb),
+            'by_owner', COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'owner_id', sub.dono_atual_id,
+                    'owner_nome', COALESCE(sub.owner_nome, 'Não atribuído'),
+                    'card_count', sub.card_count,
+                    'total', sub.owner_total,
+                    'completed', sub.owner_completed,
+                    'pending', sub.owner_pending,
+                    'overdue', sub.owner_overdue
+                ) ORDER BY sub.owner_total DESC)
+                FROM (
+                    SELECT
+                        oc4.dono_atual_id,
+                        oc4.owner_nome,
+                        COUNT(DISTINCT oc4.id)                                                              AS card_count,
+                        COUNT(t4.id)                                                                        AS owner_total,
+                        COUNT(t4.id) FILTER (WHERE t4.concluida = true)                                     AS owner_completed,
+                        COUNT(t4.id) FILTER (WHERE t4.concluida = false)                                    AS owner_pending,
+                        COUNT(t4.id) FILTER (WHERE t4.concluida = false AND t4.data_vencimento < NOW())      AS owner_overdue
+                    FROM open_cards oc4
+                    LEFT JOIN tarefas t4 ON t4.card_id = oc4.id AND t4.deleted_at IS NULL
+                    GROUP BY oc4.dono_atual_id, oc4.owner_nome
                 ) sub
             ), '[]'::jsonb)
         ) AS val
