@@ -82,6 +82,22 @@ export function useUsers() {
         },
     });
 
+    const updateEmail = useMutation({
+        mutationFn: async ({ userId, newEmail }: { userId: string; newEmail: string }) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error } = await supabase.rpc('update_user_email' as any, {
+                p_user_id: userId,
+                p_new_email: newEmail,
+            });
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({ queryKey: ['profiles'] });
+        },
+    });
+
     return {
         users: usersQuery.data || [],
         isLoading: usersQuery.isLoading,
@@ -91,5 +107,6 @@ export function useUsers() {
         toggleUserStatus,
         deleteUser,
         resetPassword,
+        updateEmail,
     };
 }

@@ -26,3 +26,10 @@
 2026-03-04T21:51:26Z | supabase/migrations/20260304_assign_produtos_members.sql | applied_to_prod
 2026-03-04T21:52:48Z | supabase/migrations/20260304_fix_admin_produtos.sql | applied_to_prod
 2026-03-05T13:26:40Z | supabase/migrations/20260305_add_origem_sorrento.sql | applied_to_prod
+2026-03-05T18:12:54Z | supabase/migrations/20260305_fix_get_client_create_card.sql | applied_to_prod
+2026-03-05T18:14:22Z | supabase/migrations/20260305_fix_get_client_create_card.sql | applied_to_prod
+PENDING | supabase/migrations/20260305_product_isolation_rpcs.sql | pending_staging
+2026-03-06T01:24:34Z | supabase/migrations/20260305_fix_ganho_planner_won.sql | applied_to_prod
+2026-03-06T11:40:07Z | supabase/migrations/20260306_revert_ganho_planner_won.sql | applied_to_prod
+2026-03-06T12:42:14Z | supabase/migrations/20260306_update_user_email.sql | applied_to_prod
+2026-03-06T12:42:37Z | supabase/migrations/20260305_product_isolation_rpcs.sql | applied_to_prod

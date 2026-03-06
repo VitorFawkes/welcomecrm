@@ -6,7 +6,7 @@ import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
-import { Shield, Users, Layers, Plane, Heart, Building2 } from 'lucide-react';
+import { Shield, Users, Layers, Plane, Heart, Building2, Mail } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -16,6 +16,7 @@ import {
 } from '../../ui/dialog';
 import { useRoles } from '../../../hooks/useRoles';
 import { useTeamOptions } from '../../../hooks/useTeams';
+import { useUsers } from '../../../hooks/useUsers';
 import type { Database } from '../../../database.types';
 import { cn } from '../../../lib/utils';
 
@@ -43,6 +44,7 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
     // Fetch roles and teams from database
     const { roles, isLoading: rolesLoading } = useRoles();
     const { options: teamOptions, isLoading: teamsLoading } = useTeamOptions(true);
+    const { updateEmail } = useUsers();
 
     // Form State
     const [formData, setFormData] = useState({
@@ -112,12 +114,22 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
         }
     });
 
+    const emailChanged = user ? formData.email.trim().toLowerCase() !== (user.email || '').trim().toLowerCase() : false;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
 
         setIsLoading(true);
         try {
+            // If email changed, update via admin RPC first
+            if (emailChanged) {
+                await updateEmail.mutateAsync({
+                    userId: user.id,
+                    newEmail: formData.email.trim(),
+                });
+            }
+
             await updateMutation.mutateAsync({
                 nome: formData.nome,
                 role_id: formData.role_id || null,
@@ -156,13 +168,23 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="edit-email">Email (Não editável)</Label>
+                            <Label htmlFor="edit-email" className="flex items-center gap-1.5">
+                                <Mail className="w-3.5 h-3.5" />
+                                Email de Acesso
+                            </Label>
                             <Input
                                 id="edit-email"
+                                type="email"
                                 value={formData.email}
-                                disabled
-                                className="bg-muted text-muted-foreground cursor-not-allowed"
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                placeholder="usuario@empresa.com"
+                                required
                             />
+                            {emailChanged && (
+                                <p className="text-xs text-amber-600">
+                                    O email de login será alterado. O usuário precisará usar o novo email para acessar o sistema.
+                                </p>
+                            )}
                         </div>
                     </div>
 
