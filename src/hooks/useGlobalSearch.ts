@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { useProductContext } from '@/hooks/useProductContext'
 
 export interface SearchResult {
     id: string
@@ -16,20 +17,22 @@ export function useGlobalSearch() {
     const [query, setQuery] = useState('')
     const [isOpen, setIsOpen] = useState(false)
     const navigate = useNavigate()
+    const { currentProduct } = useProductContext()
 
     const { data: results = [], isLoading } = useQuery({
-        queryKey: ['global-search', query],
+        queryKey: ['global-search', query, currentProduct],
         queryFn: async () => {
             if (!query || query.length < 2) return []
 
             const searchTerm = `%${query}%`
             const allResults: SearchResult[] = []
 
-            // Search Cards
+            // Search Cards (filtered by current product)
             const { data: cards } = await supabase
                 .from('cards')
                 .select('id, titulo, produto, status_comercial')
-                .or(`titulo.ilike.${searchTerm}`)
+                .eq('produto', currentProduct)
+                .ilike('titulo', searchTerm)
                 .limit(5)
 
             if (cards) {
@@ -74,14 +77,16 @@ export function useGlobalSearch() {
                 })
             }
 
-            // Search Proposals
+            // Search Proposals (filtered by card's product)
             const { data: proposals } = await supabase
                 .from('proposals')
                 .select(`
                     id,
                     status,
-                    active_version:proposal_versions!active_version_id(title)
+                    active_version:proposal_versions!active_version_id(title),
+                    card:cards!proposals_card_id_fkey(produto)
                 `)
+                .eq('cards.produto', currentProduct)
                 .limit(5)
 
             if (proposals) {

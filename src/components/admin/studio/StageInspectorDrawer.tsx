@@ -5,6 +5,7 @@ import { X, Save, Eye, EyeOff, CheckSquare, Square, Loader2, Check } from 'lucid
 import { cn } from '../../../lib/utils';
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases';
 import { useProductContext } from '../../../hooks/useProductContext';
+import { PRODUCT_PIPELINE_MAP } from '../../../lib/constants';
 import { useSections } from '../../../hooks/useSections';
 import type { Database } from '../../../database.types';
 
@@ -21,6 +22,7 @@ interface StageInspectorDrawerProps {
 export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageInspectorDrawerProps) {
     const queryClient = useQueryClient();
     const { currentProduct } = useProductContext();
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS;
     const [activeTab, setActiveTab] = useState<'general' | 'data'>('general');
 
     // Local state for stage details
@@ -63,7 +65,7 @@ export default function StageInspectorDrawer({ isOpen, onClose, stage }: StageIn
         enabled: isOpen && !!stage
     });
 
-    const { data: phasesData } = usePipelinePhases();
+    const { data: phasesData } = usePipelinePhases(pipelineId);
     const phases = phasesData || [];
 
     // --- Mutations ---

@@ -48,7 +48,7 @@ export default function StudioStructure() {
     const [activeType, setActiveType] = useState<'Phase' | 'Stage' | null>(null)
 
     // --- Data Fetching (before local state so initializers can use the data) ---
-    const { data: phasesData, isLoading: loadingPhases } = usePipelinePhases()
+    const { data: phasesData, isLoading: loadingPhases } = usePipelinePhases(pipelineId)
 
     const { data: stagesData, isLoading: loadingStages } = useQuery({
         queryKey: ['pipeline-stages-studio', pipelineId],

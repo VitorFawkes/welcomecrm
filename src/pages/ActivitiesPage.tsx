@@ -6,8 +6,10 @@ import { Select } from '../components/ui/Select'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
 import { Filter, X } from 'lucide-react'
+import { useProductContext } from '../hooks/useProductContext'
 
 export default function ActivitiesPage() {
+    const { currentProduct } = useProductContext()
     const [filters, setFilters] = useState({
         userId: 'all',
         startDate: '',
@@ -133,7 +135,7 @@ export default function ActivitiesPage() {
                 </div>
 
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <ActivityFeed filters={filters} />
+                    <ActivityFeed filters={{ ...filters, product: currentProduct }} />
                 </div>
             </div>
         </div>

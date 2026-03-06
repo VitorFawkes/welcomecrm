@@ -26,6 +26,7 @@ import { usePipelineFilters, type ViewMode, type SubView, type FilterState } fro
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { useHorizontalScroll } from '../../hooks/useHorizontalScroll'
 import { useReceitaPermission } from '../../hooks/useReceitaPermission'
 import { ScrollArrows } from '../ui/ScrollArrows'
@@ -56,7 +57,7 @@ export default function KanbanBoard({ productFilter, viewMode, subView, filters:
     const [terminalDrawer, setTerminalDrawer] = useState<{ stage: Stage, totalCards: number, totalValue: number } | null>(null)
 
     const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const { data: phasesData } = usePipelinePhases()
+    const { data: phasesData } = usePipelinePhases(PRODUCT_PIPELINE_MAP[productFilter])
     const receitaPerm = useReceitaPermission()
 
     // Elite horizontal scroll with Shift+Wheel, Drag-to-Pan, and arrow indicators

@@ -49,6 +49,7 @@ import LossReasonModal from './LossReasonModal'
 import { useStageRequirements } from '../../hooks/useStageRequirements'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { SystemPhase } from '@/types/pipeline'
 
 type CardBase = Database['public']['Tables']['cards']['Row']
@@ -389,7 +390,8 @@ export default function CardHeader({ card }: CardHeaderProps) {
     const { missingBlocking } = useStageRequirements(card)
     const { getHeaderFields } = useFieldConfig()
     const headerFields = card.pipeline_stage_id ? getHeaderFields(card.pipeline_stage_id) : []
-    const { data: phasesData } = usePipelinePhases()
+    const pipelineId = card.produto ? PRODUCT_PIPELINE_MAP[card.produto] : undefined
+    const { data: phasesData } = usePipelinePhases(pipelineId)
 
     // Card team (assistants)
     const { members: teamMembers, addMember, removeMember } = useCardTeam(card.id || undefined, card)

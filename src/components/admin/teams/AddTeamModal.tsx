@@ -1,6 +1,8 @@
 import { useForm, Controller } from 'react-hook-form';
 import { useTeams, type CreateTeamData } from '../../../hooks/useTeams';
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases';
+import { useProductContext } from '../../../hooks/useProductContext';
+import { PRODUCT_PIPELINE_MAP } from '../../../lib/constants';
 import { useToast } from '../../../contexts/ToastContext';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
@@ -27,7 +29,9 @@ interface AddTeamModalProps {
 
 export function AddTeamModal({ isOpen, onClose }: AddTeamModalProps) {
     const { createTeam } = useTeams();
-    const { data: phases } = usePipelinePhases();
+    const { currentProduct } = useProductContext();
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS;
+    const { data: phases } = usePipelinePhases(pipelineId);
     const { toast } = useToast();
     const { register, handleSubmit, reset, control, formState: { errors } } = useForm<CreateTeamData>();
 

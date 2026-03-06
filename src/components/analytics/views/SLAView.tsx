@@ -10,6 +10,8 @@ import KpiCard from '../KpiCard'
 import ChartCard from '../ChartCard'
 import { useSLAViolations, useSLASummary } from '@/hooks/analytics/useSLAData'
 import { usePipelineStages } from '@/hooks/usePipelineStages'
+import { useAnalyticsFilters } from '@/hooks/analytics/useAnalyticsFilters'
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants'
 import { useDrillDownStore } from '@/hooks/analytics/useAnalyticsDrillDown'
 import { QueryErrorState } from '@/components/ui/QueryErrorState'
 import { cn } from '@/lib/utils'
@@ -24,7 +26,9 @@ export default function SLAView() {
     const { data: violations, isLoading: violationsLoading, error: violationsError, refetch: refetchViolations } = useSLAViolations()
     const { data: summary, isLoading: summaryLoading, error: summaryError, refetch: refetchSummary } = useSLASummary()
 
-    const { data: pipelineStagesData } = usePipelineStages()
+    const { product } = useAnalyticsFilters()
+    const pipelineId = PRODUCT_PIPELINE_MAP[product]
+    const { data: pipelineStagesData } = usePipelineStages(pipelineId)
     const drillDown = useDrillDownStore()
 
     const hasError = !!(violationsError || summaryError)

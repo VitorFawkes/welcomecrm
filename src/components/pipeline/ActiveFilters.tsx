@@ -3,6 +3,8 @@ import { usePipelineFilters } from '../../hooks/usePipelineFilters'
 import { cn } from '../../lib/utils'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
+import { useProductContext } from '../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { useCardTags } from '../../hooks/useCardTags'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -24,7 +26,8 @@ export function ActiveFilters() {
     const { filters: rawFilters, setFilters } = usePipelineFilters()
     const filters = rawFilters || {}
     const { data: options } = useFilterOptions()
-    const { data: phasesData } = usePipelinePhases()
+    const { currentProduct } = useProductContext()
+    const { data: phasesData } = usePipelinePhases(PRODUCT_PIPELINE_MAP[currentProduct])
     const { tags } = useCardTags()
 
     const hasFilters = Object.keys(filters).length > 0 && (

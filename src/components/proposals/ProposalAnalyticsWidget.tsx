@@ -51,24 +51,26 @@ export function ProposalAnalyticsWidget({ productFilter }: ProposalAnalyticsWidg
     const { data: stats, isLoading: loadingStats, isError: errorStats, refetch: refetchStats } = useQuery({
         queryKey: ['proposal-stats-widget', productFilter],
         queryFn: async () => {
-            const { data: proposals, error } = await supabase
+            // Server-side filter: inner join filtra apenas propostas de cards do produto selecionado
+            const query = supabase
                 .from('proposals')
                 .select(`
                     id,
                     status,
                     created_at,
-                    card:cards!proposals_card_id_fkey(titulo, produto)
+                    card:cards!inner!proposals_card_id_fkey(titulo, produto)
                 `)
                 .order('created_at', { ascending: false })
 
+            if (productFilter) {
+                query.eq('cards.produto', productFilter)
+            }
+
+            const { data: proposals, error } = await query
+
             if (error) throw error
 
-            // Filtrar por produto do card associado
-            let filtered = proposals || []
-            if (productFilter) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                filtered = filtered.filter((p: any) => p.card?.produto === productFilter)
-            }
+            const filtered = proposals || []
 
             const stats: ProposalStats = {
                 total: filtered.length,
@@ -112,21 +114,28 @@ export function ProposalAnalyticsWidget({ productFilter }: ProposalAnalyticsWidg
     })
 
     const { data: pendingProposals = [], isLoading: loadingPending, isError: errorPending, refetch: refetchPending } = useQuery({
-        queryKey: ['pending-proposals-widget'],
+        queryKey: ['pending-proposals-widget', productFilter],
         queryFn: async () => {
-            const { data, error } = await supabase
+            // Server-side filter: inner join filtra apenas propostas pendentes de cards do produto selecionado
+            const query = supabase
                 .from('proposals')
                 .select(`
                     id,
                     card_id,
                     status,
                     created_at,
-                    card:cards!proposals_card_id_fkey(titulo),
+                    card:cards!inner!proposals_card_id_fkey(titulo, produto),
                     active_version:proposal_versions!fk_proposals_active_version(title)
                 `)
                 .in('status', ['sent', 'viewed', 'in_progress'])
                 .order('created_at', { ascending: false })
                 .limit(5)
+
+            if (productFilter) {
+                query.eq('cards.produto', productFilter)
+            }
+
+            const { data, error } = await query
 
             if (error) throw error
 

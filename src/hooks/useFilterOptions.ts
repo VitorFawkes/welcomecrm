@@ -7,6 +7,9 @@ export interface FilterOptions {
     departments: { id: string, name: string }[]
 }
 
+// TODO: Product isolation — profiles.produtos is an array field (NULL = all products).
+// Filtering by product would require `.or('produtos.is.null,produtos.cs.{PRODUCT}')` which
+// is complex and could break admin views that need to see all users. Skipping for now.
 export function useFilterOptions() {
     return useQuery({
         queryKey: ['pipeline-filter-options'],

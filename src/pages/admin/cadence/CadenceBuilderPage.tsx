@@ -21,6 +21,8 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from '@/components/ui/Badge';
+import { useProductContext } from '@/hooks/useProductContext';
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants';
 import { DayPatternEditor } from './components/DayPatternEditor';
 import { CadenceTimeline } from './components/CadenceTimeline';
 
@@ -129,6 +131,8 @@ const CadenceBuilderPage: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const isNew = id === 'new';
+    const { currentProduct } = useProductContext();
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS;
 
     const [template, setTemplate] = useState<CadenceTemplate>(defaultTemplate);
     const [steps, setSteps] = useState<CadenceStep[]>([]);
@@ -159,7 +163,7 @@ const CadenceBuilderPage: React.FC = () => {
     useEffect(() => {
         const fetchAuxData = async () => {
             const [stagesRes, motivosRes] = await Promise.all([
-                supabase.from('pipeline_stages').select('id, nome, ordem, pipeline_phases!pipeline_stages_phase_id_fkey(order_index)').order('ordem'),
+                supabase.from('pipeline_stages').select('id, nome, ordem, pipeline_phases!pipeline_stages_phase_id_fkey(order_index)').eq('pipeline_id', pipelineId).order('ordem'),
                 supabase.from('motivos_perda').select('id, nome'),
             ]);
 
@@ -175,7 +179,7 @@ const CadenceBuilderPage: React.FC = () => {
             setMotivosPerda(motivosRes.data || []);
         };
         fetchAuxData();
-    }, []);
+    }, [pipelineId]);
 
     // Carregar template existente
     useEffect(() => {

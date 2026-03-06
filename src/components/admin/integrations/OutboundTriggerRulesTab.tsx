@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/Input';
 import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, User, Pencil, Ban, CheckCheck, History, ChevronDown, ChevronUp, FileWarning, XCircle, Eye, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
+import { useProductContext } from '@/hooks/useProductContext';
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants';
 import { OutboundTriggerEventHistory } from './OutboundTriggerEventHistory';
 
 interface OutboundTriggerRulesTabProps {
@@ -102,6 +104,8 @@ const SYNC_FIELD_OPTIONS = [
 
 export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesTabProps) {
     const queryClient = useQueryClient();
+    const { currentProduct } = useProductContext();
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS;
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<TriggerFormData>(emptyFormData);
@@ -165,7 +169,7 @@ export function OutboundTriggerRulesTab({ integrationId }: OutboundTriggerRulesT
     });
 
     // Fetch CRM Pipeline Stages
-    const { data: crmStages } = usePipelineStages();
+    const { data: crmStages } = usePipelineStages(pipelineId);
 
     // Fetch CRM Users (owners)
     const { data: crmOwners } = useQuery({

@@ -17,6 +17,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { processBriefingIA, type BriefingIAResult } from '../../hooks/useBriefingIA'
 import type { Database } from '../../database.types'
 import { ORIGEM_OPTIONS, needsOrigemDetalhe } from '../../lib/constants/origem'
+import { useProductContext } from '../../hooks/useProductContext'
 
 type Product = Database['public']['Enums']['app_product']
 
@@ -203,6 +204,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
     const contentRef = useRef<HTMLDivElement>(null)
     const [showContactSelector, setShowContactSelector] = useState(false)
     const [showMoreStages, setShowMoreStages] = useState(false)
+    const { currentProduct } = useProductContext()
 
     // Scroll to top when modal opens or when returning from ContactSelector
     useEffect(() => {
@@ -238,7 +240,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
     // Core form data
     const [formData, setFormData] = useState({
         titulo: '',
-        produto: 'TRIPS' as Product,
+        produto: currentProduct as Product,
         pessoa_principal_id: null as string | null,
         pessoa_principal_nome: null as string | null,
         sdr_owner_id: null as string | null,
@@ -309,7 +311,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
             // Modal just opened - reset with initial owners based on user's role
             setFormData({
                 titulo: '',
-                produto: 'TRIPS',
+                produto: currentProduct,
                 pessoa_principal_id: null,
                 pessoa_principal_nome: null,
                 ...initialOwners,
@@ -354,7 +356,7 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
     const resetForm = () => {
         setFormData({
             titulo: '',
-            produto: 'TRIPS',
+            produto: currentProduct,
             pessoa_principal_id: null,
             pessoa_principal_nome: null,
             ...initialOwners,
@@ -565,20 +567,14 @@ export default function CreateCardModal({ isOpen, onClose }: CreateCardModalProp
                                 )}
                             </div>
 
-                            {/* Product */}
+                            {/* Product (locked to current product) */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
                                     Produto
                                 </label>
-                                <select
-                                    value={formData.produto}
-                                    onChange={(e) => setFormData({ ...formData, produto: e.target.value as Product })}
-                                    className="w-full h-11 px-4 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                >
-                                    <option value="TRIPS">Trips</option>
-                                    <option value="WEDDING">Wedding</option>
-                                    <option value="CORP">Corp</option>
-                                </select>
+                                <div className="w-full h-11 px-4 border border-slate-200 rounded-lg bg-slate-50 text-slate-900 flex items-center text-sm">
+                                    {currentProduct}
+                                </div>
                             </div>
                         </section>
 

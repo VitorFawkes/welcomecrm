@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/Input';
 import { Plus, Trash2, AlertTriangle, CheckCircle, Zap, X, ArrowRight, User, Target, Pencil, RefreshCw, FileWarning, ChevronDown, ChevronUp, ShieldAlert, ShieldOff, AlertCircle, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
+import { useProductContext } from '@/hooks/useProductContext';
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants';
 import { TriggerEventHistory } from './TriggerEventHistory';
 
 interface InboundTriggerRulesTabProps {
@@ -87,6 +89,8 @@ const emptyFormData: TriggerFormData = {
 
 export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTabProps) {
     const queryClient = useQueryClient();
+    const { currentProduct } = useProductContext();
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS;
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<TriggerFormData>(emptyFormData);
@@ -167,7 +171,7 @@ export function InboundTriggerRulesTab({ integrationId }: InboundTriggerRulesTab
     });
 
     // Fetch CRM Pipeline Stages
-    const { data: crmStages } = usePipelineStages();
+    const { data: crmStages } = usePipelineStages(pipelineId);
 
     // Fetch Stage Mappings (legado - para inferir target de regras antigas)
     const { data: stageMappings } = useQuery({

@@ -10,6 +10,8 @@ import KpiCard from '../KpiCard'
 import ChartCard from '../ChartCard'
 import { useFunnelConversion, useLossReasons } from '@/hooks/analytics/useFunnelConversion'
 import { usePipelineStages } from '@/hooks/usePipelineStages'
+import { useAnalyticsFilters } from '@/hooks/analytics/useAnalyticsFilters'
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants'
 import { useDrillDownStore } from '@/hooks/analytics/useAnalyticsDrillDown'
 import { cn } from '@/lib/utils'
 import { QueryErrorState } from '@/components/ui/QueryErrorState'
@@ -45,7 +47,9 @@ export default function FunnelView() {
     const { data: lossData, isLoading: lossLoading, error: lossError, refetch: refetchLoss } = useLossReasons()
 
     const hasError = !!(funnelError || lossError)
-    const { data: pipelineStages } = usePipelineStages()
+    const { product } = useAnalyticsFilters()
+    const pipelineId = PRODUCT_PIPELINE_MAP[product]
+    const { data: pipelineStages } = usePipelineStages(pipelineId)
 
     const navigate = useNavigate()
     const drillDown = useDrillDownStore()

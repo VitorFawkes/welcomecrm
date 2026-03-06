@@ -11,6 +11,8 @@ import {
 } from '@/hooks/analytics/useWhatsAppConversations'
 import { usePipelineStages } from '@/hooks/usePipelineStages'
 import { usePipelinePhases } from '@/hooks/usePipelinePhases'
+import { useAnalyticsFilters } from '@/hooks/analytics/useAnalyticsFilters'
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { fmt, formatMinutes, formatPhone, formatDate, formatTimeSince } from '@/utils/whatsappFormatters'
 import { Link } from 'react-router-dom'
@@ -78,8 +80,10 @@ export default function WhatsAppConversationsTab({ initialStatus }: Conversation
         instance, setInstance,
     } = useWhatsAppConversations()
 
-    const { data: stages } = usePipelineStages()
-    const { data: phases } = usePipelinePhases()
+    const { product } = useAnalyticsFilters()
+    const pipelineId = PRODUCT_PIPELINE_MAP[product]
+    const { data: stages } = usePipelineStages(pipelineId)
+    const { data: phases } = usePipelinePhases(pipelineId)
 
     // Conversation drawer state
     const [selectedContactId, setSelectedContactId] = useState<string | null>(null)

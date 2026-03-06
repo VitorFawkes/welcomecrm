@@ -88,7 +88,7 @@ export default function StudioUnified() {
         }
     })
 
-    const { data: phasesData } = usePipelinePhases()
+    const { data: phasesData } = usePipelinePhases(pipelineId)
     const phases = useMemo(() => phasesData || [], [phasesData])
 
     const { data: fields, isLoading: loadingFields } = useQuery({

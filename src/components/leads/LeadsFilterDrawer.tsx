@@ -8,6 +8,7 @@ import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { usePipelines } from '../../hooks/usePipelines'
 import { useCardTags } from '../../hooks/useCardTags'
 import { useProductContext } from '../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { ALL_ORIGEM_OPTIONS } from '../../lib/constants/origem'
 
 interface LeadsFilterDrawerProps {
@@ -18,10 +19,11 @@ interface LeadsFilterDrawerProps {
 }
 
 export function LeadsFilterDrawer({ isOpen, onClose, filters, setFilters }: LeadsFilterDrawerProps) {
-    const { data: options } = useFilterOptions()
-    const { data: stages } = usePipelineStages()
-    const { data: pipelines } = usePipelines()
     const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct]
+    const { data: options } = useFilterOptions()
+    const { data: stages } = usePipelineStages(pipelineId)
+    const { data: pipelines } = usePipelines()
     const { tags: availableTags } = useCardTags(currentProduct)
 
     // Local state for the form

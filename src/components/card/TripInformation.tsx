@@ -8,6 +8,8 @@ import { useStageRequirements } from '../../hooks/useStageRequirements'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
+import { useProductContext } from '../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { SystemPhase } from '../../types/pipeline'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
 
@@ -184,8 +186,10 @@ export default function TripInformation({ card }: TripInformationProps) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { missingBlocking } = useStageRequirements(card as any)
     const { getVisibleFields } = useFieldConfig()
-    const { data: phases } = usePipelinePhases()
-    const { data: stages } = usePipelineStages()
+    const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct]
+    const { data: phases } = usePipelinePhases(pipelineId)
+    const { data: stages } = usePipelineStages(pipelineId)
 
     // Derive current phase from card stage (must be before viewMode useState)
     const derivedViewMode = useMemo(() => {

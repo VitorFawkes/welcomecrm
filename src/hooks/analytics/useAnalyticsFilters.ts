@@ -68,6 +68,9 @@ export const initialFiltersState = {
     datePreset: defaultPreset,
     dateRange: getDateRangeForPreset(defaultPreset),
     granularity: 'month' as Granularity,
+    // Hardcoded default: Zustand store can't call hooks, so we default to TRIPS.
+    // AnalyticsPage syncs currentProduct from useProductContext on mount via useEffect,
+    // so this only affects the brief first render before the sync runs.
     product: 'TRIPS' as const,
     mode: 'entries' as AnalysisMode,
     stageId: null as string | null,

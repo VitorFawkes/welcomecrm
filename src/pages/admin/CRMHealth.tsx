@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useHealthAlerts } from '@/hooks/useIntegrationHealth'
 import IntegrationHealthTab from '@/components/admin/health/IntegrationHealthTab'
 import JuliaIAConfig from '@/components/admin/JuliaIAConfig'
+import { useProductContext } from '@/hooks/useProductContext'
 
 type Card = Database['public']['Views']['view_cards_acoes']['Row']
 
@@ -14,14 +15,15 @@ export default function CRMHealth() {
     const [searchParams] = useSearchParams()
     const tabParam = searchParams.get('tab')
     const defaultTab = tabParam === 'integrations' ? 'integrations' : tabParam === 'julia' ? 'julia' : 'operational'
+    const { currentProduct } = useProductContext()
 
     const { data: cards, isLoading } = useQuery({
-        queryKey: ['crm-health-cards'],
+        queryKey: ['crm-health-cards', currentProduct],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('view_cards_acoes')
                 .select('*')
-                .eq('produto', 'TRIPS')
+                .eq('produto', currentProduct)
                 .neq('fase', 'Pós-venda')
                 .neq('status_comercial', 'perdido')
                 .neq('status_comercial', 'ganho')

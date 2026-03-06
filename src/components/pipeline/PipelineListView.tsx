@@ -8,6 +8,7 @@ import { usePipelineListCards } from '../../hooks/usePipelineListCards'
 import { usePipelineFilters, type ViewMode, type SubView, type FilterState } from '../../hooks/usePipelineFilters'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table'
 import { Badge } from '../ui/Badge'
 import { Avatar, AvatarFallback } from '../ui/avatar'
@@ -53,7 +54,8 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
 
     // Dados para bulk actions
     const { data: filterOptions } = useFilterOptions()
-    const { data: stages } = usePipelineStages()
+    const pipelineId = PRODUCT_PIPELINE_MAP[productFilter]
+    const { data: stages } = usePipelineStages(pipelineId)
 
     // Paginação e toggle de concluídos/perdidos
     const [currentPage, setCurrentPage] = useState(1)
@@ -66,12 +68,16 @@ export default function PipelineListView({ productFilter, viewMode, subView, fil
 
     // Buscar stages completos (com is_won/is_lost) para identificar stages terminais
     const { data: fullStages } = useQuery({
-        queryKey: ['stages-full'],
+        queryKey: ['stages-full', pipelineId],
         queryFn: async () => {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('pipeline_stages')
                 .select('id, is_won, is_lost')
                 .eq('ativo', true)
+            if (pipelineId) {
+                query = query.eq('pipeline_id', pipelineId)
+            }
+            const { data, error } = await query
             if (error) throw error
             return data
         },

@@ -17,6 +17,8 @@ import { cn } from '../../lib/utils'
 import { useLeadQuickUpdate } from '../../hooks/useLeadQuickUpdate'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
+import { useProductContext } from '../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import type { LeadCard } from '../../hooks/useLeadsQuery'
 
 interface LeadsRowActionsProps {
@@ -31,9 +33,11 @@ const PRIORIDADE_OPTIONS = [
 
 export default function LeadsRowActions({ lead }: LeadsRowActionsProps) {
     const [isOpen, setIsOpen] = useState(false)
+    const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct]
     const { mutate: quickUpdate, isPending } = useLeadQuickUpdate()
     const { data: options } = useFilterOptions()
-    const { data: stages } = usePipelineStages()
+    const { data: stages } = usePipelineStages(pipelineId)
 
     const profiles = options?.profiles || []
 

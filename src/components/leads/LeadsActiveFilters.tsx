@@ -7,6 +7,7 @@ import { usePipelineStages } from '../../hooks/usePipelineStages'
 import { usePipelines } from '../../hooks/usePipelines'
 import { useCardTags } from '../../hooks/useCardTags'
 import { useProductContext } from '../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 
 interface LeadsActiveFiltersProps {
     filters: LeadsFilterState
@@ -21,9 +22,10 @@ interface FilterChip {
 
 export default function LeadsActiveFilters({ filters, setFilters }: LeadsActiveFiltersProps) {
     const { data: options } = useFilterOptions()
-    const { data: stages } = usePipelineStages()
-    const { data: pipelines } = usePipelines()
     const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct]
+    const { data: stages } = usePipelineStages(pipelineId)
+    const { data: pipelines } = usePipelines()
     const { tags } = useCardTags(currentProduct)
 
     const profiles = options?.profiles || []

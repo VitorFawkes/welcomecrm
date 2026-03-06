@@ -24,6 +24,8 @@ import {
     TooltipProvider,
 } from '@/components/ui/tooltip';
 import { usePipelinePhases } from '@/hooks/usePipelinePhases';
+import { useProductContext } from '@/hooks/useProductContext';
+import { PRODUCT_PIPELINE_MAP } from '@/lib/constants';
 
 // Line config from whatsapp_linha_config
 interface LinhaConfig {
@@ -79,12 +81,14 @@ const FASE_LABELS = [
 
 export function WhatsAppGovernanceTab() {
     const queryClient = useQueryClient();
+    const { currentProduct } = useProductContext();
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS;
     const [toggleOverrides, setToggleOverrides] = useState<Record<string, boolean> | null>(null);
     const [linhaOverrides, setLinhaOverrides] = useState<LinhaConfig[] | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
 
     // Fetch pipeline phases for the fase dropdown
-    const { data: phasesData } = usePipelinePhases();
+    const { data: phasesData } = usePipelinePhases(pipelineId);
 
     // Fetch Toggles from integration_settings
     const { data: togglesData, isLoading: isLoadingToggles } = useQuery({

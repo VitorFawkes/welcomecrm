@@ -30,6 +30,7 @@ export default function RecentActivity({ productFilter }: RecentActivityProps) {
     const { data: activities, isLoading, isError, refetch } = useQuery({
         queryKey: ['recent-activity', productFilter],
         queryFn: async () => {
+            // Server-side filter: inner join garante que só retorna atividades de cards do produto selecionado
             const query = supabase
                 .from('activities')
                 .select(`
@@ -37,7 +38,7 @@ export default function RecentActivity({ productFilter }: RecentActivityProps) {
                     tipo,
                     descricao,
                     created_at,
-                    card:cards!card_id (
+                    card:cards!inner!card_id (
                         titulo,
                         produto
                     ),
@@ -46,19 +47,17 @@ export default function RecentActivity({ productFilter }: RecentActivityProps) {
                         email
                     )
                 `)
-                .not('card_id', 'is', null)
                 .order('created_at', { ascending: false })
-                .limit(20)
+                .limit(10)
+
+            if (productFilter) {
+                query.eq('cards.produto', productFilter)
+            }
 
             const { data, error } = await query
             if (error) throw error
 
-            let result = data as unknown as Activity[]
-            // Filtrar client-side por produto (PostgREST não suporta filter em FK join facilmente)
-            if (productFilter) {
-                result = result.filter(a => a.card?.produto === productFilter)
-            }
-            return result.slice(0, 10)
+            return data as unknown as Activity[]
         }
     })
 

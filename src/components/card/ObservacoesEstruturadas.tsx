@@ -6,6 +6,8 @@ import type { Database } from '../../database.types'
 import { cn } from '../../lib/utils'
 import { usePipelinePhases } from '../../hooks/usePipelinePhases'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
+import { useProductContext } from '../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { useFieldConfig } from '../../hooks/useFieldConfig'
 import { SystemPhase } from '../../types/pipeline'
 import UniversalFieldRenderer from '../fields/UniversalFieldRenderer'
@@ -27,8 +29,10 @@ const EMPTY_OBJECT = {}
 
 export default function ObservacoesEstruturadas({ card }: ObservacoesEstruturadasProps) {
     const queryClient = useQueryClient()
-    const { data: phases } = usePipelinePhases()
-    const { data: stages } = usePipelineStages()
+    const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct]
+    const { data: phases } = usePipelinePhases(pipelineId)
+    const { data: stages } = usePipelineStages(pipelineId)
 
     // Data Sources
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

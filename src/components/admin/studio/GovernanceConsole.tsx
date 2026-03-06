@@ -15,6 +15,8 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { usePipelinePhases } from '../../../hooks/usePipelinePhases'
+import { useProductContext } from '../../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../../lib/constants'
 import { Button } from '../../ui/Button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -68,21 +70,24 @@ export const SPECIAL_RULES = [
 
 export default function GovernanceConsole() {
     const queryClient = useQueryClient()
+    const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct] || PRODUCT_PIPELINE_MAP.TRIPS
     const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
     const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(new Set())
     const [isReplicating, setIsReplicating] = useState(false)
     const [targetStageIds, setTargetStageIds] = useState<Set<string>>(new Set())
 
     // 1. Fetch Phases & Stages
-    const { data: phasesData } = usePipelinePhases()
+    const { data: phasesData } = usePipelinePhases(pipelineId)
     const phases = useMemo(() => phasesData || [], [phasesData])
 
     const { data: stages, isLoading: loadingStages } = useQuery({
-        queryKey: ['pipeline-stages-governance'],
+        queryKey: ['pipeline-stages-governance', pipelineId],
         queryFn: async () => {
             const { data } = await supabase
                 .from('pipeline_stages')
                 .select('id, nome, fase, ordem, phase_id, pipeline_phases!pipeline_stages_phase_id_fkey(order_index)')
+                .eq('pipeline_id', pipelineId)
                 .order('ordem')
             // Sort by phase order_index then stage ordem
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -3,6 +3,8 @@ import { Trash2, ArrowRight, UserCog, Flag, Loader2, X, Search } from 'lucide-re
 import { Button } from '../ui/Button'
 import { useBulkLeadActions } from '../../hooks/useBulkLeadActions'
 import { usePipelineStages } from '../../hooks/usePipelineStages'
+import { useProductContext } from '../../hooks/useProductContext'
+import { PRODUCT_PIPELINE_MAP } from '../../lib/constants'
 import { useFilterOptions } from '../../hooks/useFilterOptions'
 import {
     Dialog,
@@ -20,8 +22,10 @@ interface LeadsBulkActionsProps {
 }
 
 export default function LeadsBulkActions({ selectedIds, onClearSelection }: LeadsBulkActionsProps) {
+    const { currentProduct } = useProductContext()
+    const pipelineId = PRODUCT_PIPELINE_MAP[currentProduct]
     const { bulkMoveStage, bulkChangeOwner, bulkChangePriority, bulkDelete, isLoading } = useBulkLeadActions()
-    const { data: stages } = usePipelineStages()
+    const { data: stages } = usePipelineStages(pipelineId)
     const { data: options } = useFilterOptions()
 
     const [showMoveModal, setShowMoveModal] = useState(false)
