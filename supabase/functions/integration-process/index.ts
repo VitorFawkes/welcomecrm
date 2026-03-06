@@ -659,14 +659,14 @@ Deno.serve(async (req) => {
                 // DEAL ACTIVITY (TASK) HANDLER — AC deal_task events → CRM tarefas
                 // ═══════════════════════════════════════════════════════════════════
                 if (entity === 'dealActivity') {
-                    const acTaskId = payload['deal_task[id]'];
-                    const acDealId = payload['deal[id]'];
-                    const acTitle = payload['deal_task[title]'] || 'Tarefa AC';
-                    const acDueDate = payload['deal_task[duedate]'];
-                    const acNote = payload['deal_task[note]'];
-                    const acTaskType = parseInt(payload['deal_task[dealTasktype]'] || '3', 10);
-                    const acStatus = payload['deal_task[status]'];
-                    const acAssignee = payload['deal_task[assignee]'] || payload['deal_task[userid]'];
+                    const acTaskId = payload['task[id]'] || payload['deal_task[id]'];
+                    const acDealId = payload['deal[id]'] || payload['deal_id'];
+                    const acTitle = payload['task[title]'] || payload['deal_task[title]'] || 'Tarefa AC';
+                    const acDueDate = payload['task[duedate]'] || payload['deal_task[duedate]'];
+                    const acNote = payload['task[note]'] || payload['deal_task[note]'];
+                    const acTaskType = parseInt(payload['task[dealTasktype]'] || payload['task[type_id]'] || payload['deal_task[dealTasktype]'] || '3', 10);
+                    const acStatus = payload['task[status]'] || payload['deal_task[status]'];
+                    const acAssignee = payload['task[assignee]'] || payload['task[userid]'] || payload['deal_task[assignee]'] || payload['deal_task[userid]'];
                     const isComplete = String(acStatus) === '1';
 
                     if (!acTaskId || !acDealId) {
