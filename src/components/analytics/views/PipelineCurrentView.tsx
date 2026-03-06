@@ -53,6 +53,21 @@ const PHASE_FILTER_OPTIONS: { value: PhaseFilter; label: string }[] = [
     { value: 'pos-venda', label: 'Pós-Venda' },
 ]
 
+const TASK_TYPE_LABELS: Record<string, string> = {
+    tarefa: 'Tarefa',
+    contato: 'Contato',
+    ligacao: 'Ligação',
+    whatsapp: 'WhatsApp',
+    email: 'E-mail',
+    reuniao: 'Reunião',
+    solicitacao_mudanca: 'Mudança',
+    enviar_proposta: 'Proposta',
+    coleta_documentos: 'Documentos',
+    followup: 'Follow-up',
+    outro: 'Outro',
+    cobranca: 'Cobrança',
+}
+
 function getPhaseColor(slug: string): string {
     return PHASE_COLORS[slug] || '#94a3b8'
 }
@@ -188,6 +203,7 @@ export default function PipelineCurrentView() {
     const allAging = useMemo(() => data?.aging ?? [], [data?.aging])
     const allOwners = useMemo(() => data?.owners ?? [], [data?.owners])
     const allDeals = useMemo(() => data?.top_deals ?? [], [data?.top_deals])
+    const taskMetrics = useMemo(() => data?.tasks ?? null, [data?.tasks])
     const globalKpis = useMemo(() => data?.kpis ?? EMPTY_KPI, [data?.kpis, EMPTY_KPI])
 
     const isMonetary = metric !== 'cards'
@@ -1021,6 +1037,93 @@ export default function PipelineCurrentView() {
                         </tbody>
                     </table>
                 </div>
+            </ChartCard>
+
+            {/* ── Atividade de Tarefas ── */}
+            <ChartCard
+                title="Atividade de Tarefas"
+                description={`Tarefas nos ${kpis.total_open} cards em aberto`}
+                colSpan={2}
+                isLoading={isLoading}
+            >
+                {taskMetrics && taskMetrics.total_created > 0 ? (
+                    <div className="px-4 pb-4 space-y-4">
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="bg-slate-50 rounded-lg p-3 text-center">
+                                <p className="text-2xl font-bold text-slate-900 tabular-nums">
+                                    {taskMetrics.total_created}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-0.5">Criadas</p>
+                            </div>
+                            <div className="bg-green-50 rounded-lg p-3 text-center">
+                                <p className="text-2xl font-bold text-green-700 tabular-nums">
+                                    {taskMetrics.total_completed}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-0.5">Concluídas</p>
+                            </div>
+                            <div className="bg-amber-50 rounded-lg p-3 text-center">
+                                <p className="text-2xl font-bold text-amber-700 tabular-nums">
+                                    {taskMetrics.total_pending}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-0.5">Pendentes</p>
+                            </div>
+                        </div>
+
+                        {taskMetrics.by_type.length > 0 && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b border-slate-200">
+                                            <th className="text-left py-2 text-slate-500 font-medium">Tipo</th>
+                                            <th className="text-right py-2 px-2 text-slate-500 font-medium">Criadas</th>
+                                            <th className="text-right py-2 px-2 text-slate-500 font-medium">Concluídas</th>
+                                            <th className="text-right py-2 px-2 text-slate-500 font-medium">Pendentes</th>
+                                            <th className="text-right py-2 text-slate-500 font-medium">Taxa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {taskMetrics.by_type.map(row => {
+                                            const rate = row.total > 0
+                                                ? Math.round((row.completed / row.total) * 100) : 0
+                                            return (
+                                                <tr key={row.tipo} className="border-b border-slate-50 hover:bg-slate-50">
+                                                    <td className="py-2 text-slate-700 font-medium">
+                                                        {TASK_TYPE_LABELS[row.tipo] ?? row.tipo}
+                                                    </td>
+                                                    <td className="py-2 px-2 text-right tabular-nums text-slate-700">
+                                                        {row.total}
+                                                    </td>
+                                                    <td className="py-2 px-2 text-right tabular-nums text-green-700 font-semibold">
+                                                        {row.completed}
+                                                    </td>
+                                                    <td className="py-2 px-2 text-right tabular-nums text-amber-700">
+                                                        {row.pending}
+                                                    </td>
+                                                    <td className="py-2 text-right">
+                                                        <span className={cn(
+                                                            'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold',
+                                                            rate >= 70 ? 'bg-green-100 text-green-700' :
+                                                            rate >= 40 ? 'bg-amber-100 text-amber-700' :
+                                                                         'bg-rose-100 text-rose-700'
+                                                        )}>
+                                                            {rate}%
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    !isLoading && (
+                        <div className="px-4 pb-4 text-center text-slate-400 text-sm py-8">
+                            Nenhuma tarefa nos cards em aberto
+                        </div>
+                    )
+                )}
             </ChartCard>
 
             {/* ── Deals em Risco ── */}
