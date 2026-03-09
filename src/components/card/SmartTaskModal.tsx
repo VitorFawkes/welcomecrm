@@ -876,10 +876,13 @@ export function SmartTaskModal({ isOpen, onClose, cardId, initialData, mode = 'c
                         .eq('id', taskId);
                     error = updateError;
                 } else {
-                    const { error: insertError } = await supabase
+                    const { data: newTask, error: insertError } = await supabase
                         .from('tarefas')
-                        .insert([payload]);
+                        .insert([payload])
+                        .select('id')
+                        .single();
                     error = insertError;
+                    if (newTask) newMeetingId = newTask.id;
                 }
             }
 

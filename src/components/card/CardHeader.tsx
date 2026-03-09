@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { ArrowLeft, Calendar, DollarSign, History, Edit2, Check, X, ChevronDown, AlertCircle, RefreshCw, Clock, Pencil, TrendingUp, Link, Search, UserPlus, Phone, Mail, Loader2 } from 'lucide-react'
 import { getOrigemLabel, getOrigemColor, ORIGEM_OPTIONS, needsOrigemDetalhe } from '../../lib/constants/origem'
 import { useNavigate } from 'react-router-dom'
-import { cn } from '../../lib/utils'
+import { cn, buildContactSearchFilter } from '../../lib/utils'
 import type { Database } from '../../database.types'
 
 interface TripsProdutoData {
@@ -94,7 +94,7 @@ function OrigemBadgeEditable({ cardId, origem, origemLead, indicadoPorId }: { ca
                 .from('contatos')
                 .select('id, nome, sobrenome, telefone, email')
                 .is('deleted_at', null)
-                .or(`nome.ilike.%${debouncedIndicacao}%,sobrenome.ilike.%${debouncedIndicacao}%,email.ilike.%${debouncedIndicacao}%,telefone.ilike.%${debouncedIndicacao}%`)
+                .or(buildContactSearchFilter(debouncedIndicacao))
                 .limit(6)
             if (error) throw error
             return data

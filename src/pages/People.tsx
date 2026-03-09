@@ -16,6 +16,7 @@ import { DataQualityBanner } from '../components/people/DataQualityBanner'
 import { DataQualityDrawer } from '../components/people/DataQualityDrawer'
 import { useContactQuality } from '../hooks/useContactQuality'
 import { supabase } from '../lib/supabase'
+import { mergeContactData } from '../lib/contactMerge'
 
 export default function People() {
     const {
@@ -48,43 +49,7 @@ export default function People() {
         // 1. Se tem dados novos para mesclar, faz update no contato existente
         if (mergeData && Object.keys(mergeData).length > 0) {
             try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const { error: updateError } = await (supabase.from('contatos') as any)
-                    .update(mergeData)
-                    .eq('id', contactId)
-
-                if (updateError) throw updateError
-
-                // Inserir em contato_meios se telefone/email novos
-                const meiosToInsert = []
-                if (mergeData.telefone) {
-                    meiosToInsert.push({
-                        contato_id: contactId,
-                        tipo: 'telefone',
-                        valor: mergeData.telefone,
-                        is_principal: false,
-                        origem: 'manual'
-                    })
-                }
-                if (mergeData.email) {
-                    meiosToInsert.push({
-                        contato_id: contactId,
-                        tipo: 'email',
-                        valor: mergeData.email,
-                        is_principal: false,
-                        origem: 'manual'
-                    })
-                }
-                if (meiosToInsert.length > 0) {
-                    const { error: meiosError } = await supabase.from('contato_meios').upsert(meiosToInsert, {
-                        onConflict: 'tipo,valor_normalizado',
-                        ignoreDuplicates: true
-                    })
-                    if (meiosError) {
-                        console.error('Error upserting contato_meios:', meiosError)
-                    }
-                }
-
+                await mergeContactData(contactId, mergeData)
                 toast.success('Dados mesclados ao contato existente')
             } catch (err) {
                 console.error('Error merging contact data:', err)

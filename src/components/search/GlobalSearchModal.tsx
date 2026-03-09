@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useGlobalSearchContext } from './GlobalSearchProvider'
 import { Search, Loader2, FileText, Users, LayoutGrid, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, buildContactSearchFilter } from '@/lib/utils'
 
 interface SearchResult {
     id: string
@@ -49,12 +49,8 @@ export function GlobalSearchModal() {
                 })
             }
 
-            // Search Contacts — multi-word: first word→nome AND rest→sobrenome
-            const words = query.trim().split(/\s+/)
-            let contactFilter = `nome.ilike.${searchTerm},sobrenome.ilike.${searchTerm},email.ilike.${searchTerm},telefone.ilike.${searchTerm}`
-            if (words.length >= 2) {
-                contactFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
-            }
+            // Search Contacts
+            const contactFilter = buildContactSearchFilter(query)
 
             const { data: contacts } = await supabase
                 .from('contatos')

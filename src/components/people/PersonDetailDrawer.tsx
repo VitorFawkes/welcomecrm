@@ -12,6 +12,8 @@ import type { Person } from '../../hooks/usePeopleIntelligence'
 import type { Database } from '../../database.types'
 import { Loader2, Plane, Crown, Calendar, DollarSign, MapPin, FileText, Trash2, Database as DatabaseIcon } from 'lucide-react'
 import { formatContactName, getContactInitials } from '../../lib/contactUtils'
+import { mergeContactData } from '../../lib/contactMerge'
+import { toast } from 'sonner'
 import { ContactProposalsWidget } from '../proposals/ContactProposalsWidget'
 import ContactDetailsViewer from '../card/ContactDetailsViewer'
 import { useDeleteContact } from '../../hooks/useDeleteContact'
@@ -187,6 +189,19 @@ export default function PersonDetailDrawer({ person, card, onClose, onRefresh }:
                                 contact={person}
                                 onSave={handleSaveContact}
                                 onCancel={onClose}
+                                onSelectExisting={async (contactId, mergeData) => {
+                                    if (mergeData && Object.keys(mergeData).length > 0) {
+                                        try {
+                                            await mergeContactData(contactId, mergeData)
+                                            toast.success('Dados mesclados ao contato existente')
+                                        } catch (err) {
+                                            console.error('Error merging contact data:', err)
+                                            toast.error('Erro ao mesclar dados')
+                                        }
+                                    }
+                                    onRefresh?.()
+                                    onClose()
+                                }}
                             />
                         </TabsContent>
 
