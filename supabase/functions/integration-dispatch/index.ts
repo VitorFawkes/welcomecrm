@@ -197,6 +197,7 @@ Deno.serve(async (req) => {
                         valor_estimado?: number;
                         pipeline_stage_id?: string;
                         target_external_stage_id?: string;
+                        dono_atual_id?: string;
                     };
 
                     if (!ccPayload.target_external_stage_id) {
@@ -259,8 +260,23 @@ Deno.serve(async (req) => {
                         }
                     }
 
+                    // Mapear owner do CRM → AC
+                    if (ccPayload.dono_atual_id) {
+                        const { data: ownerMap } = await supabase
+                            .from('integration_user_map')
+                            .select('external_user_id')
+                            .eq('internal_user_id', ccPayload.dono_atual_id)
+                            .eq('integration_id', event.integration_id)
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (ownerMap?.external_user_id) {
+                            dealBody.owner = ownerMap.external_user_id;
+                        }
+                    }
+
                     body = { deal: dealBody };
-                    console.log(`[integration-dispatch] Card created: "${dealBody.title}" → Stage ${ccPayload.target_external_stage_id} Pipeline ${stageMapEntry.pipeline_id}`);
+                    console.log(`[integration-dispatch] Card created: "${dealBody.title}" → Stage ${ccPayload.target_external_stage_id} Pipeline ${stageMapEntry.pipeline_id} Owner ${dealBody.owner || 'N/A'}`);
                     break;
                 }
                 case 'stage_change': {
