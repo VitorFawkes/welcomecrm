@@ -37,6 +37,7 @@ interface LinhaConfig {
     fase_label: string | null;
     phase_id: string | null;
     criar_card: boolean | null;
+    criar_contato: boolean | null;
 }
 
 const TOGGLE_DEFINITIONS = [
@@ -112,7 +113,7 @@ export function WhatsAppGovernanceTab() {
             const { data, error } = await (supabase
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .from('whatsapp_linha_config') as any)
-                .select('id, phone_number_label, phone_number_id, ativo, produto, fase_label, phase_id, criar_card')
+                .select('id, phone_number_label, phone_number_id, ativo, produto, fase_label, phase_id, criar_card, criar_contato')
                 .order('phone_number_label');
 
             if (error) throw error;
@@ -174,6 +175,7 @@ export function WhatsAppGovernanceTab() {
                     fase_label: linha.fase_label,
                     phase_id: linha.phase_id,
                     criar_card: linha.criar_card,
+                    criar_contato: linha.criar_contato,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', linha.id);
@@ -415,8 +417,59 @@ export function WhatsAppGovernanceTab() {
                                             </div>
                                         </div>
 
-                                        {/* Criar card automaticamente — per-line override */}
-                                        <div className="mt-4 pt-3 border-t border-dashed border-slate-200">
+                                        {/* Per-line overrides */}
+                                        <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-3">
+                                            {/* Criar contato automaticamente */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">
+                                                    <label className="text-xs font-medium text-muted-foreground">
+                                                        Criar contato automaticamente
+                                                    </label>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                <Info className="w-3 h-3 text-muted-foreground" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p className="max-w-xs">
+                                                                    Cria um contato quando um número desconhecido envia mensagem por esta linha.
+                                                                    &quot;Herdar&quot; usa o toggle global ({toggles['WHATSAPP_CREATE_CONTACT'] ? 'ativado' : 'desativado'}).
+                                                                </p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </div>
+                                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                                                    {([
+                                                        { value: null, label: 'Herdar' },
+                                                        { value: true, label: 'Sim' },
+                                                        { value: false, label: 'Não' },
+                                                    ] as const).map(opt => {
+                                                        const isActive = linha.criar_contato === opt.value;
+                                                        return (
+                                                            <button
+                                                                key={String(opt.value)}
+                                                                type="button"
+                                                                onClick={() => handleLinhaChange(linha.id, 'criar_contato', opt.value)}
+                                                                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                                                                    isActive
+                                                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                                                        : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                                                                }`}
+                                                            >
+                                                                {opt.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                            {linha.criar_contato === null && (
+                                                <p className="text-[11px] text-slate-400 -mt-2">
+                                                    Usando config global: {toggles['WHATSAPP_CREATE_CONTACT'] ? 'criar contato' : 'não criar contato'}
+                                                </p>
+                                            )}
+
+                                            {/* Criar card automaticamente */}
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-1.5">
                                                     <label className="text-xs font-medium text-muted-foreground">
@@ -429,7 +482,7 @@ export function WhatsAppGovernanceTab() {
                                                             </TooltipTrigger>
                                                             <TooltipContent>
                                                                 <p className="max-w-xs">
-                                                                    Controla se um card é criado quando um contato sem viagem ativa envia mensagem por esta linha.
+                                                                    Cria um card quando um contato sem viagem ativa envia mensagem por esta linha.
                                                                     &quot;Herdar&quot; usa o toggle global ({toggles['WHATSAPP_CREATE_CARD'] ? 'ativado' : 'desativado'}).
                                                                 </p>
                                                             </TooltipContent>
@@ -461,7 +514,7 @@ export function WhatsAppGovernanceTab() {
                                                 </div>
                                             </div>
                                             {linha.criar_card === null && (
-                                                <p className="text-[11px] text-slate-400 mt-1">
+                                                <p className="text-[11px] text-slate-400 -mt-2">
                                                     Usando config global: {toggles['WHATSAPP_CREATE_CARD'] ? 'criar card' : 'não criar card'}
                                                 </p>
                                             )}

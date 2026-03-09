@@ -47,3 +47,4 @@ PENDING | supabase/migrations/20260305_product_isolation_rpcs.sql | pending_stag
 2026-03-09T15:13:17Z | supabase/migrations/20260309_sync_telefone_meios.sql | applied_to_prod
 2026-03-09T15:46:51Z | supabase/migrations/20260309_sync_telefone_meios.sql | applied_to_prod
 2026-03-09T19:28:42Z | supabase/migrations/20260309_linha_criar_card.sql | applied_to_prod
+2026-03-09T20:11:24Z | supabase/migrations/20260309_linha_criar_card.sql | applied_to_prod

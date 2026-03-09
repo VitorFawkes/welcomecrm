@@ -1,17 +1,19 @@
 -- ============================================================
--- MIGRATION: Per-line auto-create card setting
+-- MIGRATION: Per-line auto-create card + contact settings
 -- Date: 2026-03-09
 --
--- Adiciona coluna `criar_card` na whatsapp_linha_config
--- para controlar criação de card por linha (número WhatsApp).
--- NULL = herda toggle global WHATSAPP_CREATE_CARD
--- true = sempre cria card nessa linha
--- false = nunca cria card nessa linha
+-- Adiciona colunas `criar_card` e `criar_contato` na
+-- whatsapp_linha_config para controlar por linha (número).
+-- NULL = herda toggle global
+-- true = sempre cria nessa linha
+-- false = nunca cria nessa linha
 -- ============================================================
 
--- 1. Nova coluna
+-- 1. Novas colunas
 ALTER TABLE whatsapp_linha_config ADD COLUMN IF NOT EXISTS criar_card boolean DEFAULT NULL;
+ALTER TABLE whatsapp_linha_config ADD COLUMN IF NOT EXISTS criar_contato boolean DEFAULT NULL;
 COMMENT ON COLUMN whatsapp_linha_config.criar_card IS 'NULL=herda global, true=sempre criar, false=nunca criar';
+COMMENT ON COLUMN whatsapp_linha_config.criar_contato IS 'NULL=herda global, true=sempre criar, false=nunca criar';
 
 -- 2. Recria função com lógica per-line override
 CREATE OR REPLACE FUNCTION process_whatsapp_raw_event_v2(event_id uuid)
@@ -199,9 +201,13 @@ BEGIN
         AND (last_whatsapp_conversation_id IS NULL OR last_whatsapp_conversation_id <> v_conversation_id);
     END IF;
 
-    -- Auto-create contact if not found and enabled
+    -- Auto-create contact if not found and enabled (per-line override > global)
     IF v_contact_id IS NULL THEN
-        SELECT (value = 'true') INTO v_create_contact_enabled FROM integration_settings WHERE key = 'WHATSAPP_CREATE_CONTACT';
+        IF v_linha_config.criar_contato IS NOT NULL THEN
+            v_create_contact_enabled := v_linha_config.criar_contato;
+        ELSE
+            SELECT (value = 'true') INTO v_create_contact_enabled FROM integration_settings WHERE key = 'WHATSAPP_CREATE_CONTACT';
+        END IF;
         IF v_create_contact_enabled = true THEN
             INSERT INTO contatos (nome, telefone, tipo_pessoa, last_whatsapp_conversation_id)
             VALUES (COALESCE(v_sender_name, 'WhatsApp ' || v_phone), v_phone, 'adulto', v_conversation_id)
