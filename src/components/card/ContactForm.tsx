@@ -11,6 +11,7 @@ import { useDuplicateDetection } from '../../hooks/useDuplicateDetection'
 import DuplicateWarningPanel from '../contacts/DuplicateWarningPanel'
 import { parseSupabaseContactError } from '../../lib/supabaseErrorParser'
 import { cn } from '../../lib/utils'
+import { ContactMeiosEditor } from './ContactMeiosEditor'
 
 
 interface ContactFormProps {
@@ -259,6 +260,13 @@ export default function ContactForm({ contact, onSave, onCancel, initialName = '
                             />
                         </div>
                     </>
+                )}
+
+                {/* Telefones e Emails adicionais (só para contatos existentes) */}
+                {contact?.id && !isChild && (
+                    <div className="col-span-2">
+                        <ContactMeiosEditor contactId={contact.id} />
+                    </div>
                 )}
 
                 <div className="col-span-2">

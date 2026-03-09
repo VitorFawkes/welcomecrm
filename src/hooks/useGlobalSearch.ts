@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useProductContext } from '@/hooks/useProductContext'
+import { buildContactSearchFilter, normalizePhone } from '@/lib/utils'
 
 export interface SearchResult {
     id: string
@@ -48,23 +49,47 @@ export function useGlobalSearch() {
                 })
             }
 
-            // Search Contacts (nome, sobrenome, email e telefone)
-            // Multi-word: also match first word→nome AND rest→sobrenome
-            const words = query.trim().split(/\s+/)
-            let contactFilter = `nome.ilike.${searchTerm},sobrenome.ilike.${searchTerm},email.ilike.${searchTerm},telefone.ilike.${searchTerm}`
-            if (words.length >= 2) {
-                contactFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
+            // Search Contacts (primary phone + contato_meios for secondary phones)
+            const contactFilter = buildContactSearchFilter(query)
+
+            const [{ data: contacts }, meiosContactIds] = await Promise.all([
+                supabase
+                    .from('contatos')
+                    .select('id, nome, sobrenome, email, telefone')
+                    .is('deleted_at', null)
+                    .or(contactFilter)
+                    .limit(5),
+                // Search secondary phones in contato_meios
+                (async () => {
+                    const normalized = normalizePhone(query)
+                    if (normalized.length < 4) return [] as string[]
+                    const { data } = await supabase
+                        .from('contato_meios')
+                        .select('contato_id')
+                        .in('tipo', ['telefone', 'whatsapp'])
+                        .ilike('valor_normalizado', `%${normalized}%`)
+                        .limit(10)
+                    return (data || []).map(m => m.contato_id)
+                })()
+            ])
+
+            // Fetch extra contacts found via contato_meios but not in primary results
+            const primaryIds = new Set((contacts || []).map(c => c.id))
+            const extraIds = meiosContactIds.filter(id => !primaryIds.has(id))
+            let allContacts = contacts || []
+
+            if (extraIds.length > 0) {
+                const { data: extraContacts } = await supabase
+                    .from('contatos')
+                    .select('id, nome, sobrenome, email, telefone')
+                    .in('id', extraIds)
+                    .is('deleted_at', null)
+                    .limit(5)
+                if (extraContacts) allContacts = [...allContacts, ...extraContacts]
             }
 
-            const { data: contacts } = await supabase
-                .from('contatos')
-                .select('id, nome, sobrenome, email, telefone')
-                .is('deleted_at', null)
-                .or(contactFilter)
-                .limit(5)
-
-            if (contacts) {
-                contacts.forEach(contact => {
+            if (allContacts.length > 0) {
+                allContacts.forEach(contact => {
                     const fullName = [contact.nome, contact.sobrenome].filter(Boolean).join(' ')
                     allResults.push({
                         id: contact.id,

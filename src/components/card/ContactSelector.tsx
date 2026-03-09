@@ -6,11 +6,13 @@ import type { Database } from '../../database.types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
-import { cn } from '../../lib/utils'
+import { cn, buildContactSearchFilter, normalizePhone } from '../../lib/utils'
 import { useDuplicateDetection } from '../../hooks/useDuplicateDetection'
 import DuplicateWarningPanel from '../contacts/DuplicateWarningPanel'
 import { parseSupabaseContactError } from '../../lib/supabaseErrorParser'
 import { formatContactName, getContactInitials, sanitizeContactNames } from '../../lib/contactUtils'
+import { mergeContactData } from '../../lib/contactMerge'
+import { toast } from 'sonner'
 
 interface ContactSelectorProps {
     cardId: string
@@ -50,27 +52,51 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
         return () => clearTimeout(timer)
     }, [searchTerm])
 
-    // Search contacts
+    // Search contacts (primary phone + contato_meios for secondary phones)
     const { data: contacts, isLoading } = useQuery({
         queryKey: ['contacts-search', debouncedSearch],
         queryFn: async () => {
             if (!debouncedSearch) return []
 
-            const words = debouncedSearch.trim().split(/\s+/)
-            let searchFilter = `nome.ilike.%${debouncedSearch}%,sobrenome.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,telefone.ilike.%${debouncedSearch}%`
-            if (words.length >= 2) {
-                searchFilter += `,and(nome.ilike.%${words[0]}%,sobrenome.ilike.%${words.slice(1).join(' ')}%)`
-            }
+            const searchFilter = buildContactSearchFilter(debouncedSearch)
 
-            const { data, error } = await supabase
-                .from('contatos')
-                .select('*')
-                .is('deleted_at', null)
-                .or(searchFilter)
-                .limit(8)
+            // Search primary fields + secondary phones in parallel
+            const [{ data: primaryResults, error }, meiosContactIds] = await Promise.all([
+                supabase
+                    .from('contatos')
+                    .select('*')
+                    .is('deleted_at', null)
+                    .or(searchFilter)
+                    .limit(8),
+                (async () => {
+                    const normalized = normalizePhone(debouncedSearch)
+                    if (normalized.length < 4) return [] as string[]
+                    const { data } = await supabase
+                        .from('contato_meios')
+                        .select('contato_id')
+                        .in('tipo', ['telefone', 'whatsapp'])
+                        .ilike('valor_normalizado', `%${normalized}%`)
+                        .limit(10)
+                    return (data || []).map(m => m.contato_id)
+                })()
+            ])
 
             if (error) throw error
-            return data as Database['public']['Tables']['contatos']['Row'][]
+            const primaryIds = new Set((primaryResults || []).map(c => c.id))
+            const extraIds = meiosContactIds.filter(id => !primaryIds.has(id))
+            let allContacts = (primaryResults || []) as Database['public']['Tables']['contatos']['Row'][]
+
+            if (extraIds.length > 0) {
+                const { data: extraContacts } = await supabase
+                    .from('contatos')
+                    .select('*')
+                    .in('id', extraIds)
+                    .is('deleted_at', null)
+                    .limit(8)
+                if (extraContacts) allContacts = [...allContacts, ...extraContacts as Database['public']['Tables']['contatos']['Row'][]]
+            }
+
+            return allContacts
         },
         enabled: debouncedSearch.length >= 2
     })
@@ -490,7 +516,22 @@ export default function ContactSelector({ cardId, onClose, onContactAdded, addTo
                                     duplicates={duplicates}
                                     isChecking={isCheckingDuplicates}
                                     noDuplicatesFound={noDuplicatesFound}
-                                    onSelectExisting={(contactId) => addContactMutation.mutate(contactId)}
+                                    newData={{
+                                        email: newContact.email || null,
+                                        telefone: newContact.telefone || null,
+                                    }}
+                                    onSelectExisting={async (contactId, mergeData) => {
+                                        if (mergeData && Object.keys(mergeData).length > 0) {
+                                            try {
+                                                await mergeContactData(contactId, mergeData)
+                                                toast.success('Dados mesclados ao contato existente')
+                                            } catch (err) {
+                                                console.error('Error merging contact data:', err)
+                                                toast.error('Erro ao mesclar dados')
+                                            }
+                                        }
+                                        addContactMutation.mutate(contactId)
+                                    }}
                                     mode="compact"
                                 />
                             )}
