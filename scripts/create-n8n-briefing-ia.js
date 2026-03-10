@@ -343,8 +343,13 @@ for (const [key, value] of Object.entries(camposRaw)) {
 
     case 'text':
     default:
-      const str = String(value).trim();
-      if (str.length > 0 && str.length < 5000) camposValidados[key] = str;
+      // Objects pass through to converters (e.g., epoca_viagem JSON {mes, ano})
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        camposValidados[key] = value;
+      } else {
+        const str = String(value).trim();
+        if (str.length > 0 && str.length < 5000) camposValidados[key] = str;
+      }
       break;
   }
 }
@@ -453,31 +458,65 @@ function convertOrcamento(value, contextData) {
 
 function convertEpoca(value) {
   if (typeof value === 'object' && value !== null && value.tipo) return value;
-  if (typeof value === 'string') {
-    const parts = value.toLowerCase().split(/[-–a]/);
-    if (parts.length >= 2) {
-      const m1 = MESES[parts[0].trim()];
-      const m2 = MESES[parts[parts.length-1].trim()];
-      if (m1 && m2) {
-        return {
-          tipo: 'range_meses',
-          mes_inicio: m1, mes_fim: m2,
-          ano: new Date().getFullYear(),
-          display: MESES_NOMES[m1] + ' a ' + MESES_NOMES[m2]
-        };
-      }
+  const thisYear = new Date().getFullYear();
+  // Objeto estruturado do GPT: {mes: 12, ano: 2026} ou {mes_inicio: 6, mes_fim: 8, ano: 2026}
+  if (typeof value === 'object' && value !== null) {
+    if (value.mes_inicio && value.mes_fim) {
+      const ano = value.ano || thisYear;
+      return {
+        tipo: 'range_meses',
+        mes_inicio: value.mes_inicio, mes_fim: value.mes_fim,
+        ano: ano,
+        display: MESES_NOMES[value.mes_inicio] + ' a ' + MESES_NOMES[value.mes_fim] + ' ' + ano
+      };
     }
-    const single = MESES[value.toLowerCase().trim()];
-    if (single) {
+    if (value.mes) {
+      const ano = value.ano || thisYear;
       return {
         tipo: 'mes',
-        mes: single,
-        ano: new Date().getFullYear(),
-        display: MESES_NOMES[single] + ' ' + new Date().getFullYear()
+        mes: value.mes,
+        ano: ano,
+        display: MESES_NOMES[value.mes] + ' ' + ano
       };
     }
   }
-  return value;
+  // String "indefinido"
+  if (typeof value === 'string' && value.toLowerCase().trim() === 'indefinido') {
+    return { tipo: 'indefinido', display: 'Não definido' };
+  }
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase().trim();
+    // Tentar extrair mês e ano de texto: "dezembro 2026", "março de 2027"
+    for (const [nome, num] of Object.entries(MESES)) {
+      if (lower.includes(nome)) {
+        const anoMatch = value.match(/(20\\d{2})/);
+        const ano = anoMatch ? parseInt(anoMatch[1]) : thisYear;
+        // Verificar se há range: "junho a setembro", "junho-setembro"
+        const rangePattern = new RegExp(nome + '\\\\s*(?:a|até|-)\\\\s*(\\\\w+)', 'i');
+        const rangeMatch = lower.match(rangePattern);
+        if (rangeMatch) {
+          const m2 = MESES[rangeMatch[1].trim()];
+          if (m2) {
+            return {
+              tipo: 'range_meses',
+              mes_inicio: num, mes_fim: m2,
+              ano: ano,
+              display: MESES_NOMES[num] + ' a ' + MESES_NOMES[m2] + ' ' + ano
+            };
+          }
+        }
+        return {
+          tipo: 'mes',
+          mes: num,
+          ano: ano,
+          display: MESES_NOMES[num] + ' ' + ano
+        };
+      }
+    }
+    // Último fallback: NUNCA retornar string crua — envolver em indefinido com display
+    return { tipo: 'indefinido', display: value.substring(0, 100) };
+  }
+  return { tipo: 'indefinido', display: 'Não definido' };
 }
 
 function convertDuracao(value) {
