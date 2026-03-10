@@ -48,3 +48,9 @@ PENDING | supabase/migrations/20260305_product_isolation_rpcs.sql | pending_stag
 2026-03-09T15:46:51Z | supabase/migrations/20260309_sync_telefone_meios.sql | applied_to_prod
 2026-03-09T19:28:42Z | supabase/migrations/20260309_linha_criar_card.sql | applied_to_prod
 2026-03-09T20:11:24Z | supabase/migrations/20260309_linha_criar_card.sql | applied_to_prod
+2026-03-09T22:44:55Z | supabase/migrations/20260309_fix_ai_extraction_epoca_momento.sql | applied_to_prod
+2026-03-09T22:47:01Z | supabase/migrations/20260309_fix_ai_extraction_epoca_momento.sql | applied_to_prod
+supabase/migrations/20260310_backfill_orphan_contacts.sql|prod|2026-03-10T12:58:53Z
+supabase/migrations/20260310_fix_contatos_insert_rls.sql|pending_manual|2026-03-10T13:06:23Z|staging_sem_tabelas_aguardando_access_token_para_prod
+2026-03-10T14:27:06Z | supabase/migrations/20260310_fix_set_card_primary_contact.sql | applied_to_prod
+2026-03-10T14:27:06Z | supabase/migrations/20260310_fix_contatos_insert_rls.sql | already_exists_in_prod
