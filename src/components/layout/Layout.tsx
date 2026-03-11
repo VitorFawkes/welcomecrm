@@ -7,6 +7,7 @@ import { usePipelinePersistence } from '@/hooks/usePipelinePersistence';
 import { GlobalSearchProvider } from '@/components/search/GlobalSearchProvider';
 import { GlobalSearchModal } from '@/components/search/GlobalSearchModal';
 import { NetworkStatusBanner } from '@/components/ui/NetworkStatusBanner';
+import { FeedbackPopup } from '@/components/feedback/FeedbackPopup';
 
 
 export default function Layout() {
@@ -65,6 +66,7 @@ export default function Layout() {
                 </ThemeBoundary>
             </div>
             <GlobalSearchModal />
+            <FeedbackPopup />
         </GlobalSearchProvider>
     );
 }
