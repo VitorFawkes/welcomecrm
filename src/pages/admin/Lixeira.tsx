@@ -4,6 +4,7 @@ import { Trash2, RotateCcw, Calendar, User, DollarSign, Loader2, Package, Mail, 
 import { Button } from '../../components/ui/Button'
 import { useDeleteCard } from '../../hooks/useDeleteCard'
 import { useDeleteContact } from '../../hooks/useDeleteContact'
+import { useProductContext } from '../../hooks/useProductContext'
 import { cn } from '../../lib/utils'
 
 interface DeletedCard {
@@ -35,16 +36,17 @@ interface DeletedContact {
 }
 
 export default function Lixeira() {
+    const { currentProduct } = useProductContext()
     const { restore: restoreCard, isRestoring: isRestoringCard } = useDeleteCard()
     const { restore: restoreContact, isRestoring: isRestoringContact } = useDeleteContact()
 
     const { data: deletedCards, isLoading: loadingCards } = useQuery({
-        queryKey: ['deleted-cards'],
+        queryKey: ['deleted-cards', currentProduct],
         queryFn: async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data, error } = await (supabase
-                .from('view_deleted_cards' as any) as any)
+            const { data, error } = await supabase
+                .from('view_deleted_cards')
                 .select('*')
+                .eq('produto', currentProduct)
                 .order('deleted_at', { ascending: false })
 
             if (error) throw error
@@ -55,9 +57,8 @@ export default function Lixeira() {
     const { data: deletedContacts, isLoading: loadingContacts } = useQuery({
         queryKey: ['deleted-contacts'],
         queryFn: async () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data, error } = await (supabase
-                .from('view_deleted_contacts' as any) as any)
+            const { data, error } = await supabase
+                .from('view_deleted_contacts')
                 .select('*')
                 .order('deleted_at', { ascending: false })
 

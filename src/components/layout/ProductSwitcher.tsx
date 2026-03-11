@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Check, ChevronsUpDown, Plane, Heart, Building2, type LucideIcon } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '../../lib/utils'
 import {
     DropdownMenu,
@@ -26,15 +27,14 @@ interface ProductSwitcherProps {
 export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
     const { currentProduct, setProduct } = useProductContext()
     const { profile } = useAuth()
+    const queryClient = useQueryClient()
     const [open, setOpen] = useState(false)
 
     // Filter products based on profile.produtos (admins see all, empty = all)
     const allowedProducts = useMemo(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const profileProdutos = (profile as any)?.produtos as Product[] | null
         if (profile?.is_admin) return products
-        if (!profileProdutos?.length) return products
-        return products.filter(p => profileProdutos.includes(p.value))
+        if (!profile?.produtos?.length) return products
+        return products.filter(p => profile.produtos!.includes(p.value))
     }, [profile])
 
     // Auto-select: if user has only 1 product, force it
@@ -80,8 +80,7 @@ export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
                         onSelect={() => {
                             setProduct(product.value)
                             setOpen(false)
-                            // Force reload to ensure context switch is clean across the app
-                            window.location.reload()
+                            queryClient.clear()
                         }}
                         className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
                     >

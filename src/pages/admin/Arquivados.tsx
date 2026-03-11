@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { Archive, RotateCcw, Trash2, Calendar, User, DollarSign, Loader2, AlertCircle, Package, CheckSquare, Square } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { useArchiveCard } from '../../hooks/useArchiveCard'
+import { useProductContext } from '../../hooks/useProductContext'
 import { cn } from '../../lib/utils'
 import { toast } from 'sonner'
 
@@ -23,24 +24,26 @@ interface ArchivedCard {
 }
 
 export default function Arquivados() {
+    const { currentProduct } = useProductContext()
     const queryClient = useQueryClient()
     const { unarchive, isUnarchiving } = useArchiveCard()
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
     const { data: archivedCards, isLoading, error } = useQuery({
-        queryKey: ['archived-cards'],
+        queryKey: ['archived-cards', currentProduct],
         queryFn: async () => {
             // Query cards that are archived (have archived_at set)
             const { data, error } = await supabase
                 .from('cards')
                 .select('id, titulo, produto, status_comercial, valor_estimado, valor_final, archived_at, archived_by, created_at')
+                .eq('produto', currentProduct)
                 .not('archived_at', 'is', null)
                 .is('deleted_at', null)
                 .order('archived_at', { ascending: false })
 
             if (error) throw error
 
-            return (data || []).map((card: any) => ({
+            return (data || []).map((card: Record<string, unknown>) => ({
                 id: card.id,
                 titulo: card.titulo,
                 produto: card.produto,

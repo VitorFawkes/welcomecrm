@@ -7,23 +7,25 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Search, Plus, Users, Filter, Plane } from 'lucide-react';
 import CreateGroupModal from '../components/cards/group/CreateGroupModal';
+import { useProductContext } from '../hooks/useProductContext';
 import type { Database } from '../database.types';
 
 type Card = Database['public']['Tables']['cards']['Row'];
 
 export default function GroupsPage() {
     const navigate = useNavigate();
+    const { currentProduct } = useProductContext();
     const [searchTerm, setSearchTerm] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
 
     const { data: groups, isLoading } = useQuery({
-        queryKey: ['groups-gallery'],
+        queryKey: ['groups-gallery', currentProduct],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('cards')
                 .select('*')
                 .eq('is_group_parent', true)
-                .eq('produto', 'TRIPS')
+                .eq('produto', currentProduct)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
