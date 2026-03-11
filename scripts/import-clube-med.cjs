@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Import Clube Med 2026 — Cria cards para ~180 contatos na etapa "Oportunidade"
+ * Import Club Med 2026 — Cria cards para ~180 contatos na etapa "Oportunidade"
  *
  * Uso: source .env && node scripts/import-clube-med.js
  *
- * Dados: 2 CSVs em Clube Med/
+ * Dados: 2 CSVs em Club Med/
  * - Lista Top Clientes (91 contatos, potenciais compradores >40K)
- * - Prioridade Mensagem (127 contatos, já compraram Clube Med)
+ * - Prioridade Mensagem (127 contatos, já compraram Club Med)
  *
  * Cada contato ganha 1 card novo (mesmo se já tiver card ativo).
- * Título: "{Primeiro Nome} / Clube Med"
- * Tag: "Clube Med 2026"
+ * Título: "{Primeiro Nome} / Club Med"
+ * Tag: "Club Med 2026"
  */
 
 const fs = require('fs');
@@ -40,7 +40,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const PIPELINE_ID = 'c8022522-4a1d-411c-9387-efe03ca725ee'; // TRIPS
 const PRODUTO = 'TRIPS';
-const TAG_NAME = 'Clube Med 2026';
+const TAG_NAME = 'Club Med 2026';
 const TAG_COLOR = '#0891b2';
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -379,7 +379,7 @@ async function getOrCreateTag() {
   const [tag] = await supabasePost('card_tags', {
     name: TAG_NAME,
     color: TAG_COLOR,
-    description: 'Campanha Clube Med 2026',
+    description: 'Campanha Club Med 2026',
     produto: PRODUTO,
     is_active: true,
     created_by: createdBy,
@@ -411,7 +411,7 @@ async function getOportunidadeStage() {
 async function createCard(nomePessoa, contatoId, stageId, ownerId, tagId) {
   const firstName = nomePessoa.split(/\s+/)[0];
   // Capitalize first letter of each word
-  const titulo = `${firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()} / Clube Med`;
+  const titulo = `${firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()} / Club Med`;
 
   const cardData = {
     titulo,
@@ -460,7 +460,7 @@ async function createCard(nomePessoa, contatoId, stageId, ownerId, tagId) {
 // ── Main ───────────────────────────────────────────────────────────────────
 async function main() {
   console.log('═══════════════════════════════════════════════════════');
-  console.log('  IMPORT CLUBE MED 2026');
+  console.log('  IMPORT CLUB MED 2026');
   console.log(DRY_RUN ? '  ⚠️  MODO DRY-RUN (nada será criado)' : '  🚀 MODO PRODUÇÃO');
   console.log('═══════════════════════════════════════════════════════\n');
 
@@ -481,10 +481,17 @@ async function main() {
   const stageId = await getOportunidadeStage();
   console.log(`\n📍 Stage: ${stageId.slice(0, 8)}`);
 
-  // 5. Process each contact
+  // 5. Fetch existing Club Med cards to skip duplicates
+  const existingCards = await supabaseGet('cards',
+    `select=pessoa_principal_id&titulo=ilike.*Club+Med*&limit=500`
+  );
+  const existingContactIds = new Set(existingCards.map(c => c.pessoa_principal_id).filter(Boolean));
+  console.log(`\n📋 ${existingContactIds.size} contatos já têm card Club Med — serão pulados`);
+
+  // 6. Process each contact
   console.log(`\n🔄 Processando ${contacts.length} contatos...\n`);
 
-  const results = { created: 0, errors: 0, contactNotFound: 0, details: [] };
+  const results = { created: 0, skipped: 0, errors: 0, contactNotFound: 0, details: [] };
 
   for (let i = 0; i < contacts.length; i++) {
     const c = contacts[i];
@@ -498,6 +505,13 @@ async function main() {
         console.log(`${progress} ❌ CONTATO NÃO ENCONTRADO: "${c.nome}" (${c.email || 'sem email'}, ${c.telefone || 'sem tel'})`);
         results.contactNotFound++;
         results.details.push({ nome: c.nome, email: c.email, telefone: c.telefone, error: 'Contato não encontrado no CRM' });
+        continue;
+      }
+
+      // Skip if contact already has a Club Med card
+      if (existingContactIds.has(contato.id)) {
+        console.log(`${progress} ⏭️  SKIP "${c.nome}" — já tem card Club Med`);
+        results.skipped++;
         continue;
       }
 
@@ -530,6 +544,7 @@ async function main() {
   console.log('  RESULTADO');
   console.log('═══════════════════════════════════════════════════════');
   console.log(`  ✅ Cards criados: ${results.created}`);
+  console.log(`  ⏭️  Pulados (já existiam): ${results.skipped}`);
   console.log(`  ❌ Contatos não encontrados: ${results.contactNotFound}`);
   console.log(`  ❌ Erros: ${results.errors}`);
   console.log(`  📊 Total processados: ${contacts.length}`);
