@@ -19,10 +19,10 @@ export default function CardByConversation() {
         }
 
         async function findCard() {
-            // 1. Find contato by conversation_id
+            // Find contato with its most recent card via join
             const { data: contato, error: contatoError } = await supabase
                 .from('contatos')
-                .select('id')
+                .select('id, cards!cards_contato_id_fkey(id, created_at)')
                 .eq('last_whatsapp_conversation_id', conversationId!)
                 .maybeSingle()
 
@@ -37,28 +37,20 @@ export default function CardByConversation() {
                 return
             }
 
-            // 2. Find the most recent card for this contato
-            const { data: card, error: cardError } = await supabase
-                .from('cards')
-                .select('id')
-                .eq('contato_id', contato.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-
-            if (cardError) {
-                console.error('Erro ao buscar card:', cardError)
-                setError('Erro ao buscar card')
-                return
-            }
-
-            if (!card) {
+            // Get most recent card from the joined data
+            const cards = contato.cards as Array<{ id: string; created_at: string }> | null
+            if (!cards || cards.length === 0) {
                 setError('Nenhum card encontrado para esse contato')
                 return
             }
 
-            // 3. Redirect to card detail
-            navigate(`/cards/${card.id}`, { replace: true })
+            // Sort by created_at desc and get first
+            const mostRecent = cards.sort((a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )[0]
+
+            // Redirect to card detail
+            navigate(`/cards/${mostRecent.id}`, { replace: true })
         }
 
         findCard()
