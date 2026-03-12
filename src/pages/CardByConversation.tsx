@@ -19,46 +19,28 @@ export default function CardByConversation() {
         }
 
         async function findCard() {
-            // 1. Find contato by conversation_id
-            const { data: contato, error: contatoError } = await supabase
-                .from('contatos')
-                .select('id')
-                .eq('last_whatsapp_conversation_id', conversationId!)
-                .maybeSingle()
-
-            if (contatoError) {
-                console.error('Erro ao buscar contato:', contatoError)
-                setError('Erro ao buscar contato')
-                return
-            }
-
-            if (!contato) {
-                setError('Nenhum contato encontrado para essa conversa')
-                return
-            }
-
-            // 2. Find most recent card via cards_contatos junction table
-            const { data: cardLink, error: cardError } = await supabase
-                .from('cards_contatos')
-                .select('card_id, cards!cards_contatos_card_id_fkey(created_at)')
-                .eq('contato_id', contato.id)
-                .order('created_at', { ascending: false, referencedTable: 'cards' })
+            // Find card via whatsapp_messages.conversation_id
+            const { data: message, error: msgError } = await supabase
+                .from('whatsapp_messages')
+                .select('card_id')
+                .eq('conversation_id', conversationId!)
+                .not('card_id', 'is', null)
                 .limit(1)
                 .maybeSingle()
 
-            if (cardError) {
-                console.error('Erro ao buscar card:', cardError)
+            if (msgError) {
+                console.error('Erro ao buscar card:', msgError)
                 setError('Erro ao buscar card')
                 return
             }
 
-            if (!cardLink) {
-                setError('Nenhum card encontrado para esse contato')
+            if (!message?.card_id) {
+                setError('Nenhum card encontrado para essa conversa')
                 return
             }
 
             // Redirect to card detail
-            navigate(`/cards/${cardLink.card_id}`, { replace: true })
+            navigate(`/cards/${message.card_id}`, { replace: true })
         }
 
         findCard()
