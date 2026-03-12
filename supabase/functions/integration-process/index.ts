@@ -1132,12 +1132,36 @@ Deno.serve(async (req) => {
 
                     // UPSERT CARD
                     // Fetch all fields including locked_fields for field protection
-                    const { data: existingCard } = await supabase
+                    let { data: existingCard } = await supabase
                         .from('cards')
                         .select('*, locked_fields') // Include locked_fields for user-level field protection
                         .eq('external_id', dealId)
                         .eq('external_source', 'active_campaign')
                         .single();
+
+                    // DEDUP: If no card found by AC external_id, check if contact already has an active card
+                    // (e.g., created by WhatsApp auto-create before the AC deal was synced)
+                    if (!existingCard && contactId) {
+                        const { data: contactCard } = await supabase
+                            .from('cards')
+                            .select('*, locked_fields')
+                            .eq('pessoa_principal_id', contactId)
+                            .not('status_comercial', 'in', '(ganho,perdido)')
+                            .is('deleted_at', null)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .single();
+
+                        if (contactCard) {
+                            existingCard = contactCard;
+                            // Link the AC deal to the existing card so future updates find it directly
+                            await supabase.from('cards').update({
+                                external_id: dealId,
+                                external_source: 'active_campaign'
+                            }).eq('id', contactCard.id);
+                            console.log(`[DEDUP] Linked AC deal ${dealId} to existing card ${contactCard.id} (was created by ${contactCard.external_source || 'whatsapp'})`);
+                        }
+                    }
 
                     // Apply Field Updates with Protection Logic
                     // MERGE: Start with existing marketing_data to preserve contact-sourced fields
