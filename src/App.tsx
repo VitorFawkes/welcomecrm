@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import InvitePage from './pages/InvitePage'
 import Pipeline from './pages/Pipeline'
 import CardDetail from './pages/CardDetail'
+import CardByConversation from './pages/CardByConversation'
 import Cards from './pages/Cards'
 import Leads from './pages/Leads'
 import People from './pages/People'
@@ -142,6 +143,7 @@ function App() {
                   <Route path="/groups" element={<GroupsPage />} />
                   <Route path="/trips" element={<Cards />} />
                   <Route path="/cards" element={<Navigate to="/trips" replace />} />
+                  <Route path="/cards/convo/:conversationId" element={<CardByConversation />} />
                   <Route path="/cards/:id" element={<CardDetail />} />
                   <Route path="/cards/:id/monde-preview" element={<MondePreviewPage />} />
                   <Route path="/people" element={<People />} />
