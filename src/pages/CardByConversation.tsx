@@ -19,10 +19,10 @@ export default function CardByConversation() {
         }
 
         async function findCard() {
-            // Find contato with its most recent card via join
+            // 1. Find contato by conversation_id
             const { data: contato, error: contatoError } = await supabase
                 .from('contatos')
-                .select('id, cards!cards_contato_id_fkey(id, created_at)')
+                .select('id')
                 .eq('last_whatsapp_conversation_id', conversationId!)
                 .maybeSingle()
 
@@ -37,20 +37,28 @@ export default function CardByConversation() {
                 return
             }
 
-            // Get most recent card from the joined data
-            const cards = contato.cards as Array<{ id: string; created_at: string }> | null
-            if (!cards || cards.length === 0) {
+            // 2. Find most recent card via cards_contatos junction table
+            const { data: cardLink, error: cardError } = await supabase
+                .from('cards_contatos')
+                .select('card_id, cards!cards_contatos_card_id_fkey(created_at)')
+                .eq('contato_id', contato.id)
+                .order('created_at', { ascending: false, referencedTable: 'cards' })
+                .limit(1)
+                .maybeSingle()
+
+            if (cardError) {
+                console.error('Erro ao buscar card:', cardError)
+                setError('Erro ao buscar card')
+                return
+            }
+
+            if (!cardLink) {
                 setError('Nenhum card encontrado para esse contato')
                 return
             }
 
-            // Sort by created_at desc and get first
-            const mostRecent = cards.sort((a, b) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0]
-
             // Redirect to card detail
-            navigate(`/cards/${mostRecent.id}`, { replace: true })
+            navigate(`/cards/${cardLink.card_id}`, { replace: true })
         }
 
         findCard()
