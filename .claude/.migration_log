@@ -77,3 +77,4 @@ supabase/migrations/20260310_add_pessoa_nome_system_field.sql|2026-03-10T19:31:1
 2026-03-12T17:03:00Z | supabase/migrations/20260313_monde_numbers_merge.sql | applied_to_prod
 2026-03-12T17:14:23Z | supabase/migrations/20260313_monde_numbers_merge.sql | applied_to_prod
 2026-03-12T17:15:56Z | supabase/migrations/20260313_monde_numbers_merge.sql | applied_to_prod
+2026-03-12T18:18:46Z | supabase/migrations/20260312_add_receita_valor_display_to_view_cards_acoes.sql | applied_to_prod

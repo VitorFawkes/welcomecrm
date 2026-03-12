@@ -6943,6 +6943,7 @@ export type Database = {
       sections: {
         Row: {
           active: boolean | null
+          collapse_on_phases: string[] | null
           color: string | null
           created_at: string | null
           icon: string | null
@@ -6960,6 +6961,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          collapse_on_phases?: string[] | null
           color?: string | null
           created_at?: string | null
           icon?: string | null
@@ -6977,6 +6979,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          collapse_on_phases?: string[] | null
           color?: string | null
           created_at?: string | null
           icon?: string | null
@@ -8939,6 +8942,8 @@ export type Database = {
           produto: Database["public"]["Enums"]["app_product"] | null
           produto_data: Json | null
           proxima_tarefa: Json | null
+          receita: number | null
+          receita_source: string | null
           sdr_nome: string | null
           sdr_owner_email: string | null
           sdr_owner_id: string | null
@@ -8955,6 +8960,7 @@ export type Database = {
           updated_at: string | null
           urgencia_tempo_etapa: number | null
           urgencia_viagem: number | null
+          valor_display: number | null
           valor_estimado: number | null
           valor_final: number | null
           vendas_nome: string | null
