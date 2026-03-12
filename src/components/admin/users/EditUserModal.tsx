@@ -6,7 +6,7 @@ import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
 import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
-import { Shield, Users, Layers, Plane, Heart, Building2, Mail } from 'lucide-react';
+import { Shield, Users, Layers, Mail } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -17,16 +17,11 @@ import {
 import { useRoles } from '../../../hooks/useRoles';
 import { useTeamOptions } from '../../../hooks/useTeams';
 import { useUsers } from '../../../hooks/useUsers';
+import { useProducts } from '../../../hooks/useProducts';
 import type { Database } from '../../../database.types';
 import { cn } from '../../../lib/utils';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
-
-const PRODUCTS = [
-    { value: 'TRIPS',   label: 'Welcome Trips',    icon: Plane,      color: 'text-teal-500' },
-    { value: 'WEDDING', label: 'Welcome Weddings',  icon: Heart,      color: 'text-rose-500' },
-    { value: 'CORP',    label: 'Welcome Corp',      icon: Building2,  color: 'text-purple-500' },
-] as const;
 
 interface EditUserModalProps {
     user: Profile | null;
@@ -41,10 +36,11 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
     const queryClient = useQueryClient();
     const [isLoading, setIsLoading] = useState(false);
 
-    // Fetch roles and teams from database
+    // Fetch roles, teams and products from database
     const { roles, isLoading: rolesLoading } = useRoles();
     const { options: teamOptions, isLoading: teamsLoading } = useTeamOptions(true);
     const { updateEmail } = useUsers();
+    const { products: PRODUCTS } = useProducts(true);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -248,16 +244,16 @@ export function EditUserModal({ user, isOpen, onClose, onSuccess }: EditUserModa
 
                         <div className="space-y-2">
                             {PRODUCTS.map(p => (
-                                <label key={p.value} className="flex items-center gap-3 cursor-pointer py-1">
+                                <label key={p.slug} className="flex items-center gap-3 cursor-pointer py-1">
                                     <input
                                         type="checkbox"
-                                        checked={formData.produtos.includes(p.value)}
-                                        onChange={() => toggleProduct(p.value)}
+                                        checked={formData.produtos.includes(p.slug)}
+                                        onChange={() => toggleProduct(p.slug)}
                                         className="rounded border-slate-300 text-indigo-600 w-4 h-4 flex-shrink-0"
                                     />
                                     <div className="flex items-center gap-2">
-                                        <p.icon className={cn('w-4 h-4', p.color)} />
-                                        <span className="text-sm text-foreground">{p.label}</span>
+                                        <p.icon className={cn('w-4 h-4', p.color_class)} />
+                                        <span className="text-sm text-foreground">{p.name}</span>
                                     </div>
                                 </label>
                             ))}

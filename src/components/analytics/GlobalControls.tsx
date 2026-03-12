@@ -102,7 +102,6 @@ export default function GlobalControls() {
     const triggerLabel = useMemo(() => {
         switch (mode) {
             case 'entries': return 'Entradas por Etapa'
-            case 'cohort': return 'Coorte: Criação'
             case 'stage_entry':
                 if (stageId && stages) {
                     const stage = stages.find(s => s.id === stageId)
@@ -136,14 +135,13 @@ export default function GlobalControls() {
 
     const isSelected = (value: string) => {
         if (value === 'entries') return mode === 'entries'
-        if (value === 'cohort') return mode === 'cohort'
         if (value === 'ganho_sdr' || value === 'ganho_planner' || value === 'ganho_total') return mode === value
         // UUID = specific stage
         return mode === 'stage_entry' && stageId === value
     }
 
     const handleSelect = (value: string) => {
-        if (value === 'entries' || value === 'cohort' || value === 'ganho_sdr' || value === 'ganho_planner' || value === 'ganho_total') {
+        if (value === 'entries' || value === 'ganho_sdr' || value === 'ganho_planner' || value === 'ganho_total') {
             setModeWithStage(value as AnalysisMode, null)
         } else {
             // UUID = stage_entry with specific stage
@@ -185,14 +183,6 @@ export default function GlobalControls() {
                         <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
                             Coorte (a partir de)
                         </DropdownMenuLabel>
-                        <DropdownMenuItem
-                            onClick={() => handleSelect('cohort')}
-                            className="flex items-center gap-2 text-xs"
-                        >
-                            <Check className={cn('w-3.5 h-3.5', isSelected('cohort') ? 'opacity-100' : 'opacity-0')} />
-                            Criação do Lead
-                        </DropdownMenuItem>
-
                         {stagesByPhase.map((group) => (
                             <div key={group.phaseName}>
                                 <div className="px-2 py-1 mt-1">

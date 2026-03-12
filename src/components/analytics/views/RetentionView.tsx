@@ -24,7 +24,7 @@ export default function RetentionView() {
     const hasError = !!(cohortError || kpisError)
 
     const isLoading = cohortLoading || kpisLoading
-    const modeDoesNotApply = mode !== 'entries' && mode !== 'cohort'
+    const modeDoesNotApply = mode !== 'entries'
 
     // Build cohort matrix: rows = cohort months, cols = offsets
     const cohortMatrix = useMemo(() => {

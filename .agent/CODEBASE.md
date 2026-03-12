@@ -5,9 +5,9 @@
 > Use o workflow `/new-module` Phase 5 para manter sincronizado.
 
 > **Purpose:** Source of Truth for the AI Agent. Read this BEFORE any implementation.
-> **Last Updated:** 2026-03-10
+> **Last Updated:** 2026-03-11
 > **Trigger:** ALWAYS ON
-> **Stats:** 112 tabelas | 39 paginas | 69 hooks | 17 views | 422 components
+> **Stats:** 114 tabelas | 38 paginas | 70 hooks | 17 views | 424 components
 
 ---
 
@@ -169,7 +169,7 @@ Permite bloquear campos individuais para impedir atualizações automáticas via
 
 ### 2.4 Frontend Hooks (AUTO-GENERATED)
 
-> **69 hooks** escaneados de `src/hooks/*.ts` — atualizado automaticamente via `npm run sync:fix`
+> **70 hooks** escaneados de `src/hooks/*.ts` — atualizado automaticamente via `npm run sync:fix`
 
 #### AI & Search
 | Hook | File |
@@ -217,6 +217,7 @@ Permite bloquear campos individuais para impedir atualizações automáticas via
 | `useMondeSales()` | `useMondeSales.ts` |
 | `useNetworkStatus()` | `useNetworkStatus.ts` |
 | `useProductContext()` | `useProductContext.ts` |
+| `useProducts()` | `useProducts.ts` |
 | `useReceitaPermission()` | `useReceitaPermission.ts` |
 | `useTrips()` | `useTrips.ts` |
 
@@ -307,12 +308,11 @@ Permite bloquear campos individuais para impedir atualizações automáticas via
 
 ### 3.3 All Pages (AUTO-GENERATED)
 
-> **39 pages** escaneadas de `src/pages/` — atualizado automaticamente via `npm run sync:fix`
+> **38 pages** escaneadas de `src/pages/` — atualizado automaticamente via `npm run sync:fix`
 
 | Page | Path |
 |------|------|
 | `ActivitiesPage` | `src/pages/ActivitiesPage.tsx` |
-| `Analytics` | `src/pages/Analytics.tsx` |
 | `CalendarPage` | `src/pages/CalendarPage.tsx` |
 | `CardDetail` | `src/pages/CardDetail.tsx` |
 | `Cards` | `src/pages/Cards.tsx` |

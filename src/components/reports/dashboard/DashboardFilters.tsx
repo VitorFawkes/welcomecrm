@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Filter, X, Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFilterOptions } from '@/hooks/useFilterOptions'
+import { useProducts } from '@/hooks/useProducts'
 import type { DashboardGlobalFilters } from '@/lib/reports/reportTypes'
 
 interface DashboardFiltersProps {
@@ -22,11 +23,7 @@ const DATE_PRESETS = [
     { value: 'all_time', label: 'Tudo' },
 ]
 
-const PRODUCTS = [
-    { value: 'TRIPS', label: 'Trips' },
-    { value: 'WEDDING', label: 'Wedding' },
-    { value: 'CORP', label: 'Corp' },
-]
+// Products loaded from DB via useProducts hook
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function resolveDatePreset(preset: string): { start: string; end: string } | undefined {
@@ -78,6 +75,7 @@ export function resolveDatePreset(preset: string): { start: string; end: string 
 
 export default function DashboardFilters({ filters, onChange, hideOwner }: DashboardFiltersProps) {
     const { data: filterOptions } = useFilterOptions()
+    const { products: PRODUCTS } = useProducts()
     const profiles = filterOptions?.profiles ?? []
 
     const isCustom = filters.datePreset === 'custom'
@@ -182,16 +180,16 @@ export default function DashboardFilters({ filters, onChange, hideOwner }: Dashb
                 {PRODUCTS.map(p => (
                     <button
                         type="button"
-                        key={p.value}
-                        onClick={() => onChange({ ...filters, product: p.value })}
+                        key={p.slug}
+                        onClick={() => onChange({ ...filters, product: p.slug })}
                         className={cn(
                             'px-2.5 py-1 text-xs rounded-md transition-all duration-150 font-medium',
-                            (filters.product ?? 'TRIPS') === p.value
+                            (filters.product ?? 'TRIPS') === p.slug
                                 ? 'bg-indigo-100 text-indigo-700'
                                 : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                         )}
                     >
-                        {p.label}
+                        {p.name_short}
                     </button>
                 ))}
             </div>

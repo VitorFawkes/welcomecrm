@@ -39,6 +39,14 @@ test_query() {
   fi
 }
 
+# ── H2: organizations + products ──
+
+test_query "organizations table" \
+  "organizations?select=id,name,slug&limit=1"
+
+test_query "products table" \
+  "products?select=id,slug,name,pipeline_id,active&limit=1"
+
 # ── Queries que o frontend FAZ (extraídas do código) ──
 
 # Pipeline (usePipelineCards.ts + usePipelineListCards.ts)

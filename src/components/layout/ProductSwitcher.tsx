@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Check, ChevronsUpDown, Plane, Heart, Building2, type LucideIcon } from 'lucide-react'
+import { Check, ChevronsUpDown } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '../../lib/utils'
 import {
@@ -10,15 +10,7 @@ import {
 } from '../ui/dropdown-menu'
 import { useProductContext } from '../../hooks/useProductContext'
 import { useAuth } from '../../contexts/AuthContext'
-import type { Database } from '../../database.types'
-
-type Product = Database['public']['Enums']['app_product']
-
-const products: { value: Product; label: string; icon: LucideIcon; color: string }[] = [
-    { value: 'TRIPS', label: 'Welcome Trips', icon: Plane, color: 'text-teal-500' },
-    { value: 'WEDDING', label: 'Welcome Wedding', icon: Heart, color: 'text-rose-500' },
-    { value: 'CORP', label: 'Welcome Corp', icon: Building2, color: 'text-purple-500' },
-]
+import { useProducts } from '../../hooks/useProducts'
 
 interface ProductSwitcherProps {
     isCollapsed?: boolean
@@ -27,6 +19,7 @@ interface ProductSwitcherProps {
 export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
     const { currentProduct, setProduct } = useProductContext()
     const { profile } = useAuth()
+    const { products } = useProducts()
     const queryClient = useQueryClient()
     const [open, setOpen] = useState(false)
 
@@ -34,17 +27,17 @@ export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
     const allowedProducts = useMemo(() => {
         if (profile?.is_admin) return products
         if (!profile?.produtos?.length) return products
-        return products.filter(p => profile.produtos!.includes(p.value))
-    }, [profile])
+        return products.filter(p => profile.produtos!.includes(p.slug))
+    }, [profile, products])
 
     // Auto-select: if user has only 1 product, force it
     useEffect(() => {
-        if (allowedProducts.length === 1 && currentProduct !== allowedProducts[0].value) {
-            setProduct(allowedProducts[0].value)
+        if (allowedProducts.length === 1 && currentProduct !== allowedProducts[0].slug) {
+            setProduct(allowedProducts[0].slug)
         }
     }, [allowedProducts, currentProduct, setProduct])
 
-    const selectedProduct = allowedProducts.find((p) => p.value === currentProduct) || allowedProducts[0] || products[0]
+    const selectedProduct = allowedProducts.find((p) => p.slug === currentProduct) || allowedProducts[0] || products[0]
 
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -52,7 +45,7 @@ export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
                 <button
                     role="combobox"
                     aria-expanded={open}
-                    title={isCollapsed ? selectedProduct.label : undefined}
+                    title={isCollapsed ? selectedProduct.name : undefined}
                     className={cn(
                         "flex items-center rounded-lg bg-white/10 text-sm font-medium text-white hover:bg-white/20 transition-colors border border-white/10 h-10",
                         isCollapsed
@@ -61,12 +54,12 @@ export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
                     )}
                 >
                     {isCollapsed ? (
-                        <selectedProduct.icon className={cn("h-5 w-5", selectedProduct.color)} />
+                        <selectedProduct.icon className={cn("h-5 w-5", selectedProduct.color_class)} />
                     ) : (
                         <>
                             <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
-                                <selectedProduct.icon className={cn("h-4 w-4 flex-shrink-0", selectedProduct.color)} />
-                                <span className="truncate">{selectedProduct.label}</span>
+                                <selectedProduct.icon className={cn("h-4 w-4 flex-shrink-0", selectedProduct.color_class)} />
+                                <span className="truncate">{selectedProduct.name}</span>
                             </div>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </>
@@ -76,17 +69,17 @@ export function ProductSwitcher({ isCollapsed = false }: ProductSwitcherProps) {
             <DropdownMenuContent align="start" className="w-[200px] p-0">
                 {allowedProducts.map((product) => (
                     <DropdownMenuItem
-                        key={product.value}
+                        key={product.slug}
                         onSelect={() => {
-                            setProduct(product.value)
+                            setProduct(product.slug)
                             setOpen(false)
                             queryClient.clear()
                         }}
                         className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
                     >
-                        <product.icon className={cn("h-4 w-4", product.color)} />
-                        <span className="flex-1">{product.label}</span>
-                        {currentProduct === product.value && (
+                        <product.icon className={cn("h-4 w-4", product.color_class)} />
+                        <span className="flex-1">{product.name}</span>
+                        {currentProduct === product.slug && (
                             <Check className="h-4 w-4 text-primary" />
                         )}
                     </DropdownMenuItem>

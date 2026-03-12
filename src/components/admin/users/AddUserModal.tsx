@@ -6,9 +6,10 @@ import { Select } from '../../ui/Select';
 import { Label } from '../../ui/label';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
-import { Copy, Check, UserPlus, Link as LinkIcon, Loader2, Layers, Plane, Heart, Building2 } from 'lucide-react';
+import { Copy, Check, UserPlus, Link as LinkIcon, Loader2, Layers } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRoles } from '../../../hooks/useRoles';
+import { useProducts } from '../../../hooks/useProducts';
 import { cn } from '../../../lib/utils';
 
 interface Team {
@@ -21,16 +22,11 @@ interface AddUserModalProps {
     onSuccess: () => void;
 }
 
-const PRODUCTS = [
-    { value: 'TRIPS',   label: 'Welcome Trips',   icon: Plane,     color: 'text-teal-500' },
-    { value: 'WEDDING', label: 'Welcome Weddings', icon: Heart,     color: 'text-rose-500' },
-    { value: 'CORP',    label: 'Welcome Corp',     icon: Building2, color: 'text-purple-500' },
-] as const;
-
 export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
     const { user } = useAuth();
     const { toast } = useToast();
     const { roles, isLoading: rolesLoading } = useRoles();
+    const { products: PRODUCTS } = useProducts(true);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -144,22 +140,22 @@ export function AddUserModal({ teams, onSuccess }: AddUserModalProps) {
                         <div className="grid grid-cols-3 gap-2">
                             {PRODUCTS.map(p => (
                                 <label
-                                    key={p.value}
+                                    key={p.slug}
                                     className={cn(
                                         'flex flex-col items-center gap-1.5 p-3 rounded-lg border cursor-pointer transition-colors',
-                                        inviteProdutos.includes(p.value)
+                                        inviteProdutos.includes(p.slug)
                                             ? 'border-indigo-300 bg-indigo-50'
                                             : 'border-slate-200 bg-white hover:bg-slate-50'
                                     )}
                                 >
                                     <input
                                         type="checkbox"
-                                        checked={inviteProdutos.includes(p.value)}
-                                        onChange={() => toggleProduct(p.value)}
+                                        checked={inviteProdutos.includes(p.slug)}
+                                        onChange={() => toggleProduct(p.slug)}
                                         className="sr-only"
                                     />
-                                    <p.icon className={cn('w-5 h-5', p.color)} />
-                                    <span className="text-xs font-medium text-foreground">{p.value}</span>
+                                    <p.icon className={cn('w-5 h-5', p.color_class)} />
+                                    <span className="text-xs font-medium text-foreground">{p.slug}</span>
                                 </label>
                             ))}
                         </div>

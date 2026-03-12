@@ -3,7 +3,7 @@ import { startOfMonth, subMonths, endOfDay, startOfYear } from 'date-fns'
 
 export type Granularity = 'day' | 'week' | 'month'
 export type DatePreset = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'last_year' | 'all_time' | 'custom'
-export type AnalysisMode = 'entries' | 'cohort' | 'stage_entry' | 'ganho_sdr' | 'ganho_planner' | 'ganho_total'
+export type AnalysisMode = 'entries' | 'stage_entry' | 'ganho_sdr' | 'ganho_planner' | 'ganho_total'
 
 export interface AnalyticsFiltersState {
     datePreset: DatePreset
